@@ -1,5 +1,5 @@
 project('imladris', 'vala', 'c',
-  version: '0.15.1',
+  version: '0.15.2',
   default_options: ['warning_level=1']
 )
 
@@ -56,6 +56,7 @@ sources = files(
   'src/services/PersistentSessionManager.vala',
   'src/services/HistoryManager.vala',
   'src/services/ZoteroService.vala',
+  'src/services/ShinyService.vala',
   'src/editor/CitationCompletionProvider.vala',
   'src/services/ExportService.vala',
   'src/services/MediaHelper.vala',
@@ -63,6 +64,7 @@ sources = files(
   'src/plugins/PluginManager.vala',
   'src/core/layout/DockTypes.vala',
   'src/ui/PersistentPanelRegistry.vala',
+  'src/ui/ShinyWindow.vala',
   'src/ui/RStudioDockGrid.vala',
   'src/ui/DataGridViewer.vala',
   'src/ui/EnvironmentController.vala',
@@ -234,6 +236,35 @@ zotero_test_exe = executable('test_zotero_service',
 )
 
 test('zotero_service_tests', zotero_test_exe, timeout: 30)
+
+shiny_test_sources = files(
+  'tests/test_shiny_service.vala',
+  'src/services/ShinyService.vala',
+  'src/core/frontmatter_parser.vala',
+  'src/core/notebook_serializer.vala',
+  'src/core/project_scaffolder.vala',
+  'src/core/MallornManager.vala',
+  'src/core/PlatformUtils.vala',
+  'src/core/ToolchainManager.vala',
+  'src/services/SandboxController.vala',
+  'src/services/PersistentSessionManager.vala',
+  'src/services/HistoryManager.vala',
+  'src/services/ExportService.vala',
+  'src/services/MediaHelper.vala',
+  'src/adapters/DocumentAdapter.vala',
+  'src/core/ChunkParser.vala',
+  'src/console/ReplBridge.vala',
+  'src/editor/ChunkExecutionEngine.vala',
+)
+
+shiny_test_exe = executable('test_shiny_service',
+  shiny_test_sources,
+  dependencies: deps,
+  vala_args: ['--target-glib=2.76'],
+)
+
+test('shiny_service_tests', shiny_test_exe, timeout: 30)
+
 
 
 

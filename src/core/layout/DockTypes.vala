@@ -45,7 +45,8 @@ namespace Imladris.Core.Layout {
         PLOTS,
         FILES,
         PACKAGES,
-        HELP;
+        HELP,
+        SHINY_VIEWER;
 
         public string to_id_string () {
             switch (this) {
@@ -63,6 +64,7 @@ namespace Imladris.Core.Layout {
                 case FILES: return "files";
                 case PACKAGES: return "packages";
                 case HELP: return "help";
+                case SHINY_VIEWER: return "shiny-viewer";
                 default: return "source-editor";
             }
         }
@@ -83,6 +85,7 @@ namespace Imladris.Core.Layout {
                 case "files": return FILES;
                 case "packages": return PACKAGES;
                 case "help": return HELP;
+                case "shiny-viewer": return SHINY_VIEWER;
                 default: return null;
             }
         }
@@ -103,6 +106,7 @@ namespace Imladris.Core.Layout {
                 case FILES: return "Files";
                 case PACKAGES: return "Packages";
                 case HELP: return "Help";
+                case SHINY_VIEWER: return "Viewer";
                 default: return "Panel";
             }
         }
@@ -123,6 +127,7 @@ namespace Imladris.Core.Layout {
                 case FILES: return "folder-symbolic";
                 case PACKAGES: return "application-x-addon-symbolic";
                 case HELP: return "help-browser-symbolic";
+                case SHINY_VIEWER: return "applications-internet-symbolic";
                 default: return "application-x-addon-symbolic";
             }
         }
@@ -288,7 +293,7 @@ namespace Imladris.Core.Layout {
             );
             quadrants.set (
                 QuadrantId.Q4_BOTTOM_RIGHT,
-                new QuadrantConfig (QuadrantId.Q4_BOTTOM_RIGHT, { PanelId.FILES, PanelId.PLOTS, PanelId.PACKAGES, PanelId.HELP, PanelId.LIVE_PREVIEW }, PanelId.FILES)
+                new QuadrantConfig (QuadrantId.Q4_BOTTOM_RIGHT, { PanelId.FILES, PanelId.PLOTS, PanelId.PACKAGES, PanelId.HELP, PanelId.SHINY_VIEWER, PanelId.LIVE_PREVIEW }, PanelId.FILES)
             );
             state_updated ();
         }
@@ -364,6 +369,16 @@ namespace Imladris.Core.Layout {
                 }
                 save_to_disk ();
                 state_updated ();
+            }
+        }
+
+        public void activate_panel (PanelId panel_id) {
+            foreach (var qid in QuadrantId.all ()) {
+                var q = quadrants.get (qid);
+                if (q != null && q.tabs.contains (panel_id)) {
+                    activate_tab (qid, panel_id);
+                    return;
+                }
             }
         }
 

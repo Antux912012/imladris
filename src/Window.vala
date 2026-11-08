@@ -43,6 +43,8 @@ namespace Imladris {
         private Gtk.Widget? btn_restore_env = null;
         private Gtk.Widget? btn_render_html = null;
         private Gtk.Widget? btn_render_pdf = null;
+        private Gtk.Button? btn_shiny_app = null;
+        private Adw.ButtonContent? shiny_app_content = null;
         private Gtk.Widget? btn_export_odt = null;
         private Gtk.Widget? btn_export_odp = null;
         private Gtk.Widget? btn_export_mallorn = null;
@@ -119,6 +121,7 @@ namespace Imladris {
             new_sec.append ("New Jupyter Notebook (.ipynb)", "app.new_ipynb");
             new_sec.append ("New Simple Markdown (.md)", "app.new_md");
             new_sec.append ("New R Script (.R)", "app.new_r");
+            new_sec.append ("New Shiny Web App (.R)", "app.new_shiny");
             new_sec.append ("New Python Script (.py)", "app.new_py");
             new_sec.append ("New HTML5 Document (.html)", "app.new_html");
             brand_menu.append_section ("Create New", new_sec);
@@ -209,6 +212,37 @@ namespace Imladris {
                 trigger_render ("html");
             });
             tier1_box.append (btn_render_quarto);
+
+            btn_shiny_app = new Gtk.Button () {
+                tooltip_text = "Run Shiny Web Application (Ctrl+Shift+A)",
+                valign = Gtk.Align.CENTER
+            };
+            btn_shiny_app.add_css_class ("pill-button");
+            shiny_app_content = new Adw.ButtonContent () {
+                icon_name = "media-playback-start-symbolic",
+                label = "Run App"
+            };
+            btn_shiny_app.set_child (shiny_app_content);
+            btn_shiny_app.clicked.connect (() => {
+                toggle_shiny_app_execution ();
+            });
+            tier1_box.append (btn_shiny_app);
+
+            var shiny_svc = Services.ShinyService.get_default ();
+            shiny_svc.status_changed.connect ((st) => {
+                if (btn_shiny_app != null && shiny_app_content != null) {
+                    if (st == Services.ShinyAppStatus.RUNNING || st == Services.ShinyAppStatus.STARTING) {
+                        btn_shiny_app.remove_css_class ("suggested-action");
+                        btn_shiny_app.add_css_class ("destructive-action");
+                        shiny_app_content.icon_name = "process-stop-symbolic";
+                        shiny_app_content.label = "Stop";
+                    } else {
+                        btn_shiny_app.remove_css_class ("destructive-action");
+                        shiny_app_content.icon_name = "media-playback-start-symbolic";
+                        shiny_app_content.label = "Run App";
+                    }
+                }
+            });
 
             var btn_zotero_header = new Gtk.Button () {
                 tooltip_text = "Insert Citation from Zotero (Ctrl+Shift+I)",
@@ -438,6 +472,10 @@ namespace Imladris {
                         Services.PersistentSessionManager.get_default ().set_working_directory (
                             d.file_location.get_parent ().get_path (), current_project_type
                         );
+                    }
+                    if (btn_shiny_app != null) {
+                        bool is_shiny = Services.ShinyService.get_default ().is_shiny_file (fname, d.source_buffer.text);
+                        btn_shiny_app.visible = is_shiny || (d.doc_type == "r" || d.doc_type == "rmd");
                     }
                 }
             });
@@ -813,6 +851,19 @@ namespace Imladris {
                 add_document_tab ("report.Rmd", "rmd", "---\ntitle: \"Analysis Report\"\noutput: html_document\n---\n\n```{r setup, include=FALSE}\nknitr::opts_chunk$set(echo = TRUE)\n```\n\n## Introduction\n\n");
             });
             group.add (rmd_row);
+
+            var shiny_row = new Adw.ActionRow () {
+                title = "New Shiny Web App (.R)",
+                subtitle = "Interactive reactive web application and dashboard with R & Shiny",
+                activatable = true
+            };
+            shiny_row.add_prefix (new Gtk.Image.from_icon_name ("applications-internet-symbolic"));
+            shiny_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            shiny_row.activated.connect (() => {
+                string template = ProjectScaffolder.get_shiny_template ();
+                add_document_tab ("app.R", "r", template);
+            });
+            group.add (shiny_row);
 
             var ipynb_row = new Adw.ActionRow () {
                 title = "New Jupyter Notebook (.ipynb)",
@@ -2157,6 +2208,39 @@ namespace Imladris {
             } catch (GLib.Error e) {
                 if (doc != null) {
                     doc.append_console_log (@"✖ Restore error: $(e.message)");
+                }
+            }
+        }
+
+        public void toggle_shiny_app_execution () {
+            var service = Services.ShinyService.get_default ();
+            if (service.status == Services.ShinyAppStatus.RUNNING || service.status == Services.ShinyAppStatus.STARTING) {
+                service.stop_app ();
+                var d = get_active_document ();
+                if (d != null) d.append_console_log ("⏹ Stopped Shiny Web Application.");
+            } else {
+                var doc = get_active_document ();
+                string target_path = "";
+                if (doc != null && doc.file_location != null) {
+                    target_path = doc.file_location.get_path ();
+                } else if (current_project_dir != "") {
+                    target_path = current_project_dir;
+                } else if (doc != null) {
+                    string tmp_dir = Core.PlatformUtils.get_shared_cache_dir ("tmp");
+                    string tmp_app = GLib.Path.build_filename (tmp_dir, "app.R");
+                    try {
+                        GLib.FileUtils.set_contents (tmp_app, doc.source_buffer.text);
+                        target_path = tmp_app;
+                    } catch (GLib.Error e) {
+                        doc.append_console_log (@"✖ Failed to write temporary app.R: $(e.message)");
+                        return;
+                    }
+                }
+                if (target_path != "") {
+                    if (doc != null) {
+                        doc.append_console_log (@"⚡ Launching Shiny Web Application from $target_path...");
+                    }
+                    service.launch_app_async.begin (target_path, service.current_target);
                 }
             }
         }

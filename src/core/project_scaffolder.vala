@@ -453,5 +453,64 @@ Start typing your Markdown document here.
 """.printf (cfg.project_name, author_name, date_str, rel_bib, cfg.project_name);
             }
         }
+
+        public static string get_shiny_template (string app_title = "Imladris Scientific Shiny App") {
+            return """# ==============================================================================
+# %s
+# Interactive Reactive Web Application powered by R & Shiny
+# ==============================================================================
+
+library(shiny)
+library(bslib)
+
+ui <- page_sidebar(
+  title = "%s",
+  sidebar = sidebar(
+    title = "Controls",
+    sliderInput("obs", "Number of Observations:", min = 20, max = 1000, value = 250),
+    selectInput("dist", "Distribution:", choices = c("Normal", "Uniform", "Exponential")),
+    checkboxInput("density", "Overlay Density Curve", value = TRUE),
+    hr(),
+    actionButton("resample", "Re-sample Data", class = "btn-primary")
+  ),
+  card(
+    card_header("Distribution Histogram"),
+    plotOutput("distPlot")
+  ),
+  card(
+    card_header("Summary Statistics"),
+    verbatimTextOutput("summary")
+  )
+)
+
+server <- function(input, output, session) {
+  # Reactive distribution sampler
+  data <- reactive({
+    input$resample # Dependency on button
+    switch(input$dist,
+      "Normal" = rnorm(input$obs),
+      "Uniform" = runif(input$obs),
+      "Exponential" = rexp(input$obs)
+    )
+  })
+
+  output$distPlot <- renderPlot({
+    x <- data()
+    hist(x, probability = TRUE, col = "#3584e4", border = "white",
+         main = paste(input$dist, "Distribution (n =", length(x), ")"),
+         xlab = "Value", ylab = "Density")
+    if (input$density) {
+      lines(density(x), col = "#e01b24", lwd = 2.5)
+    }
+  })
+
+  output$summary <- renderPrint({
+    summary(data())
+  })
+}
+
+shinyApp(ui = ui, server = server)
+""".printf (app_title, app_title);
+        }
     }
 }

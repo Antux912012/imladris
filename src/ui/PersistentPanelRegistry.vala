@@ -37,6 +37,14 @@ namespace Imladris.UI {
         public Gtk.ListBox packages_list { get; private set; }
         public Gtk.Entry repl_entry { get; private set; }
         public WebKit.WebView help_view { get; private set; }
+        public WebKit.WebView shiny_webview { get; private set; }
+
+        private Gtk.Label? shiny_status_lbl = null;
+        private Gtk.Button? btn_shiny_refresh = null;
+        private Gtk.Button? btn_shiny_popout = null;
+        private Gtk.Button? btn_shiny_browser = null;
+        private Gtk.Button? btn_shiny_stop = null;
+        private ShinyWindow? active_shiny_window = null;
 
         private Gtk.Label? files_dir_lbl = null;
         private string current_browser_dir = "";
@@ -1019,6 +1027,103 @@ namespace Imladris.UI {
             help_box.append (help_view);
             load_default_help_home ();
             panels.set (PanelId.HELP, help_box);
+
+            // 15. SHINY VIEWER PANEL (Interactive R Shiny Application Viewer)
+            var shiny_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+                hexpand = true,
+                vexpand = true
+            };
+
+            var shiny_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+                margin_top = 4,
+                margin_bottom = 4,
+                margin_start = 6,
+                margin_end = 6
+            };
+            shiny_bar.add_css_class ("toolbar");
+
+            btn_shiny_refresh = (Gtk.Button) RibbonFactory.create_compact_button ("view-refresh-symbolic");
+            btn_shiny_refresh.tooltip_text = "Reload Shiny App";
+            btn_shiny_refresh.clicked.connect (() => {
+                if (shiny_webview != null) shiny_webview.reload ();
+            });
+            shiny_bar.append (btn_shiny_refresh);
+
+            btn_shiny_browser = (Gtk.Button) RibbonFactory.create_compact_button ("applications-internet-symbolic", "Browser");
+            btn_shiny_browser.tooltip_text = "Open in System Browser";
+            btn_shiny_browser.clicked.connect (() => {
+                var service = Services.ShinyService.get_default ();
+                if (service.active_url != null) {
+                    try {
+                        GLib.AppInfo.launch_default_for_uri (service.active_url, null);
+                    } catch (GLib.Error e) {}
+                }
+            });
+            shiny_bar.append (btn_shiny_browser);
+
+            btn_shiny_popout = (Gtk.Button) RibbonFactory.create_compact_button ("view-restore-symbolic", "Window");
+            btn_shiny_popout.tooltip_text = "Open in Dedicated Window";
+            btn_shiny_popout.clicked.connect (() => {
+                open_shiny_in_dedicated_window ();
+            });
+            shiny_bar.append (btn_shiny_popout);
+
+            btn_shiny_stop = (Gtk.Button) RibbonFactory.create_compact_button ("process-stop-symbolic", "Stop");
+            btn_shiny_stop.tooltip_text = "Stop Shiny Server";
+            btn_shiny_stop.add_css_class ("destructive-action");
+            btn_shiny_stop.clicked.connect (() => {
+                Services.ShinyService.get_default ().stop_app ();
+            });
+            shiny_bar.append (btn_shiny_stop);
+
+            shiny_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
+
+            shiny_status_lbl = new Gtk.Label ("○ Idle") { valign = Gtk.Align.CENTER };
+            shiny_status_lbl.add_css_class ("caption");
+            shiny_status_lbl.add_css_class ("dim-label");
+            shiny_bar.append (shiny_status_lbl);
+
+            shiny_box.append (shiny_bar);
+
+            shiny_webview = WebViewFactory.create ();
+            shiny_box.append (shiny_webview);
+            load_empty_shiny_placeholder ();
+
+            panels.set (PanelId.SHINY_VIEWER, shiny_box);
+
+            var shiny_svc = Services.ShinyService.get_default ();
+            shiny_svc.status_changed.connect ((st) => {
+                if (shiny_status_lbl != null) {
+                    shiny_status_lbl.label = st.to_badge_label ();
+                    if (st == Services.ShinyAppStatus.RUNNING) {
+                        shiny_status_lbl.remove_css_class ("dim-label");
+                        shiny_status_lbl.add_css_class ("accent");
+                        if (btn_shiny_stop != null) btn_shiny_stop.sensitive = true;
+                    } else {
+                        shiny_status_lbl.remove_css_class ("accent");
+                        shiny_status_lbl.add_css_class ("dim-label");
+                        if (btn_shiny_stop != null) btn_shiny_stop.sensitive = false;
+                        if (st == Services.ShinyAppStatus.STOPPED) {
+                            load_empty_shiny_placeholder ();
+                        }
+                    }
+                }
+            });
+
+            shiny_svc.url_ready.connect ((url) => {
+                if (shiny_svc.current_target == Services.ShinyViewerTarget.VIEWER_PANE) {
+                    if (shiny_webview != null) {
+                        shiny_webview.load_uri (url);
+                    }
+                    doc_page.dock_layout_state.activate_panel (PanelId.SHINY_VIEWER);
+                } else if (shiny_svc.current_target == Services.ShinyViewerTarget.DEDICATED_WINDOW) {
+                    open_shiny_in_dedicated_window ();
+                } else if (shiny_svc.current_target == Services.ShinyViewerTarget.EXTERNAL_BROWSER) {
+                    try {
+                        GLib.AppInfo.launch_default_for_uri (url, null);
+                    } catch (GLib.Error e) {}
+                }
+            });
 
             // Initial AST & Environment scan
             refresh_environment_and_outline ();
@@ -2200,6 +2305,55 @@ th { background: #f1f5f9; }
                     return;
                 }
             }
+        }
+
+        private void load_empty_shiny_placeholder () {
+            if (shiny_webview == null) return;
+            string html = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    background: #1e1e1e;
+    color: #94a3b8;
+    font-family: system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 90vh;
+    margin: 0;
+    text-align: center;
+  }
+  .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
+  h2 { color: #f1f5f9; margin: 0 0 8px 0; font-size: 18px; }
+  p { font-size: 13px; max-width: 320px; line-height: 1.5; margin: 0; }
+  code { background: #334155; padding: 2px 6px; border-radius: 4px; color: #38bdf8; }
+</style>
+</head>
+<body>
+  <div class="icon">⚡</div>
+  <h2>Shiny Web App Viewer</h2>
+  <p>Run a Shiny application (<code>app.R</code> or <code>shinyApp()</code>) to preview interactive reactive dashboards directly in this pane.</p>
+</body>
+</html>""";
+            shiny_webview.load_html (html, null);
+        }
+
+        public void open_shiny_in_dedicated_window () {
+            var service = Services.ShinyService.get_default ();
+            if (service.active_url == null) return;
+            if (active_shiny_window != null) {
+                active_shiny_window.present ();
+                return;
+            }
+            active_shiny_window = new ShinyWindow (main_window, service.active_url);
+            active_shiny_window.close_request.connect (() => {
+                active_shiny_window = null;
+                return false;
+            });
+            active_shiny_window.present ();
         }
     }
 }

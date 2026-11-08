@@ -60,6 +60,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.15.2" date="2026-11-08">
+      <description>
+        <p>Release v0.15.2 introduces complete R Shiny interactive web application support matching RStudio workbench capabilities: Real-time Shiny app detection across app.R, server.R, ui.R, and inline reactive notebooks; context-aware HeaderBar 'Run App' / 'Stop' execution controls with Ctrl+Shift+A shortcut; multi-target display engine supporting the embedded Viewer Pane in Quadrant 4, a dedicated standalone Adw.Window, and the user's default external browser; dynamic ephemeral port allocation and stdout/stderr stream interception; and built-in modern bslib sidebar Shiny templates accessible from the primary menu and welcome dashboard.</p>
+      </description>
+    </release>
     <release version="0.15.1" date="2026-11-08">
       <description>
         <p>Release v0.15.1 incorporates deep GNOME architectural debugging and stability improvements: Resolves GObject circular reference memory cycles in citation completion; secures code chunk signal disconnections with try-finally execution guards; adds graceful persistent session shutdown routines to eliminate zombie subshell processes; guarantees stream and descriptor closure in REPL bridges; adds non-blocking timeout wrappers for binary checks; harmonizes license declarations to GPL-3.0-or-later; and resolves GTK4 widget class compiler warnings.</p>

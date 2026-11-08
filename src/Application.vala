@@ -3,7 +3,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.15.1";
+        public const string APP_VERSION = "0.15.2";
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },
@@ -12,6 +12,8 @@ namespace Imladris {
             { "new_rmd", on_new_rmd },
             { "new_ipynb", on_new_ipynb },
             { "new_r", on_new_r },
+            { "new_shiny", on_new_shiny },
+            { "run_shiny_app", on_run_shiny_app },
             { "new_py", on_new_py },
             { "new_ts", on_new_ts },
             { "new_html", on_new_html },
@@ -60,6 +62,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.save", { "<Control>s" });
             this.set_accels_for_action ("app.package_installer", { "<Control><Shift>p" });
             this.set_accels_for_action ("app.export_html", { "<Control><Shift>k" });
+            this.set_accels_for_action ("app.run_shiny_app", { "<Control><Shift>a" });
             this.set_accels_for_action ("app.elrond_assist", { "<Control><Shift>e" });
             this.set_accels_for_action ("app.preferences", { "<Control>comma" });
             this.set_accels_for_action ("app.insert_image", { "<Control><Alt>i", "<Control><Shift>m" });
@@ -148,6 +151,21 @@ namespace Imladris {
         private void on_new_r () {
             var win = this.active_window as Window;
             if (win != null) win.add_document_tab ("script.R", "r");
+        }
+
+        private void on_new_shiny () {
+            var win = this.active_window as Window;
+            if (win != null) {
+                string template = ProjectScaffolder.get_shiny_template ();
+                win.add_document_tab ("app.R", "r", template);
+            }
+        }
+
+        private void on_run_shiny_app () {
+            var win = this.active_window as Window;
+            if (win != null) {
+                win.toggle_shiny_app_execution ();
+            }
         }
 
         private void on_new_py () {
