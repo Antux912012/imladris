@@ -24,4 +24,4 @@ modules:
       - type: git
         url: https://github.com/Antux912012/imladris-next-md-editor.git
         tag: v0.15.1
-        commit: 99fa26a1e1c7872e7894cd2432759a59265bbcae
+        commit: a43375cfcb12b769870485263e5395a5a5de8a71
