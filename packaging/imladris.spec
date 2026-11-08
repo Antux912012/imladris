@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        Scientific notebook studio and Markdown editor
 
 License:        GPL-3.0-or-later
-URL:            https://github.com/Antux912012/imladris-next-md-editor
+URL:            https://github.com/Antux912012/imladris
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  gcc

@@ -32,26 +32,26 @@
   </branding>
   <screenshots>
     <screenshot type="default">
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris-next-md-editor/main/data/screenshots/imladris-screenshot.png</image>
+      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-screenshot.png</image>
       <caption>Imladris polyglot scientific authoring workspace and notebook studio</caption>
     </screenshot>
     <screenshot>
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris-next-md-editor/main/data/screenshots/imladris-ai-copilot.png</image>
+      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-ai-copilot.png</image>
       <caption>Elrond AI copilot and agent harness integration with code synthesis and live assistance</caption>
     </screenshot>
     <screenshot>
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris-next-md-editor/main/data/screenshots/imladris-preferences-theming.png</image>
+      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-theming.png</image>
       <caption>Appearance preferences with theme selection and GNOME accent colors</caption>
     </screenshot>
     <screenshot>
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris-next-md-editor/main/data/screenshots/imladris-preferences-ai.png</image>
+      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-ai.png</image>
       <caption>Multi-provider AI assistant configuration with direct API key portal links</caption>
     </screenshot>
   </screenshots>
   <launchable type="desktop-id">io.github.Antux912012.Imladris.desktop</launchable>
-  <url type="homepage">https://github.com/Antux912012/imladris-next-md-editor</url>
-  <url type="bugtracker">https://github.com/Antux912012/imladris-next-md-editor/issues</url>
-  <url type="vcs-browser">https://github.com/Antux912012/imladris-next-md-editor</url>
+  <url type="homepage">https://github.com/Antux912012/imladris</url>
+  <url type="bugtracker">https://github.com/Antux912012/imladris/issues</url>
+  <url type="vcs-browser">https://github.com/Antux912012/imladris</url>
   <provides>
     <binary>imladris</binary>
   </provides>

@@ -4,7 +4,7 @@ pkgver=0.15.2
 pkgrel=1
 pkgdesc="Polyglot Scientific & Markdown IDE with Elrond Local AI Copilot, R, Python, and Libadwaita UI"
 arch=('x86_64')
-url="https://github.com/Antux912012/imladris-next-md-editor"
+url="https://github.com/Antux912012/imladris"
 license=('GPL-3.0-or-later')
 depends=(
     'gtk4>=4.12'
@@ -35,21 +35,21 @@ makedepends=(
     'pkgconf'
     'gcc'
 )
-source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris-next-md-editor/archive/refs/tags/v$pkgver.tar.gz")
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('cc28c4f0cbd563cd74dbb806d1c5685efd38b7417e3c0f2b3cce46c6e91776b2')
 
 build() {
-    cd "$srcdir/imladris-next-md-editor-$pkgver"
+    cd "$srcdir/imladris-$pkgver"
     arch-meson build
     meson compile -C build
 }
 
 check() {
-    cd "$srcdir/imladris-next-md-editor-$pkgver"
+    cd "$srcdir/imladris-$pkgver"
     meson test -C build --print-errorlogs || true
 }
 
 package() {
-    cd "$srcdir/imladris-next-md-editor-$pkgver"
+    cd "$srcdir/imladris-$pkgver"
     DESTDIR="$pkgdir" meson install -C build
 }

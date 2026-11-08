@@ -6,7 +6,7 @@
 <h3 align="center">A GNOME-native home for scientific writing, notebooks and data work</h3>
 
 <p align="center">
-  <a href="https://github.com/Antux912012/imladris-next-md-editor/releases"><img src="https://img.shields.io/github/v/release/Antux912012/imladris-next-md-editor?include_prereleases&style=flat-square&color=blue" alt="Release"></a>
+  <a href="https://github.com/Antux912012/imladris/releases"><img src="https://img.shields.io/github/v/release/Antux912012/imladris?include_prereleases&style=flat-square&color=blue" alt="Release"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-GPL--3.0--or--later-green?style=flat-square" alt="Vala, GPL-3.0-or-later">
   <img src="https://img.shields.io/badge/Flatpak-io.github.Antux912012.Imladris-blue?style=flat-square&logo=flatpak" alt="Flatpak">
@@ -224,7 +224,7 @@ For complete technical specifications, component connection maps, sequence flows
 
 ## Install
 
-Packages for each release live on the [Releases page](https://github.com/Antux912012/imladris-next-md-editor/releases).
+Packages for each release live on the [Releases page](https://github.com/Antux912012/imladris/releases).
 
 **Flatpak**
 ```bash
