@@ -36,7 +36,7 @@ makedepends=(
     'gcc'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris-next-md-editor/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('cc28c4f0cbd563cd74dbb806d1c5685efd38b7417e3c0f2b3cce46c6e91776b2')
 
 build() {
     cd "$srcdir/imladris-next-md-editor-$pkgver"

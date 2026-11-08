@@ -28,7 +28,7 @@ pkgbase = imladris
 	optdepends = quarto-cli-bin: Quarto document rendering
 	optdepends = pandoc: Document export to PDF, HTML, and Word
 	optdepends = libreoffice: Presentation and spreadsheet export
-	source = imladris-0.15.0.tar.gz::https://github.com/Antux912012/imladris-next-md-editor/archive/refs/tags/v0.15.0.tar.gz
-	sha256sums = SKIP
+	source = imladris-0.15.2.tar.gz::https://github.com/Antux912012/imladris-next-md-editor/archive/refs/tags/v0.15.2.tar.gz
+	sha256sums = cc28c4f0cbd563cd74dbb806d1c5685efd38b7417e3c0f2b3cce46c6e91776b2
 
 pkgname = imladris
