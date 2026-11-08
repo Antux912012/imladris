@@ -71,6 +71,10 @@ namespace Imladris {
             this.set_accels_for_action ("win.zoom_reset", { "<Control>0" });
             this.set_accels_for_action ("win.run_chunk", { "<Control><Shift>Return" });
             this.set_accels_for_action ("win.run_line", { "<Control>Return" });
+            this.set_accels_for_action ("app.run_all_cells", { "<Control><Alt>r" });
+            this.set_accels_for_action ("win.run_chunks_above", { "<Control><Alt>p" });
+            this.set_accels_for_action ("win.clear_console", { "<Control>l" });
+            this.set_accels_for_action ("app.restart_kernel", { "<Control><Shift>F10" });
 
             var provider = new Gtk.CssProvider ();
             provider.load_from_resource ("/org/imladris/app/style.css");

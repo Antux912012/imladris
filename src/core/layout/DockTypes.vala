@@ -39,10 +39,12 @@ namespace Imladris.Core.Layout {
         TERMINAL,
         ELROND_AI,
         ENVIRONMENT,
+        HISTORY,
         OUTLINE,
         CITATIONS,
         PLOTS,
         FILES,
+        PACKAGES,
         HELP;
 
         public string to_id_string () {
@@ -54,10 +56,12 @@ namespace Imladris.Core.Layout {
                 case TERMINAL: return "terminal";
                 case ELROND_AI: return "elrond-ai";
                 case ENVIRONMENT: return "environment";
+                case HISTORY: return "history";
                 case OUTLINE: return "outline";
                 case CITATIONS: return "citations";
                 case PLOTS: return "plots";
                 case FILES: return "files";
+                case PACKAGES: return "packages";
                 case HELP: return "help";
                 default: return "source-editor";
             }
@@ -72,10 +76,12 @@ namespace Imladris.Core.Layout {
                 case "terminal": return TERMINAL;
                 case "elrond-ai": return ELROND_AI;
                 case "environment": return ENVIRONMENT;
+                case "history": return HISTORY;
                 case "outline": return OUTLINE;
                 case "citations": return CITATIONS;
                 case "plots": return PLOTS;
                 case "files": return FILES;
+                case "packages": return PACKAGES;
                 case "help": return HELP;
                 default: return null;
             }
@@ -90,10 +96,12 @@ namespace Imladris.Core.Layout {
                 case TERMINAL: return "Terminal";
                 case ELROND_AI: return "Elrond AI";
                 case ENVIRONMENT: return "Environment";
+                case HISTORY: return "History";
                 case OUTLINE: return "Outline";
                 case CITATIONS: return "Citations";
                 case PLOTS: return "Plots";
                 case FILES: return "Files";
+                case PACKAGES: return "Packages";
                 case HELP: return "Help";
                 default: return "Panel";
             }
@@ -108,10 +116,12 @@ namespace Imladris.Core.Layout {
                 case TERMINAL: return "utilities-terminal-symbolic";
                 case ELROND_AI: return "ai-elrond";
                 case ENVIRONMENT: return "view-list-symbolic";
+                case HISTORY: return "document-open-recent-symbolic";
                 case OUTLINE: return "view-list-bullet-symbolic";
                 case CITATIONS: return "accessories-dictionary-symbolic";
                 case PLOTS: return "x-office-presentation-symbolic";
                 case FILES: return "folder-symbolic";
+                case PACKAGES: return "application-x-addon-symbolic";
                 case HELP: return "help-browser-symbolic";
                 default: return "application-x-addon-symbolic";
             }
@@ -274,11 +284,11 @@ namespace Imladris.Core.Layout {
             );
             quadrants.set (
                 QuadrantId.Q3_TOP_RIGHT,
-                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.OUTLINE, PanelId.CITATIONS }, PanelId.ENVIRONMENT)
+                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS }, PanelId.ENVIRONMENT)
             );
             quadrants.set (
                 QuadrantId.Q4_BOTTOM_RIGHT,
-                new QuadrantConfig (QuadrantId.Q4_BOTTOM_RIGHT, { PanelId.LIVE_PREVIEW, PanelId.PLOTS, PanelId.FILES, PanelId.HELP }, PanelId.LIVE_PREVIEW)
+                new QuadrantConfig (QuadrantId.Q4_BOTTOM_RIGHT, { PanelId.FILES, PanelId.PLOTS, PanelId.PACKAGES, PanelId.HELP, PanelId.LIVE_PREVIEW }, PanelId.FILES)
             );
             state_updated ();
         }

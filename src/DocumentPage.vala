@@ -924,6 +924,14 @@ print("Python Interpreter:", sys.version.split()[0])
             stats_changed (words, lines, doc_type.up ());
         }
 
+        public void run_chunks_above () {
+            panel_registry.execute_cells_above ();
+        }
+
+        public void clear_console () {
+            console_view.buffer.text = "";
+        }
+
         public void undo () {
             if (source_buffer.can_undo) {
                 source_buffer.undo ();

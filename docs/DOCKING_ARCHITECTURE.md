@@ -19,8 +19,8 @@ The critical challenge in transitioning between **Apostrophe Mode** (single-pane
            │    │    ├── <DockQuadrant id="Q1_TOP_LEFT" />      // Default: Source Editor
            │    │    └── <DockQuadrant id="Q2_BOTTOM_LEFT" />   // Default: Console / Terminal
            │    └── <SplitAxis orientation="vertical" ratio={rightRowRatio}>
-           │         ├── <DockQuadrant id="Q3_TOP_RIGHT" />     // Default: Environment / TOC / Citations
-           │         └── <DockQuadrant id="Q4_BOTTOM_RIGHT" />  // Default: Preview / Plots / Files
+           │         ├── <DockQuadrant id="Q3_TOP_RIGHT" />     // Default: Environment / History / TOC / Citations
+           │         └── <DockQuadrant id="Q4_BOTTOM_RIGHT" />  // Default: Files / Plots / Packages / Help / Preview
            └── <DragDropOverlay />        // Visual drop-zone indicator (Header / Center Body)
 ```
 
@@ -47,14 +47,16 @@ Defined in `src/core/layout/DockTypes.vala` and `src/services/WorkspaceStateMana
 - **`PanelId`:**
   - `source-editor`: `.Rmd`, `.Qmd`, `.ipynb` cells, or `.md` buffer
   - `live-preview`: Rendered HTML / Quarto / Notebook preview
-  - `console`: R / Python / Jupyter kernel execution log & REPL (`In [n]:` / `Out [n]:`)
+  - `console`: R / Python / Jupyter kernel execution log & REPL (`In [n]:` / `Out [n]:`) with readline history navigation and `?topic` help intercept
   - `terminal`: System shell
-  - `environment`: Active dataframe / variable inspector
+  - `environment`: Active dataframe / variable inspector categorized into Data, Values, Functions with 1-click View and live filtering
+  - `history`: Interactive command history ledger with `.Rhistory` auto-sync, REPL/Source insertion, and search
   - `outline`: Document AST Table of Contents
   - `citations`: BibTeX / CSL bibliography manager
-  - `plots`: Rendered graphic outputs / zoomable figures
-  - `files`: Project directory browser
-  - `help`: Documentation viewer
+  - `plots`: Multi-plot gallery deck with Previous/Next navigation, zoom popout, and image/PDF export
+  - `files`: Project directory browser with New Folder, New File, Delete, Rename, and Set Working Directory
+  - `packages`: R package library manager with search, package details, and attach/detach (`library()`) toggles
+  - `help`: Documentation browser with history navigation and R `Rd2HTML` integration
 - **`QuadrantSizeState`:** `NORMAL`, `MINIMIZED`, `MAXIMIZED`
 - **`SplitterRatios`:**
   - `mainVertical`: Left column vs Right column (`0.15` to `0.85`, default `0.55`)

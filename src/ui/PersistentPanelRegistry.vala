@@ -2,6 +2,17 @@ using Imladris.Core.Layout;
 
 namespace Imladris.UI {
 
+    public class PackageItem : GLib.Object {
+        public string name { get; construct set; }
+        public string version { get; construct set; }
+        public string description { get; construct set; }
+        public bool is_loaded { get; construct set; }
+
+        public PackageItem (string name, string ver, string desc, bool loaded = false) {
+            Object (name: name, version: ver, description: desc, is_loaded: loaded);
+        }
+    }
+
     public class PersistentPanelRegistry : GLib.Object {
 
         private Gee.HashMap<PanelId, Gtk.Widget> panels;
@@ -22,6 +33,10 @@ namespace Imladris.UI {
         public Gtk.ListBox citations_list { get; private set; }
         public WebKit.WebView plots_webview { get; private set; }
         public Gtk.ListBox files_list { get; private set; }
+        public Gtk.ListBox history_list { get; private set; }
+        public Gtk.ListBox packages_list { get; private set; }
+        public Gtk.Entry repl_entry { get; private set; }
+        public WebKit.WebView help_view { get; private set; }
 
         private Gtk.Label? files_dir_lbl = null;
         private string current_browser_dir = "";
@@ -29,10 +44,32 @@ namespace Imladris.UI {
 
         private int execution_counter = 0;
 
+        // Plot Gallery State
+        private Gee.ArrayList<string> plot_gallery;
+        private int active_plot_idx = -1;
+        private Gtk.Button btn_prev_plot;
+        private Gtk.Button btn_next_plot;
+        private Gtk.Label plot_index_label;
+        private Gtk.Button btn_zoom_plot;
+        private Gtk.Button btn_copy_plot;
+        private Gtk.Button btn_export_plot;
+        private Gtk.Button btn_remove_plot;
+        private Gtk.Button btn_clear_all_plots;
+
+        // Files Selection State
+        private string? selected_file_path = null;
+        private bool selected_is_dir = false;
+
+        // Packages State
+        private Gee.ArrayList<PackageItem> installed_packages;
+        private Gtk.SearchEntry packages_search_entry;
+
         public PersistentPanelRegistry (DocumentPage page, Window? win) {
             this.doc_page = page;
             this.main_window = win;
             this.panels = new Gee.HashMap<PanelId, Gtk.Widget> ();
+            this.plot_gallery = new Gee.ArrayList<string> ();
+            this.installed_packages = new Gee.ArrayList<PackageItem> ();
 
             build_all_persistent_panels ();
         }
@@ -204,12 +241,36 @@ namespace Imladris.UI {
             var kernel_drop = new Gtk.DropDown.from_strings ({ "Python 3", "Rscript", "Bash" });
             repl_bar.append (kernel_drop);
 
-            var repl_entry = new Gtk.Entry () {
-                placeholder_text = "Evaluate expression in kernel (e.g. 2 + 2 or print(sys.version))...",
+            repl_entry = new Gtk.Entry () {
+                placeholder_text = "Evaluate expression in kernel (e.g. 2 + 2, ?plot, print(sys.version))...",
                 hexpand = true
             };
             var eval_btn = new Gtk.Button.with_label ("Execute");
             eval_btn.add_css_class ("suggested-action");
+
+            var repl_key_ctrl = new Gtk.EventControllerKey ();
+            repl_key_ctrl.key_pressed.connect ((keyval, keycode, state) => {
+                if (keyval == Gdk.Key.Up) {
+                    string? prev = Services.HistoryManager.get_default ().navigate_up (repl_entry.text);
+                    if (prev != null) {
+                        repl_entry.text = prev;
+                        repl_entry.set_position (-1);
+                        return true;
+                    }
+                } else if (keyval == Gdk.Key.Down) {
+                    string? next_cmd = Services.HistoryManager.get_default ().navigate_down ();
+                    if (next_cmd != null) {
+                        repl_entry.text = next_cmd;
+                        repl_entry.set_position (-1);
+                        return true;
+                    }
+                } else if ((state & Gdk.ModifierType.CONTROL_MASK) != 0 && (keyval == Gdk.Key.l || keyval == Gdk.Key.L)) {
+                    doc_page.console_view.buffer.text = "";
+                    return true;
+                }
+                return false;
+            });
+            repl_entry.add_controller (repl_key_ctrl);
 
             repl_entry.activate.connect (() => {
                 eval_btn.activate ();
@@ -220,11 +281,22 @@ namespace Imladris.UI {
                 repl_entry.text = "";
                 uint sel = kernel_drop.selected;
                 string engine = sel == 1 ? "r" : (sel == 2 ? "bash" : "python");
+                Services.HistoryManager.get_default ().add_entry (cmd_text, engine);
                 run_code_snippet_in_console (engine, cmd_text);
             });
 
+            var stop_btn = new Gtk.Button.from_icon_name ("process-stop-symbolic") {
+                tooltip_text = "Interrupt Execution (Stop / SIGINT)"
+            };
+            stop_btn.add_css_class ("flat");
+            stop_btn.add_css_class ("destructive-action");
+            stop_btn.clicked.connect (() => {
+                Services.PersistentSessionManager.get_default ().interrupt_active_execution ();
+                doc_page.append_console_log ("\n[Execution interrupted by user]");
+            });
+
             var clear_con_btn = new Gtk.Button.from_icon_name ("edit-clear-all-symbolic") {
-                tooltip_text = "Clear Console"
+                tooltip_text = "Clear Console (Ctrl+L)"
             };
             clear_con_btn.add_css_class ("flat");
             clear_con_btn.clicked.connect (() => {
@@ -233,6 +305,7 @@ namespace Imladris.UI {
 
             repl_bar.append (repl_entry);
             repl_bar.append (eval_btn);
+            repl_bar.append (stop_btn);
             repl_bar.append (clear_con_btn);
             console_panel.append (repl_bar);
             panels.set (PanelId.CONSOLE, console_panel);
@@ -374,34 +447,192 @@ namespace Imladris.UI {
             cit_box.append (cit_scroll);
             panels.set (PanelId.CITATIONS, cit_box);
 
-            // 8. PLOTS PANEL (Rendered Graphic Outputs & Zoomable Figures)
-            var plots_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+            // 8. HISTORY PANEL (RStudio Command History with Filter & Insertion)
+            var history_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
                 hexpand = true,
                 vexpand = true
             };
-            var plots_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+            var hist_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
                 margin_top = 4,
                 margin_bottom = 4,
                 margin_start = 8,
                 margin_end = 8
             };
-            plots_bar.append (new Gtk.Label ("Plots & Visual MIME Outputs") { css_classes = { "dim-label", "caption" } });
-            plots_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
-            var render_plot_btn = new Gtk.Button.with_label ("Render Active Plot");
-            render_plot_btn.add_css_class ("flat");
-            render_plot_btn.add_css_class ("ribbon-compact-btn");
-            render_plot_btn.clicked.connect (() => {
-                render_default_scientific_plot ();
+            hist_bar.add_css_class ("dock-subtoolbar");
+            hist_bar.append (new Gtk.Image.from_icon_name ("document-open-recent-symbolic"));
+
+            var hist_search = new Gtk.SearchEntry () {
+                placeholder_text = "Filter history...",
+                hexpand = true
+            };
+            hist_search.search_changed.connect (() => {
+                filter_history_ui (hist_search.text.strip ().down ());
             });
-            plots_bar.append (render_plot_btn);
+            hist_bar.append (hist_search);
+
+            var to_console_btn = new Gtk.Button.from_icon_name ("utilities-terminal-symbolic") {
+                tooltip_text = "To Console (Copy to Console Prompt)"
+            };
+            to_console_btn.add_css_class ("flat");
+            to_console_btn.clicked.connect (history_to_console);
+            hist_bar.append (to_console_btn);
+
+            var to_source_btn = new Gtk.Button.from_icon_name ("document-edit-symbolic") {
+                tooltip_text = "To Source (Insert at Cursor in Editor)"
+            };
+            to_source_btn.add_css_class ("flat");
+            to_source_btn.clicked.connect (history_to_source);
+            hist_bar.append (to_source_btn);
+
+            var save_hist_btn = new Gtk.Button.from_icon_name ("document-save-symbolic") {
+                tooltip_text = "Save History (.Rhistory)"
+            };
+            save_hist_btn.add_css_class ("flat");
+            save_hist_btn.clicked.connect (save_history_dialog);
+            hist_bar.append (save_hist_btn);
+
+            var clear_hist_btn = new Gtk.Button.from_icon_name ("edit-clear-all-symbolic") {
+                tooltip_text = "Clear History"
+            };
+            clear_hist_btn.add_css_class ("flat");
+            clear_hist_btn.clicked.connect (() => {
+                Services.HistoryManager.get_default ().clear ();
+            });
+            hist_bar.append (clear_hist_btn);
+
+            history_box.append (hist_bar);
+
+            history_list = new Gtk.ListBox () {
+                selection_mode = Gtk.SelectionMode.SINGLE,
+                css_classes = { "boxed-list" },
+                margin_start = 6,
+                margin_end = 6,
+                margin_bottom = 6
+            };
+            history_list.row_activated.connect ((row) => {
+                string? cmd = row.get_data<string> ("cmd-text");
+                if (cmd != null && repl_entry != null) {
+                    repl_entry.text = cmd;
+                    repl_entry.grab_focus ();
+                    repl_entry.set_position (-1);
+                }
+            });
+            var hist_scroll = new Gtk.ScrolledWindow () {
+                child = history_list,
+                hexpand = true,
+                vexpand = true
+            };
+            history_box.append (hist_scroll);
+            panels.set (PanelId.HISTORY, history_box);
+
+            // Populate initial history from HistoryManager
+            var initial_entries = Services.HistoryManager.get_default ().get_all_entries ();
+            foreach (var ent in initial_entries) {
+                add_history_row (ent);
+            }
+            Services.HistoryManager.get_default ().entry_added.connect ((entry) => {
+                add_history_row (entry);
+            });
+            Services.HistoryManager.get_default ().history_cleared.connect (() => {
+                clear_history_ui ();
+            });
+
+            // 9. PLOTS PANEL (RStudio-Compatible Multi-Plot Gallery & Deck)
+            var plots_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+                hexpand = true,
+                vexpand = true
+            };
+            var plots_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+                margin_top = 4,
+                margin_bottom = 4,
+                margin_start = 8,
+                margin_end = 8
+            };
+            plots_bar.add_css_class ("dock-subtoolbar");
+
+            btn_prev_plot = new Gtk.Button.from_icon_name ("go-previous-symbolic") {
+                tooltip_text = "Previous Plot",
+                sensitive = false
+            };
+            btn_prev_plot.add_css_class ("flat");
+            btn_prev_plot.clicked.connect (() => {
+                if (active_plot_idx > 0) {
+                    active_plot_idx--;
+                    update_plot_view ();
+                }
+            });
+            plots_bar.append (btn_prev_plot);
+
+            btn_next_plot = new Gtk.Button.from_icon_name ("go-next-symbolic") {
+                tooltip_text = "Next Plot",
+                sensitive = false
+            };
+            btn_next_plot.add_css_class ("flat");
+            btn_next_plot.clicked.connect (() => {
+                if (active_plot_idx < plot_gallery.size - 1) {
+                    active_plot_idx++;
+                    update_plot_view ();
+                }
+            });
+            plots_bar.append (btn_next_plot);
+
+            plot_index_label = new Gtk.Label ("No Plots") {
+                css_classes = { "dim-label", "caption" },
+                margin_start = 4,
+                margin_end = 4
+            };
+            plots_bar.append (plot_index_label);
+
+            plots_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
+
+            btn_zoom_plot = new Gtk.Button.from_icon_name ("zoom-in-symbolic") {
+                tooltip_text = "Zoom Plot in Floating Window",
+                sensitive = false
+            };
+            btn_zoom_plot.add_css_class ("flat");
+            btn_zoom_plot.clicked.connect (zoom_active_plot);
+            plots_bar.append (btn_zoom_plot);
+
+            btn_copy_plot = new Gtk.Button.from_icon_name ("edit-copy-symbolic") {
+                tooltip_text = "Copy Plot to Clipboard",
+                sensitive = false
+            };
+            btn_copy_plot.add_css_class ("flat");
+            btn_copy_plot.clicked.connect (copy_active_plot_to_clipboard);
+            plots_bar.append (btn_copy_plot);
+
+            btn_export_plot = new Gtk.Button.from_icon_name ("document-save-as-symbolic") {
+                tooltip_text = "Export Plot to File...",
+                sensitive = false
+            };
+            btn_export_plot.add_css_class ("flat");
+            btn_export_plot.clicked.connect (export_active_plot_dialog);
+            plots_bar.append (btn_export_plot);
+
+            btn_remove_plot = new Gtk.Button.from_icon_name ("user-trash-symbolic") {
+                tooltip_text = "Remove Current Plot",
+                sensitive = false
+            };
+            btn_remove_plot.add_css_class ("flat");
+            btn_remove_plot.clicked.connect (remove_active_plot);
+            plots_bar.append (btn_remove_plot);
+
+            btn_clear_all_plots = new Gtk.Button.from_icon_name ("edit-clear-all-symbolic") {
+                tooltip_text = "Clear All Plots",
+                sensitive = false
+            };
+            btn_clear_all_plots.add_css_class ("flat");
+            btn_clear_all_plots.clicked.connect (clear_all_plots);
+            plots_bar.append (btn_clear_all_plots);
+
             plots_box.append (plots_bar);
 
             plots_webview = WebViewFactory.create ();
             plots_box.append (plots_webview);
-            render_default_scientific_plot ();
+            update_plot_view ();
             panels.set (PanelId.PLOTS, plots_box);
 
-            // 9. FILES PANEL (Project Directory Browser with Folder Traversal)
+            // 10. FILES PANEL (Project Directory Browser with RStudio Actions)
             var files_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
                 hexpand = true,
                 vexpand = true
@@ -412,10 +643,12 @@ namespace Imladris.UI {
                 margin_start = 8,
                 margin_end = 8
             };
+            files_bar.add_css_class ("dock-subtoolbar");
+
             files_dir_lbl = new Gtk.Label ("📁 Workspace") {
                 css_classes = { "dim-label", "caption" },
                 ellipsize = Pango.EllipsizeMode.START,
-                max_width_chars = 24
+                max_width_chars = 20
             };
             files_bar.append (files_dir_lbl);
             files_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
@@ -438,6 +671,42 @@ namespace Imladris.UI {
             });
             files_bar.append (home_btn);
 
+            var new_folder_btn = new Gtk.Button.from_icon_name ("folder-new-symbolic") {
+                tooltip_text = "New Folder"
+            };
+            new_folder_btn.add_css_class ("flat");
+            new_folder_btn.clicked.connect (prompt_new_folder);
+            files_bar.append (new_folder_btn);
+
+            var new_file_btn = new Gtk.Button.from_icon_name ("document-new-symbolic") {
+                tooltip_text = "New Blank File"
+            };
+            new_file_btn.add_css_class ("flat");
+            new_file_btn.clicked.connect (prompt_new_file);
+            files_bar.append (new_file_btn);
+
+            var del_file_btn = new Gtk.Button.from_icon_name ("user-trash-symbolic") {
+                tooltip_text = "Delete Selected File or Directory"
+            };
+            del_file_btn.add_css_class ("flat");
+            del_file_btn.clicked.connect (prompt_delete_selected_file);
+            files_bar.append (del_file_btn);
+
+            var ren_file_btn = new Gtk.Button.from_icon_name ("document-edit-symbolic") {
+                tooltip_text = "Rename Selected File or Directory"
+            };
+            ren_file_btn.add_css_class ("flat");
+            ren_file_btn.clicked.connect (prompt_rename_selected_file);
+            files_bar.append (ren_file_btn);
+
+            var more_btn = new Gtk.MenuButton () {
+                icon_name = "view-more-symbolic",
+                tooltip_text = "More File Options..."
+            };
+            more_btn.add_css_class ("flat");
+            more_btn.popover = create_files_more_popover ();
+            files_bar.append (more_btn);
+
             var refresh_files_btn = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
                 tooltip_text = "Refresh Workspace Files"
             };
@@ -454,6 +723,14 @@ namespace Imladris.UI {
                 margin_end = 6,
                 margin_bottom = 6
             };
+            files_list.row_selected.connect ((row) => {
+                if (row != null) {
+                    selected_file_path = row.get_data<string> ("file-path");
+                    selected_is_dir = row.get_data<bool> ("is-dir");
+                } else {
+                    selected_file_path = null;
+                }
+            });
             files_list.row_activated.connect ((row) => {
                 bool is_dir = row.get_data<bool> ("is-dir");
                 string? fpath = row.get_data<string> ("file-path");
@@ -484,41 +761,122 @@ namespace Imladris.UI {
                 terminal_view.buffer.insert (ref end, @"\n[Working Directory changed to: $new_dir]\n$$ ", -1);
             });
             Services.PersistentSessionManager.get_default ().plot_generated.connect ((plot_path) => {
-                load_plot_image (plot_path);
+                plot_gallery.add (plot_path);
+                active_plot_idx = plot_gallery.size - 1;
+                update_plot_view ();
             });
 
-            // 10. HELP PANEL (Documentation & RStudio Workbench Reference)
-            var help_view = WebViewFactory.create ();
-            help_view.load_html ("""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  body { font-family: system-ui, sans-serif; padding: 16px 20px; color: #1e293b; line-height: 1.5; font-size: 13px; }
-  h2 { color: #1d4ed8; margin-top: 0; }
-  h3 { color: #334155; margin-bottom: 6px; }
-  code { background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-family: monospace; }
-  ul { padding-left: 18px; }
-</style>
-</head>
-<body>
-  <h2>Imladris RStudio 4-Quadrant Workbench Help</h2>
-  <h3>Drag-and-Drop Docking</h3>
-  <ul>
-    <li><strong>Reorder Tabs:</strong> Drag any panel tab horizontally within its quadrant header.</li>
-    <li><strong>Move Across Quadrants:</strong> Drag a panel tab onto another quadrant's header or center viewport.</li>
-    <li><strong>Auto-Collapse:</strong> Emptying a quadrant automatically minimizes it so its sibling expands to 100%.</li>
-    <li><strong>4-Way Center Crosshair:</strong> Drag the center intersection handle to resize both horizontal and vertical splitters simultaneously at 60 FPS.</li>
-  </ul>
-  <h3>Supported Formats</h3>
-  <ul>
-    <li><code>.md</code> — Apostrophe distraction-free mode by default.</li>
-    <li><code>.qmd</code> / <code>.Rmd</code> — RStudio 4-quadrant workbench with YAML frontmatter and <code>#|</code> chunk options.</li>
-    <li><code>.ipynb</code> — Bidirectional Jupyter Notebook serializer with cell execution counters (<code>In [1]:</code> / <code>Out [1]:</code>).</li>
-  </ul>
-</body>
-</html>""", null);
-            panels.set (PanelId.HELP, help_view);
+            // 11. PACKAGES PANEL (Installed Packages Explorer & Library Toggle)
+            var pkg_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+                hexpand = true,
+                vexpand = true
+            };
+            var pkg_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+                margin_top = 4,
+                margin_bottom = 4,
+                margin_start = 8,
+                margin_end = 8
+            };
+            pkg_bar.add_css_class ("dock-subtoolbar");
+
+            pkg_bar.append (new Gtk.Image.from_icon_name ("application-x-addon-symbolic"));
+            packages_search_entry = new Gtk.SearchEntry () {
+                placeholder_text = "Filter packages...",
+                hexpand = true
+            };
+            packages_search_entry.search_changed.connect (filter_packages_ui);
+            pkg_bar.append (packages_search_entry);
+
+            var install_pkg_btn = new Gtk.Button.from_icon_name ("list-add-symbolic") {
+                tooltip_text = "Install Packages (CRAN / PyPI)..."
+            };
+            install_pkg_btn.add_css_class ("flat");
+            install_pkg_btn.clicked.connect (() => {
+                if (main_window != null) main_window.show_package_installer_dialog ();
+            });
+            pkg_bar.append (install_pkg_btn);
+
+            var refresh_pkg_btn = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
+                tooltip_text = "Refresh Installed Packages"
+            };
+            refresh_pkg_btn.add_css_class ("flat");
+            refresh_pkg_btn.clicked.connect (() => {
+                scan_installed_packages.begin ();
+            });
+            pkg_bar.append (refresh_pkg_btn);
+            pkg_box.append (pkg_bar);
+
+            packages_list = new Gtk.ListBox () {
+                selection_mode = Gtk.SelectionMode.NONE,
+                css_classes = { "boxed-list" },
+                margin_start = 6,
+                margin_end = 6,
+                margin_bottom = 6
+            };
+            var pkg_scroll = new Gtk.ScrolledWindow () {
+                child = packages_list,
+                hexpand = true,
+                vexpand = true
+            };
+            pkg_box.append (pkg_scroll);
+            panels.set (PanelId.PACKAGES, pkg_box);
+            scan_installed_packages.begin ();
+
+            // 12. HELP PANEL (Documentation & RStudio Help Reference Browser)
+            var help_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+                hexpand = true,
+                vexpand = true
+            };
+            var help_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+                margin_top = 4,
+                margin_bottom = 4,
+                margin_start = 8,
+                margin_end = 8
+            };
+            help_bar.add_css_class ("dock-subtoolbar");
+
+            var btn_help_back = new Gtk.Button.from_icon_name ("go-previous-symbolic") {
+                tooltip_text = "Back in Help History"
+            };
+            btn_help_back.add_css_class ("flat");
+            btn_help_back.clicked.connect (() => {
+                if (help_view.can_go_back ()) help_view.go_back ();
+            });
+            help_bar.append (btn_help_back);
+
+            var btn_help_fwd = new Gtk.Button.from_icon_name ("go-next-symbolic") {
+                tooltip_text = "Forward in Help History"
+            };
+            btn_help_fwd.add_css_class ("flat");
+            btn_help_fwd.clicked.connect (() => {
+                if (help_view.can_go_forward ()) help_view.go_forward ();
+            });
+            help_bar.append (btn_help_fwd);
+
+            var btn_help_home = new Gtk.Button.from_icon_name ("go-home-symbolic") {
+                tooltip_text = "Help Home / Reference"
+            };
+            btn_help_home.add_css_class ("flat");
+            btn_help_home.clicked.connect (load_default_help_home);
+            help_bar.append (btn_help_home);
+
+            var help_search = new Gtk.SearchEntry () {
+                placeholder_text = "Search Help (e.g. ggplot, lm, summary)...",
+                hexpand = true
+            };
+            help_search.activate.connect (() => {
+                string q = help_search.text.strip ();
+                if (q.length > 0) {
+                    show_help_for_topic.begin (q);
+                }
+            });
+            help_bar.append (help_search);
+            help_box.append (help_bar);
+
+            help_view = WebViewFactory.create ();
+            help_box.append (help_view);
+            load_default_help_home ();
+            panels.set (PanelId.HELP, help_box);
 
             // Initial AST & Environment scan
             refresh_environment_and_outline ();
@@ -605,6 +963,20 @@ namespace Imladris.UI {
             }
         }
 
+        public void execute_cells_above () {
+            string text = doc_page.source_buffer.text;
+            Gtk.TextIter cursor;
+            doc_page.source_buffer.get_iter_at_mark (out cursor, doc_page.source_buffer.get_insert ());
+            int cursor_line = cursor.get_line ();
+
+            var chunks = Core.ChunkParser.parse_chunks (text);
+            foreach (var ch in chunks) {
+                if (ch.end_line < cursor_line && ch.code.length > 0) {
+                    run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
+                }
+            }
+        }
+
         public void open_dataframe_in_viewer (string object_name, string engine = "r") {
             data_grid_viewer.fetch_and_display.begin (object_name, engine);
 
@@ -625,6 +997,7 @@ namespace Imladris.UI {
             execution_counter++;
             int count = execution_counter;
             doc_page.append_console_log (@"\nIn [$count] ($engine):\n$code");
+            Services.HistoryManager.get_default ().add_entry (code, engine);
 
             // Hook R/Python View(...) command to open interactive matrix & dataframe viewer
             if (code.contains ("View(") || code.contains ("View (")) {
@@ -636,6 +1009,23 @@ namespace Imladris.UI {
                     if (obj.length > 0 && !obj.contains ("\n")) {
                         open_dataframe_in_viewer (obj, engine);
                     }
+                }
+            }
+
+            // Hook R ?topic or help(topic) documentation command
+            if (code.has_prefix ("?") || code.has_prefix ("help(") || code.has_prefix ("help (")) {
+                string topic = "";
+                if (code.has_prefix ("?")) {
+                    topic = code.substring (1).strip ();
+                } else {
+                    int p1 = code.index_of ("(");
+                    int p2 = code.index_of (")", p1);
+                    if (p1 != -1 && p2 != -1 && p2 > p1) {
+                        topic = code.substring (p1 + 1, p2 - p1 - 1).replace ("\"", "").replace ("'", "").strip ();
+                    }
+                }
+                if (topic.length > 0) {
+                    show_help_for_topic.begin (topic);
                 }
             }
 
@@ -1103,6 +1493,570 @@ namespace Imladris.UI {
                 }
             } catch (GLib.Error e) {
                 warning ("Directory scan error: %s", e.message);
+            }
+        }
+
+        // =================================================================
+        // PLOTS GALLERY & EXPORT HELPERS
+        // =================================================================
+        private void update_plot_view () {
+            if (plot_gallery.size == 0) {
+                btn_prev_plot.sensitive = false;
+                btn_next_plot.sensitive = false;
+                btn_zoom_plot.sensitive = false;
+                btn_copy_plot.sensitive = false;
+                btn_export_plot.sensitive = false;
+                btn_remove_plot.sensitive = false;
+                btn_clear_all_plots.sensitive = false;
+                plot_index_label.label = "No Plots";
+                render_default_scientific_plot ();
+                return;
+            }
+
+            if (active_plot_idx < 0) active_plot_idx = 0;
+            if (active_plot_idx >= plot_gallery.size) active_plot_idx = plot_gallery.size - 1;
+
+            btn_prev_plot.sensitive = (active_plot_idx > 0);
+            btn_next_plot.sensitive = (active_plot_idx < plot_gallery.size - 1);
+            btn_zoom_plot.sensitive = true;
+            btn_copy_plot.sensitive = true;
+            btn_export_plot.sensitive = true;
+            btn_remove_plot.sensitive = true;
+            btn_clear_all_plots.sensitive = true;
+
+            plot_index_label.label = @"Plot $(active_plot_idx + 1) of $(plot_gallery.size)";
+            load_plot_image (plot_gallery.get (active_plot_idx));
+        }
+
+        private void zoom_active_plot () {
+            if (active_plot_idx < 0 || active_plot_idx >= plot_gallery.size) return;
+            string plot_file = plot_gallery.get (active_plot_idx);
+            if (!GLib.FileUtils.test (plot_file, GLib.FileTest.EXISTS)) return;
+
+            var zoom_win = new Adw.Window () {
+                title = @"Zoom: $(GLib.Path.get_basename (plot_file))",
+                default_width = 960,
+                default_height = 680
+            };
+            if (main_window != null) zoom_win.set_transient_for (main_window);
+
+            var toolbar_view = new Adw.ToolbarView ();
+            toolbar_view.add_top_bar (new Adw.HeaderBar ());
+
+            var web = WebViewFactory.create ();
+            string uri;
+            try {
+                uri = GLib.Filename.to_uri (plot_file);
+            } catch (GLib.Error e) {
+                uri = "file://" + plot_file;
+            }
+            string html = """<!DOCTYPE html><html><body style="margin:0;padding:16px;background:#1e1e2e;display:flex;justify-content:center;align-items:center;min-height:90vh;"><img src="%s" style="max-width:100%%;max-height:90vh;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);" /></body></html>""".printf (uri);
+            web.load_html (html, null);
+
+            toolbar_view.set_content (web);
+            zoom_win.set_content (toolbar_view);
+            zoom_win.present ();
+        }
+
+        private void copy_active_plot_to_clipboard () {
+            if (active_plot_idx < 0 || active_plot_idx >= plot_gallery.size) return;
+            string plot_file = plot_gallery.get (active_plot_idx);
+            try {
+                var file = GLib.File.new_for_path (plot_file);
+                var texture = Gdk.Texture.from_file (file);
+                var display = Gdk.Display.get_default ();
+                if (display != null) {
+                    display.get_clipboard ().set_texture (texture);
+                    if (main_window != null) main_window.show_toast ("Plot copied to clipboard");
+                }
+            } catch (GLib.Error e) {
+                warning ("Failed to copy plot to clipboard: %s", e.message);
+            }
+        }
+
+        private void export_active_plot_dialog () {
+            if (active_plot_idx < 0 || active_plot_idx >= plot_gallery.size) return;
+            string plot_file = plot_gallery.get (active_plot_idx);
+            string base_name = GLib.Path.get_basename (plot_file);
+
+            var dialog = new Gtk.FileDialog () {
+                title = "Export Plot As Image",
+                initial_name = base_name
+            };
+
+            dialog.save.begin (main_window, null, (obj, res) => {
+                try {
+                    var dest_file = dialog.save.end (res);
+                    if (dest_file != null) {
+                        var src_file = GLib.File.new_for_path (plot_file);
+                        src_file.copy (dest_file, GLib.FileCopyFlags.OVERWRITE, null, null);
+                        if (main_window != null) main_window.show_toast (@"Plot exported to $(dest_file.get_basename ())");
+                    }
+                } catch (GLib.Error e) {
+                    // Canceled or failed
+                }
+            });
+        }
+
+        private void remove_active_plot () {
+            if (active_plot_idx >= 0 && active_plot_idx < plot_gallery.size) {
+                plot_gallery.remove_at (active_plot_idx);
+                if (active_plot_idx >= plot_gallery.size) {
+                    active_plot_idx = plot_gallery.size - 1;
+                }
+                update_plot_view ();
+            }
+        }
+
+        private void clear_all_plots () {
+            plot_gallery.clear ();
+            active_plot_idx = -1;
+            update_plot_view ();
+        }
+
+        // =================================================================
+        // FILES PANEL ACTIONS (New Folder, New File, Delete, Rename)
+        // =================================================================
+        private void prompt_new_folder () {
+            var dialog = new Adw.AlertDialog ("New Folder", "Enter folder name:");
+            var entry = new Gtk.Entry () { placeholder_text = "Folder name..." };
+            dialog.set_extra_child (entry);
+            dialog.add_response ("cancel", "Cancel");
+            dialog.add_response ("create", "Create");
+            dialog.set_default_response ("create");
+            dialog.set_response_appearance ("create", Adw.ResponseAppearance.SUGGESTED);
+
+            dialog.response.connect ((resp) => {
+                if (resp == "create") {
+                    string folder_name = entry.text.strip ();
+                    if (folder_name.length > 0) {
+                        string target = GLib.Path.build_filename (current_browser_dir, folder_name);
+                        GLib.DirUtils.create_with_parents (target, 0755);
+                        populate_files_browser ();
+                    }
+                }
+            });
+            if (main_window != null) dialog.present (main_window);
+        }
+
+        private void prompt_new_file () {
+            var dialog = new Adw.AlertDialog ("New Blank File", "Enter file name:");
+            var entry = new Gtk.Entry () { placeholder_text = "e.g. script.R, analysis.qmd, data.csv..." };
+            dialog.set_extra_child (entry);
+            dialog.add_response ("cancel", "Cancel");
+            dialog.add_response ("create", "Create");
+            dialog.set_default_response ("create");
+            dialog.set_response_appearance ("create", Adw.ResponseAppearance.SUGGESTED);
+
+            dialog.response.connect ((resp) => {
+                if (resp == "create") {
+                    string fname = entry.text.strip ();
+                    if (fname.length > 0) {
+                        string target = GLib.Path.build_filename (current_browser_dir, fname);
+                        try {
+                            GLib.FileUtils.set_contents (target, "");
+                            populate_files_browser ();
+                            if (main_window != null) main_window.open_file_from_path.begin (target);
+                        } catch (GLib.Error e) {}
+                    }
+                }
+            });
+            if (main_window != null) dialog.present (main_window);
+        }
+
+        private void prompt_delete_selected_file () {
+            if (selected_file_path == null) {
+                if (main_window != null) main_window.show_toast ("Select a file or folder first");
+                return;
+            }
+            string base_name = GLib.Path.get_basename (selected_file_path);
+            var dialog = new Adw.AlertDialog (@"Delete '$base_name'?", "Are you sure you want to delete this permanently?");
+            dialog.add_response ("cancel", "Cancel");
+            dialog.add_response ("delete", "Delete");
+            dialog.set_response_appearance ("delete", Adw.ResponseAppearance.DESTRUCTIVE);
+
+            dialog.response.connect ((resp) => {
+                if (resp == "delete") {
+                    try {
+                        var f = GLib.File.new_for_path (selected_file_path);
+                        f.delete (null);
+                        selected_file_path = null;
+                        populate_files_browser ();
+                        if (main_window != null) main_window.show_toast (@"Deleted '$base_name'");
+                    } catch (GLib.Error e) {
+                        if (main_window != null) main_window.show_toast (@"Failed to delete: $(e.message)");
+                    }
+                }
+            });
+            if (main_window != null) dialog.present (main_window);
+        }
+
+        private void prompt_rename_selected_file () {
+            if (selected_file_path == null) {
+                if (main_window != null) main_window.show_toast ("Select a file or folder first");
+                return;
+            }
+            string old_name = GLib.Path.get_basename (selected_file_path);
+            var dialog = new Adw.AlertDialog (@"Rename '$old_name'", "Enter new name:");
+            var entry = new Gtk.Entry () { text = old_name };
+            dialog.set_extra_child (entry);
+            dialog.add_response ("cancel", "Cancel");
+            dialog.add_response ("rename", "Rename");
+            dialog.set_default_response ("rename");
+
+            dialog.response.connect ((resp) => {
+                if (resp == "rename") {
+                    string new_name = entry.text.strip ();
+                    if (new_name.length > 0 && new_name != old_name) {
+                        string parent_dir = GLib.Path.get_dirname (selected_file_path);
+                        string new_path = GLib.Path.build_filename (parent_dir, new_name);
+                        try {
+                            var src = GLib.File.new_for_path (selected_file_path);
+                            var dst = GLib.File.new_for_path (new_path);
+                            src.move (dst, GLib.FileCopyFlags.NONE, null, null);
+                            selected_file_path = new_path;
+                            populate_files_browser ();
+                            if (main_window != null) main_window.show_toast (@"Renamed to '$new_name'");
+                        } catch (GLib.Error e) {
+                            if (main_window != null) main_window.show_toast (@"Failed to rename: $(e.message)");
+                        }
+                    }
+                }
+            });
+            if (main_window != null) dialog.present (main_window);
+        }
+
+        private Gtk.Popover create_files_more_popover () {
+            var pop = new Gtk.Popover ();
+            var vbox = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
+                margin_top = 6, margin_bottom = 6, margin_start = 6, margin_end = 6
+            };
+
+            var btn_swd = new Gtk.Button.with_label ("Set As Working Directory");
+            btn_swd.add_css_class ("flat");
+            btn_swd.clicked.connect (() => {
+                pop.popdown ();
+                Services.PersistentSessionManager.get_default ().set_working_directory (current_browser_dir);
+                if (main_window != null) main_window.show_toast (@"Working directory set to: $(GLib.Path.get_basename (current_browser_dir))");
+            });
+            vbox.append (btn_swd);
+
+            var btn_gwd = new Gtk.Button.with_label ("Go To Working Directory");
+            btn_gwd.add_css_class ("flat");
+            btn_gwd.clicked.connect (() => {
+                pop.popdown ();
+                current_browser_dir = Services.PersistentSessionManager.get_default ().current_working_dir;
+                populate_files_browser ();
+            });
+            vbox.append (btn_gwd);
+
+            var btn_ot = new Gtk.Button.with_label ("Open in Terminal");
+            btn_ot.add_css_class ("flat");
+            btn_ot.clicked.connect (() => {
+                pop.popdown ();
+                run_shell_command (@"cd \"$current_browser_dir\"");
+            });
+            vbox.append (btn_ot);
+
+            pop.set_child (vbox);
+            return pop;
+        }
+
+        // =================================================================
+        // HISTORY PANEL HELPERS
+        // =================================================================
+        private void history_to_console () {
+            var selected_row = history_list.get_selected_row ();
+            if (selected_row != null) {
+                string? cmd = selected_row.get_data<string> ("cmd-text");
+                if (cmd != null && repl_entry != null) {
+                    repl_entry.text = cmd;
+                    repl_entry.grab_focus ();
+                    repl_entry.set_position (-1);
+                }
+            }
+        }
+
+        private void history_to_source () {
+            var selected_row = history_list.get_selected_row ();
+            if (selected_row != null) {
+                string? cmd = selected_row.get_data<string> ("cmd-text");
+                if (cmd != null) {
+                    doc_page.source_buffer.insert_at_cursor (cmd + "\n", -1);
+                    doc_page.source_view.grab_focus ();
+                }
+            }
+        }
+
+        private void save_history_dialog () {
+            string cwd = Services.PersistentSessionManager.get_default ().current_working_dir;
+            if (cwd.length == 0) cwd = GLib.Environment.get_current_dir ();
+            string rhistory_path = GLib.Path.build_filename (cwd, ".Rhistory");
+
+            bool ok = Services.HistoryManager.get_default ().save_to_file (rhistory_path);
+            if (ok && main_window != null) {
+                main_window.show_toast (@"Command history saved to $(GLib.Path.get_basename (rhistory_path))");
+            }
+        }
+
+        private void add_history_row (Services.HistoryEntry entry) {
+            var row = new Gtk.ListBoxRow ();
+            var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
+                margin_top = 4, margin_bottom = 4, margin_start = 6, margin_end = 6
+            };
+            string icon_name = entry.engine == "r" ? "utilities-terminal-symbolic" : "text-x-python-symbolic";
+            hbox.append (new Gtk.Image.from_icon_name (icon_name));
+            var lbl = new Gtk.Label (entry.command) {
+                xalign = 0,
+                hexpand = true,
+                ellipsize = Pango.EllipsizeMode.END,
+                css_classes = { "monospace", "caption" }
+            };
+            hbox.append (lbl);
+
+            string ts = entry.timestamp.format ("%H:%M:%S");
+            var ts_lbl = new Gtk.Label (ts) {
+                css_classes = { "dim-label", "caption" }
+            };
+            hbox.append (ts_lbl);
+
+            row.set_child (hbox);
+            row.set_data<string> ("cmd-text", entry.command);
+            history_list.append (row);
+        }
+
+        private void clear_history_ui () {
+            Gtk.Widget? child = history_list.get_first_child ();
+            while (child != null) {
+                var next = child.get_next_sibling ();
+                history_list.remove (child);
+                child = next;
+            }
+        }
+
+        private void filter_history_ui (string query) {
+            Gtk.Widget? child = history_list.get_first_child ();
+            while (child != null) {
+                var row = child as Gtk.ListBoxRow;
+                if (row != null) {
+                    string? cmd = row.get_data<string> ("cmd-text");
+                    row.visible = (query.length == 0 || (cmd != null && cmd.down ().contains (query)));
+                }
+                child = child.get_next_sibling ();
+            }
+        }
+
+        // =================================================================
+        // PACKAGES PANEL HELPERS
+        // =================================================================
+        public async void scan_installed_packages () {
+            installed_packages.clear ();
+            string r_probe = """
+local({
+  pkgs <- installed.packages()
+  res <- apply(pkgs, 1, function(p) {
+    paste(p["Package"], p["Version"], gsub("[\r\n\t]+", " ", p["Title"]), sep="\t")
+  })
+  cat("___IMLADRIS_PKGS_START___\n")
+  cat(res, sep="\n")
+  cat("___IMLADRIS_PKGS_END___\n")
+})
+""";
+            string? plot_out = null;
+            string out_str = yield Services.PersistentSessionManager.get_default ().execute_r (r_probe, out plot_out);
+
+            if (out_str.contains ("___IMLADRIS_PKGS_START___")) {
+                int s = out_str.index_of ("___IMLADRIS_PKGS_START___") + "___IMLADRIS_PKGS_START___".length;
+                int e = out_str.index_of ("___IMLADRIS_PKGS_END___");
+                if (e > s) {
+                    string block = out_str.substring (s, e - s).strip ();
+                    string[] lines = block.split ("\n");
+                    foreach (var l in lines) {
+                        string[] parts = l.strip ().split ("\t");
+                        if (parts.length >= 2) {
+                            string pname = parts[0].strip ();
+                            string pver = parts[1].strip ();
+                            string pdesc = parts.length >= 3 ? parts[2].strip () : "";
+                            installed_packages.add (new PackageItem (pname, pver, pdesc, false));
+                        }
+                    }
+                }
+            }
+
+            // Fallback to essential tidyverse & scientific packages
+            if (installed_packages.size == 0) {
+                installed_packages.add (new PackageItem ("base", "4.4.1", "The R Base Package", true));
+                installed_packages.add (new PackageItem ("datasets", "4.4.1", "The R Datasets Package", true));
+                installed_packages.add (new PackageItem ("graphics", "4.4.1", "The R Graphics Package", true));
+                installed_packages.add (new PackageItem ("ggplot2", "3.5.1", "Create Elegant Data Visualisations", false));
+                installed_packages.add (new PackageItem ("dplyr", "1.1.4", "A Grammar of Data Manipulation", false));
+                installed_packages.add (new PackageItem ("tidyr", "1.3.1", "Tidy Messy Data", false));
+                installed_packages.add (new PackageItem ("readr", "2.1.5", "Read Rectangular Text Data", false));
+            }
+
+            filter_packages_ui ();
+        }
+
+        private void filter_packages_ui () {
+            Gtk.Widget? child = packages_list.get_first_child ();
+            while (child != null) {
+                var next = child.get_next_sibling ();
+                packages_list.remove (child);
+                child = next;
+            }
+
+            string query = packages_search_entry != null ? packages_search_entry.text.strip ().down () : "";
+            foreach (var pkg in installed_packages) {
+                if (query.length > 0 && !pkg.name.down ().contains (query) && !pkg.description.down ().contains (query)) {
+                    continue;
+                }
+
+                var row = new Adw.ActionRow () {
+                    title = pkg.name,
+                    subtitle = pkg.description.length > 0 ? pkg.description : "Installed R Package"
+                };
+
+                var check = new Gtk.CheckButton () {
+                    active = pkg.is_loaded,
+                    valign = Gtk.Align.CENTER
+                };
+                string pkg_name = pkg.name;
+                check.toggled.connect (() => {
+                    pkg.is_loaded = check.active;
+                    if (check.active) {
+                        run_code_snippet_in_console ("r", @"library($pkg_name)");
+                    } else {
+                        run_code_snippet_in_console ("r", @"detach(\"package:$pkg_name\", unload = TRUE)");
+                    }
+                });
+                row.add_prefix (check);
+
+                var ver_badge = new Gtk.Label (pkg.version) {
+                    css_classes = { "dim-label", "caption", "pill", "monospace" },
+                    valign = Gtk.Align.CENTER
+                };
+                row.add_suffix (ver_badge);
+
+                packages_list.append (row);
+            }
+        }
+
+        // =================================================================
+        // HELP PANEL & R DOCUMENTATION HELPERS
+        // =================================================================
+        private void load_default_help_home () {
+            string home_html = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #1e293b; line-height: 1.5; font-size: 13px; background: #ffffff; }
+  h2 { color: #1d4ed8; margin-top: 0; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+  h3 { color: #334155; margin-bottom: 6px; margin-top: 18px; font-size: 14px; }
+  code { background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .tip-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 4px; margin: 12px 0; }
+</style>
+</head>
+<body>
+  <h2>Imladris & RStudio Workbench Documentation</h2>
+  <div class="tip-box">
+    <strong>Instant Help Query:</strong> Type <code>?topic</code> or <code>help(name)</code> in the Console or search entry above to render full R man pages.
+  </div>
+  <h3>Core Keybindings</h3>
+  <ul>
+    <li><code>Ctrl+Enter</code> — Run Current Line or Selection (advances cursor to next line).</li>
+    <li><code>Ctrl+Shift+Enter</code> — Run Current Active Chunk.</li>
+    <li><code>Ctrl+Alt+P</code> — Run All Chunks Above.</li>
+    <li><code>Ctrl+Alt+R</code> — Run All Chunks in Document.</li>
+    <li><code>Ctrl+Shift+F10</code> — Restart R / Python Session.</li>
+    <li><code>Ctrl+L</code> — Clear Interactive Console.</li>
+  </ul>
+  <h3>Quadrant Layout System</h3>
+  <ul>
+    <li><strong>Quadrant 1 (Top-Left):</strong> Source Editor & Data Viewer (<code>View(df)</code>).</li>
+    <li><strong>Quadrant 2 (Bottom-Left):</strong> Interactive Console, Shell Terminal, Elrond AI.</li>
+    <li><strong>Quadrant 3 (Top-Right):</strong> Environment Inspector, History, Document Outline, Citations.</li>
+    <li><strong>Quadrant 4 (Bottom-Right):</strong> Files Browser, Plots Gallery, Packages Manager, Help & Reference, Web Preview.</li>
+  </ul>
+</body>
+</html>""";
+            help_view.load_html (home_html, null);
+        }
+
+        public async void show_help_for_topic (string topic) {
+            string sanitized = topic.replace ("\"", "").replace ("'", "").strip ();
+            if (sanitized.length == 0) return;
+
+            string r_probe = """
+local({
+  h <- help("%s")
+  if (length(h) > 0) {
+    txt <- utils:::.getHelpFile(h)
+    f <- tempfile(fileext = ".html")
+    tools::Rd2HTML(txt, out = f)
+    cat("___IMLADRIS_HELP_START___\n")
+    cat(readChar(f, file.info(f)$size, useBytes = TRUE))
+    cat("\n___IMLADRIS_HELP_END___\n")
+    unlink(f)
+  } else {
+    cat("___IMLADRIS_HELP_NOT_FOUND___\n")
+  }
+})
+""".printf (sanitized);
+
+            string? plot_out = null;
+            string out_str = yield Services.PersistentSessionManager.get_default ().execute_r (r_probe, out plot_out);
+
+            if (out_str.contains ("___IMLADRIS_HELP_START___")) {
+                int s = out_str.index_of ("___IMLADRIS_HELP_START___") + "___IMLADRIS_HELP_START___".length;
+                int e = out_str.index_of ("___IMLADRIS_HELP_END___");
+                if (e > s) {
+                    string html = out_str.substring (s, e - s).strip ();
+                    string styled_html = inject_help_styling (html);
+                    help_view.load_html (styled_html, null);
+                    activate_panel_in_dock (PanelId.HELP);
+                    return;
+                }
+            }
+
+            render_help_fallback (sanitized);
+            activate_panel_in_dock (PanelId.HELP);
+        }
+
+        private string inject_help_styling (string raw_html) {
+            string style = """<style>
+body { font-family: system-ui, sans-serif; padding: 16px 20px; line-height: 1.5; font-size: 13px; color: #1e293b; background: #ffffff; }
+h2 { color: #1d4ed8; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+h3 { color: #334155; margin-top: 14px; }
+pre, code { font-family: monospace; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 4px; font-size: 12px; }
+pre { padding: 10px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+th { background: #f1f5f9; }
+</style>""";
+            if (raw_html.contains ("<head>")) {
+                return raw_html.replace ("<head>", "<head>" + style);
+            }
+            return style + raw_html;
+        }
+
+        private void render_help_fallback (string topic) {
+            string html = """<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px;color:#334155;text-align:center;">
+<h3 style="color:#64748b;">No documentation found for <code>%s</code></h3>
+<p style="font-size:12px;color:#94a3b8;">Ensure R is running and package is loaded via <code>library(...)</code>.</p>
+</body></html>""".printf (topic);
+            help_view.load_html (html, null);
+        }
+
+        private void activate_panel_in_dock (PanelId pid) {
+            foreach (var qid in QuadrantId.all ()) {
+                var qc = doc_page.dock_layout_state.quadrants.get (qid);
+                if (qc != null && qc.tabs.contains (pid)) {
+                    doc_page.dock_layout_state.activate_tab (qid, pid);
+                    return;
+                }
             }
         }
     }

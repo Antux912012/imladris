@@ -13,6 +13,7 @@ namespace Imladris.Tests {
             Test.add_func ("/dock/layout_persistence", test_layout_persistence);
             Test.add_func ("/dock/undock_redock_flow", test_undock_redock_flow);
             Test.add_func ("/dock/layout_serializer_presets", test_layout_serializer_presets);
+            Test.add_func ("/dock/history_manager", test_history_manager);
             Test.add_func ("/grid/data_row", test_data_row);
             if (has_display) {
                 Test.add_func ("/grid/data_viewer_widget", test_data_viewer_widget);
@@ -32,6 +33,18 @@ namespace Imladris.Tests {
             assert (p_grid.to_title () == "Data Viewer");
             assert (p_grid.to_icon_name () == "view-grid-symbolic");
             assert (PanelId.from_id_string ("data-viewer") == PanelId.DATA_VIEWER);
+
+            var p_hist = PanelId.HISTORY;
+            assert (p_hist.to_id_string () == "history");
+            assert (p_hist.to_title () == "History");
+            assert (p_hist.to_icon_name () == "document-open-recent-symbolic");
+            assert (PanelId.from_id_string ("history") == PanelId.HISTORY);
+
+            var p_pkgs = PanelId.PACKAGES;
+            assert (p_pkgs.to_id_string () == "packages");
+            assert (p_pkgs.to_title () == "Packages");
+            assert (p_pkgs.to_icon_name () == "application-x-addon-symbolic");
+            assert (PanelId.from_id_string ("packages") == PanelId.PACKAGES);
         }
 
         private static void test_layout_topology_states () {
@@ -56,6 +69,41 @@ namespace Imladris.Tests {
             assert (q2.tabs.contains (PanelId.CONSOLE));
             assert (q2.tabs.contains (PanelId.TERMINAL));
             assert (q2.tabs.contains (PanelId.ELROND_AI));
+
+            var q3 = state.quadrants.get (QuadrantId.Q3_TOP_RIGHT);
+            assert (q3 != null);
+            assert (q3.tabs.contains (PanelId.ENVIRONMENT));
+            assert (q3.tabs.contains (PanelId.HISTORY));
+
+            var q4 = state.quadrants.get (QuadrantId.Q4_BOTTOM_RIGHT);
+            assert (q4 != null);
+            assert (q4.tabs.contains (PanelId.FILES));
+            assert (q4.tabs.contains (PanelId.PLOTS));
+            assert (q4.tabs.contains (PanelId.PACKAGES));
+            assert (q4.tabs.contains (PanelId.HELP));
+        }
+
+        private static void test_history_manager () {
+            var hm = Imladris.Services.HistoryManager.get_default ();
+            hm.clear ();
+            assert (hm.size == 0);
+
+            hm.add_entry ("x <- 42", "r");
+            hm.add_entry ("plot(x)", "r");
+            assert (hm.size == 2);
+
+            string? up1 = hm.navigate_up ("");
+            assert (up1 == "plot(x)");
+            string? up2 = hm.navigate_up ("");
+            assert (up2 == "x <- 42");
+
+            string? down1 = hm.navigate_down ();
+            assert (down1 == "plot(x)");
+            string? down2 = hm.navigate_down ();
+            assert (down2 == "");
+
+            hm.clear ();
+            assert (hm.size == 0);
         }
 
         private static void test_layout_persistence () {

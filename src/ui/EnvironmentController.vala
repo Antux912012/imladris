@@ -36,15 +36,19 @@ namespace Imladris.UI {
         private Gtk.ListBox list_box;
         private Gtk.Label header_status_lbl;
         private Gtk.Spinner refresh_spinner;
+        private Gtk.SearchEntry search_entry;
         private Gtk.Button btn_clean;
         private Gtk.Button btn_refresh;
+        private Gtk.Button btn_import;
         private unowned Gtk.Window? parent_window;
+        private Gee.ArrayList<EnvVariableItem> last_items;
 
         public string active_engine { get; set; default = "r"; }
 
         public EnvironmentController (Gtk.Window? win) {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
             this.parent_window = win;
+            this.last_items = new Gee.ArrayList<EnvVariableItem> ();
             this.hexpand = true;
             this.vexpand = true;
 
@@ -78,6 +82,20 @@ namespace Imladris.UI {
             toolbar.append (refresh_spinner);
 
             toolbar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
+
+            search_entry = new Gtk.SearchEntry () {
+                placeholder_text = "Filter objects...",
+                width_request = 130
+            };
+            search_entry.search_changed.connect (apply_filter);
+            toolbar.append (search_entry);
+
+            btn_import = new Gtk.Button.from_icon_name ("document-open-symbolic") {
+                tooltip_text = "Import Dataset (CSV / Text)..."
+            };
+            btn_import.add_css_class ("flat");
+            btn_import.clicked.connect (prompt_import_dataset);
+            toolbar.append (btn_import);
 
             btn_clean = new Gtk.Button.from_icon_name ("edit-clear-all-symbolic") {
                 tooltip_text = "Clear All Objects from Global Environment"
@@ -182,16 +200,67 @@ for _k in list(globals().keys()):
                 yield fetch_python_environment (items);
             }
 
-            // Fallback sample variables if session has no objects yet
-            if (items.size == 0) {
-                items.add (new EnvVariableItem ("mtcars", "data.frame", "32 × 11", "7.2 Kb", true, "mpg, cyl, disp, hp, drat, wt..."));
-                items.add (new EnvVariableItem ("iris", "data.frame", "150 × 5", "7.8 Kb", true, "Sepal.Length, Sepal.Width, Species..."));
-            }
-
-            render_items (items);
+            this.last_items = items;
+            apply_filter ();
 
             refresh_spinner.spinning = false;
             refresh_spinner.visible = false;
+        }
+
+        private void apply_filter () {
+            string query = search_entry != null ? search_entry.text.strip ().down () : "";
+            var filtered = new Gee.ArrayList<EnvVariableItem> ();
+            foreach (var it in last_items) {
+                if (query.length == 0 || it.name.down ().contains (query) || it.var_type.down ().contains (query)) {
+                    filtered.add (it);
+                }
+            }
+            render_items (filtered);
+        }
+
+        private void prompt_import_dataset () {
+            var file_dialog = new Gtk.FileDialog () {
+                title = "Import Dataset (CSV, TSV, Text)"
+            };
+            var filter = new Gtk.FileFilter ();
+            filter.set_filter_name ("Delimited Data (*.csv, *.tsv, *.txt)");
+            filter.add_pattern ("*.csv");
+            filter.add_pattern ("*.tsv");
+            filter.add_pattern ("*.txt");
+            var filters = new GLib.ListStore (typeof (Gtk.FileFilter));
+            filters.append (filter);
+            file_dialog.filters = filters;
+
+            file_dialog.open.begin (parent_window, null, (obj, res) => {
+                try {
+                    var file = file_dialog.open.end (res);
+                    if (file != null) {
+                        string path = file.get_path ();
+                        string base_name = file.get_basename ();
+                        string var_name = base_name.replace (".csv", "").replace (".tsv", "").replace (".txt", "").replace ("-", "_").replace (" ", "_");
+                        if (var_name.length == 0 || !var_name.get_char (0).isalpha ()) {
+                            var_name = "dataset_" + var_name;
+                        }
+
+                        if (active_engine == "r") {
+                            string r_code = @"$var_name <- read.csv(\"$path\")\nView($var_name)\n";
+                            PersistentSessionManager.get_default ().execute_r.begin (r_code, (o, r) => {
+                                refresh_environment.begin ();
+                                view_dataframe_requested (var_name, "r");
+                            });
+                        } else {
+                            string py_code = @"import pandas as pd\n$var_name = pd.read_csv(\"$path\")\n";
+                            PersistentSessionManager.get_default ().execute_python.begin (py_code, (o, r) => {
+                                refresh_environment.begin ();
+                                view_dataframe_requested (var_name, "python");
+                            });
+                        }
+                        toast_requested (@"Imported dataset as '$var_name'");
+                    }
+                } catch (GLib.Error e) {
+                    // Canceled or failed
+                }
+            });
         }
 
         private async void fetch_r_environment (Gee.ArrayList<EnvVariableItem> items) {
@@ -274,57 +343,128 @@ print("___IMLADRIS_ENV_END___")
 
             header_status_lbl.label = @"Global Environment ($(items.size) Objects)";
 
-            foreach (var item in items) {
-                var expander_row = new Adw.ExpanderRow () {
-                    title = item.name,
-                    subtitle = @"$(item.var_type)$(item.dimensions != "" ? @" • $(item.dimensions)" : "")$(item.memory_size != "" ? @" • $(item.memory_size)" : "")"
+            if (items.size == 0) {
+                var empty_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) {
+                    margin_top = 32,
+                    margin_bottom = 32,
+                    halign = Gtk.Align.CENTER,
+                    valign = Gtk.Align.CENTER
                 };
-
-                string icon_name = item.is_dataframe ? "view-grid-symbolic" : (item.dimensions.contains ("×") ? "view-list-symbolic" : "view-list-bullet-symbolic");
-                expander_row.add_prefix (new Gtk.Image.from_icon_name (icon_name));
-
-                if (item.is_dataframe) {
-                    var view_btn = new Gtk.Button.from_icon_name ("view-grid-symbolic") {
-                        valign = Gtk.Align.CENTER,
-                        tooltip_text = @"View Data / Matrix: $(item.name)"
-                    };
-                    view_btn.add_css_class ("flat");
-                    string obj_to_view = item.name;
-                    view_btn.clicked.connect (() => {
-                        view_dataframe_requested (obj_to_view, active_engine);
-                    });
-                    expander_row.add_suffix (view_btn);
-                }
-
-                // Summary monospace container inside expander
-                var summary_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
-                    margin_start = 12,
-                    margin_end = 12,
-                    margin_top = 6,
-                    margin_bottom = 8
+                var empty_icon = new Gtk.Image.from_icon_name ("view-list-symbolic") {
+                    pixel_size = 48,
+                    css_classes = { "dim-label" }
                 };
-
-                var summary_label = new Gtk.Label ("Click to inspect str() / summary()...") {
-                    xalign = 0,
-                    selectable = true,
-                    wrap = true,
-                    wrap_mode = Pango.WrapMode.WORD_CHAR,
-                    css_classes = { "monospace", "caption", "dim-label" }
+                var empty_title = new Gtk.Label ("Environment is empty") {
+                    css_classes = { "heading", "dim-label" }
                 };
-                summary_box.append (summary_label);
-
-                bool fetched = false;
-                string vname = item.name;
-                expander_row.notify["expanded"].connect (() => {
-                    if (expander_row.expanded && !fetched) {
-                        fetched = true;
-                        fetch_variable_summary.begin (vname, summary_label);
-                    }
-                });
-
-                expander_row.add_row (new Adw.ActionRow () { child = summary_box });
-                list_box.append (expander_row);
+                var empty_sub = new Gtk.Label ("Execute code chunks or console commands to inspect objects") {
+                    css_classes = { "caption", "dim-label" }
+                };
+                empty_box.append (empty_icon);
+                empty_box.append (empty_title);
+                empty_box.append (empty_sub);
+                list_box.append (empty_box);
+                return;
             }
+
+            var data_items = new Gee.ArrayList<EnvVariableItem> ();
+            var value_items = new Gee.ArrayList<EnvVariableItem> ();
+            var func_items = new Gee.ArrayList<EnvVariableItem> ();
+
+            foreach (var item in items) {
+                string cls_lower = item.var_type.down ();
+                if (item.is_dataframe || cls_lower.contains ("matrix") || cls_lower.contains ("data.frame") || cls_lower.contains ("tibble") || cls_lower.contains ("data.table")) {
+                    data_items.add (item);
+                } else if (cls_lower.contains ("function") || cls_lower.contains ("builtin") || cls_lower.contains ("closure")) {
+                    func_items.add (item);
+                } else {
+                    value_items.add (item);
+                }
+            }
+
+            if (data_items.size > 0) {
+                add_category_header (@"Data ($(data_items.size))");
+                foreach (var it in data_items) {
+                    append_variable_row (it);
+                }
+            }
+
+            if (value_items.size > 0) {
+                add_category_header (@"Values ($(value_items.size))");
+                foreach (var it in value_items) {
+                    append_variable_row (it);
+                }
+            }
+
+            if (func_items.size > 0) {
+                add_category_header (@"Functions ($(func_items.size))");
+                foreach (var it in func_items) {
+                    append_variable_row (it);
+                }
+            }
+        }
+
+        private void add_category_header (string title) {
+            var header_label = new Gtk.Label (title) {
+                xalign = 0,
+                margin_start = 8,
+                margin_top = 8,
+                margin_bottom = 2,
+                css_classes = { "caption", "dim-label", "heading" }
+            };
+            list_box.append (header_label);
+        }
+
+        private void append_variable_row (EnvVariableItem item) {
+            var expander_row = new Adw.ExpanderRow () {
+                title = item.name,
+                subtitle = @"$(item.var_type)$(item.dimensions != "" ? @" • $(item.dimensions)" : "")$(item.memory_size != "" ? @" • $(item.memory_size)" : "")"
+            };
+
+            string icon_name = item.is_dataframe ? "view-grid-symbolic" : (item.dimensions.contains ("×") ? "view-list-symbolic" : "view-list-bullet-symbolic");
+            expander_row.add_prefix (new Gtk.Image.from_icon_name (icon_name));
+
+            if (item.is_dataframe) {
+                var view_btn = new Gtk.Button.from_icon_name ("view-grid-symbolic") {
+                    valign = Gtk.Align.CENTER,
+                    tooltip_text = @"View Data / Matrix: $(item.name)"
+                };
+                view_btn.add_css_class ("flat");
+                string obj_to_view = item.name;
+                view_btn.clicked.connect (() => {
+                    view_dataframe_requested (obj_to_view, active_engine);
+                });
+                expander_row.add_suffix (view_btn);
+            }
+
+            // Summary monospace container inside expander
+            var summary_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
+                margin_start = 12,
+                margin_end = 12,
+                margin_top = 6,
+                margin_bottom = 8
+            };
+
+            var summary_label = new Gtk.Label ("Click to inspect str() / summary()...") {
+                xalign = 0,
+                selectable = true,
+                wrap = true,
+                wrap_mode = Pango.WrapMode.WORD_CHAR,
+                css_classes = { "monospace", "caption", "dim-label" }
+            };
+            summary_box.append (summary_label);
+
+            bool fetched = false;
+            string vname = item.name;
+            expander_row.notify["expanded"].connect (() => {
+                if (expander_row.expanded && !fetched) {
+                    fetched = true;
+                    fetch_variable_summary.begin (vname, summary_label);
+                }
+            });
+
+            expander_row.add_row (new Adw.ActionRow () { child = summary_box });
+            list_box.append (expander_row);
         }
 
         private async void fetch_variable_summary (string var_name, Gtk.Label target_label) {

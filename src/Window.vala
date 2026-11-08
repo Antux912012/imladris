@@ -1139,6 +1139,18 @@ namespace Imladris {
             });
             this.add_action (action_run_line);
 
+            var action_run_above = new GLib.SimpleAction ("run_chunks_above", null);
+            action_run_above.activate.connect (() => {
+                run_chunks_above ();
+            });
+            this.add_action (action_run_above);
+
+            var action_clear_console = new GLib.SimpleAction ("clear_console", null);
+            action_clear_console.activate.connect (() => {
+                clear_console ();
+            });
+            this.add_action (action_clear_console);
+
             var action_toolchain = new GLib.SimpleAction ("toolchain_setup", null);
             action_toolchain.activate.connect (() => {
                 show_toolchain_setup_dialog ();
@@ -1440,9 +1452,9 @@ namespace Imladris {
                 run_all_chunks ();
             });
 
-            btn_run_above = RibbonFactory.create_tool_button ("media-skip-backward-symbolic", "Run Above", "Run All Chunks Above");
+            btn_run_above = RibbonFactory.create_tool_button ("media-skip-backward-symbolic", "Run Above", "Run All Chunks Above (Ctrl+Alt+P)");
             ((Gtk.Button) btn_run_above).clicked.connect (() => {
-                run_all_chunks ();
+                run_chunks_above ();
             });
 
             btn_run_below = RibbonFactory.create_tool_button ("media-skip-forward-symbolic", "Run Below", "Run Active and Below Chunks");
@@ -2036,6 +2048,20 @@ namespace Imladris {
             var doc = get_active_document ();
             if (doc != null) {
                 doc.panel_registry.execute_all_cells ();
+            }
+        }
+
+        public void run_chunks_above () {
+            var doc = get_active_document ();
+            if (doc != null) {
+                doc.run_chunks_above ();
+            }
+        }
+
+        public void clear_console () {
+            var doc = get_active_document ();
+            if (doc != null) {
+                doc.clear_console ();
             }
         }
 

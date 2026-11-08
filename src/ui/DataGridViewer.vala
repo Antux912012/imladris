@@ -187,7 +187,8 @@ namespace Imladris.UI {
             string[] cols = { "#", "Info" };
             var rows = new Gee.ArrayList<DataRow> ();
             rows.add (new DataRow (1, new string[] { "—", "Use View(dataframe) in R/Python or click 'View Data' in the Environment panel to inspect dataframes." }));
-            populate_grid_data ("Data Viewer", cols, rows);
+            populate_grid_data ("", cols, rows);
+            title_label.label = "No Object Loaded";
         }
 
         public void populate_grid_data (string object_name, string[] col_names, Gee.ArrayList<DataRow> rows) {
