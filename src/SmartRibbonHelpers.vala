@@ -68,6 +68,21 @@ namespace Imladris {
                 css_classes = { "heading" }
             });
 
+            var zotero_btn = new Gtk.Button.with_label ("Pick in Zotero (Ctrl+Shift+I)") {
+                icon_name = "accessories-dictionary-symbolic"
+            };
+            zotero_btn.clicked.connect (() => {
+                popover.popdown ();
+                var zotero = Services.ZoteroService.get_default ();
+                zotero.open_native_citation_picker_async.begin ((obj, res) => {
+                    string? cite = zotero.open_native_citation_picker_async.end (res);
+                    if (cite != null && cite.length > 0) {
+                        cb (cite + " ");
+                    }
+                });
+            });
+            vbox.append (zotero_btn);
+
             var entry = new Gtk.Entry () {
                 placeholder_text = "e.g. knuth1984, wickham2019"
             };

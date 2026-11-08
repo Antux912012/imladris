@@ -55,10 +55,11 @@ sources = files(
   'src/services/SandboxController.vala',
   'src/services/PersistentSessionManager.vala',
   'src/services/HistoryManager.vala',
+  'src/services/ZoteroService.vala',
+  'src/editor/CitationCompletionProvider.vala',
   'src/services/ExportService.vala',
   'src/services/MediaHelper.vala',
   'src/services/PackageIndexCache.vala',
-  'src/services/HistoryManager.vala',
   'src/plugins/PluginManager.vala',
   'src/core/layout/DockTypes.vala',
   'src/ui/PersistentPanelRegistry.vala',
@@ -220,6 +221,19 @@ dock_test_exe = executable('test_dock_environment',
 )
 
 test('dock_environment_tests', dock_test_exe, timeout: 30)
+
+zotero_test_sources = files(
+  'tests/test_zotero_service.vala',
+  'src/services/ZoteroService.vala',
+)
+
+zotero_test_exe = executable('test_zotero_service',
+  zotero_test_sources,
+  dependencies: deps,
+  vala_args: ['--target-glib=2.76'],
+)
+
+test('zotero_service_tests', zotero_test_exe, timeout: 30)
 
 
 

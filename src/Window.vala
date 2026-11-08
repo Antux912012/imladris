@@ -7,6 +7,8 @@ namespace Imladris {
         private Gtk.ToggleButton? btn_collapse_ribbon = null;
         private Adw.TabView tab_view;
         private Adw.TabBar tab_bar;
+        private Gtk.Stack content_stack;
+        private Adw.StatusPage welcome_page;
         private Gtk.Label status_badge_lbl;
         private Gtk.Label status_env_badge_lbl;
         private Gtk.Label status_words_lbl;
@@ -104,6 +106,9 @@ namespace Imladris {
             tier1_box.add_css_class ("imladris-topbar");
             win_handle.set_child (tier1_box);
 
+            // Native Window Controls for Pantheon (elementary OS close at start) & GNOME
+            tier1_box.append (new Gtk.WindowControls (Gtk.PackType.START));
+
             // Branded "Imladris" Primary Menu
             var brand_menu = new GLib.Menu ();
             var new_sec = new GLib.Menu ();
@@ -188,6 +193,37 @@ namespace Imladris {
 
             tier1_box.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
 
+            var btn_render_quarto = new Gtk.Button () {
+                tooltip_text = "Render Document to HTML / Quarto (Ctrl+Shift+K)",
+                valign = Gtk.Align.CENTER
+            };
+            btn_render_quarto.add_css_class ("pill-button");
+            btn_render_quarto.add_css_class ("suggested-action");
+            var render_content = new Adw.ButtonContent () {
+                icon_name = "media-playback-start-symbolic",
+                label = "Render"
+            };
+            btn_render_quarto.set_child (render_content);
+            btn_render_quarto.clicked.connect (() => {
+                trigger_render ("html");
+            });
+            tier1_box.append (btn_render_quarto);
+
+            var btn_zotero_header = new Gtk.Button () {
+                tooltip_text = "Insert Citation from Zotero (Ctrl+Shift+I)",
+                valign = Gtk.Align.CENTER
+            };
+            btn_zotero_header.add_css_class ("pill-button");
+            var zotero_content = new Adw.ButtonContent () {
+                icon_name = "accessories-dictionary-symbolic",
+                label = "Cite"
+            };
+            btn_zotero_header.set_child (zotero_content);
+            btn_zotero_header.clicked.connect (() => {
+                open_zotero_picker ();
+            });
+            tier1_box.append (btn_zotero_header);
+
             btn_collapse_ribbon = new Gtk.ToggleButton () {
                 icon_name = "ribbon-toggle-symbolic",
                 tooltip_text = "Show / Hide Ribbon Toolbar (Ctrl+F1)",
@@ -269,6 +305,16 @@ namespace Imladris {
                 }
                 tab_view.close_page_finish (page, true);
                 return true;
+            });
+            tab_view.page_detached.connect ((page, pos) => {
+                if (tab_view.n_pages == 0) {
+                    content_stack.visible_child_name = "welcome";
+                    tab_bar.visible = false;
+                }
+            });
+            tab_view.page_attached.connect ((page, pos) => {
+                content_stack.visible_child_name = "editor";
+                tab_bar.visible = true;
             });
             tab_bar = new Adw.TabBar () {
                 view = tab_view,
@@ -356,7 +402,16 @@ namespace Imladris {
             // MAIN WORKSPACE & STATE MACHINE LISTENERS
             // =================================================================
             toast_overlay = new Adw.ToastOverlay ();
-            toast_overlay.set_child (tab_view);
+            content_stack = new Gtk.Stack () {
+                transition_type = Gtk.StackTransitionType.CROSSFADE,
+                transition_duration = 150
+            };
+            welcome_page = build_welcome_page ();
+            content_stack.add_named (welcome_page, "welcome");
+            content_stack.add_named (tab_view, "editor");
+            content_stack.visible_child_name = "editor";
+
+            toast_overlay.set_child (content_stack);
             toolbar_view.set_content (toast_overlay);
 
             Services.WorkspaceStateManager.get_default ().layout_changed.connect ((mode) => {
@@ -714,6 +769,91 @@ namespace Imladris {
 
             var fmt = doc_page.get_document_format ();
             update_ribbon_state_machine (fmt, current_project_type);
+        }
+
+        private Adw.StatusPage build_welcome_page () {
+            var status = new Adw.StatusPage () {
+                icon_name = "io.github.Antux912012.Imladris",
+                title = "Welcome to Imladris",
+                description = "Write scientific documents with Markdown, R, Quarto, and Jupyter.",
+                vexpand = true,
+                hexpand = true
+            };
+
+            var clamp = new Adw.Clamp () {
+                maximum_size = 540,
+                tightening_threshold = 400
+            };
+
+            var group = new Adw.PreferencesGroup () {
+                title = "Get Started"
+            };
+
+            var qmd_row = new Adw.ActionRow () {
+                title = "New Quarto Document (.qmd)",
+                subtitle = "Literate scientific document supporting R, Python, and LaTeX",
+                activatable = true
+            };
+            qmd_row.add_prefix (new Gtk.Image.from_icon_name ("x-office-document-symbolic"));
+            qmd_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            qmd_row.activated.connect (() => {
+                add_document_tab ("analysis.qmd", "markdown", "---\ntitle: \"Untitled Quarto Analysis\"\nauthor: \"Scientist\"\nformat: html\n---\n\n## Introduction\n\n");
+            });
+            group.add (qmd_row);
+
+            var rmd_row = new Adw.ActionRow () {
+                title = "New R Markdown (.Rmd)",
+                subtitle = "Reproducible computational analysis powered by knitr and R",
+                activatable = true
+            };
+            rmd_row.add_prefix (new Gtk.Image.from_icon_name ("text-x-generic-symbolic"));
+            rmd_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            rmd_row.activated.connect (() => {
+                add_document_tab ("report.Rmd", "rmd", "---\ntitle: \"Analysis Report\"\noutput: html_document\n---\n\n```{r setup, include=FALSE}\nknitr::opts_chunk$set(echo = TRUE)\n```\n\n## Introduction\n\n");
+            });
+            group.add (rmd_row);
+
+            var ipynb_row = new Adw.ActionRow () {
+                title = "New Jupyter Notebook (.ipynb)",
+                subtitle = "Interactive notebook cells with rich inline outputs and plots",
+                activatable = true
+            };
+            ipynb_row.add_prefix (new Gtk.Image.from_icon_name ("utilities-terminal-symbolic"));
+            ipynb_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            ipynb_row.activated.connect (() => {
+                add_document_tab ("notebook.ipynb", "json", "{\n \"cells\": [],\n \"metadata\": {},\n \"nbformat\": 4,\n \"nbformat_minor\": 2\n}\n");
+            });
+            group.add (ipynb_row);
+
+            var wizard_row = new Adw.ActionRow () {
+                title = "New Project Wizard...",
+                subtitle = "Initialize a sandboxed reproducible environment (.mallorn)",
+                activatable = true
+            };
+            wizard_row.add_prefix (new Gtk.Image.from_icon_name ("system-run-symbolic"));
+            wizard_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            wizard_row.activated.connect (() => {
+                show_new_project_modal ();
+            });
+            group.add (wizard_row);
+
+            var open_row = new Adw.ActionRow () {
+                title = "Open Document or Project...",
+                subtitle = "Open an existing scientific file or project directory",
+                activatable = true
+            };
+            open_row.add_prefix (new Gtk.Image.from_icon_name ("document-open-symbolic"));
+            open_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            open_row.activated.connect (() => {
+                if (this.application != null) {
+                    this.application.activate_action ("open", null);
+                }
+            });
+            group.add (open_row);
+
+            clamp.set_child (group);
+            status.set_child (clamp);
+            return status;
         }
 
         public void show_new_project_modal () {
@@ -1150,6 +1290,12 @@ namespace Imladris {
                 clear_console ();
             });
             this.add_action (action_clear_console);
+
+            var action_zotero = new GLib.SimpleAction ("zotero_picker", null);
+            action_zotero.activate.connect (() => {
+                open_zotero_picker ();
+            });
+            this.add_action (action_zotero);
 
             var action_toolchain = new GLib.SimpleAction ("toolchain_setup", null);
             action_toolchain.activate.connect (() => {
@@ -2063,6 +2209,43 @@ namespace Imladris {
             if (doc != null) {
                 doc.clear_console ();
             }
+        }
+
+        public void open_zotero_picker () {
+            var zotero = Services.ZoteroService.get_default ();
+            zotero.open_native_citation_picker_async.begin ((obj, res) => {
+                string? citation = zotero.open_native_citation_picker_async.end (res);
+                if (citation != null && citation.length > 0) {
+                    var doc = get_active_document ();
+                    if (doc != null) {
+                        doc.source_buffer.begin_user_action ();
+                        doc.source_buffer.insert_at_cursor (citation, -1);
+                        doc.source_buffer.end_user_action ();
+
+                        try {
+                            var reg = new Regex ("@([a-zA-Z0-9_:-]+)");
+                            MatchInfo mi;
+                            if (reg.match (citation, 0, out mi)) {
+                                while (mi.matches ()) {
+                                    string key = mi.fetch (1);
+                                    string full_text;
+                                    Gtk.TextIter b_s, b_e;
+                                    doc.source_buffer.get_bounds (out b_s, out b_e);
+                                    full_text = doc.source_buffer.get_text (b_s, b_e, false);
+                                    string updated = zotero.ensure_yaml_bibliography (full_text, "references.bib");
+                                    if (updated != full_text) {
+                                        doc.source_buffer.begin_user_action ();
+                                        doc.source_buffer.set_text (updated);
+                                        doc.source_buffer.end_user_action ();
+                                    }
+                                    zotero.sync_citation_to_project_async.begin (key, doc.current_project_dir);
+                                    mi.next ();
+                                }
+                            }
+                        } catch (RegexError e) {}
+                    }
+                }
+            });
         }
 
         public void source_active_file () {

@@ -408,25 +408,79 @@ namespace Imladris.UI {
             outline_box.append (outline_scroll);
             panels.set (PanelId.OUTLINE, outline_box);
 
-            // 7. CITATIONS PANEL (BibTeX / CSL Bibliography Manager)
-            var cit_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
+            // 7. CITATIONS PANEL (Zotero & BibTeX / CSL Bibliography Manager)
+            var cit_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
                 hexpand = true,
-                vexpand = true,
-                margin_top = 6,
-                margin_bottom = 6,
+                vexpand = true
+            };
+
+            var cit_toolbar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+                margin_top = 4,
+                margin_bottom = 4,
                 margin_start = 8,
                 margin_end = 8
             };
-            var cit_input_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
+            cit_toolbar.add_css_class ("dock-subtoolbar");
+
+            var zotero_status_badge = new Gtk.Label ("Zotero") {
+                css_classes = { "caption", "dim-label" }
+            };
+
+            // Probe Zotero status
+            var zotero_svc = Services.ZoteroService.get_default ();
+            zotero_svc.is_zotero_running_async.begin ((obj, res) => {
+                bool running = zotero_svc.is_zotero_running_async.end (res);
+                if (running) {
+                    zotero_status_badge.label = "● Zotero Connected";
+                    zotero_status_badge.remove_css_class ("dim-label");
+                    zotero_status_badge.add_css_class ("success");
+                } else {
+                    zotero_status_badge.label = "○ Zotero Offline (references.bib)";
+                }
+            });
+
+            var btn_zotero_picker = new Gtk.Button.from_icon_name ("accessories-dictionary-symbolic") {
+                tooltip_text = "Pick in Zotero (Ctrl+Shift+I)"
+            };
+            btn_zotero_picker.clicked.connect (() => {
+                zotero_svc.open_native_citation_picker_async.begin ((obj, res) => {
+                    string? cite = zotero_svc.open_native_citation_picker_async.end (res);
+                    if (cite != null && cite.length > 0) {
+                        doc_page.source_buffer.begin_user_action ();
+                        doc_page.source_buffer.insert_at_cursor (cite, -1);
+                        doc_page.source_buffer.end_user_action ();
+                        refresh_environment_and_outline ();
+                    }
+                });
+            });
+
+            var cit_search_entry = new Gtk.SearchEntry () {
+                placeholder_text = "Search Zotero & references.bib...",
+                hexpand = true
+            };
+
+            cit_toolbar.append (zotero_status_badge);
+            cit_toolbar.append (cit_search_entry);
+            cit_toolbar.append (btn_zotero_picker);
+            cit_box.append (cit_toolbar);
+
+            var cit_input_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+                margin_top = 4,
+                margin_bottom = 4,
+                margin_start = 8,
+                margin_end = 8
+            };
             var cit_key_entry = new Gtk.Entry () {
-                placeholder_text = "Citation key (e.g. knuth1984)...",
+                placeholder_text = "Quick citation key (e.g. knuth1984)...",
                 hexpand = true
             };
             var cit_add_btn = new Gtk.Button.with_label ("Insert @key");
             cit_add_btn.clicked.connect (() => {
                 string key = cit_key_entry.text.strip ().replace ("@", "");
                 if (key.length > 0) {
+                    doc_page.source_buffer.begin_user_action ();
                     doc_page.source_buffer.insert_at_cursor (@"[@$key]", -1);
+                    doc_page.source_buffer.end_user_action ();
                     cit_key_entry.text = "";
                     refresh_environment_and_outline ();
                 }
@@ -439,6 +493,94 @@ namespace Imladris.UI {
                 selection_mode = Gtk.SelectionMode.NONE,
                 css_classes = { "boxed-list" }
             };
+
+            cit_search_entry.search_changed.connect (() => {
+                string q = cit_search_entry.text.strip ();
+                if (q == "") {
+                    refresh_environment_and_outline ();
+                    return;
+                }
+
+                // Read local bib if available
+                string? fallback_bib = null;
+                if (doc_page.current_project_dir != "") {
+                    string bib_path = GLib.Path.build_filename (doc_page.current_project_dir, "references.bib");
+                    var f = GLib.File.new_for_path (bib_path);
+                    if (f.query_exists ()) {
+                        try {
+                            uint8[] data;
+                            f.load_contents (null, out data, null);
+                            fallback_bib = (string) data;
+                        } catch (GLib.Error e) {}
+                    }
+                }
+
+                zotero_svc.search_citations_async.begin (q, fallback_bib, (obj, res) => {
+                    var items = zotero_svc.search_citations_async.end (res);
+                    var child = citations_list.get_first_child ();
+                    while (child != null) {
+                        var next = child.get_next_sibling ();
+                        citations_list.remove (child);
+                        child = next;
+                    }
+
+                    if (items.size == 0) {
+                        var empty_row = new Adw.ActionRow () {
+                            title = "No citations found",
+                            subtitle = @"No matches for '$q' in Zotero or references.bib"
+                        };
+                        citations_list.append (empty_row);
+                        return;
+                    }
+
+                    foreach (var item in items) {
+                        var row = new Adw.ActionRow () {
+                            title = @"@$(item.citekey)",
+                            subtitle = @"$(item.authors) ($(item.year)) — $(item.title)"
+                        };
+                        row.add_prefix (new Gtk.Image.from_icon_name ("accessories-dictionary-symbolic"));
+
+                        var ins_btn = new Gtk.Button.from_icon_name ("insert-text-symbolic") {
+                            valign = Gtk.Align.CENTER,
+                            tooltip_text = "Insert citation [@key]"
+                        };
+                        ins_btn.add_css_class ("flat");
+                        string k = item.citekey;
+                        ins_btn.clicked.connect (() => {
+                            doc_page.source_buffer.begin_user_action ();
+                            doc_page.source_buffer.insert_at_cursor (@"[@$k]", -1);
+                            doc_page.source_buffer.end_user_action ();
+                            Gtk.TextIter s, e;
+                            doc_page.source_buffer.get_bounds (out s, out e);
+                            string cur_text = doc_page.source_buffer.get_text (s, e, false);
+                            string updated_text = zotero_svc.ensure_yaml_bibliography (cur_text, "references.bib");
+                            if (updated_text != cur_text) {
+                                doc_page.source_buffer.begin_user_action ();
+                                doc_page.source_buffer.set_text (updated_text);
+                                doc_page.source_buffer.end_user_action ();
+                            }
+                            zotero_svc.sync_citation_to_project_async.begin (k, doc_page.current_project_dir);
+                        });
+                        row.add_suffix (ins_btn);
+
+                        var open_btn = new Gtk.Button.from_icon_name ("system-run-symbolic") {
+                            valign = Gtk.Align.CENTER,
+                            tooltip_text = "Highlight item in Zotero desktop"
+                        };
+                        open_btn.add_css_class ("flat");
+                        open_btn.clicked.connect (() => {
+                            try {
+                                string zot_uri = zotero_svc.get_zotero_select_uri (k);
+                                GLib.AppInfo.launch_default_for_uri (zot_uri, null);
+                            } catch (GLib.Error e) {}
+                        });
+                        row.add_suffix (open_btn);
+
+                        citations_list.append (row);
+                    }
+                });
+            });
+
             var cit_scroll = new Gtk.ScrolledWindow () {
                 child = citations_list,
                 hexpand = true,

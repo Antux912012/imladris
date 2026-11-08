@@ -71,7 +71,7 @@ namespace Imladris.UI {
             };
 
             var about_row = new Adw.ActionRow () {
-                title = "Imladris v0.12.2",
+                title = @"Imladris v$(Application.APP_VERSION)",
                 subtitle = "Documentation, credits, and project inspiration"
             };
             about_row.add_prefix (new Gtk.Image.from_icon_name ("help-browser-symbolic") { pixel_size = 22 });
@@ -91,6 +91,80 @@ namespace Imladris.UI {
             gen_page.add (about_group);
 
             this.add (gen_page);
+
+            // Page 2: Citations & Zotero Engine
+            var cite_page = new Adw.PreferencesPage () {
+                title = "Citations",
+                icon_name = "accessories-dictionary-symbolic"
+            };
+
+            var zotero_group = new Adw.PreferencesGroup () {
+                title = "Zotero Citation Engine",
+                description = "Zero-filesystem-hole localhost RPC (127.0.0.1:23119) for Quarto & Markdown"
+            };
+
+            var zot_status_row = new Adw.ActionRow () {
+                title = "Zotero Local HTTP Connector",
+                subtitle = "http://127.0.0.1:23119/connector/ping"
+            };
+            var zot_badge = new Gtk.Label ("Checking...") {
+                css_classes = { "caption", "dim-label" },
+                valign = Gtk.Align.CENTER
+            };
+            var btn_test_zot = new Gtk.Button.with_label ("Test Connection") {
+                valign = Gtk.Align.CENTER
+            };
+            btn_test_zot.clicked.connect (() => {
+                var z_svc = Services.ZoteroService.get_default ();
+                z_svc.is_zotero_running_async.begin ((obj, res) => {
+                    bool running = z_svc.is_zotero_running_async.end (res);
+                    if (running) {
+                        zot_badge.label = "● Connected";
+                        zot_badge.remove_css_class ("dim-label");
+                        zot_badge.add_css_class ("success");
+                    } else {
+                        zot_badge.label = "○ Offline";
+                        zot_badge.remove_css_class ("success");
+                        zot_badge.add_css_class ("dim-label");
+                    }
+                });
+            });
+            btn_test_zot.clicked ();
+
+            zot_status_row.add_suffix (zot_badge);
+            zot_status_row.add_suffix (btn_test_zot);
+            zotero_group.add (zot_status_row);
+
+            var bbt_row = new Adw.ActionRow () {
+                title = "Better BibTeX (BBT) JSON-RPC",
+                subtitle = "http://127.0.0.1:23119/better-bibtex/json-rpc"
+            };
+            var bbt_badge = new Gtk.Label ("Available") {
+                css_classes = { "caption", "dim-label" },
+                valign = Gtk.Align.CENTER
+            };
+            bbt_row.add_suffix (bbt_badge);
+            zotero_group.add (bbt_row);
+
+            var cayw_row = new Adw.ActionRow () {
+                title = "Native Citation Picker (CAYW)",
+                subtitle = "Shortcut: Ctrl+Shift+I — Launches desktop search dialog"
+            };
+            var btn_try_cayw = new Gtk.Button.with_label ("Open Picker") {
+                valign = Gtk.Align.CENTER
+            };
+            btn_try_cayw.clicked.connect (() => {
+                var app = GLib.Application.get_default () as Application;
+                if (app != null) {
+                    var win = app.active_window as Window;
+                    if (win != null) win.open_zotero_picker ();
+                }
+            });
+            cayw_row.add_suffix (btn_try_cayw);
+            zotero_group.add (cayw_row);
+
+            cite_page.add (zotero_group);
+            this.add (cite_page);
 
             // Page 2: AI Engine Configuration
             var ai_config_mgr = AiConfigManager.get_default ();

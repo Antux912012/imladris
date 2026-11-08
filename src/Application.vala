@@ -58,9 +58,11 @@ namespace Imladris {
             this.set_accels_for_action ("app.open", { "<Control>o" });
             this.set_accels_for_action ("app.save", { "<Control>s" });
             this.set_accels_for_action ("app.package_installer", { "<Control><Shift>p" });
+            this.set_accels_for_action ("app.export_html", { "<Control><Shift>k" });
             this.set_accels_for_action ("app.elrond_assist", { "<Control><Shift>e" });
             this.set_accels_for_action ("app.preferences", { "<Control>comma" });
-            this.set_accels_for_action ("app.insert_image", { "<Control><Shift>i" });
+            this.set_accels_for_action ("app.insert_image", { "<Control><Alt>i", "<Control><Shift>m" });
+            this.set_accels_for_action ("win.zotero_picker", { "<Control><Shift>i" });
             this.set_accels_for_action ("app.insert_video", { "<Control><Shift>v" });
             this.set_accels_for_action ("app.quit", { "<Control>q" });
             this.set_accels_for_action ("win.undo", { "<Control>z" });

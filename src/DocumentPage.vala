@@ -15,6 +15,17 @@ namespace Imladris {
 
         public AssistantPanel? assistant_panel { get; private set; default = null; }
         public GLib.File? file_location { get; set; default = null; }
+        public string current_project_dir {
+            owned get {
+                if (file_location != null) {
+                    var parent = file_location.get_parent ();
+                    if (parent != null) {
+                        return (string) parent.get_path ();
+                    }
+                }
+                return "";
+            }
+        }
         private Window? parent_window;
         private uint update_debounce_id = 0;
 
@@ -710,6 +721,9 @@ print("Python Interpreter:", sys.version.split()[0])
 
         private void setup_completion () {
             var completion = source_view.get_completion ();
+
+            var citation_provider = new Editor.CitationCompletionProvider (this);
+            completion.add_provider (citation_provider);
 
             var ai_provider = new AI.AiCompletionProvider ();
             completion.add_provider (ai_provider);
