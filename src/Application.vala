@@ -2,7 +2,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.14.1";
+        public const string APP_VERSION = "0.15.0";
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },

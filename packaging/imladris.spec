@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.14.1
+Version:        0.15.0
 Release:        1%{?dist}
 Summary:        Scientific notebook studio and Markdown editor
 
@@ -56,6 +56,16 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Sun Nov 08 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.15.0-1
+- Release 0.15.0: RStudio Functional Parity across 4-Quadrant Workbench:
+  * Add HistoryManager service with .Rhistory sync, readline Up/Down navigation, and export.
+  * Add dedicated History (Quadrant 3) and Packages (Quadrant 4) dock panels.
+  * Upgrade Plots panel to multi-plot gallery deck with zoom popout, image/PDF export, and clipboard texture copy.
+  * Upgrade Files panel with New Folder, New File, Delete, Rename, and Set Working Directory.
+  * Integrate Help documentation browser with R Rd2HTML pipeline.
+  * Categorize Environment into Data (with 1-click View), Values, and Functions with live search.
+  * Implement Run Chunks Above and Clear Console execution actions.
+
 * Wed Oct 28 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.14.1-1
 - Release 0.14.1: Live Preview Stability, Pandoc Export, and Crash Fixes:
   * Implement GLib.ApplicationFlags.HANDLES_OPEN and application open hooks to resolve file opening crash.
