@@ -60,6 +60,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.15.1" date="2026-11-08">
+      <description>
+        <p>Release v0.15.1 incorporates deep GNOME architectural debugging and stability improvements: Resolves GObject circular reference memory cycles in citation completion; secures code chunk signal disconnections with try-finally execution guards; adds graceful persistent session shutdown routines to eliminate zombie subshell processes; guarantees stream and descriptor closure in REPL bridges; adds non-blocking timeout wrappers for binary checks; harmonizes license declarations to GPL-3.0-or-later; and resolves GTK4 widget class compiler warnings.</p>
+      </description>
+    </release>
     <release version="0.15.0" date="2026-11-08">
       <description>
         <p>Release v0.15.0 delivers full functional parity with RStudio across the 4-quadrant workbench docking system: Introduces interactive Command History tracking with project-level .Rhistory synchronization, readline Up/Down navigation, and history export; adds the dedicated History panel (Quadrant 3) and Packages manager panel (Quadrant 4) with live library attach/detach toggles; upgrades Plots to a multi-plot gallery deck with Previous/Next navigation, zoom popout window, image/PDF export, and clipboard copy; adds complete Files workspace actions (New Folder, New File, Delete, Rename, and Set Working Directory); integrates the Help documentation browser with R Rd2HTML pipeline; refines Environment categorization into Data (with 1-click View), Values, and Functions with live search and CSV/text dataset import; and implements cell execution controls (Run Chunks Above, Clear Console) with custom keyboard shortcuts.</p>

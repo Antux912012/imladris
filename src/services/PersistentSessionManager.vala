@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace Imladris.Services {
 
     public class PersistentSessionManager : GLib.Object {
@@ -211,6 +212,11 @@ namespace Imladris.Services {
         }
 
         public void restart_all_sessions () {
+            terminate_r ();
+            terminate_python ();
+        }
+
+        public void shutdown_all () {
             terminate_r ();
             terminate_python ();
         }

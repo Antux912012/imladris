@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace Imladris {
 
     public delegate void StringInsertCallback (string text_to_insert);
@@ -23,9 +24,9 @@ namespace Imladris {
                 margin_end = 8
             };
 
-            vbox.append (new Gtk.Label ("Insert Code Chunk / Fenced Block") {
-                css_classes = { "heading" }
-            });
+            var title_lbl = new Gtk.Label ("Insert Code Chunk / Fenced Block");
+            title_lbl.add_css_class ("heading");
+            vbox.append (title_lbl);
 
             string[] langs = { "r", "python", "julia", "bash", "sql", "typescript", "json", "yaml" };
             var grid = new Gtk.Grid () { row_spacing = 4, column_spacing = 6 };

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using GLib;
 using Soup;
 using Json;
@@ -587,8 +588,20 @@ Analyze the report narrative and active dataframe columns to suggest the optimal
 
                 var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                 var proc = launcher.spawnv (argv);
-                proc.wait (null);
-                return (proc.get_if_exited () && proc.get_exit_status () == 0);
+                var cancellable = new GLib.Cancellable ();
+                uint timeout_id = GLib.Timeout.add (1500, () => {
+                    cancellable.cancel ();
+                    return GLib.Source.REMOVE;
+                });
+                bool ok = false;
+                try {
+                    proc.wait (cancellable);
+                    ok = (proc.get_if_exited () && proc.get_exit_status () == 0);
+                } catch (GLib.IOError.CANCELLED e) {
+                    proc.force_exit ();
+                }
+                GLib.Source.remove (timeout_id);
+                return ok;
             } catch (Error e) {
                 return false;
             }

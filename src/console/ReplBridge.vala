@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using GLib;
 using Gtk;
 
@@ -133,6 +134,14 @@ namespace Imladris.Execution {
 
         public void stop () {
             _is_running = false;
+            try {
+                if (stdin_stream != null) stdin_stream.close (null);
+                if (stdout_stream != null) stdout_stream.close (null);
+                if (stderr_stream != null) stderr_stream.close (null);
+            } catch (GLib.Error e) {}
+            stdin_stream = null;
+            stdout_stream = null;
+            stderr_stream = null;
             if (process != null) {
                 process.force_exit ();
                 process = null;

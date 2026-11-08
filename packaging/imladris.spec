@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.15.0
+Version:        0.15.1
 Release:        1%{?dist}
 Summary:        Scientific notebook studio and Markdown editor
 

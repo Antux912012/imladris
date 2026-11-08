@@ -2,6 +2,7 @@ using Gtk;
 using Adw;
 using GLib;
 
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace Imladris.UI {
 
     public class ToolchainSetupDialog : Adw.Dialog {
@@ -58,9 +59,10 @@ namespace Imladris.UI {
             if (usage > 0) {
                 double mb = (double) usage / (1024.0 * 1024.0);
                 var size_badge = new Gtk.Label ("%.1f MB installed".printf (mb)) {
-                    valign = Gtk.Align.CENTER,
-                    css_classes = { "dim-label", "caption" }
+                    valign = Gtk.Align.CENTER
                 };
+                size_badge.add_css_class ("dim-label");
+                size_badge.add_css_class ("caption");
                 location_row.add_suffix (size_badge);
             }
             info_group.add (location_row);
@@ -141,9 +143,9 @@ namespace Imladris.UI {
 
             status_lbl = new Gtk.Label ("Preparing installation...") {
                 xalign = 0.0f,
-                wrap = true,
-                css_classes = { "dim-label" }
+                wrap = true
             };
+            status_lbl.add_css_class ("dim-label");
             progress_box.append (status_lbl);
 
             progress_bar = new Gtk.ProgressBar () {

@@ -8,6 +8,7 @@ rpmbuild/
 build-flatpak/
 build-flatpak-app/
 .flatpak-builder/
+flatpak_repo/
 repo/
 *.flatpak
 *.deb

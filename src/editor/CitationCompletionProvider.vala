@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using GLib;
 using Gtk;
 using GtkSource;
@@ -22,7 +23,7 @@ namespace Imladris.Editor {
     }
 
     public class CitationCompletionProvider : GLib.Object, GtkSource.CompletionProvider {
-        private DocumentPage? doc_page;
+        private weak DocumentPage? doc_page;
 
         public CitationCompletionProvider (DocumentPage? doc_page = null) {
             this.doc_page = doc_page;

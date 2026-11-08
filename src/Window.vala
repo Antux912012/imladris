@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace Imladris {
 
     public class Window : Adw.ApplicationWindow, Imladris.Plugins.PluginHostWindow {
@@ -1937,7 +1938,7 @@ namespace Imladris {
                 developer_name = "Antonio De Gaetano",
                 developers = devs,
                 copyright = "© 2026 Antonio De Gaetano",
-                license_type = Gtk.License.GPL_3_0_ONLY,
+                license_type = Gtk.License.GPL_3_0,
                 website = "https://github.com/Antux912012/imladris-next-md-editor",
                 issue_url = "https://github.com/Antux912012/imladris-next-md-editor/issues",
                 support_url = "https://github.com/Antux912012/imladris-next-md-editor/discussions",

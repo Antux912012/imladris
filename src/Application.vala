@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.15.0";
+        public const string APP_VERSION = "0.15.1";
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },
@@ -101,6 +102,11 @@ namespace Imladris {
                 win = new Window (this);
             }
             win.present ();
+        }
+
+        protected override void shutdown () {
+            Services.PersistentSessionManager.get_default ().shutdown_all ();
+            base.shutdown ();
         }
 
         protected override void open (GLib.File[] files, string hint) {

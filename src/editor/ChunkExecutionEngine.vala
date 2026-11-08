@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using GLib;
 using Gtk;
 
@@ -125,17 +126,19 @@ print(f"\n%s")
                 error_buffer.append (text);
             });
 
-            yield active_bridge.send_command (wrapped_code);
+            try {
+                yield active_bridge.send_command (wrapped_code);
 
-            // Wait for sentinel with timeout
-            int elapsed = 0;
-            while (!output_buffer.str.contains (sentinel) && elapsed < 30000 && active_bridge.is_running) {
-                yield Nap.sleep (50);
-                elapsed += 50;
+                // Wait for sentinel with timeout
+                int elapsed = 0;
+                while (!output_buffer.str.contains (sentinel) && elapsed < 30000 && active_bridge.is_running) {
+                    yield Nap.sleep (50);
+                    elapsed += 50;
+                }
+            } finally {
+                active_bridge.disconnect (out_id);
+                active_bridge.disconnect (err_id);
             }
-
-            active_bridge.disconnect (out_id);
-            active_bridge.disconnect (err_id);
 
             string full_output = output_buffer.str;
             result.stderr = error_buffer.str;
