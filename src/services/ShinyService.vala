@@ -50,6 +50,19 @@ namespace Imladris.Services {
             return instance;
         }
 
+        private static GLib.Regex? s_url_regex = null;
+
+        private static GLib.Regex get_url_regex () {
+            if (s_url_regex == null) {
+                try {
+                    s_url_regex = new GLib.Regex ("Listening on (http://[0-9a-zA-Z.:]+)");
+                } catch (GLib.RegexError e) {
+                    critical ("Failed to compile shiny URL regex: %s", e.message);
+                }
+            }
+            return s_url_regex;
+        }
+
         private GLib.Subprocess? app_process = null;
         private DataInputStream? stdout_stream = null;
         private DataInputStream? stderr_stream = null;
@@ -166,7 +179,7 @@ shiny::runApp('%s', port = %d, host = '127.0.0.1', launch.browser = FALSE)
         private async void read_stream_loop (DataInputStream? stream, bool is_error) {
             if (stream == null) return;
             try {
-                var url_regex = new Regex ("Listening on (http://[0-9a-zA-Z.:]+)");
+                var url_regex = get_url_regex ();
                 while (app_process != null) {
                     size_t len;
                     string? line = yield stream.read_line_async (Priority.DEFAULT, cancellable, out len);

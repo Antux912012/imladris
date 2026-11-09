@@ -36,7 +36,7 @@ namespace Imladris {
                     builder.set_member_name ("name");
                     builder.add_string_value ("imladris-mcp");
                     builder.set_member_name ("version");
-                    builder.add_string_value ("0.12.2");
+                    builder.add_string_value (Application.APP_VERSION);
                     builder.end_object ();
 
                     builder.end_object ();

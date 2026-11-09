@@ -270,8 +270,9 @@ namespace Imladris {
                 }
                 update_debounce_id = GLib.Timeout.add (250, () => {
                     update_debounce_id = 0;
-                    emit_buffer_stats ();
-                    refresh_live_preview ();
+                    string doc_text = source_buffer.text;
+                    emit_buffer_stats (doc_text);
+                    refresh_live_preview (doc_text);
                     panel_registry.refresh_environment_and_outline ();
 
                     // Non-blocking shadow buffer write for crash resilience
@@ -287,7 +288,7 @@ namespace Imladris {
                         doc_id,
                         path,
                         doc_type,
-                        source_buffer.text,
+                        doc_text,
                         line,
                         col,
                         true
@@ -467,8 +468,8 @@ print("Python Interpreter:", sys.version.split()[0])
             }
         }
 
-        public void refresh_live_preview () {
-            string raw = source_buffer.text;
+        public void refresh_live_preview (string? preloaded_text = null) {
+            string raw = preloaded_text != null ? preloaded_text : source_buffer.text;
             string? base_uri = null;
             if (file_location != null) {
                 var parent = file_location.get_parent ();
@@ -921,8 +922,8 @@ print("Python Interpreter:", sys.version.split()[0])
             console_view.buffer.insert (ref end, text + "\n", -1);
         }
 
-        public void emit_buffer_stats () {
-            string txt = source_buffer.text;
+        public void emit_buffer_stats (string? preloaded_text = null) {
+            string txt = preloaded_text != null ? preloaded_text : source_buffer.text;
             int words = 0;
             bool in_word = false;
             for (int i = 0; i < txt.length; i++) {

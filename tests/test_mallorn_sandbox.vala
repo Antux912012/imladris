@@ -320,8 +320,8 @@ print(np.mean([1, 2, 3]))
                         assert (chunk_res.stdout.contains ("Computed Result: 42"));
 
                         if (Gtk.init_check ()) {
-                            var widget = new Execution.InlineChunkOutputWidget (10);
-                            widget.update_output (chunk_res);
+                            var widget = new UI.InlineChunkOutputWidget (10);
+                            widget.set_output (chunk_res.stdout, chunk_res.plot_path, 1);
                         }
 
                         py_bridge.stop ();

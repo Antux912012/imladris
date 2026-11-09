@@ -22,12 +22,10 @@ namespace Imladris.Services {
         }
 
         private string cache_dir;
-        private string manifest_path;
 
         public RecoveryService () {
             Object ();
             cache_dir = Core.PlatformUtils.get_shared_cache_dir ("recovery");
-            manifest_path = GLib.Path.build_filename (cache_dir, "manifest.json");
             ensure_directory ();
         }
 

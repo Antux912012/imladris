@@ -1,13 +1,13 @@
 namespace Imladris.Core {
 
     public class FrontmatterData : GLib.Object {
-        public string? title { get; set; default = null; }
-        public string? author { get; set; default = null; }
-        public string? date { get; set; default = null; }
-        public string? bibliography { get; set; default = null; }
-        public string? format_type { get; set; default = null; }
-        public string? output { get; set; default = null; }
-        public string? abstract_text { get; set; default = null; }
+        public string? title { owned get; set; default = null; }
+        public string? author { owned get; set; default = null; }
+        public string? date { owned get; set; default = null; }
+        public string? bibliography { owned get; set; default = null; }
+        public string? format_type { owned get; set; default = null; }
+        public string? output { owned get; set; default = null; }
+        public string? abstract_text { owned get; set; default = null; }
 
         public bool is_empty () {
             return title == null && author == null && date == null &&

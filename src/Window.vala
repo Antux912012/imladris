@@ -1488,11 +1488,7 @@ namespace Imladris {
             box.append (RibbonFactory.create_vseparator ());
 
             // Group 4: Assistant & Settings
-            var btn_ai_home = RibbonFactory.create_tool_button ("system-run-symbolic", "Elrond Assistance", "Write with Elrond Assistance (AI) — Local R, Python, SQL & Data Science Copilot (Ctrl+Shift+E)");
-            ((Gtk.Button) btn_ai_home).clicked.connect (() => {
-                trigger_elrond_assistance ();
-            });
-            box.append (btn_ai_home);
+            box.append (create_elrond_assistance_button ());
 
             box.append (RibbonFactory.create_tool_button ("emblem-system-symbolic", "Preferences", "Open Preferences (Ctrl+,)", false, false, true, null, "app.preferences"));
             box.append (RibbonFactory.create_tool_button ("help-browser-symbolic", "About", "About Imladris & Credits", false, false, true, null, "app.about"));
@@ -1710,12 +1706,7 @@ namespace Imladris {
 
             box.append (RibbonFactory.create_linked_group ({ btn_restart_kernel, btn_package_installer, btn_snapshot_env, btn_restore_env, btn_toolchains }));
             box.append (RibbonFactory.create_vseparator ());
-
-            var btn_comp_ai = RibbonFactory.create_tool_button ("system-run-symbolic", "Elrond Assistance", "Write with Elrond Assistance (AI) — Local R, Python, SQL & Data Science Copilot (Ctrl+Shift+E)");
-            ((Gtk.Button) btn_comp_ai).clicked.connect (() => {
-                trigger_elrond_assistance ();
-            });
-            box.append (btn_comp_ai);
+            box.append (create_elrond_assistance_button ());
 
             return box;
         }
@@ -1758,14 +1749,21 @@ namespace Imladris {
             });
             box.append (btn_preview);
             box.append (RibbonFactory.create_vseparator ());
-
-            var btn_pub_ai = RibbonFactory.create_tool_button ("system-run-symbolic", "Elrond Assistance", "Write with Elrond Assistance (AI) — Local R, Python, SQL & Data Science Copilot (Ctrl+Shift+E)");
-            ((Gtk.Button) btn_pub_ai).clicked.connect (() => {
-                trigger_elrond_assistance ();
-            });
-            box.append (btn_pub_ai);
+            box.append (create_elrond_assistance_button ());
 
             return box;
+        }
+
+        private Gtk.Widget create_elrond_assistance_button () {
+            var btn = RibbonFactory.create_tool_button (
+                "system-run-symbolic",
+                "Elrond Assistance",
+                "Write with Elrond Assistance (AI) — Local R, Python, SQL & Data Science Copilot (Ctrl+Shift+E)"
+            );
+            ((Gtk.Button) btn).clicked.connect (() => {
+                trigger_elrond_assistance ();
+            });
+            return btn;
         }
 
         /**

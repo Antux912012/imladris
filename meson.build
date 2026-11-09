@@ -1,5 +1,5 @@
 project('imladris', 'vala', 'c',
-  version: '0.15.2',
+  version: '0.16.0',
   default_options: ['warning_level=1']
 )
 
@@ -136,6 +136,7 @@ test_sources = files(
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
   'src/editor/ChunkExecutionEngine.vala',
+  'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
 )
@@ -181,6 +182,7 @@ plugin_test_sources = files(
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
   'src/editor/ChunkExecutionEngine.vala',
+  'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
 )
@@ -208,6 +210,7 @@ dock_test_sources = files(
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
   'src/editor/ChunkExecutionEngine.vala',
+  'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
   'src/core/layout/DockTypes.vala',

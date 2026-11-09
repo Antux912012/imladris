@@ -110,6 +110,30 @@ namespace Imladris.Adapters {
             }
         }
 
+        private static GLib.Regex? inline_code_regex = null;
+        private static GLib.Regex? inline_bold_regex = null;
+        private static GLib.Regex? inline_italic_regex = null;
+        private static GLib.Regex? inline_strike_regex = null;
+        private static GLib.Regex? inline_link_regex = null;
+
+        private static string format_inline_markdown (string line) {
+            string escaped = GLib.Markup.escape_text (line);
+            try {
+                if (inline_code_regex == null) inline_code_regex = new GLib.Regex ("`([^`]+)`");
+                if (inline_bold_regex == null) inline_bold_regex = new GLib.Regex ("\\*\\*([^\\*]+)\\*\\*");
+                if (inline_italic_regex == null) inline_italic_regex = new GLib.Regex ("(?<!\\*)\\*([^\\*]+)\\*(?!\\*)");
+                if (inline_strike_regex == null) inline_strike_regex = new GLib.Regex ("~~([^~]+)~~");
+                if (inline_link_regex == null) inline_link_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
+
+                escaped = inline_code_regex.replace (escaped, -1, 0, "<code>\\1</code>");
+                escaped = inline_bold_regex.replace (escaped, -1, 0, "<strong>\\1</strong>");
+                escaped = inline_italic_regex.replace (escaped, -1, 0, "<em>\\1</em>");
+                escaped = inline_strike_regex.replace (escaped, -1, 0, "<del>\\1</del>");
+                escaped = inline_link_regex.replace (escaped, -1, 0, "<a href=\"\\2\">\\1</a>");
+            } catch (GLib.RegexError e) {}
+            return escaped;
+        }
+
         private static string basic_markdown_to_html (string text) {
             var lines = text.split ("\n");
             var res = new StringBuilder ();
@@ -149,17 +173,17 @@ namespace Imladris.Adapters {
                 }
 
                 if (line.has_prefix ("### ")) {
-                    res.append_printf ("<h3>%s</h3>\n", GLib.Markup.escape_text (line.substring (4)));
+                    res.append_printf ("<h3>%s</h3>\n", format_inline_markdown (line.substring (4)));
                 } else if (line.has_prefix ("## ")) {
-                    res.append_printf ("<h2>%s</h2>\n", GLib.Markup.escape_text (line.substring (3)));
+                    res.append_printf ("<h2>%s</h2>\n", format_inline_markdown (line.substring (3)));
                 } else if (line.has_prefix ("# ")) {
-                    res.append_printf ("<h1>%s</h1>\n", GLib.Markup.escape_text (line.substring (2)));
+                    res.append_printf ("<h1>%s</h1>\n", format_inline_markdown (line.substring (2)));
                 } else if (line.has_prefix ("- ") || line.has_prefix ("* ")) {
                     if (!in_ul) {
                         res.append ("<ul>\n");
                         in_ul = true;
                     }
-                    res.append_printf ("  <li>%s</li>\n", GLib.Markup.escape_text (line.substring (2)));
+                    res.append_printf ("  <li>%s</li>\n", format_inline_markdown (line.substring (2)));
                 } else {
                     if (in_ul) {
                         res.append ("</ul>\n");
@@ -169,7 +193,7 @@ namespace Imladris.Adapters {
                     if (trimmed == "") {
                         res.append ("\n");
                     } else {
-                        res.append_printf ("<p>%s</p>\n", GLib.Markup.escape_text (line));
+                        res.append_printf ("<p>%s</p>\n", format_inline_markdown (line));
                     }
                 }
             }

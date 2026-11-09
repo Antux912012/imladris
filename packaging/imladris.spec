@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.15.2
+Version:        0.16.0
 Release:        1%{?dist}
 Summary:        Scientific notebook studio and Markdown editor
 
@@ -56,6 +56,15 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Mon Nov 09 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.16.0-1
+- Release 0.16.0: Codebase Deduplication, Performance Optimization & Stability Update:
+  * Eliminate duplicated inline chunk output widget and dead export pipeline methods.
+  * Optimize DocumentPage buffer change debounce and snapshot serialization.
+  * Pre-compile regular expressions for Markdown styling and Shiny stream parsing.
+  * Optimize Flatpak host runtime resolution to prevent duplicate IPC roundtrips.
+  * Guard DataGridViewer column removal against infinite UI thread blocking.
+  * Expand fenced chunk parser detection for polyglot languages.
+
 * Sun Nov 08 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.15.0-1
 - Release 0.15.0: RStudio Functional Parity across 4-Quadrant Workbench:
   * Add HistoryManager service with .Rhistory sync, readline Up/Down navigation, and export.

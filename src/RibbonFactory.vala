@@ -81,75 +81,6 @@ namespace Imladris {
             return btn;
         }
 
-        public static Gtk.Widget create_tall_button (
-            string icon_name,
-            string label_text,
-            bool has_dropdown = false,
-            bool is_toggle = false,
-            bool active = false,
-            bool sensitive = true,
-            GLib.MenuModel? menu_model = null,
-            string? action_name = null,
-            Gtk.Popover? custom_popover = null
-        ) {
-            var vbox = new Gtk.Box (Gtk.Orientation.VERTICAL, 2) {
-                valign = Gtk.Align.CENTER,
-                halign = Gtk.Align.CENTER
-            };
-
-            var img = new Gtk.Image.from_icon_name (icon_name) {
-                pixel_size = 18
-            };
-            vbox.append (img);
-
-            var lbl = new Gtk.Label (label_text) {
-                justify = Gtk.Justification.CENTER
-            };
-            lbl.add_css_class ("caption");
-            vbox.append (lbl);
-
-            if (custom_popover != null) {
-                var mbtn = new Gtk.MenuButton () {
-                    popover = custom_popover,
-                    sensitive = sensitive,
-                    valign = Gtk.Align.CENTER
-                };
-                mbtn.add_css_class ("flat");
-                mbtn.add_css_class ("ribbon-tall-btn");
-                mbtn.set_child (vbox);
-                return mbtn;
-            }
-
-            if (menu_model != null) {
-                var mbtn = new Gtk.MenuButton () {
-                    menu_model = menu_model,
-                    sensitive = sensitive,
-                    valign = Gtk.Align.CENTER
-                };
-                mbtn.add_css_class ("flat");
-                mbtn.add_css_class ("ribbon-tall-btn");
-                mbtn.set_child (vbox);
-                return mbtn;
-            }
-
-            Gtk.Button btn = is_toggle ? new Gtk.ToggleButton () : new Gtk.Button ();
-            btn.add_css_class ("flat");
-            btn.add_css_class ("ribbon-tall-btn");
-            btn.sensitive = sensitive;
-            btn.valign = Gtk.Align.CENTER;
-
-            if (action_name != null) {
-                btn.action_name = action_name;
-            }
-
-            if (is_toggle && active) {
-                ((Gtk.ToggleButton) btn).active = true;
-            }
-
-            btn.set_child (vbox);
-            return btn;
-        }
-
         public static Gtk.Widget create_compact_button (
             string? icon_name = null,
             string? label_text = null,
@@ -171,16 +102,6 @@ namespace Imladris {
                 action_name,
                 custom_popover
             );
-        }
-
-        public static Gtk.Box create_vertical_stack (Gtk.Widget[] widgets) {
-            var col = new Gtk.Box (Gtk.Orientation.VERTICAL, 2) {
-                valign = Gtk.Align.CENTER
-            };
-            foreach (unowned Gtk.Widget w in widgets) {
-                col.append (w);
-            }
-            return col;
         }
 
         public static Gtk.Separator create_vseparator () {

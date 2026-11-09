@@ -1,9 +1,9 @@
 namespace Imladris.Core {
 
     public class DistroInfo : GLib.Object {
-        public string id { get; set; default = "linux"; }
-        public string name { get; set; default = "Linux"; }
-        public string install_cmd { get; set; default = "curl -fsSL https://llama.app/install.sh | sh"; }
+        public string id { owned get; set; default = "linux"; }
+        public string name { owned get; set; default = "Linux"; }
+        public string install_cmd { owned get; set; default = "curl -fsSL https://llama.app/install.sh | sh"; }
     }
 
     public enum RuntimeSource {
@@ -107,8 +107,9 @@ namespace Imladris.Core {
             }
 
             if (is_flatpak ()) {
-                if (check_host_program_available (binary_name)) {
-                    resolved_path = resolve_host_program_path (binary_name) ?? binary_name;
+                string? host_path = resolve_host_program_path (binary_name);
+                if (host_path != null) {
+                    resolved_path = host_path;
                     return RuntimeSource.HOST_FLATPAK_SPAWN;
                 }
             }
@@ -281,14 +282,8 @@ namespace Imladris.Core {
             }
         }
 
-        private static bool check_host_program_available (string program) {
-            try {
-                string[] argv = { "flatpak-spawn", "--host", "sh", "-c", "command -v \"$1\"", "_", program };
-                var proc = new GLib.Subprocess.newv (argv, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_SILENCE);
-                return proc.wait_check ();
-            } catch (GLib.Error e) {
-                return false;
-            }
+        public static bool check_host_program_available (string program) {
+            return resolve_host_program_path (program) != null;
         }
 
         private static string? resolve_host_program_path (string program) {

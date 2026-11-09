@@ -196,11 +196,14 @@ namespace Imladris.UI {
             this.current_col_names = col_names;
             title_label.label = object_name;
 
-            // Remove existing columns
+            // Remove existing columns safely in reverse order
             var cols_model = column_view.get_columns ();
-            while (cols_model.get_n_items () > 0) {
-                var col = cols_model.get_item (0) as Gtk.ColumnViewColumn;
-                if (col != null) column_view.remove_column (col);
+            uint n_cols = cols_model.get_n_items ();
+            for (int i = (int) n_cols - 1; i >= 0; i--) {
+                var col = cols_model.get_item ((uint) i) as Gtk.ColumnViewColumn;
+                if (col != null) {
+                    column_view.remove_column (col);
+                }
             }
 
             // Create index column "#"
