@@ -169,6 +169,67 @@ namespace Imladris.UI {
             cite_page.add (zotero_group);
             this.add (cite_page);
 
+            // Page: Galaxy Project Integration
+            var galaxy_page = new Adw.PreferencesPage () {
+                title = "Galaxy Project",
+                icon_name = "applications-internet-symbolic"
+            };
+
+            var galaxy_group = new Adw.PreferencesGroup () {
+                title = "Cloud Bioinformatics Bridge",
+                description = "Configure Galaxy instance endpoint and API credentials for reproducible data fetching."
+            };
+
+            var galaxy_client = Imladris.Bridges.GalaxyClient.get_default ();
+
+            var g_server_row = new Adw.EntryRow () {
+                title = "Galaxy Server URL",
+                text = galaxy_client.server_url
+            };
+            g_server_row.notify["text"].connect (() => {
+                galaxy_client.server_url = g_server_row.text;
+                galaxy_client.save_credentials (galaxy_client.server_url, galaxy_client.api_key);
+            });
+            galaxy_group.add (g_server_row);
+
+            var g_key_row = new Adw.PasswordEntryRow () {
+                title = "Galaxy API Key",
+                text = galaxy_client.api_key
+            };
+            g_key_row.notify["text"].connect (() => {
+                galaxy_client.api_key = g_key_row.text;
+                galaxy_client.save_credentials (galaxy_client.server_url, galaxy_client.api_key);
+            });
+            galaxy_group.add (g_key_row);
+
+            var g_test_row = new Adw.ActionRow () {
+                title = "Connection Status",
+                subtitle = galaxy_client.is_authenticated ? "Connected" : "Not validated"
+            };
+            var g_test_btn = new Gtk.Button.with_label ("Test Connection") {
+                valign = Gtk.Align.CENTER
+            };
+            g_test_btn.clicked.connect (() => {
+                g_test_btn.sensitive = false;
+                g_test_row.subtitle = "Testing connection...";
+                galaxy_client.test_connection_async.begin (g_server_row.text, g_key_row.text, (obj, res) => {
+                    g_test_btn.sensitive = true;
+                    try {
+                        var u = galaxy_client.test_connection_async.end (res);
+                        g_test_row.subtitle = @"Connected as $(u.username) ($(u.email))";
+                        this.add_toast (new Adw.Toast ("Galaxy connection verified."));
+                    } catch (GLib.Error e) {
+                        g_test_row.subtitle = @"Error: $(e.message)";
+                        this.add_toast (new Adw.Toast (@"Galaxy connection failed: $(e.message)"));
+                    }
+                });
+            });
+            g_test_row.add_suffix (g_test_btn);
+            galaxy_group.add (g_test_row);
+
+            galaxy_page.add (galaxy_group);
+            this.add (galaxy_page);
+
             // Page 2: AI Engine Configuration
             var ai_config_mgr = AiConfigManager.get_default ();
 

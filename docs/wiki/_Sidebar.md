@@ -8,6 +8,7 @@
 * [[.mallorn & RStudio 1:1 Sync|Mallorn-Format-and-RStudio]]
 
 #### 📦 Core Workflows
+* [[Galaxy to Quarto Bridge|Galaxy-to-Quarto-Bridge]]
 * [[Packages Ribbon Manager|Packages-Ribbon-Manager]]
 * [[Exporting ODT, ODP & PDF|Exporting-ODT-ODP-PDF]]
 

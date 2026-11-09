@@ -41,6 +41,7 @@ namespace Imladris.UI {
         public Gtk.Entry repl_entry { get; private set; }
         public WebKit.WebView help_view { get; private set; }
         public WebKit.WebView shiny_webview { get; private set; }
+        public GalaxyPanel galaxy_panel { get; private set; }
 
         private Gtk.Label? shiny_status_lbl = null;
         private Gtk.Button? btn_shiny_refresh = null;
@@ -1127,6 +1128,16 @@ namespace Imladris.UI {
                     } catch (GLib.Error e) {}
                 }
             });
+
+            // 16. GALAXY PROJECT PANEL (Galaxy History & Dataset Bridge)
+            galaxy_panel = new GalaxyPanel ();
+            galaxy_panel.insert_chunk_requested.connect ((chunk) => {
+                doc_page.source_buffer.begin_user_action ();
+                doc_page.source_buffer.insert_at_cursor (chunk, -1);
+                doc_page.source_buffer.end_user_action ();
+                refresh_environment_and_outline ();
+            });
+            panels.set (PanelId.GALAXY, galaxy_panel);
 
             // Initial AST & Environment scan
             refresh_environment_and_outline ();

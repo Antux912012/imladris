@@ -49,7 +49,8 @@ namespace Imladris.Core.Layout {
         FILES,
         PACKAGES,
         HELP,
-        SHINY_VIEWER;
+        SHINY_VIEWER,
+        GALAXY;
 
         public string to_id_string () {
             switch (this) {
@@ -68,6 +69,7 @@ namespace Imladris.Core.Layout {
                 case PACKAGES: return "packages";
                 case HELP: return "help";
                 case SHINY_VIEWER: return "shiny-viewer";
+                case GALAXY: return "galaxy";
                 default: return "source-editor";
             }
         }
@@ -89,6 +91,7 @@ namespace Imladris.Core.Layout {
                 case "packages": return PACKAGES;
                 case "help": return HELP;
                 case "shiny-viewer": return SHINY_VIEWER;
+                case "galaxy": return GALAXY;
                 default: return null;
             }
         }
@@ -110,6 +113,7 @@ namespace Imladris.Core.Layout {
                 case PACKAGES: return "Packages";
                 case HELP: return "Help";
                 case SHINY_VIEWER: return "Viewer";
+                case GALAXY: return "Galaxy";
                 default: return "Panel";
             }
         }
@@ -131,6 +135,7 @@ namespace Imladris.Core.Layout {
                 case PACKAGES: return "application-x-addon-symbolic";
                 case HELP: return "help-browser-symbolic";
                 case SHINY_VIEWER: return "applications-internet-symbolic";
+                case GALAXY: return "applications-internet-symbolic";
                 default: return "application-x-addon-symbolic";
             }
         }
@@ -292,7 +297,7 @@ namespace Imladris.Core.Layout {
             );
             quadrants.set (
                 QuadrantId.Q3_TOP_RIGHT,
-                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS }, PanelId.ENVIRONMENT)
+                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS, PanelId.GALAXY }, PanelId.ENVIRONMENT)
             );
             quadrants.set (
                 QuadrantId.Q4_BOTTOM_RIGHT,

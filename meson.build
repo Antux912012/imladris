@@ -65,6 +65,9 @@ sources = files(
   'src/services/MediaHelper.vala',
   'src/services/PackageIndexCache.vala',
   'src/plugins/PluginManager.vala',
+  'src/bridges/galaxy_client.vala',
+  'src/ui/galaxy_auth_dialog.vala',
+  'src/ui/galaxy_panel.vala',
   'src/core/layout/DockTypes.vala',
   'src/ui/PersistentPanelRegistry.vala',
   'src/ui/ShinyWindow.vala',
@@ -270,6 +273,19 @@ shiny_test_exe = executable('test_shiny_service',
 )
 
 test('shiny_service_tests', shiny_test_exe, timeout: 30)
+
+galaxy_test_sources = files(
+  'tests/test_galaxy_bridge.vala',
+  'src/bridges/galaxy_client.vala',
+)
+
+galaxy_test_exe = executable('test_galaxy_bridge',
+  galaxy_test_sources,
+  dependencies: deps,
+  vala_args: ['--target-glib=2.76'],
+)
+
+test('galaxy_bridge_tests', galaxy_test_exe, timeout: 30)
 
 
 

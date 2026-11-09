@@ -36,6 +36,7 @@ The application automatically transitions between two editing layouts. Single-pa
 * **Export Pipeline**: Generates publication-ready documents in PDF, standalone HTML, OpenDocument Text (`.odt`), and OpenDocument Presentation (`.odp`) formats through Quarto and Pandoc.
 * **Reproducible Project Environments**: Manages isolated `renv` (R) and `.venv` (Python) sandboxes with status badge indicators and export profiles.
 * **Local Elrond AI Copilot**: Integrates a local `llama-server` engine on loopback (`127.0.0.1:8088`) for offline code completion and data science synthesis.
+* **Galaxy Project Bioinformatics Bridge**: Connects to remote Galaxy servers (e.g., `usegalaxy.eu`), inspects active histories/datasets in Quadrant 3, and generates reproducible R (`httr`) or Python (`requests`/`pandas`) data-fetching chunks into active documents.
 * **Model Context Protocol (MCP)**: Provides a JSON-RPC stdio server (`imladris --mcp-server`) for agentic tool use and document analysis.
 
 ---
@@ -86,6 +87,7 @@ Imladris follows a modular architecture that separates UI presentation, core dom
 * `Imladris.Core`: Parses document syntaxes, frontmatter metadata, configuration keys, and project structures.
 * `Imladris.Execution`: Operates subprocess pipes, interactive language bridges, and chunk stdout/stderr interception.
 * `Imladris.Services`: Orchestrates data export, Shiny process lifecycles, and automatic session recovery.
+* `Imladris.Bridges`: Manages cloud bioinformatics connections, dataset retrieval, and external platform bridges (Galaxy Project REST APIs).
 
 ---
 
