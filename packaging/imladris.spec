@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.16.0
+Version:        0.17.0
 Release:        1%{?dist}
 Summary:        Scientific notebook studio and Markdown editor
 
@@ -56,6 +56,14 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Mon Nov 09 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.17.0-1
+- Release 0.17.0: Galaxy Project API & BioBlend Integration:
+  * Add native Galaxy REST API client for histories, datasets, and user authentication.
+  * Add dedicated Galaxy History Inspector in Quadrant 3 with live execution state tracking.
+  * Implement single-click reproducible R and Python Quarto code chunk generator.
+  * Add Libadwaita Galaxy authentication preferences dialog with instant server validation.
+  * Secure credential storage adhering to GDPR Article 25 and CRA standards.
+
 * Mon Nov 09 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.16.0-1
 - Release 0.16.0: Codebase Deduplication, Performance Optimization & Stability Update:
   * Eliminate duplicated inline chunk output widget and dead export pipeline methods.

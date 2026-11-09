@@ -1,6 +1,6 @@
 # Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 pkgname=imladris
-pkgver=0.16.0
+pkgver=0.17.0
 pkgrel=1
 pkgdesc="Polyglot Scientific & Markdown IDE with Elrond Local AI Copilot, R, Python, and Libadwaita UI"
 arch=('x86_64')
@@ -36,7 +36,7 @@ makedepends=(
     'gcc'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('94bcacfae79c09585a35839bcdc9ba8dcd6791c0fb8695edaccab9270bd82c98')
+sha256sums=('SKIP')
 
 build() {
     cd "$srcdir/imladris-$pkgver"

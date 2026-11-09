@@ -15,8 +15,8 @@ We provide security updates for the current minor release branch:
 
 | Version Branch | Supported | Security Patch Delivery Channel |
 | :--- | :--- | :--- |
-| `0.16.x` | **Yes** | GitHub Releases, Flatpak, Debian, Fedora RPM, AUR |
-| `< 0.16.0` | No | Upgrade to the latest stable release |
+| `0.17.x` | **Yes** | GitHub Releases, Flatpak, Debian, Fedora RPM, AUR |
+| `< 0.17.0` | No | Upgrade to the latest stable release |
 
 ---
 
