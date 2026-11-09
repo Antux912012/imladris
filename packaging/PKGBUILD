@@ -36,7 +36,7 @@ makedepends=(
     'gcc'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('94bcacfae79c09585a35839bcdc9ba8dcd6791c0fb8695edaccab9270bd82c98')
 
 build() {
     cd "$srcdir/imladris-$pkgver"
