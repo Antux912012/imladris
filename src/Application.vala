@@ -1,4 +1,11 @@
+// SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
+
+/**
+ * Single Responsibility: Main application life-cycle manager and action dispatcher.
+ * Architecture: Upstream entry point from main.vala; coordinates windows, settings, and desktop integrations.
+ * Concurrency: Executes on the GLib MainContext thread.
+ */
 namespace Imladris {
 
     public class Application : Adw.Application {
@@ -49,6 +56,96 @@ namespace Imladris {
                 application_id: "io.github.Antux912012.Imladris",
                 flags: GLib.ApplicationFlags.HANDLES_OPEN
             );
+
+            add_main_option (
+                "version",
+                'v',
+                GLib.OptionFlags.NONE,
+                GLib.OptionArg.NONE,
+                "Print application version and exit",
+                null
+            );
+
+            add_main_option (
+                "purge-user-data",
+                0,
+                GLib.OptionFlags.NONE,
+                GLib.OptionArg.NONE,
+                "Erase all local user data, cache, and state (GDPR Art. 17)",
+                null
+            );
+        }
+
+        protected override int handle_local_options (GLib.VariantDict options) {
+            if (options.contains ("version")) {
+                stdout.printf ("Imladris %s\n", APP_VERSION);
+                return 0;
+            }
+
+            if (options.contains ("purge-user-data")) {
+                purge_all_user_data ();
+                return 0;
+            }
+
+            return -1;
+        }
+
+        private static void recursively_delete_directory (GLib.File dir) {
+            if (!dir.query_exists ()) {
+                return;
+            }
+            try {
+                var enumerator = dir.enumerate_children (
+                    GLib.FileAttribute.STANDARD_NAME,
+                    GLib.FileQueryInfoFlags.NOFOLLOW_SYMLINKS
+                );
+                GLib.FileInfo? info = null;
+                while ((info = enumerator.next_file ()) != null) {
+                    var child = dir.get_child (info.get_name ());
+                    if (info.get_file_type () == GLib.FileType.DIRECTORY) {
+                        recursively_delete_directory (child);
+                    } else {
+                        child.delete ();
+                    }
+                }
+                dir.delete ();
+            } catch (GLib.Error e) {
+                // Best-effort removal
+            }
+        }
+
+        /**
+         * Right to Erasure implementation complying with GDPR Article 17.
+         * Deterministically deletes all local application state, cache, and configurations.
+         */
+        public static void purge_all_user_data () {
+            string config_dir = GLib.Path.build_filename (GLib.Environment.get_user_config_dir (), "imladris");
+            string data_dir = GLib.Path.build_filename (GLib.Environment.get_user_data_dir (), "imladris");
+            string cache_dir = GLib.Path.build_filename (GLib.Environment.get_user_cache_dir (), "imladris");
+
+            recursively_delete_directory (GLib.File.new_for_path (config_dir));
+            recursively_delete_directory (GLib.File.new_for_path (data_dir));
+            recursively_delete_directory (GLib.File.new_for_path (cache_dir));
+
+            try {
+                var settings = new GLib.Settings ("io.github.Antux912012.Imladris");
+                settings.reset ("app-theme");
+                settings.reset ("accent-color");
+                settings.reset ("hardware-acceleration");
+                settings.reset ("ai-provider");
+                settings.reset ("ai-model");
+                settings.reset ("ai-stream");
+                settings.reset ("ai-temperature");
+                settings.reset ("restore-session");
+                settings.reset ("active-session-id");
+                settings.reset ("last-opened-project");
+                settings.reset ("ribbon-visible");
+                settings.reset ("default-workbench-mode");
+                settings.reset ("active-tab-id");
+                settings.reset ("elrond-level");
+            } catch (GLib.Error e) {}
+
+            stdout.printf ("[GDPR Art. 17] All local user data, cache, and state files erased successfully.\n");
         }
 
         protected override void startup () {

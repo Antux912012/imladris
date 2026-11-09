@@ -15,6 +15,7 @@ repo/
 *.rpm
 *.AppImage
 SHA256SUMS.txt
+*-sbom.*
 subprojects/cmark/
 subprojects/packagecache/
 *.o

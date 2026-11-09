@@ -1,4 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 using GLib;
 using Imladris.Services;
 using Imladris.Core;

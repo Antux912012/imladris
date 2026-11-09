@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 project('imladris', 'vala', 'c',
   version: '0.16.0',
   default_options: ['warning_level=1']

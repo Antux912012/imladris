@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 namespace Imladris.Core {
     public class NotebookCell : GLib.Object {
         public string cell_type { get; set; default = "code"; }

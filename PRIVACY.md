@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # Privacy Policy & GDPR Compliance
 
 Imladris is designed from first principles as a **local-first, private scientific computing studio and Markdown editor**. We believe your research, statistical models, datasets, and intellectual property belong entirely to you.
@@ -41,7 +46,7 @@ Under the European Union General Data Protection Regulation (GDPR) and equivalen
 * **Data Minimization (Art. 5(1)(c))**: The application does not collect, retain, or process personal data on external servers.
 * **Integrity and Confidentiality (Art. 5(1)(f))**: All data is managed locally under user permissions; external API requests use TLS encryption.
 * **Right of Access & Data Portability (Art. 15 & 20)**: All your files and project bundles are stored in open, human-readable formats (standard Markdown, YAML frontmatter, JSON, and standard `.tar.gz` for `.mallorn` archives).
-* **Right to Erasure ("Right to be Forgotten", Art. 17)**: You can permanently erase all application data at any time by deleting the `~/.config/imladris`, `~/.cache/imladris`, and `~/.local/share/imladris` directories.
+* **Right to Erasure ("Right to be Forgotten", Art. 17)**: You can permanently erase all application data, caches, and state at any time by executing the deterministic command `imladris --purge-user-data` or by manually deleting the `~/.config/imladris`, `~/.cache/imladris`, and `~/.local/share/imladris` directories.
 
 ---
 

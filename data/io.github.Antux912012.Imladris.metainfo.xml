@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>Imladris</name>
-  <summary>Scientific notebook studio and Markdown editor</summary>
+  <summary>Scientific notebook studio</summary>
   <description>
     <p>
       Imladris is a native Linux polyglot document studio and scientific Markdown editor built with Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0. Featuring an adaptive ribbon interface, Imladris provides a distraction-free writing environment for technical authors, data scientists, and researchers.
