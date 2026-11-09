@@ -27,6 +27,8 @@ modules:
       - install -Dm644 io.github.Antux912012.Imladris.desktop /app/share/applications/io.github.Antux912012.Imladris.desktop
       - install -Dm644 io.github.Antux912012.Imladris.metainfo.xml /app/share/metainfo/io.github.Antux912012.Imladris.metainfo.xml
       - install -Dm644 io.github.Antux912012.Imladris.png /app/share/icons/hicolor/512x512/apps/io.github.Antux912012.Imladris.png
+      - install -Dm644 io.github.Antux912012.Imladris.gschema.xml /app/share/glib-2.0/schemas/io.github.Antux912012.Imladris.gschema.xml
+      - glib-compile-schemas /app/share/glib-2.0/schemas
     sources:
       # BEGIN MANAGED EXTRA-DATA
       - type: extra-data
@@ -47,3 +49,5 @@ modules:
         path: io.github.Antux912012.Imladris.metainfo.xml
       - type: file
         path: io.github.Antux912012.Imladris.png
+      - type: file
+        path: io.github.Antux912012.Imladris.gschema.xml
