@@ -7,9 +7,19 @@
   <meta name="description" content="Native scientific workbench for reproducible research built in Vala, GTK4, and Libadwaita.">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
   <link rel="alternate icon" type="image/png" href="assets/logo.png">
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem('imladris-theme');
+        if (savedTheme === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <style>
     :root {
-      /* Nord & Libadwaita Dark Theme Palette */
+      /* Nord Dark & Libadwaita Dark Theme Palette (Default) */
       --bg-primary: #242933;
       --bg-secondary: #2E3440;
       --bg-card: #3B4252;
@@ -21,8 +31,45 @@
       --accent-blue: #5E81AC;
       --accent-green: #A3BE8C;
       --accent-purple: #B48EAD;
+      --header-bg: rgba(46, 52, 64, 0.92);
+      --btn-primary-bg: #88C0D0;
+      --btn-primary-text: #242933;
+      --shadow-color: rgba(0, 0, 0, 0.45);
+      --shadow-card: rgba(0, 0, 0, 0.25);
+      --hero-glow: rgba(136, 192, 208, 0.25);
+      --hero-glow-hover: rgba(136, 192, 208, 0.45);
+      --hero-tag-bg: rgba(163, 190, 140, 0.1);
+      --hero-tag-border: rgba(163, 190, 140, 0.3);
+      --author-bg: linear-gradient(145deg, #2E3440, #3B4252);
+      --brand-logo-shadow: rgba(0, 0, 0, 0.4);
       --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    [data-theme="light"] {
+      /* Nord Light Theme Palette (Snow Storm base with Polar Night typography) */
+      --bg-primary: #ECEFF4;         /* nord6 base */
+      --bg-secondary: #E5E9F0;       /* nord5 containers */
+      --bg-card: #FFFFFF;            /* crisp light card surface */
+      --border-color: #D8DEE9;       /* nord4 borders */
+      --text-primary: #2E3440;       /* nord0 primary text */
+      --text-secondary: #434C5E;     /* nord2 secondary text */
+      --text-muted: #6C7A92;         /* nord3 accessible muted text */
+      --accent-frost: #3B6F96;       /* Deep Frost blue for readable text & links */
+      --accent-blue: #5E81AC;        /* nord10 Frost */
+      --accent-green: #487834;       /* Accessible Aurora green */
+      --accent-purple: #7E4A78;      /* Accessible Aurora purple */
+      --header-bg: rgba(236, 239, 244, 0.94);
+      --btn-primary-bg: #5E81AC;     /* Crisp Nord blue primary button */
+      --btn-primary-text: #ECEFF4;   /* Snow Storm button text */
+      --shadow-color: rgba(46, 52, 64, 0.10);
+      --shadow-card: rgba(46, 52, 64, 0.06);
+      --hero-glow: rgba(94, 129, 172, 0.20);
+      --hero-glow-hover: rgba(94, 129, 172, 0.35);
+      --hero-tag-bg: rgba(72, 120, 52, 0.08);
+      --hero-tag-border: rgba(72, 120, 52, 0.25);
+      --author-bg: linear-gradient(145deg, #E5E9F0, #F4F6F9);
+      --brand-logo-shadow: rgba(46, 52, 64, 0.12);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,6 +79,7 @@
       font-family: var(--font-sans);
       line-height: 1.65;
       -webkit-font-smoothing: antialiased;
+      transition: background-color 0.25s ease, color 0.25s ease;
     }
 
     a { color: var(--accent-frost); text-decoration: none; transition: opacity 0.2s; }
@@ -41,12 +89,13 @@
 
     /* Header Bar (Libadwaita style) */
     header {
-      background: rgba(46, 52, 64, 0.92);
+      background: var(--header-bg);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border-color);
       position: sticky;
       top: 0;
       z-index: 100;
+      transition: background 0.25s ease, border-color 0.25s ease;
     }
     .nav-bar {
       display: flex;
@@ -67,11 +116,12 @@
       height: 32px;
       border-radius: 8px;
       object-fit: contain;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 2px 8px var(--brand-logo-shadow);
       flex-shrink: 0;
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       padding: 2px;
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     }
     .brand-badge {
       background: var(--bg-card);
@@ -81,9 +131,47 @@
       padding: 2px 8px;
       border-radius: 6px;
       border: 1px solid var(--border-color);
+      transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
     }
-    .nav-links { display: flex; gap: 28px; font-size: 0.95rem; }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .nav-links { display: flex; gap: 24px; font-size: 0.95rem; }
     .nav-links a { color: var(--text-secondary); font-weight: 500; }
+
+    /* Theme Toggle Button */
+    .theme-toggle-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px var(--shadow-card);
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+      user-select: none;
+    }
+    .theme-toggle-btn:hover {
+      background: var(--bg-secondary);
+      border-color: var(--accent-frost);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px var(--shadow-color);
+    }
+    .theme-toggle-btn:active {
+      transform: translateY(0);
+    }
+    :root:not([data-theme="light"]) .icon-moon { display: none; }
+    :root:not([data-theme="light"]) .icon-sun { display: inline-block; color: #EBCB8B; }
+    [data-theme="light"] .icon-sun { display: none; }
+    [data-theme="light"] .icon-moon { display: inline-block; color: #5E81AC; }
 
     /* Hero Section */
     .hero {
@@ -104,26 +192,27 @@
       border-radius: 26px;
       object-fit: contain;
       background: var(--bg-secondary);
-      border: 1px solid rgba(136, 192, 208, 0.3);
+      border: 1px solid var(--border-color);
       padding: 10px;
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 28px rgba(136, 192, 208, 0.25);
-      transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+      box-shadow: 0 16px 36px var(--shadow-color), 0 0 28px var(--hero-glow);
+      transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease, border-color 0.35s ease, background-color 0.25s ease;
     }
     .hero-logo:hover {
       transform: translateY(-4px) scale(1.04);
       border-color: var(--accent-frost);
-      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.65), 0 0 40px rgba(136, 192, 208, 0.45);
+      box-shadow: 0 22px 48px var(--shadow-color), 0 0 40px var(--hero-glow-hover);
     }
     .hero-tag {
       display: inline-block;
       font-family: var(--font-mono);
       font-size: 0.8rem;
       color: var(--accent-green);
-      background: rgba(163, 190, 140, 0.1);
-      border: 1px solid rgba(163, 190, 140, 0.3);
+      background: var(--hero-tag-bg);
+      border: 1px solid var(--hero-tag-border);
       padding: 4px 14px;
       border-radius: 999px;
       margin-bottom: 24px;
+      transition: all 0.25s ease;
     }
     .hero h1 {
       font-size: clamp(2.4rem, 5vw, 3.8rem);
@@ -151,19 +240,25 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      transition: transform 0.15s ease, background-color 0.2s ease;
+      transition: transform 0.15s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
     .btn:hover {
       transform: translateY(-1px);
     }
     .btn-primary {
-      background: var(--accent-frost);
-      color: var(--bg-primary);
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      box-shadow: 0 2px 8px var(--shadow-card);
     }
     .btn-secondary {
       background: var(--bg-card);
       color: var(--text-primary);
       border: 1px solid var(--border-color);
+      box-shadow: 0 1px 3px var(--shadow-card);
+    }
+    .btn-secondary:hover {
+      background: var(--bg-secondary);
+      border-color: var(--accent-frost);
     }
 
     /* 4-Quadrant Mockup Frame */
@@ -174,7 +269,8 @@
       border-radius: 12px;
       overflow: hidden;
       text-align: left;
-      box-shadow: 0 24px 48px rgba(0,0,0,0.45);
+      box-shadow: 0 24px 48px var(--shadow-color);
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     }
     .ide-header {
       background: var(--bg-card);
@@ -187,6 +283,7 @@
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 8px;
+      transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
     }
     .ide-grid {
       display: grid;
@@ -194,6 +291,7 @@
       grid-template-rows: auto auto;
       gap: 1px;
       background: var(--border-color);
+      transition: background 0.25s ease;
     }
     @media (max-width: 768px) {
       .ide-grid { grid-template-columns: 1fr; }
@@ -205,6 +303,7 @@
       font-family: var(--font-mono);
       font-size: 0.82rem;
       min-height: 190px;
+      transition: background 0.25s ease;
     }
     .quadrant-title {
       color: var(--accent-frost);
@@ -247,6 +346,8 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      box-shadow: 0 2px 8px var(--shadow-card);
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     }
     .card h3 { font-size: 1.2rem; margin-bottom: 12px; color: var(--text-primary); }
     .card p { color: var(--text-secondary); font-size: 0.95rem; }
@@ -259,10 +360,12 @@
 
     /* Author Section */
     .author-box {
-      background: linear-gradient(145deg, var(--bg-secondary), var(--bg-card));
+      background: var(--author-bg);
       border: 1px solid var(--accent-blue);
       border-radius: 12px;
       padding: 48px;
+      box-shadow: 0 12px 32px var(--shadow-color);
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     }
     .author-box h3 { font-size: 1.8rem; margin-bottom: 6px; }
     .author-role {
@@ -298,12 +401,31 @@
         <span>IMLADRIS</span>
         <span class="brand-badge">GTK4 · Vala · v0.17.0</span>
       </div>
-      <nav class="nav-links">
-        <a href="#architecture">The Workbench</a>
-        <a href="#wiki">Technical Wiki</a>
-        <a href="#github">GitHub</a>
-        <a href="#author">The Architect</a>
-      </nav>
+      <div class="nav-right">
+        <nav class="nav-links">
+          <a href="#architecture">The Workbench</a>
+          <a href="#wiki">Technical Wiki</a>
+          <a href="#github">GitHub</a>
+          <a href="#author">The Architect</a>
+        </nav>
+        <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle Light/Dark Theme" title="Toggle Light/Dark Theme">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <span id="theme-toggle-label">Light</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -464,6 +586,46 @@ Provenance hash: <span class="code-comment">sha256:7a4f9b2e...</span> (Verified)
       <p>© 2026 Antonio De Gaetano · Engineered natively with Vala, GTK4, and Libadwaita.</p>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      var toggleBtn = document.getElementById('theme-toggle');
+      var toggleLabel = document.getElementById('theme-toggle-label');
+
+      function updateTheme(theme) {
+        if (theme === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+          if (toggleLabel) toggleLabel.textContent = 'Dark';
+          if (toggleBtn) {
+            toggleBtn.setAttribute('title', 'Switch to Nord Dark theme');
+            toggleBtn.setAttribute('aria-label', 'Switch to Nord Dark theme');
+          }
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+          if (toggleLabel) toggleLabel.textContent = 'Light';
+          if (toggleBtn) {
+            toggleBtn.setAttribute('title', 'Switch to Nord Light theme');
+            toggleBtn.setAttribute('aria-label', 'Switch to Nord Light theme');
+          }
+        }
+      }
+
+      // Initialize button text based on currently active theme
+      var activeTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      updateTheme(activeTheme);
+
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', function () {
+          var isCurrentlyLight = document.documentElement.getAttribute('data-theme') === 'light';
+          var newTheme = isCurrentlyLight ? 'dark' : 'light';
+          try {
+            localStorage.setItem('imladris-theme', newTheme);
+          } catch (e) {}
+          updateTheme(newTheme);
+        });
+      }
+    })();
+  </script>
 
 </body>
 </html>
