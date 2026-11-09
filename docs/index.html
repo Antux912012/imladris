@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Imladris | Native Scientific Workbench & Polyglot IDE</title>
   <meta name="description" content="Native scientific workbench for reproducible research built in Vala, GTK4, and Libadwaita.">
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+  <link rel="alternate icon" type="image/png" href="assets/logo.png">
   <style>
     :root {
       /* Nord & Libadwaita Dark Theme Palette */
@@ -58,7 +60,18 @@
       letter-spacing: -0.02em;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      object-fit: contain;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      flex-shrink: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 2px;
     }
     .brand-badge {
       background: var(--bg-card);
@@ -74,9 +87,32 @@
 
     /* Hero Section */
     .hero {
-      padding: 80px 0 64px;
+      padding: 72px 0 64px;
       text-align: center;
       border-bottom: 1px solid var(--border-color);
+    }
+    .hero-logo-wrapper {
+      margin-bottom: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .hero-logo {
+      width: 112px;
+      height: 112px;
+      border-radius: 26px;
+      object-fit: contain;
+      background: var(--bg-secondary);
+      border: 1px solid rgba(136, 192, 208, 0.3);
+      padding: 10px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 28px rgba(136, 192, 208, 0.25);
+      transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+    }
+    .hero-logo:hover {
+      transform: translateY(-4px) scale(1.04);
+      border-color: var(--accent-frost);
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.65), 0 0 40px rgba(136, 192, 208, 0.45);
     }
     .hero-tag {
       display: inline-block;
@@ -239,6 +275,18 @@
     .author-links { margin-top: 28px; display: flex; gap: 16px; flex-wrap: wrap; }
 
     footer { padding: 40px 0; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+    .footer-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .footer-logo {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      opacity: 0.85;
+    }
   </style>
 </head>
 <body>
@@ -246,6 +294,7 @@
   <header>
     <div class="container nav-bar">
       <div class="brand">
+        <img src="assets/logo.svg" alt="Imladris App Logo" class="brand-logo" width="32" height="32">
         <span>IMLADRIS</span>
         <span class="brand-badge">GTK4 · Vala · v1.0</span>
       </div>
@@ -261,7 +310,12 @@
   <main class="container">
     <!-- HERO -->
     <section class="hero">
-      <span class="hero-tag">Native Linux Scientific Computing & Bioinformatics IDE</span>
+      <div class="hero-logo-wrapper">
+        <img src="assets/logo.svg" alt="Imladris App Icon" class="hero-logo" width="112" height="112">
+      </div>
+      <div>
+        <span class="hero-tag">Native Linux Scientific Computing & Bioinformatics IDE</span>
+      </div>
       <h1>Bridge Cloud Bioinformatics to Reproducible Manuscripts.</h1>
       <p>
         Imladris is a zero-bloat native polyglot IDE (<code>.qmd</code>, <code>.Rmd</code>, <code>.ipynb</code>) engineered in Vala, GTK4, and Libadwaita. Connect upstream <strong>Galaxy</strong> histories directly to local R/Python environments, Zotero libraries, and Quarto publishing pipelines.
@@ -404,7 +458,8 @@ Provenance hash: <span class="code-comment">sha256:7a4f9b2e...</span> (Verified)
   </main>
 
   <footer>
-    <div class="container">
+    <div class="container footer-content">
+      <img src="assets/logo.svg" alt="Imladris Icon" width="22" height="22" class="footer-logo">
       <p>© 2026 Antonio De Gaetano · Engineered natively with Vala, GTK4, and Libadwaita.</p>
     </div>
   </footer>
