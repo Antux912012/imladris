@@ -9,11 +9,23 @@ Imladris (`v0.18.0`) can be installed either as an isolated **Flatpak bundle**, 
 
 ---
 
-## 1. Pre-Built Flatpak Bundle (Recommended)
+## 1. Installation via Flatpark & Flatpak (Recommended)
 
-Imladris publishes self-contained Flatpak bundles targeting `org.gnome.Platform//51` (or `50`). The Flatpak package bundles Papirus symbolic icons, integrates `org.freedesktop.secrets` for the Arekyer Galaxy keyring, and pre-provisions the standalone **Vulkan-accelerated `llama-server`** for local AI assistance.
+Imladris is officially distributed on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) ([flatpark/flatpark](https://github.com/flatpark/flatpark)) and publishes self-contained Flatpak bundles targeting `org.gnome.Platform//51`. The Flatpak package bundles Papirus symbolic icons, integrates `org.freedesktop.secrets` for the Arekyer Galaxy keyring, and pre-provisions the standalone **Vulkan-accelerated `llama-server`** for local AI assistance.
 
-### Installing the `.flatpak` Bundle
+### Method A: Install via the Flatpark Repository
+```bash
+# 1. Add the Flatpark repository
+flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo
+
+# 2. Install Imladris directly
+flatpak install flatpark io.github.Antux912012.Imladris
+
+# 3. Launch Imladris
+flatpak run io.github.Antux912012.Imladris
+```
+
+### Method B: Installing the Downloaded `.flatpak` Bundle
 ```bash
 # 1. Ensure Flatpak is installed on your Linux distribution
 # Ubuntu/Debian: sudo apt install flatpak

@@ -12,6 +12,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 <p align="center">
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
+  <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
   <a href="https://github.com/Antux912012/imladris/releases"><img src="https://img.shields.io/github/v/release/Antux912012/imladris?include_prereleases&style=flat-square&color=blue" alt="Release"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
@@ -21,6 +22,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Visit the Official Landing Page</a></strong> ·
+  <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Read the Technical Wiki</a></strong> ·
   <strong><a href="docs/ARCHITECTURE.md">🏗️ System Architecture</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.18.0">⬇️ Download v0.18.0 (.deb / Flatpak)</a></strong>
@@ -205,6 +207,23 @@ sudo pacman -S vala meson ninja gcc \
 ---
 
 ## 7. Build and Installation Instructions
+
+### Installation via Flatpark & Flatpak:
+Imladris is officially distributed on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) (the open Flatpak application repository, [flatpark/flatpark](https://github.com/flatpark/flatpark)).
+
+To install Imladris via Flatpark:
+```bash
+# Add the Flatpark repository
+flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo
+
+# Install Imladris from Flatpark
+flatpak install flatpark io.github.Antux912012.Imladris
+
+# Run Imladris
+flatpak run io.github.Antux912012.Imladris
+```
+
+You can also download the standalone `.flatpak` bundle or `.deb` package directly from [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) or [GitHub Releases](https://github.com/Antux912012/imladris/releases/tag/v0.18.0).
 
 ### Debug Profile Build & Verification:
 ```bash
