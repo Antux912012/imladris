@@ -1,52 +1,69 @@
+<!--
+SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # Imladris: Architectural Blueprint & Component Connection Map
 
-> **Purpose:** This document provides a complete structural map of Imladris, detailing the connections between all UI, computational, AI, and system layers. Use this guide to understand data flows, identify component responsibilities, and pinpoint the exact source file when debugging issues.
+> **Purpose:** This document provides a complete structural map of **Imladris v0.18.0**, detailing the connections between all UI, computational, bioinformatics bridge, mathematical/chemical parsing, AI, and system layers. Use this guide to understand data flows, identify component responsibilities, and pinpoint the exact source file when debugging issues.
 
 ---
 
 ## 1. High-Level System Architecture
 
-Imladris is built in **Vala** on **GTK4 + Libadwaita**, with **GtkSourceView 5** for text editing, **WebKitGTK 6.0** for rendering, and **libsoup-3.0** for networking.
+Imladris is built in **Vala** on **GTK4 + Libadwaita**, with **GtkSourceView 5** for text editing, **WebKitGTK 6.0** for live rendering, **libsoup-3.0 + json-glib-1.0** for asynchronous REST networking, and **libsecret-1** for native OS keyring credential isolation.
 
 ```mermaid
 flowchart TD
     subgraph UI_Layer ["🖥️ Presentation & UI Shell"]
-        APP["Application.vala<br/>(Gtk.Application, Action Map)"]
+        APP["Application.vala<br/>(Adw.Application, Action Map)"]
         WIN["Window.vala<br/>(Adw.ApplicationWindow, Ribbon, Tabs)"]
         RIBBON["RibbonFactory.vala & SmartRibbonHelpers.vala<br/>(Dynamic Ribbon Toolbars & Popovers)"]
         PKG_UI["PackagesRibbonBar.vala<br/>(CRAN & PyPI Integrated Ribbon)"]
         DOC["DocumentPage.vala<br/>(Editor, Split Paned, Dock Host)"]
         DOCK["RStudioDockGrid.vala & PersistentPanelRegistry.vala<br/>(4-Quadrant Workbench Layout)"]
+        MATH_UI["MathChemEditorDialog.vala<br/>(Natural Math & Chemical Studio)"]
+        RPROJ_UI["rproj_dialog.vala & new_project_dialog.vala<br/>(.Rproj & .mallorn Project Creation)"]
+        GALAXY_UI["galaxy_panel.vala & galaxy_auth_dialog.vala<br/>(Arekyer Galaxy Bridge UI)"]
         CHAT["AssistantPanel.vala<br/>(Interactive AI Chat & Model Selector)"]
         PREFS["PreferencesDialog.vala & AiSettingsDialog.vala<br/>(Appearance, Elrond AI, Cloud API Keys)"]
     end
 
     subgraph Editor_Execution ["⚙️ Editor & Execution Subsystem"]
         VIEW["GtkSource.View / Buffer<br/>(Syntax Highlighting, TextTags)"]
-        COMPLETION["AiCompletionProvider.vala<br/>(Inline AI Copilot Suggestions)"]
+        COMPLETION["AiCompletionProvider.vala & CitationCompletionProvider.vala<br/>(Inline AI & Zotero @citekey Completion)"]
         PARSER["ChunkParser.vala<br/>(Code Cell & Option Boundary Scanner)"]
         CHUNK_ENG["ChunkExecutionEngine.vala<br/>(Cell Pipeline & Output Dispatcher)"]
         OUT_WIDGET["InlineChunkOutputWidget.vala<br/>(Embedded Cards, Stdout, Plots)"]
         REPL["ReplBridge.vala<br/>(Persistent Interactive R & Python Stdio)"]
         SESS_MGR["PersistentSessionManager.vala<br/>(Project REPL Lifecycle & PWD Sync)"]
+        SHINY["ShinyService.vala & ShinyWindow.vala<br/>(Reactive R Shiny Ephemeral Server)"]
+    end
+
+    subgraph Bridges_Domain ["🧬 Arekyer Bioinformatics Bridge & Domain Engines"]
+        AREKYER["ArekyerBridge.vala<br/>(Imladris.Bridges.Arekyer Facade)"]
+        GALAXY_CL["galaxy_client.vala & galaxy_models.vala<br/>(libsoup-3.0 REST + libsecret-1 Keyring)"]
+        GALAXY_GEN["galaxy_chunk_generator.vala<br/>(Standardized httr2 / pandas Synthesis)"]
+        MATH_ENG["MathChemEngine.vala<br/>(Natural Math & mhchem -> LaTeX / Markdown)"]
+        NB_SER["notebook_serializer.vala<br/>(Jupyter nbformat 4.5 Lossless Round-Trip)"]
+        ZOTERO["ZoteroService.vala<br/>(BetterBibTeX .bib & CSL-JSON Indexer)"]
     end
 
     subgraph AI_Subsystem ["🧠 AI & Elrond Copilot Subsystem"]
         ELROND["ElrondEngineController.vala<br/>(Smart Local AI & Agent Harness Bridge)"]
-        LOCAL_SERVERS["Local Inference & Agent Harnesses<br/>(Ollama :11434, LM Studio :1234, Cherry :23333, Antigravity agy)"]
         AI_CLIENT["AiClient.vala<br/>(Cloud REST Client: Gemini, Claude, OpenAI, etc.)"]
         AI_CFG["AiConfigManager.vala<br/>(API Keys, Models, Endpoints Config)"]
         MCP["McpServer.vala<br/>(Model Context Protocol Stdio Server)"]
     end
 
-    subgraph Core_Services ["📦 Core Services & Domain Models"]
+    subgraph Core_Services ["📦 Core Services & System Runtime"]
         SETTINGS["SettingsManager.vala<br/>(GSettings + settings.ini)"]
         TOOLCHAIN["ToolchainManager.vala<br/>(4-Tier Runtime Resolution Hierarchy)"]
-        MALLORN["MallornManager.vala<br/>(.mallorn / .Rproj Scaffold & Packaging)"]
+        MALLORN["MallornManager.vala & project_scaffolder.vala<br/>(.mallorn / .Rproj Scaffold & Packaging)"]
         RECOVERY["RecoveryService.vala<br/>(Shadow Snapshot Auto-Recovery)"]
         EXPORT["ExportService.vala<br/>(Quarto, Pandoc, Typst, ODT/ODP Pipeline)"]
         PKG_CACHE["PackageIndexCache.vala<br/>(CRAN & PyPI ETag Binary-Search Cache)"]
-        PLATFORM["PlatformUtils.vala<br/>(Distro Detection, Flatpak Host Spawning)"]
+        PLATFORM["PlatformUtils.vala<br/>(Distro Detection, Keyring Injection, flatpak-spawn)"]
     end
 
     %% Connections
@@ -54,11 +71,20 @@ flowchart TD
     WIN --> DOC
     WIN --> RIBBON
     WIN --> PKG_UI
+    WIN --> MATH_UI
+    WIN --> RPROJ_UI
     WIN --> PREFS
     DOC --> VIEW
     DOC --> DOCK
     DOC --> CHAT
     DOC --> RECOVERY
+    DOCK --> GALAXY_UI
+    GALAXY_UI --> AREKYER
+    AREKYER --> GALAXY_CL
+    AREKYER --> GALAXY_GEN
+    AREKYER --> PLATFORM
+    MATH_UI --> MATH_ENG
+    RPROJ_UI --> MALLORN
     VIEW --> COMPLETION
     VIEW --> PARSER
     DOC --> CHUNK_ENG
@@ -68,15 +94,15 @@ flowchart TD
     REPL --> SESS_MGR
     REPL --> TOOLCHAIN
     COMPLETION --> ELROND
+    COMPLETION --> ZOTERO
     CHAT --> AI_CLIENT
     CHAT --> ELROND
     CHAT --> AI_CFG
-    ELROND --> LLAMA
     ELROND --> PLATFORM
     TOOLCHAIN --> PLATFORM
+    EXPORT --> PLATFORM
     DOC --> SETTINGS
     PREFS --> SETTINGS
-    PREFS --> ELROND
     PKG_UI --> PKG_CACHE
 ```
 
@@ -88,89 +114,72 @@ flowchart TD
 
 | Component | File Path | Responsibilities & Connections |
 | :--- | :--- | :--- |
-| **`Application`** | [`src/Application.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/Application.vala) | Root GTK application singleton. Registers application actions (`app.*`), global accelerators (`Ctrl+Shift+E`, `Ctrl+F1`), and bundled Papirus SVG icon resources. |
-| **`Window`** | [`src/Window.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/Window.vala) | Main application shell (`Adw.ApplicationWindow`). Coordinates the multi-tier Libadwaita ribbon bar, document tabs (`Adw.TabView`), project status badge, and routing for Elrond AI assistance. |
-| **`RibbonFactory`** | [`src/RibbonFactory.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/RibbonFactory.vala) | Declarative factory producing linked tool button groups, collapsible sections, and menu buttons according to Libadwaita design tokens. |
-| **`SmartRibbonHelpers`** | [`src/SmartRibbonHelpers.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/SmartRibbonHelpers.vala) | Generates interactive popovers for code chunk insertion (`{r}`, `{python}`, `{sql}`), citation keys, LaTeX formulas, and 6x6 table creation grids. |
-| **`PackagesRibbonBar`** | [`src/ui/PackagesRibbonBar.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/PackagesRibbonBar.vala) | Dual-pane CRAN and PyPI package installer bar. Connects to `PackageIndexCache` for real-time autocompletion and calls `pak` or `uv` via `ToolchainManager`. |
-| **`DocumentPage`** | [`src/DocumentPage.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/DocumentPage.vala) | Active document container. Manages single-pane writer view vs 4-quadrant RStudio workbench, dynamic left/right AI chat and preview docking, and debounced shadow buffer backups. |
-| **`PersistentPanelRegistry`** | [`src/ui/PersistentPanelRegistry.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/PersistentPanelRegistry.vala) | Caches singleton widgets (Console, Terminal, WebKit Preview, Environment, Files, Plots, History, Packages, Help) to prevent expensive re-instantiation across tab switches. |
-| **`RStudioDockGrid`** | [`src/ui/RStudioDockGrid.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/RStudioDockGrid.vala) | Implements the four-quadrant split layout (Editor, Console/Terminal, Environment/History/Outline/Citations, Files/Plots/Packages/Help/Preview) with draggable paned dividers. |
-| **`AssistantPanel`** | [`src/AssistantPanel.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/AssistantPanel.vala) | Interactive AI chat panel. Features model dropdown with official brand SVG logos, quick action buttons (Explain, Fix, Add Plot, Insert at Cursor), and streaming output view. |
-| **`PreferencesDialog`** | [`src/ui/PreferencesDialog.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/PreferencesDialog.vala) | Preferences editor for themes, GNOME accent colors, Elrond local model setup, inline editing toggles, and side panel left/right positioning. |
-| **`AiSettingsDialog`** | [`src/ui/AiSettingsDialog.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/AiSettingsDialog.vala) | Multi-provider API credential manager for Google Gemini, Claude, OpenAI, DeepSeek, Kimi, Qwen, Cursor, NVIDIA NIM, Ollama, LM Studio, and Custom endpoints. |
-| **`InlineChunkOutputWidget`** | [`src/ui/InlineChunkOutputWidget.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/InlineChunkOutputWidget.vala) | Card widget anchored beneath code chunks in the GtkSourceView editor displaying stdout text, stderr diagnostics, and rendered PNG plots. |
+| **`Application`** | [`src/Application.vala`](../src/Application.vala) | Root `Adw.Application` singleton (`APP_VERSION = "0.18.0"`). Registers application actions (`app.*`), global accelerators (`Ctrl+M`, `Ctrl+Shift+E`, `Ctrl+Shift+A`, `Ctrl+F1`), and bundled Papirus SVG icon resources. |
+| **`Window`** | [`src/Window.vala`](../src/Window.vala) | Main application shell (`Adw.ApplicationWindow`). Coordinates the multi-tier Libadwaita ribbon bar, document tabs (`Adw.TabView`), project status badge, MathChemStudio launcher, and Elrond AI routing. |
+| **`RibbonFactory`** | [`src/RibbonFactory.vala`](../src/RibbonFactory.vala) | Declarative factory producing linked tool button groups, collapsible sections, and menu buttons according to Libadwaita design tokens. |
+| **`SmartRibbonHelpers`** | [`src/SmartRibbonHelpers.vala`](../src/SmartRibbonHelpers.vala) | Generates interactive popovers for code chunk insertion (`{r}`, `{python}`, `{sql}`), citation keys, LaTeX formulas, and 6x6 table creation grids. |
+| **`MathChemEditorDialog`** | [`src/ui/MathChemEditorDialog.vala`](../src/ui/MathChemEditorDialog.vala) | Interactive modal studio (`Ctrl+M`) for natural mathematical formulas and chemical reactions. Provides quick-insert symbol bars, curated scientific presets, live HTML/SVG preview, and 6 output modes (LaTeX Display/Inline/Equation/Align, Markdown `~sub~`/`^sup^`, and Unicode). |
+| **`RprojDialog`** | [`src/ui/rproj_dialog.vala`](../src/ui/rproj_dialog.vala) | Native dialog for creating and configuring RStudio-compatible `.Rproj` project manifests with DCF options (`RestoreWorkspace`, `SaveWorkspace`, `Encoding`, `NumSpacesForTab`, `RnwWeave`, `LaTeX`) and optional `renv`/Git initialization. |
+| **`GalaxyPanel`** | [`src/ui/galaxy_panel.vala`](../src/ui/galaxy_panel.vala) | Dockable **Arekyer Bridge** inspector panel. Displays remote Galaxy histories and datasets with live state badges (`ok`, `running`, `queued`, `error`), search filtering, and one-click `[ + R ]` and `[ + Py ]` provenance chunk buttons. |
+| **`GalaxyAuthDialog`** | [`src/ui/galaxy_auth_dialog.vala`](../src/ui/galaxy_auth_dialog.vala) | Libadwaita preferences dialog for configuring Galaxy server URLs (`usegalaxy.eu`, `usegalaxy.org`, custom), validating API keys via `/api/whoami`, and storing credentials in `libsecret-1`. |
+| **`PackagesRibbonBar`** | [`src/ui/PackagesRibbonBar.vala`](../src/ui/PackagesRibbonBar.vala) | Dual-pane CRAN and PyPI package installer bar. Connects to `PackageIndexCache` for real-time autocompletion and calls `pak` or `uv` via `ToolchainManager`. |
+| **`DocumentPage`** | [`src/DocumentPage.vala`](../src/DocumentPage.vala) | Active document container. Manages single-pane writer view vs 4-quadrant RStudio workbench, cell navigation (`Shift+Enter`), and debounced shadow buffer backups. |
+| **`PersistentPanelRegistry`** | [`src/ui/PersistentPanelRegistry.vala`](../src/ui/PersistentPanelRegistry.vala) | Caches singleton widgets (Console, Terminal, WebKit Preview, Environment, Files, Plots, History, Packages, Help, Citations, Arekyer Bridge, Shiny Viewer) across tab switches. |
+| **`RStudioDockGrid`** | [`src/ui/RStudioDockGrid.vala`](../src/ui/RStudioDockGrid.vala) | Implements the four-quadrant split layout with draggable paned dividers and layout presets. |
+| **`DataGridViewer`** | [`src/ui/DataGridViewer.vala`](../src/ui/DataGridViewer.vala) | High-performance `Gtk.ColumnView` inspector for R and Python dataframes with sorting, regex filtering, and clipboard export. |
+| **`ShinyWindow`** | [`src/ui/ShinyWindow.vala`](../src/ui/ShinyWindow.vala) | Dedicated `Adw.Window` hosting live WebKitGTK 6.0 sessions for reactive R Shiny applications. |
 
 ---
 
-### 2.2 Computation & Execution Subsystem (`src/console/`, `src/editor/`, `src/services/`)
+### 2.2 Arekyer Bioinformatics Bridge & Domain Engines (`src/bridges/`, `src/core/`)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
-    participant View as GtkSource.View (DocumentPage)
-    participant Eng as ChunkExecutionEngine
-    participant Parser as ChunkParser
-    participant Repl as ReplBridge
-    participant Sub as Subprocess (R / Python)
-    participant Widget as InlineChunkOutputWidget
+    actor Scientist
+    participant Panel as GalaxyPanel (Arekyer Bridge)
+    participant Bridge as ArekyerBridge
+    participant Client as GalaxyClient (libsoup-3.0)
+    participant Keyring as OS Keyring (libsecret-1)
+    participant Buffer as GtkSource.Buffer (.qmd)
+    participant Export as ExportService / PlatformUtils
 
-    User->>View: Press Ctrl+Shift+Enter (Run Chunk)
-    View->>Eng: execute_chunk_at_cursor(cursor_line)
-    Eng->>Parser: scan_active_chunk(source_buffer, cursor_line)
-    Parser-->>Eng: ChunkData (code, lang, options, start_line, end_line)
-    Eng->>Widget: ensure_output_widget(end_line)
-    Widget->>Widget: set_running_state(true)
-    Eng->>Repl: execute_code_async(lang, code, options)
-    Repl->>Sub: write_stdin(wrapped_code_with_sentinels)
-    Sub-->>Repl: stdout / stderr / plot.png
-    Repl-->>Eng: ExecutionResult(stdout, plot_path, return_code)
-    Eng->>Widget: set_output(stdout, plot_path, count)
-    Widget->>Widget: set_running_state(false)
+    Scientist->>Panel: Enter Server URL & API Key -> Click Connect
+    Panel->>Client: verify_connection_async() (/api/whoami)
+    Client->>Keyring: store_api_key_in_keyring_async() (org.ardatech.Imladris.GalaxyApiKey)
+    Client-->>Panel: Connected (Histories & Datasets Loaded)
+    Scientist->>Panel: Click [ + R ] or [ + Py ] on Dataset #43
+    Panel->>Bridge: generate_provenance_chunk(ds, history, R_QUARTO)
+    Bridge-->>Panel: Standardized arekyer-galaxy-43 Code Block
+    Panel->>Bridge: inject_into_buffer(buffer, chunk_code)
+    Bridge->>Buffer: Insert verified httr2 / pandas chunk at cursor
+    Scientist->>Export: Render Manuscript (quarto render)
+    Export->>Keyring: PlatformUtils.inject_galaxy_credentials(launcher)
+    Keyring-->>Export: Inject GALAXY_API_KEY into isolated subprocess memory
 ```
 
 | Component | File Path | Responsibilities & Connections |
 | :--- | :--- | :--- |
-| **`ReplBridge`** | [`src/console/ReplBridge.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/console/ReplBridge.vala) | Manages long-running interactive REPL subprocesses (`R --interactive`, `python -i -u`). Injects prompt sentinels, captures graphics devices (PNG), and sets working directories. |
-| **`ChunkExecutionEngine`** | [`src/editor/ChunkExecutionEngine.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/editor/ChunkExecutionEngine.vala) | Dispatches chunk execution, parses options (`#| echo: false`), routes code to `ReplBridge`, and mounts `InlineChunkOutputWidget`. |
-| **`ChunkParser`** | [`src/core/ChunkParser.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/ChunkParser.vala) | Zero-copy scanner for fenced markdown code chunks (````{r}`, ````{python}`, ````{sql}`) and Quarto chunk headers. |
-| **`PersistentSessionManager`** | [`src/services/PersistentSessionManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/PersistentSessionManager.vala) | Project-scoped singleton ensuring variables, loaded libraries, and dataframes survive across multiple chunk runs. |
-| **`SandboxController`** | [`src/services/SandboxController.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/SandboxController.vala) | Interacts with project virtual environments (`.venv`, `renv`, `.imladris-env`) and checks lockfiles. |
+| **`ArekyerBridge`** | [`src/bridges/ArekyerBridge.vala`](../src/bridges/ArekyerBridge.vala) | High-level facade in `Imladris.Bridges.Arekyer`. Coordinates `GalaxyClient`, `GalaxyChunkGenerator`, `GtkSource.Buffer` injection, and `GLib.SubprocessLauncher` credential injection. |
+| **`GalaxyClient`** | [`src/bridges/galaxy_client.vala`](../src/bridges/galaxy_client.vala) | Asynchronous REST client (`libsoup-3.0`, `json-glib-1.0`) querying `/api/whoami`, `/api/histories`, and `/api/histories/{id}/contents`. Integrates `libsecret-1` (`org.ardatech.Imladris.GalaxyApiKey`) for OS keyring storage and GDPR erasure. |
+| **`GalaxyChunkGenerator`** | [`src/bridges/galaxy_chunk_generator.vala`](../src/bridges/galaxy_chunk_generator.vala) | Synthesizes WIKI 02 standardized R (`httr2` + `readr`) and Python (`requests` + `pandas`) code chunks with `# AREKYER PROVENANCE RECORD` metadata headers and binary dataset local caching. |
+| **`GalaxyModels`** | [`src/bridges/galaxy_models.vala`](../src/bridges/galaxy_models.vala) | GObject models (`GalaxyHistory`, `GalaxyDataset`, `GalaxyDatasetState`, `TargetLanguage`) for binding directly to `GLib.ListStore` and `Gtk.ListView`. |
+| **`MathChemEngine`** | [`src/core/MathChemEngine.vala`](../src/core/MathChemEngine.vala) | Deterministic parser converting natural mathematical syntax (fractions, integrals, sums, roots, matrices, Greek identifiers) and chemical notation (stoichiometry, states, reaction arrows `->[cat][cond]`, ions, hydrates) into LaTeX (`\ce{...}`) or Markdown (`~sub~`/`^sup^`). |
+| **`NotebookSerializer`** | [`src/core/notebook_serializer.vala`](../src/core/notebook_serializer.vala) | Bidirectional Jupyter `.ipynb` (`nbformat 4.5`) serializer preserving cell IDs, `execution_count`, `tags`, `raw` cells, and custom notebook/cell metadata via hidden HTML comment anchors. |
 
 ---
 
-### 2.3 AI & Copilot Subsystem (`src/ai/`, `src/`)
-
-```mermaid
-flowchart LR
-    subgraph Triggers ["User Triggers"]
-        T1["Typing in Editor"] --> AC["AiCompletionProvider.vala"]
-        T2["Ctrl+Shift+E / Context Menu"] --> POP["Inline Popover (DocumentPage)"]
-        T3["AI Chat Panel"] --> AP["AssistantPanel.vala"]
-    end
-
-    subgraph Controllers ["Controllers & Clients"]
-        AC --> EL["ElrondEngineController.vala"]
-        POP -->|if inline_editing_enabled| EL
-        POP -->|fallback to cloud| CL["AiClient.vala"]
-        AP --> CL
-        AP --> EL
-    end
-
-    subgraph Backends ["Inference Backends"]
-        EL -->|HTTP 127.0.0.1:18089| LS["llama-server Daemon (Local GGUF)"]
-        CL -->|HTTPS REST| EXT["Cloud APIs: Gemini, Claude, OpenAI, DeepSeek, etc."]
-    end
-```
+### 2.3 Computation & Execution Subsystem (`src/console/`, `src/editor/`, `src/services/`)
 
 | Component | File Path | Responsibilities & Connections |
 | :--- | :--- | :--- |
-| **`ElrondEngineController`** | [`src/ai/ElrondEngineController.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ai/ElrondEngineController.vala) | Smart Local AI Server & Agent Harness Bridge. Probes and connects to running local inference servers (Ollama on `:11434`, LM Studio on `:1234`, Cherry Studio / LocalAI on `:23333` / `:8080`) and host agent harnesses (Antigravity `agy`, OpenCode, Pi). Completely eliminates container exit 127 crashes. |
-| **`AiCompletionProvider`** | [`src/ai/AiCompletionProvider.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ai/AiCompletionProvider.vala) | Implements `GtkSource.CompletionProvider` for real-time inline copilot completions. Debounced according to `AiAssistanceLevel`. |
-| **`AiClient`** | [`src/AiClient.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/AiClient.vala) | Asynchronous HTTP client using `libsoup-3.0` supporting OpenAI-compatible endpoints and Anthropic native `/v1/messages`. |
-| **`AiConfigManager`** | [`src/core/AiConfigManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/AiConfigManager.vala) | Manages provider metadata, API keys, models, and endpoints. Stores credentials in `~/.config/imladris/ai_config.json` with secure permissions (`0600`). |
-| **`McpServer`** | [`src/McpServer.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/McpServer.vala) | Model Context Protocol stdio server exposing document reading and editing tools to external agents (`imladris --mcp-server`). |
+| **`ReplBridge`** | [`src/console/ReplBridge.vala`](../src/console/ReplBridge.vala) | Manages long-running interactive REPL subprocesses (`R --interactive`, `python -i -u`). Injects prompt sentinels, captures graphics devices (PNG), and enforces project-root `pwd` locking. |
+| **`ChunkExecutionEngine`** | [`src/editor/ChunkExecutionEngine.vala`](../src/editor/ChunkExecutionEngine.vala) | Dispatches chunk execution (`Ctrl+Shift+Enter` or `Shift+Enter`), parses options (`#| echo: false`), routes code to `ReplBridge`, and mounts `InlineChunkOutputWidget`. |
+| **`ChunkParser`** | [`src/core/ChunkParser.vala`](../src/core/ChunkParser.vala) | Zero-copy scanner for fenced markdown code chunks (````{r}`, ````{python}`, ````{julia}`, ````{sql}`, ````{bash}`) and Quarto chunk headers. |
+| **`PersistentSessionManager`** | [`src/services/PersistentSessionManager.vala`](../src/services/PersistentSessionManager.vala) | Project-scoped singleton ensuring variables, loaded libraries, and dataframes survive across multiple chunk runs. |
+| **`ShinyService`** | [`src/services/ShinyService.vala`](../src/services/ShinyService.vala) | Detects Shiny applications, allocates ephemeral localhost ports, spawns `Rscript`, intercepts listening URLs, and routes display to Quadrant 4, `ShinyWindow`, or external browser. |
+| **`ZoteroService`** | [`src/services/ZoteroService.vala`](../src/services/ZoteroService.vala) | Parses local BetterBibTeX `.bib` and CSL-JSON files and feeds `CitationCompletionProvider` for live `@citekey` completion. |
+| **`SandboxController`** | [`src/services/SandboxController.vala`](../src/services/SandboxController.vala) | Interacts with project virtual environments (`.venv`, `renv`, `.imladris-env`) and synchronizes lockfiles. |
 
 ---
 
@@ -178,71 +187,33 @@ flowchart LR
 
 | Component | File Path | Responsibilities & Connections |
 | :--- | :--- | :--- |
-| **`SettingsManager`** | [`src/core/SettingsManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/SettingsManager.vala) | Persistent application settings. Integrates GSettings schema and `~/.config/imladris/settings.ini` for Elrond AI preferences, inline editing toggle, and side panel position. |
-| **`ToolchainManager`** | [`src/core/ToolchainManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/ToolchainManager.vala) | Resolves R, Python, Quarto, and Typst runtimes via a 4-tier priority hierarchy (`.imladris-env` -> micromamba -> host -> installer dialog). |
-| **`MallornManager`** | [`src/core/MallornManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/MallornManager.vala) | Parses `.mallorn` / `.Rproj` project configuration files and generates portable `.tar.zst` reproducible archives. |
-| **`RecoveryService`** | [`src/services/RecoveryService.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/RecoveryService.vala) | Asynchronous shadow snapshot engine saving unsaved buffer states to `~/.cache/imladris/recovery/` every 250ms without locking the UI thread. |
-| **`HistoryManager`** | [`src/services/HistoryManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/HistoryManager.vala) | Interactive REPL command history tracking, `.Rhistory` synchronization, Up/Down readline navigation, and history export. |
-| **`ExportService`** | [`src/services/ExportService.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/ExportService.vala) | Pipeline rendering documents to HTML, PDF, ODT, and ODP using Quarto, Pandoc, or LibreOffice. |
-| **`MediaHelper`** | [`src/services/MediaHelper.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/MediaHelper.vala) | Simplifies inserting images and videos into files. In sandboxed projects, automatically copies external assets into `/img` and generates relative links for Quarto (`{{< video ... >}}`), Markdown images (`![alt](...)`), and HTML5 video. |
-| **`PackageIndexCache`** | [`src/services/PackageIndexCache.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/PackageIndexCache.vala) | Fast $O(\log N)$ binary search cache for CRAN and PyPI package indices with HTTP ETag disk caching. |
-| **`PlatformUtils`** | [`src/core/PlatformUtils.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/PlatformUtils.vala) | Detects Linux distribution (`/etc/os-release`), verifies executable runnability, and builds host commands via `flatpak-spawn --host`. |
-| **`DocumentAdapter`** | [`src/adapters/DocumentAdapter.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/adapters/DocumentAdapter.vala) | Normalizes disparate formats (`.md`, `.qmd`, `.rmd`, `.ipynb`, `.R`, `.py`) into standard buffer and notebook data structures. |
+| **`SettingsManager`** | [`src/core/SettingsManager.vala`](../src/core/SettingsManager.vala) | Persistent application settings via `GLib.Settings` and `~/.config/imladris/settings.ini`. |
+| **`ToolchainManager`** | [`src/core/ToolchainManager.vala`](../src/core/ToolchainManager.vala) | Resolves R, Python, Quarto, and Typst runtimes via a 4-tier priority hierarchy (`.imladris-env` $\rightarrow$ managed micromamba $\rightarrow$ host $\rightarrow$ setup dialog). |
+| **`MallornManager`** | [`src/core/MallornManager.vala`](../src/core/MallornManager.vala) | Parses and writes `.mallorn` and `.Rproj` DCF project manifests and packages reproducible `.tar.zst` archives. |
+| **`ProjectScaffolder`** | [`src/core/project_scaffolder.vala`](../src/core/project_scaffolder.vala) | Scaffolds multi-file project directories, `.Rproj` files, `.gitignore`, `README.md`, and initial notebooks. |
+| **`RecoveryService`** | [`src/services/RecoveryService.vala`](../src/services/RecoveryService.vala) | Asynchronous shadow snapshot engine saving unsaved buffer states to `~/.cache/imladris/recovery/`. |
+| **`ExportService`** | [`src/services/ExportService.vala`](../src/services/ExportService.vala) | Renders documents to HTML, PDF, ODT, and ODP using Quarto, Pandoc, or LibreOffice with isolated `GALAXY_API_KEY` injection. |
+| **`PlatformUtils`** | [`src/core/PlatformUtils.vala`](../src/core/PlatformUtils.vala) | Detects Linux distribution, resolves Flatpak host portals (`flatpak-spawn --host`), and injects keyring credentials (`inject_galaxy_credentials`) into subprocess launchers. |
+| **`DocumentAdapter`** | [`src/adapters/DocumentAdapter.vala`](../src/adapters/DocumentAdapter.vala) | Normalizes `.md`, `.qmd`, `.Rmd`, `.ipynb`, `.R`, and `.py` into standard editor buffers and renders live HTML/KaTeX/mhchem previews. |
 
 ---
 
 ## 3. Bug Localization & Diagnostic Matrix
 
-When encountering an issue in Imladris, use this table to immediately identify the responsible subsystem, files, and debugging commands:
-
 | Symptom / Failure Mode | Primary Subsystem | Primary Source Files | How to Diagnose & Verify |
 | :--- | :--- | :--- | :--- |
-| **Code chunks hang or fail to execute** | Execution / REPL | [`src/console/ReplBridge.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/console/ReplBridge.vala)<br/>[`src/editor/ChunkExecutionEngine.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/editor/ChunkExecutionEngine.vala) | Check terminal stdout/stderr. Verify that the interpreter (`R` or `python`) starts properly on the host/sandbox. Check sentinel matching in `ReplBridge.vala`. |
-| **Inline plot does not render under chunk** | Output Widget / Device | [`src/console/ReplBridge.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/console/ReplBridge.vala)<br/>[`src/ui/InlineChunkOutputWidget.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/InlineChunkOutputWidget.vala) | Look in `~/.cache/imladris/tmp/` for generated `.png` files. Ensure `AGG` device or `matplotlib` backend is writing valid image bytes. |
-| **Local Elrond AI / Server Bridge offline** | AI Subsystem | [`src/ai/ElrondEngineController.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ai/ElrondEngineController.vala)<br/>[`src/ui/PreferencesDialog.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/PreferencesDialog.vala) | Check if a local server is running: `curl http://127.0.0.1:11434/api/tags` (Ollama), `curl http://127.0.0.1:1234/v1/models` (LM Studio), or `agy --version` (Antigravity). Click "Probe Servers" in Preferences to refresh. |
-| **Inline AI completions not showing up** | AI Completion | [`src/ai/AiCompletionProvider.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ai/AiCompletionProvider.vala)<br/>[`src/core/SettingsManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/SettingsManager.vala) | Ensure `inline_completion_enabled` is `true` in Preferences. Check if `ElrondEngineController.is_ready` is true or if debouncer timed out. |
-| **Chat panel opens on wrong side (left vs right)** | Document Layout | [`src/DocumentPage.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/DocumentPage.vala)<br/>[`src/core/SettingsManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/SettingsManager.vala) | Check `apply_panel_position()` in `DocumentPage.vala`. Inspect `chat_panel_position` in `~/.config/imladris/settings.ini` under `[ElrondAI]`. |
-| **Cloud AI (Gemini/Claude/OpenAI) fails with error** | Cloud AI Client | [`src/AiClient.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/AiClient.vala)<br/>[`src/core/AiConfigManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/AiConfigManager.vala) | Check `~/.config/imladris/ai_config.json` for valid API key and endpoint. Inspect HTTP response status code in console output. |
-| **CRAN / PyPI search autocompletion empty** | Package Cache | [`src/services/PackageIndexCache.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/PackageIndexCache.vala)<br/>[`src/ui/PackagesRibbonBar.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/PackagesRibbonBar.vala) | Check files in `~/.cache/imladris/indices/`. Verify network connectivity to CRAN/PyPI index endpoints. |
-| **Toolchain / interpreter not found** | Toolchain Manager | [`src/core/ToolchainManager.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/core/ToolchainManager.vala)<br/>[`src/ui/ToolchainSetupDialog.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/ToolchainSetupDialog.vala) | Check 4-tier resolution in `ToolchainManager.vala`. Verify micromamba install in `~/.local/share/imladris/toolchains/mamba_root/`. |
-| **Unsaved document lost after crash** | Crash Recovery | [`src/services/RecoveryService.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/services/RecoveryService.vala) | Inspect `~/.cache/imladris/recovery/` for `.recovery.json` snapshots. Ensure snapshot debounce was triggered. |
-| **UI widgets disappear on tab switch** | Panel Registry | [`src/ui/PersistentPanelRegistry.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/PersistentPanelRegistry.vala)<br/>[`src/ui/RStudioDockGrid.vala`](file:///home/antonio/Projects/imladris-next-md-editor/src/ui/RStudioDockGrid.vala) | Ensure panels are unmounted before re-parenting with `panel_registry.mount_panel()`. Check GTK4 parent constraints. |
+| **Galaxy connection fails or histories do not load** | Arekyer Bridge | [`src/bridges/galaxy_client.vala`](../src/bridges/galaxy_client.vala)<br/>[`src/ui/galaxy_auth_dialog.vala`](../src/ui/galaxy_auth_dialog.vala) | Verify server URL starts with `https://` and API key is valid via `curl -H "x-api-key: <KEY>" https://usegalaxy.eu/api/whoami`. Run `meson test galaxy_bridge_tests`. |
+| **`GALAXY_API_KEY` missing during `quarto render`** | Subprocess / Keyring | [`src/core/PlatformUtils.vala`](../src/core/PlatformUtils.vala)<br/>[`src/bridges/ArekyerBridge.vala`](../src/bridges/ArekyerBridge.vala) | Check `PlatformUtils.inject_galaxy_credentials()`. Verify `org.freedesktop.secrets` service is active or `GALAXY_API_KEY` is set in environment. |
+| **Math or chemical formula conversion mismatch** | MathChem Engine | [`src/core/MathChemEngine.vala`](../src/core/MathChemEngine.vala)<br/>[`src/ui/MathChemEditorDialog.vala`](../src/ui/MathChemEditorDialog.vala) | Inspect `convert_math_to_latex()` or `convert_chem_to_mhchem()`. Run `meson test mallorn_sandbox_tests` to verify formula test cases. |
+| **`.ipynb` cell metadata or raw cells lost on save** | Notebook Serializer | [`src/core/notebook_serializer.vala`](../src/core/notebook_serializer.vala) | Check `<!-- imladris-cell: {...} -->` comment preservation in `markdown_to_ipynb()` and `ipynb_to_markdown()`. |
+| **Code chunks hang or fail to execute** | Execution / REPL | [`src/console/ReplBridge.vala`](../src/console/ReplBridge.vala)<br/>[`src/editor/ChunkExecutionEngine.vala`](../src/editor/ChunkExecutionEngine.vala) | Check terminal stdout/stderr. Verify that the interpreter (`R` or `python3`) starts properly on the host/sandbox and sentinel markers resolve. |
+| **Local Elrond AI / Server Bridge offline** | AI Subsystem | [`src/ai/ElrondEngineController.vala`](../src/ai/ElrondEngineController.vala)<br/>[`src/ui/PreferencesDialog.vala`](../src/ui/PreferencesDialog.vala) | Probe local server (`curl http://127.0.0.1:11434/api/tags` or `127.0.0.1:8088/health`). Click "Probe Servers" in Preferences. |
 
 ---
 
-## 4. Signal & Event Flow Diagram
+## 4. Architectural Conventions & Guidelines
 
-```mermaid
-flowchart TD
-    %% User Actions
-    KEY["Keybindings / UI Actions<br/>(Ctrl+Shift+E, Ctrl+Shift+Enter, Ribbon)"]
-
-    %% Settings Changes
-    SETT_EV["Preferences Dialog Changes"] -->|mutates| SM["SettingsManager"]
-    SM -->|emits ai_settings_changed| DP["DocumentPage.apply_panel_position()"]
-    SM -->|emits theme_changed| WIN["Window / StyleManager"]
-
-    %% Document Buffer Changes
-    BUF["source_buffer.changed"] -->|250ms debounce| SNAP["RecoveryService.snapshot_async"]
-    BUF -->|250ms debounce| PREV["DocumentPage.refresh_live_preview()"]
-    BUF -->|250ms debounce| STATS["DocumentPage.stats_changed -> Window Status Bar"]
-
-    %% Execution Events
-    KEY -->|Run Chunk| CE["ChunkExecutionEngine.execute_chunk_at_cursor"]
-    CE -->|send code| RB["ReplBridge"]
-    RB -->|output available| OUT["InlineChunkOutputWidget.set_output"]
-
-    %% AI Events
-    KEY -->|Elrond Assist| WIN_ACT["Window.trigger_elrond_assistance()"]
-    WIN_ACT -->|if inline_editing_enabled| POP["DocumentPage.show_inline_prompt_popover()"]
-    WIN_ACT -->|if disabled| CHAT["DocumentPage.show_ai_assistant() -> AssistantPanel.focus_input()"]
-```
-
----
-
-## 5. Architectural Conventions & Guidelines
-
-1. **Non-Blocking UI Thread:** Heavy I/O (model weight loading, child process stdio, disk index search, network REST requests) MUST be asynchronous using GLib `SourceFunc`, `AsyncReadyCallback`, or background threads.
-2. **Flatpak Sandbox Awareness:** Never assume host `/usr/bin` is accessible directly. Always check `PlatformUtils.resolve_runtime()` and route external binaries through `PlatformUtils.build_host_command()` when running in a sandbox.
-3. **Widget Ownership & Re-parenting:** GTK4 strictly enforces single-parent widget hierarchies. Before re-mounting panels across tabs or changing split orientation, always unparent or call `paned.set_start_child(null)` / `paned.set_end_child(null)`.
-4. **Data Isolation & GDPR:** AI models are opt-in. Telemetry metrics in the status bar are strictly read from local `/proc` or `llama.cpp` local health endpoints. No network requests are made without explicit user action.
+1. **ASD-STE100 Documentation:** All documentation, comments, and UI messages follow Simplified Technical English (active voice, unambiguous terms).
+2. **Non-Blocking UI Thread:** Network I/O (`libsoup-3.0`), keyring lookups (`libsecret-1`), subprocess execution, and disk snapshots run asynchronously on GLib worker threads or async main-loop callbacks.
+3. **Zero Plain-Text Credentials:** Cloud bioinformatics tokens (`GALAXY_API_KEY`) are never written into `.qmd`, `.Rmd`, or `.ipynb` files; they reside in `libsecret-1` and are injected exclusively into isolated child process memory spaces.
+4. **Beyonce Rule Testing:** Every domain feature (Arekyer chunk synthesis, MathChem conversion, `.Rproj` scaffolding, `.ipynb` parity, Zotero, Shiny, Docking) is verified by automated Meson unit test suites (`7/7 OK`).

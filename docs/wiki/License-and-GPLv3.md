@@ -12,7 +12,7 @@ Imladris gives users the freedom to:
 - Redistribute exact copies of the software to help colleagues.
 - Distribute copies of your modified versions to the community under the same GPLv3 license.
 
-The complete text of the license is available in the repository at [`LICENSE`](file:///home/antonio/Projects/imladris-next-md-editor/LICENSE).
+The complete text of the license is available in the repository at [`LICENSE`](https://github.com/Antux912012/imladris/blob/main/LICENSE).
 
 ---
 

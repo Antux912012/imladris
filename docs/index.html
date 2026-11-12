@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Imladris | Native Scientific Workbench & Polyglot IDE</title>
-  <meta name="description" content="Native scientific workbench for reproducible research built in Vala, GTK4, and Libadwaita.">
+  <title>Imladris v0.18.0 | Native Linux Scientific Workbench, Bioinformatics Bridge & Polyglot IDE</title>
+  <meta name="description" content="Native Linux scientific workbench for reproducible research built in Vala, GTK4, and Libadwaita. Features the Arekyer Galaxy-to-Quarto Provenance Bridge, Natural Math & Chemical Reaction Studio, Rproj scaffolding, and Jupyter nbformat 4.5 parity.">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
   <link rel="alternate icon" type="image/png" href="assets/logo.png">
   <script>
@@ -31,6 +31,7 @@
       --accent-blue: #5E81AC;
       --accent-green: #A3BE8C;
       --accent-purple: #B48EAD;
+      --accent-amber: #EBCB8B;
       --header-bg: rgba(46, 52, 64, 0.92);
       --btn-primary-bg: #88C0D0;
       --btn-primary-text: #242933;
@@ -48,20 +49,21 @@
 
     [data-theme="light"] {
       /* Nord Light Theme Palette (Snow Storm base with Polar Night typography) */
-      --bg-primary: #ECEFF4;         /* nord6 base */
-      --bg-secondary: #E5E9F0;       /* nord5 containers */
-      --bg-card: #FFFFFF;            /* crisp light card surface */
-      --border-color: #D8DEE9;       /* nord4 borders */
-      --text-primary: #2E3440;       /* nord0 primary text */
-      --text-secondary: #434C5E;     /* nord2 secondary text */
-      --text-muted: #6C7A92;         /* nord3 accessible muted text */
-      --accent-frost: #3B6F96;       /* Deep Frost blue for readable text & links */
-      --accent-blue: #5E81AC;        /* nord10 Frost */
-      --accent-green: #487834;       /* Accessible Aurora green */
-      --accent-purple: #7E4A78;      /* Accessible Aurora purple */
+      --bg-primary: #ECEFF4;
+      --bg-secondary: #E5E9F0;
+      --bg-card: #FFFFFF;
+      --border-color: #D8DEE9;
+      --text-primary: #2E3440;
+      --text-secondary: #434C5E;
+      --text-muted: #6C7A92;
+      --accent-frost: #3B6F96;
+      --accent-blue: #5E81AC;
+      --accent-green: #487834;
+      --accent-purple: #7E4A78;
+      --accent-amber: #9A6B16;
       --header-bg: rgba(236, 239, 244, 0.94);
-      --btn-primary-bg: #5E81AC;     /* Crisp Nord blue primary button */
-      --btn-primary-text: #ECEFF4;   /* Snow Storm button text */
+      --btn-primary-bg: #5E81AC;
+      --btn-primary-text: #ECEFF4;
       --shadow-color: rgba(46, 52, 64, 0.10);
       --shadow-card: rgba(46, 52, 64, 0.06);
       --hero-glow: rgba(94, 129, 172, 0.20);
@@ -138,7 +140,7 @@
       align-items: center;
       gap: 20px;
     }
-    .nav-links { display: flex; gap: 24px; font-size: 0.95rem; }
+    .nav-links { display: flex; gap: 22px; font-size: 0.92rem; }
     .nav-links a { color: var(--text-secondary); font-weight: 500; }
 
     /* Theme Toggle Button */
@@ -221,15 +223,15 @@
       margin-bottom: 24px;
     }
     .hero p {
-      max-width: 780px;
+      max-width: 820px;
       margin: 0 auto 36px;
-      font-size: 1.18rem;
+      font-size: 1.15rem;
       color: var(--text-secondary);
     }
     .cta-group {
       display: flex;
       justify-content: center;
-      gap: 16px;
+      gap: 14px;
       flex-wrap: wrap;
     }
     .btn {
@@ -301,8 +303,8 @@
       background: var(--bg-secondary);
       padding: 20px;
       font-family: var(--font-mono);
-      font-size: 0.82rem;
-      min-height: 190px;
+      font-size: 0.80rem;
+      min-height: 205px;
       transition: background 0.25s ease;
     }
     .quadrant-title {
@@ -347,15 +349,33 @@
       flex-direction: column;
       justify-content: space-between;
       box-shadow: 0 2px 8px var(--shadow-card);
-      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
     }
-    .card h3 { font-size: 1.2rem; margin-bottom: 12px; color: var(--text-primary); }
+    .card:hover {
+      border-color: var(--accent-frost);
+      transform: translateY(-2px);
+    }
+    .card h3 { font-size: 1.18rem; margin-bottom: 12px; color: var(--text-primary); }
     .card p { color: var(--text-secondary); font-size: 0.95rem; }
     .card-meta {
       margin-top: 20px;
       font-family: var(--font-mono);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       color: var(--accent-green);
+    }
+
+    /* Code Block Showcase */
+    .spec-block {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      overflow-x: auto;
+      line-height: 1.55;
+      margin-top: 14px;
+      color: var(--text-primary);
     }
 
     /* Author Section */
@@ -383,6 +403,7 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
+      flex-wrap: wrap;
     }
     .footer-logo {
       width: 22px;
@@ -404,8 +425,8 @@
       <div class="nav-right">
         <nav class="nav-links">
           <a href="#architecture">The Workbench</a>
+          <a href="#arekyer">Arekyer &amp; MathStudio</a>
           <a href="#wiki">Technical Wiki</a>
-          <a href="#github">GitHub</a>
           <a href="#author">The Architect</a>
         </nav>
         <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle Light/Dark Theme" title="Toggle Light/Dark Theme">
@@ -436,65 +457,64 @@
         <img src="assets/logo.svg" alt="Imladris App Icon" class="hero-logo" width="112" height="112">
       </div>
       <div>
-        <span class="hero-tag">Native Linux Scientific Computing & Bioinformatics IDE</span>
+        <span class="hero-tag">Native Linux Scientific Computing, Bioinformatics &amp; Polyglot IDE · v0.18.0</span>
       </div>
       <h1>Bridge Cloud Bioinformatics to Reproducible Manuscripts.</h1>
       <p>
-        Imladris is a zero-bloat native polyglot IDE (<code>.qmd</code>, <code>.Rmd</code>, <code>.ipynb</code>) engineered in Vala, GTK4, and Libadwaita. Connect upstream <strong>Galaxy</strong> histories directly to local R/Python environments, Zotero libraries, and Quarto publishing pipelines.
+        Imladris is a zero-bloat native polyglot IDE (<code>.qmd</code>, <code>.Rmd</code>, <code>.ipynb</code>, <code>.Rproj</code>) engineered in Vala, GTK4, and Libadwaita. Connect upstream <strong>Galaxy Project</strong> histories via the <strong>Arekyer Provenance Bridge</strong>, author equations in the <strong>Natural Math &amp; Chemical Reaction Studio</strong>, and compile reproducibly across R, Python, Zotero, and Quarto.
       </p>
       <div class="cta-group">
         <a href="https://github.com/Antux912012/imladris/releases/tag/v0.18.0" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Download v0.18.0 (Flatpak / .deb)</a>
         <a href="https://github.com/Antux912012/imladris" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Explore GitHub Repository</a>
-        <a href="#wiki" class="btn btn-secondary">Read Architecture Wiki &rarr;</a>
+        <a href="https://github.com/Antux912012/imladris/wiki" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Read Architecture Wiki &rarr;</a>
       </div>
 
       <!-- 4-Quadrant Visual Representation -->
       <div class="ide-preview">
         <div class="ide-header">
-          <span>imladris — rna_seq_differential_expression.qmd</span>
-          <span>env: micromamba/bio-r4.3 · Galaxy API: Connected</span>
+          <span>imladris — rna_seq_differential_expression.qmd [Sandboxed · .Rproj Synced]</span>
+          <span>env: renv + .venv · Arekyer Vault: libsecret-1 (Connected)</span>
         </div>
         <div class="ide-grid">
           <div class="quadrant">
             <div class="quadrant-title">Q1 // Polyglot Source (GtkSourceView 5)</div>
-            <div class="code-snippet"><span class="code-comment">```{r galaxy-fetch, message=FALSE}
-# Auto-injected via Imladris Galaxy Bridge</span>
-counts &lt;- imladris::<span class="code-fn">galaxy_pull</span>(
-  history_id = <span class="code-keyword">"bbd44e69cb8906b5"</span>,
-  dataset = <span class="code-keyword">"DESeq2_Normalized_Counts.tsv"</span>
-)
+            <div class="code-snippet"><span class="code-comment">```{r arekyer-galaxy-43, message=FALSE}
+# AREKYER PROVENANCE RECORD
+# Server: https://usegalaxy.eu | HID: 43 (tabular)</span>
+req &lt;- httr2::<span class="code-fn">request</span>(galaxy_url) |&gt;
+  httr2::<span class="code-fn">req_headers</span>(<span class="code-keyword">"x-api-key"</span> = Sys.getenv(<span class="code-keyword">"GALAXY_API_KEY"</span>))
+galaxy_df_43 &lt;- readr::<span class="code-fn">read_tsv</span>(httr2::<span class="code-fn">resp_body_raw</span>(httr2::<span class="code-fn">req_perform</span>(req)))
 <span class="code-comment">```</span>
-
-According to recent pathway models [@smith2025_genomics], differential expression in...</div>
+$$\ce{6CO2(g) + 6H2O(l) -&gt;[h\nu] C6H12O6(aq) + 6O2(g)}$$</div>
           </div>
 
           <div class="quadrant">
-            <div class="quadrant-title">Q2 // Galaxy History & Zotero Bridge</div>
-            <div class="code-snippet"><span class="code-keyword">[Galaxy usegalaxy.eu]</span>
-<span class="status-ok">✓</span> #42: HISAT2 Aligned Reads (BAM)
-<span class="status-ok">✓</span> #43: DESeq2_Normalized_Counts.tsv <span class="code-comment">[Imported -&gt; R]</span>
+            <div class="quadrant-title">Q2 // Arekyer Bridge &amp; Zotero Inspector</div>
+            <div class="code-snippet"><span class="code-keyword">[Arekyer Bridge · usegalaxy.eu]</span>
+<span class="status-ok">●</span> #42: HISAT2 Aligned Reads [BAM · 100 MB]      [ + R ] [ + Py ]
+<span class="status-ok">●</span> #43: DESeq2_Normalized_Counts.tsv [1.0 MB]    [ + R ] [ + Py ]
 
-<span class="code-keyword">[Zotero Local BibTeX]</span>
+<span class="code-keyword">[Zotero BetterBibTeX]</span>
 <span class="status-ok">✓</span> @smith2025_genomics — Nature Biotechnology (2025)
-<span class="status-ok">✓</span> @anders2010_differential — Genome Biology (2010)</div>
+<span class="status-ok">✓</span> @love2014_deseq2 — Genome Biology (2014)</div>
           </div>
 
           <div class="quadrant">
-            <div class="quadrant-title">Q3 // Hermetic Subprocess Console (Micromamba)</div>
+            <div class="quadrant-title">Q3 // Hermetic Subprocess Console &amp; Keyring Injection</div>
             <div class="code-snippet">$ quarto render rna_seq_differential_expression.qmd --to pdf
-<span class="status-ok">[✓]</span> Executing R kernel via micromamba (env: bio-r4.3)
-<span class="status-ok">[✓]</span> Validating upstream BioBlend dataset provenance
-<span class="status-ok">[✓]</span> Compiling LaTeX manuscript (0 errors, 1420ms)
+<span class="status-ok">[✓]</span> Keyring lookup: org.ardatech.Imladris.GalaxyApiKey (libsecret-1)
+<span class="status-ok">[✓]</span> Injecting GALAXY_API_KEY into isolated SubprocessLauncher
+<span class="status-ok">[✓]</span> Executing R &amp; Python chunks (galaxy_df_43 verified)
 <span class="status-ok">[✓]</span> Output generated: build/manuscript_v1.pdf</div>
           </div>
 
           <div class="quadrant">
-            <div class="quadrant-title">Q4 // Live Manuscript & Plot Preview (WebKitGTK 6.0)</div>
-            <div class="code-snippet"><span class="code-comment">[Live WebKitGTK 6.0 PDF / SVG Render]</span>
+            <div class="quadrant-title">Q4 // Live Manuscript, MathChem &amp; Shiny Preview (WebKitGTK 6.0)</div>
+            <div class="code-snippet"><span class="code-comment">[Live WebKitGTK 6.0 / mhchem / KaTeX Render]</span>
 --------------------------------------------------
-<span class="code-keyword">Figure 1.2:</span> Volcano Plot of Log2 Fold Change vs 
-Adjusted P-Value (FDR &lt; 0.05).
-Provenance hash: <span class="code-comment">sha256:7a4f9b2e...</span> (Verified)
+<span class="code-keyword">Eq 1.1:</span> 6 CO₂(g) + 6 H₂O(l) →[hν] C₆H₁₂O₆(aq) + 6 O₂(g)
+<span class="code-keyword">Fig 1.2:</span> Volcano Plot of Log2 Fold Change vs FDR (&lt; 0.05)
+Dataset UUID: <span class="code-comment">f2db41e1fa331b3e (HID: 43 · Verified)</span>
 --------------------------------------------------</div>
           </div>
         </div>
@@ -504,29 +524,80 @@ Provenance hash: <span class="code-comment">sha256:7a4f9b2e...</span> (Verified)
     <!-- THE TOOL & SCIENTIFIC DEPTH -->
     <section id="architecture">
       <div class="section-header">
-        <div class="section-eyebrow">01 // Scientific Depth & System Design</div>
-        <h2 class="section-title">Engineered for the "Last Mile" of Science</h2>
+        <div class="section-eyebrow">01 // Scientific Depth &amp; System Design</div>
+        <h2 class="section-title">Engineered for the "Last Mile" of Reproducible Science</h2>
       </div>
       <div class="grid-2">
         <div class="card">
-          <h3>Upstream Galaxy to Downstream Quarto</h3>
-          <p>Stop breaking data provenance by manually downloading TSVs from cloud bioinformatics pipelines. Inspect Galaxy Histories natively and inject reproducible data-fetching code chunks directly into your manuscript.</p>
-          <div class="card-meta">Stack: REST / BioBlend Bridge · Provenance Hashing</div>
+          <h3>Arekyer: Galaxy-to-Quarto Bridge (<code>WIKI 02</code>)</h3>
+          <p>Stop breaking data provenance by manually downloading TSVs from cloud bioinformatics pipelines. Browse Galaxy Histories natively, store API keys securely in the Linux OS keyring (<code>libsecret-1</code>), and inject verified <code>httr2</code> (R) or <code>pandas</code> (Python) loaders into your manuscript.</p>
+          <div class="card-meta">Stack: libsoup-3.0 · json-glib-1.0 · libsecret-1 · GtkSourceView 5</div>
         </div>
         <div class="card">
-          <h3>Native GTK4 & Libadwaita Performance</h3>
+          <h3>Natural Math &amp; Chemical Reaction Studio (<code>Ctrl+M</code>)</h3>
+          <p>Write mathematical expressions (<code>(-b +- sqrt(b^2 - 4*a*c)) / (2*a)</code>) and chemical reactions (<code>6CO2(g) + 6H2O(l) -&gt;[h*nu] C6H12O6(aq) + 6O2(g)</code>) naturally and convert them instantaneously into LaTeX (<code>$$...$$</code>, <code>\ce{...}</code>) or Markdown (<code>~sub~</code>/<code>^sup^</code>).</p>
+          <div class="card-meta">Stack: MathChemEngine · mhchem · Unicode Scientific Parser</div>
+        </div>
+        <div class="card">
+          <h3>Native <code>.Rproj</code> Scaffolding &amp; Jupyter Parity</h3>
+          <p>Create and synchronize RStudio <code>.Rproj</code> manifests alongside portable <code>.mallorn</code> bundles (<code>tar.zst</code>). Edit Jupyter Notebooks (<code>.ipynb</code> <code>nbformat 4.5</code>) with lossless preservation of cell IDs, execution counts, cell tags, raw cells, and <code>Shift+Enter</code> cell execution.</p>
+          <div class="card-meta">Stack: DCF .Rproj Sync · nbformat 4.5 Serializer · Shift+Enter</div>
+        </div>
+        <div class="card">
+          <h3>Native GTK4 &amp; Libadwaita Performance</h3>
           <p>Built in compiled Vala with GtkSourceView 5 and WebKitGTK 6.0. Zero Electron overhead means your workstation's RAM and CPU remain dedicated to statistical compute, genomic matrices, and local AI inference.</p>
-          <div class="card-meta">Stack: Vala · GTK4 · Libadwaita · Nord UI</div>
+          <div class="card-meta">Stack: Vala 0.56+ · GTK4 · Libadwaita · Nord Dark/Light UI</div>
         </div>
         <div class="card">
-          <h3>Hermetic Micromamba & Docker Runtimes</h3>
-          <p>Eliminate dependency drift across R, Python, Pandoc, and LaTeX. Bind any workspace to an isolated Micromamba environment or compile reproducibly via the headless Imladris Docker runtime.</p>
-          <div class="card-meta">Stack: Micromamba · Containers · CI/CD Ready</div>
+          <h3>Hermetic Sandboxes &amp; Reactive R Shiny</h3>
+          <p>Isolate projects inside project-local <code>renv</code> (R) and <code>.venv</code> (Python) environments with strict <code>pwd</code> root locking. Launch interactive R Shiny web applications (<code>Ctrl+Shift+A</code>) directly inside Quadrant 4 or a standalone window.</p>
+          <div class="card-meta">Stack: renv · uv / .venv · Micromamba · Shiny Ephemeral Server</div>
         </div>
         <div class="card">
-          <h3>Zotero Citations & Local AI Assistance</h3>
-          <p>Query your local Zotero library via BetterBibTeX/CSL-JSON without leaving the keyboard, paired with privacy-preserving local LLM integration for statistical code review and documentation.</p>
-          <div class="card-meta">Stack: Zotero IPC · OpenAI-Compatible Local Endpoints</div>
+          <h3>Zotero Citations, Elrond Local AI &amp; MCP</h3>
+          <p>Query your local Zotero library via BetterBibTeX/CSL-JSON with live <code>@citekey</code> completion, paired with local LLM inference (<code>llama-server</code>, Ollama, LM Studio) and a built-in Model Context Protocol (<code>--mcp-server</code>) stdio server.</p>
+          <div class="card-meta">Stack: Zotero BibTeX/CSL · Elrond Copilot · JSON-RPC 2.0 MCP</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AREKYER & MATH STUDIO CODE SHOWCASE -->
+    <section id="arekyer">
+      <div class="section-header">
+        <div class="section-eyebrow">02 // Technical Specifications in Action</div>
+        <h2 class="section-title">Verifiable Provenance &amp; Natural Scientific Notation</h2>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>WIKI 02 // Arekyer Provenance Code Output</h3>
+          <p>Clicking <strong>[ + R ]</strong> in the Arekyer Bridge panel injects a standardized provenance block that reads <code>GALAXY_API_KEY</code> from isolated subprocess memory at compile time:</p>
+          <pre class="spec-block"><code>```{r arekyer-galaxy-43, message=FALSE}
+# AREKYER PROVENANCE RECORD
+# Server: https://usegalaxy.eu
+# History ID: bbd44e69cb8906b5
+# Dataset ID: f2db41e1fa331b3e (HID: 43 | Format: tabular)
+
+galaxy_url &lt;- "https://usegalaxy.eu/api/histories/bbd44e69cb8906b5/contents/f2db41e1fa331b3e/display"
+req &lt;- httr2::request(galaxy_url) |&gt;
+  httr2::req_headers("x-api-key" = Sys.getenv("GALAXY_API_KEY"))
+resp &lt;- httr2::req_perform(req)
+galaxy_df_43 &lt;- readr::read_tsv(httr2::resp_body_raw(resp), show_col_types = FALSE)
+```</code></pre>
+        </div>
+        <div class="card">
+          <h3>WIKI 03 // Natural Math &amp; Chemical Reaction Studio</h3>
+          <p>Press <strong><code>Ctrl+M</code></strong> to write formulas naturally and export to LaTeX or Markdown:</p>
+          <pre class="spec-block"><code># Natural Math Input:
+int(0, inf) e^(-x^2) dx = sqrt(pi) / 2
+# LaTeX Output:
+$$\int_{0}^{\infty} e^{-x^{2}} \, dx = \frac{\sqrt{\pi}}{2}$$
+
+# Natural Chemical Reaction Input:
+6CO2(g) + 6H2O(l) -&gt;[h*nu][chlorophyll] C6H12O6(aq) + 6O2(g)
+# LaTeX (mhchem) Output:
+$$\ce{6CO2(g) + 6H2O(l) -&gt;[h\nu][\text{chlorophyll}] C6H12O6(aq) + 6O2(g)}$$
+# Markdown (~sub~/^sup^) Output:
+6CO~2~(g) + 6H~2~O(l) →[hν, chlorophyll] C~6~H~12~O~6~(aq) + 6O~2~(g)</code></pre>
         </div>
       </div>
     </section>
@@ -534,18 +605,18 @@ Provenance hash: <span class="code-comment">sha256:7a4f9b2e...</span> (Verified)
     <!-- WIKI & GITHUB -->
     <section id="wiki">
       <div class="section-header">
-        <div class="section-eyebrow">02 // Documentation & Open Source</div>
-        <h2 class="section-title">Technical Wiki & Repository Architecture</h2>
+        <div class="section-eyebrow">03 // Documentation &amp; Open Source</div>
+        <h2 class="section-title">Technical Wiki &amp; Repository Architecture</h2>
       </div>
       <div class="grid-2">
         <div class="card" id="github">
-          <h3>GitHub Repository (<code>imladris</code>)</h3>
-          <p>Explore the modular Vala source tree, Meson build definitions, Flatpak manifests, and issue roadmap. Contributions and bioinformatics workflow feedback are welcome.</p>
-          <div class="card-meta"><a href="https://github.com/Antux912012/imladris" target="_blank" rel="noopener noreferrer">→ View Source Code & Releases on GitHub</a></div>
+          <h3>GitHub Repository (<code>Antux912012/imladris</code>)</h3>
+          <p>Explore the modular Vala source tree, Meson build definitions, 7 automated unit test suites, Flatpak manifests, and Debian/RPM packaging scripts.</p>
+          <div class="card-meta"><a href="https://github.com/Antux912012/imladris" target="_blank" rel="noopener noreferrer">→ View Source Code &amp; Releases on GitHub</a></div>
         </div>
         <div class="card">
           <h3>ASD-STE100 Technical Wiki</h3>
-          <p>All architectural specifications, Galaxy API bridge protocols, and user guides are authored in strict compliance with Simplified Technical English (ASD-STE100) for unambiguous engineering clarity.</p>
+          <p>All architectural specifications—including <strong>WIKI 02 (Arekyer Bridge)</strong>, <strong>WIKI 03 (Math &amp; Chemical Studio)</strong>, and <strong>.mallorn / .Rproj Synchronization</strong>—are authored in Simplified Technical English (ASD-STE100).</p>
           <div class="card-meta"><a href="https://github.com/Antux912012/imladris/wiki" target="_blank" rel="noopener noreferrer">→ Browse the Architecture Wiki</a></div>
         </div>
       </div>
@@ -554,27 +625,27 @@ Provenance hash: <span class="code-comment">sha256:7a4f9b2e...</span> (Verified)
     <!-- THE AUTHOR -->
     <section id="author">
       <div class="section-header">
-        <div class="section-eyebrow">03 // The Architect</div>
-        <h2 class="section-title">Built at the Intersection of Biology, Systems & Product</h2>
+        <div class="section-eyebrow">04 // The Architect</div>
+        <h2 class="section-title">Built at the Intersection of Biology, Systems &amp; Product</h2>
       </div>
       <div class="author-box">
         <h3>Antonio De Gaetano</h3>
-        <div class="author-role">Biological Scientist (BSc Hons) · Systems Architect · Technical Product & CX Leader</div>
+        <div class="author-role">Bioinformatician · Biological Scientist (BSc Hons) · Linux Systems &amp; GTK4 Architect</div>
         <p>
-          <strong>Imladris is the culmination of my multidisciplinary career—and my flagship engineering work to date.</strong>
+          <strong>Imladris is the culmination of my multidisciplinary career—and my flagship scientific engineering work to date.</strong>
         </p>
         <p>
           Most scientific software fails for one of two reasons: it is either built by software engineers who do not understand the daily realities of wet-lab and dry-lab research, or it is scripted by scientists who lack the systems architecture discipline to build fast, maintainable, enterprise-grade software.
         </p>
         <p>
-          I built Imladris because I have lived on every side of that equation. Trained originally with a <strong>Bachelor of Science (Hons) in Biological Sciences</strong>, I spent years leading <strong>Customer Experience (CX) and Business Development</strong> across technology, finance, and the life sciences—listening firsthand to why complex technical platforms frustrate researchers and stall during enterprise adoption. Alongside my commercial leadership, I dedicated myself to low-level Linux systems engineering, native GTK4/Libadwaita development, and local AI optimization.
+          I built Imladris because I have lived on every side of that equation. Trained originally with a <strong>Bachelor of Science (Hons) in Biological Sciences</strong> and advanced training in <strong>Bioinformatics</strong>, I spent years leading <strong>Customer Experience (CX) and Technical Operations</strong> across technology, finance, and the life sciences—listening firsthand to why complex technical platforms frustrate researchers and stall during adoption. Alongside my domain work, I dedicated myself to low-level Linux systems engineering, native GTK4/Libadwaita development, and local AI optimization.
         </p>
         <p>
-          <strong>Imladris is where those three worlds converge.</strong> Every architectural decision in this workbench—from the zero-bloat native Vala/GTK4 memory footprint to the frictionless bridge between cloud bioinformatics (Galaxy), local polyglot compute (R/Python/Micromamba), and academic publishing (Quarto/Zotero)—was designed with a single philosophy: <em>scientific tools should respect both the hardware they run on and the cognitive flow of the researcher using them.</em>
+          <strong>Imladris is where those worlds converge.</strong> Every architectural decision in this workbench—from the zero-bloat native Vala/GTK4 memory footprint to the frictionless <strong>Arekyer</strong> bridge between cloud bioinformatics (Galaxy), local polyglot compute (R/Python/renv/.venv), natural mathematical/chemical notation, and academic publishing (Quarto/Zotero)—was designed with a single philosophy: <em>scientific tools should respect both the hardware they run on and the cognitive flow of the researcher using them.</em>
         </p>
         <div class="author-links">
-          <a href="https://github.com/Antux912012" class="btn btn-primary" target="_blank" rel="noopener noreferrer">GitHub Ecosystem (Antux912012)</a>
-          <a href="https://linkedin.com" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Connect on LinkedIn</a>
+          <a href="https://github.com/Antux912012" class="btn btn-primary" target="_blank" rel="noopener noreferrer">GitHub Profile (@Antux912012)</a>
+          <a href="https://antux912012.github.io/" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Portfolio &amp; Interactive CV</a>
         </div>
       </div>
     </section>
@@ -583,7 +654,7 @@ Provenance hash: <span class="code-comment">sha256:7a4f9b2e...</span> (Verified)
   <footer>
     <div class="container footer-content">
       <img src="assets/logo.svg" alt="Imladris Icon" width="22" height="22" class="footer-logo">
-      <p>© 2026 Antonio De Gaetano · Engineered natively with Vala, GTK4, and Libadwaita.</p>
+      <p>© 2026 Antonio De Gaetano · Engineered natively with Vala, GTK4, and Libadwaita · Released under GPL-3.0-or-later.</p>
     </div>
   </footer>
 
@@ -610,7 +681,6 @@ Provenance hash: <span class="code-comment">sha256:7a4f9b2e...</span> (Verified)
         }
       }
 
-      // Initialize button text based on currently active theme
       var activeTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
       updateTheme(activeTheme);
 

@@ -1,30 +1,37 @@
-# Projects and Sandboxing Architecture
+<!--
+SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
+# Projects, Native `.Rproj` Scaffolding, and Sandboxing Architecture
 
 Imladris distinguishes between **single-document rapid drafting** and **multi-file computational research projects**, giving users maximum speed for prose and rigorous hermetic isolation for data science.
 
 ---
 
-## 1. The 9 Creation Targets
+## 1. Creation Targets (`Ctrl+N`)
 
-Clicking **"New Project or Document…"** (`Ctrl+N` or top-left Imladris brand menu) opens the Creation Modal with 9 specialized targets:
+Clicking **"New Project or Document…"** (`Ctrl+N` or top-left Imladris brand menu) opens the Creation Modal with specialized workspace and document targets:
 
 ```mermaid
 graph TD
     Modal["Creation Modal (Ctrl+N)"]
     
     subgraph MultiFile["Workspace Projects"]
-        P_Std["1. Create a Standard Project"]
-        P_Box["2. Create a Sandboxed Project (.imladris-env)"]
+        P_Std["1. Standard Project (.mallorn + .Rproj)"]
+        P_Box["2. Sandboxed Project (.imladris-env / renv / .venv)"]
+        P_Rproj["3. RStudio Project (.Rproj Scaffold Dialog)"]
     end
     
     subgraph SingleFile["Fast-Path Documents & Notebooks"]
-        F_Qmd["3. Quarto Document (.qmd)"]
-        F_Rmd["4. R Markdown (.Rmd)"]
-        F_Ipynb["5. Jupyter Notebook (.ipynb)"]
-        F_Md["6. Simple Markdown (.md)"]
-        F_R["7. R Script (.R)"]
-        F_Py["8. Python Script (.py)"]
-        F_Html["9. HTML5 Document (.html)"]
+        F_Qmd["4. Quarto Document (.qmd)"]
+        F_Rmd["5. R Markdown (.Rmd)"]
+        F_Ipynb["6. Jupyter Notebook (.ipynb)"]
+        F_Md["7. Simple Markdown (.md)"]
+        F_R["8. R Script (.R)"]
+        F_Py["9. Python Script (.py)"]
+        F_Shiny["10. R Shiny Web App (app.R)"]
+        F_Html["11. HTML5 Document (.html)"]
     end
     
     Modal --> MultiFile
@@ -33,8 +40,8 @@ graph TD
 
 ### Document Targets vs. Workspace Projects
 - **Single-File Fast-Path (`.md`, `.html`)**: Apostrophe-style distraction-free writer mode. No background R or Python interpreters are spawned, keeping memory usage minimal.
-- **Standalone Notebooks (`.qmd`, `.Rmd`, `.ipynb`)**: Launches the 4-quadrant RStudio workbench mode with active editor, environment inspector, console, and files pane.
-- **Multi-File Workspace Projects**: Creates a dedicated project directory with scaffolded README, data folder, script directory, and either a standard or sandboxed environment marker.
+- **Standalone Notebooks (`.qmd`, `.Rmd`, `.ipynb`)**: Launches the 4-quadrant RStudio workbench mode with active editor, environment inspector, console, Arekyer Galaxy Bridge, and files pane.
+- **Multi-File Workspace Projects & `.Rproj` Scaffolds**: Creates a dedicated project directory with `.Rproj` and `.mallorn` manifests, scaffolded `README.md`, `data/` folder, and optional `renv` / `.venv` / Git initialization.
 
 ---
 

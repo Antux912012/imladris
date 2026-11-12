@@ -1,14 +1,21 @@
-### 🌿 Imladris IDE
+<!--
+SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
+### 🌿 Imladris IDE (v0.18.0)
 
 * [[Home|Home]]
+* 🌐 [Official Landing Page](https://antux912012.github.io/imladris/)
 
 #### 🚀 Getting Started
 * [[Installation & Building|Installation-and-Building]]
 * [[Projects & Sandboxing|Projects-and-Sandboxing]]
-* [[.mallorn & RStudio 1:1 Sync|Mallorn-Format-and-RStudio]]
+* [[.mallorn, .Rproj & Jupyter Parity|Mallorn-Format-and-RStudio]]
 
-#### 📦 Core Workflows
-* [[Galaxy to Quarto Bridge|Galaxy-to-Quarto-Bridge]]
+#### 🧬 Scientific Workflows
+* [[WIKI 02 // Arekyer: Galaxy Bridge|Galaxy-to-Quarto-Bridge]]
+* [[WIKI 03 // Math & Chem Studio|Math-and-Chemical-Studio]]
 * [[Packages Ribbon Manager|Packages-Ribbon-Manager]]
 * [[Exporting ODT, ODP & PDF|Exporting-ODT-ODP-PDF]]
 

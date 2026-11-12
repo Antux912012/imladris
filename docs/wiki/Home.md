@@ -1,9 +1,15 @@
+<!--
+SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # Welcome to the Imladris IDE Wiki
 
-**Imladris** is a native Linux scientific authoring, data science, and polyglot notebook IDE built with **Vala**, **GTK4**, **Libadwaita**, and **WebKitGTK 6.0**. Designed for researchers, bioinformaticians, statisticians, and data scientists, Imladris combines the reproducibility of RStudio and Jupyter with a modern GNOME HIG-compliant interface, 100% local Vulkan-accelerated AI assistance (**Elrond**), and an Obsidian-style JavaScript extension ecosystem (`JSC.Context`).
+**Imladris (`v0.18.0`)** is a native Linux scientific authoring, bioinformatics provenance, and polyglot notebook IDE built with **Vala**, **GTK4**, **Libadwaita**, **GtkSourceView 5**, and **WebKitGTK 6.0**. Designed for researchers, bioinformaticians, statisticians, and data scientists, Imladris combines the reproducibility of RStudio and Jupyter with a modern GNOME HIG-compliant interface, the **Arekyer Galaxy-to-Quarto Provenance Bridge**, the **Natural Math & Chemical Reaction Studio**, 100% local Vulkan-accelerated AI assistance (**Elrond**), and an Obsidian-style JavaScript extension ecosystem (`JSC.Context`).
 
 > [!TIP]
-> **New to Imladris?** Start with the [[Installation and Building|Installation-and-Building]] guide or jump straight into [[Projects and Sandboxing|Projects-and-Sandboxing]] to learn how `.mallorn` workspaces keep your R and Python environments 100% reproducible.
+> 🌐 **Visit the Official Project Landing Page:** [https://antux912012.github.io/imladris/](https://antux912012.github.io/imladris/)  
+> **New to Imladris?** Start with the [[Installation and Building|Installation-and-Building]] guide or jump straight into [[Arekyer: Galaxy-to-Quarto Bridge|Galaxy-to-Quarto-Bridge]] and [[Projects and Sandboxing|Projects-and-Sandboxing]].
 
 ---
 
@@ -11,12 +17,13 @@
 
 | Pillar | Feature | Description |
 | :--- | :--- | :--- |
-| **Workspaces & Portability** | **Standard & Sandboxed Projects** | Create multi-file `.Rmd`, `.Qmd`, or `.ipynb` projects bound either to host system libraries or isolated inside `renv` (R) and `.venv` (Python) sandboxes. |
-| **1:1 RStudio Exchange** | **`.mallorn` Format** | Native project marker and portable archive format with byte-for-byte 1:1 `.Rproj` compatibility and automatic `renv.lock` / `requirements.txt` snapshotting. |
-| **Fast-Path Editors** | **9 Creation Targets** | Launch full computational notebooks or lightweight single-file editors for `.md`, `.html`, `.R`, and `.py` with hardware-accelerated WebKitGTK 6.0 live preview. |
-| **Interactive Compute** | **Live REPL & Inline Output** | Persistent bidirectional `R` and `Python 3` consoles with inline chunk stdout, dataframe previews, and high-DPI plot capture. |
-| **Package Management** | **Packages Ribbon Bar** | Dedicated top Ribbon tab featuring live CRAN and PyPI search autocomplete, `uv`/`pak` acceleration, plus `...` overflow menus for GitHub (`owner/repo`) and local archive (`.tar.gz`, `.whl`) installations. |
-| **Local AI Copilot** | **Write with Elrond Assistance (AI)** | Zero-configuration local AI powered by `llama.cpp` (Vulkan GPU / CPU fallback) and `Qwen2.5-Coder-3B`, featuring `Low`, `Medium`, and `High` assistance levels and live RAM/VRAM status bar telemetry. |
+| **Bioinformatics Bridge** | **Arekyer (`WIKI 02`)** | Connects upstream **Galaxy Project** histories (`usegalaxy.eu`, `usegalaxy.org`) to local `.qmd` and `.Rmd` files. Injects verifiable `httr2` (R) and `pandas` (Python) loaders while storing API keys in the OS keyring (`libsecret-1`). |
+| **Scientific Notation** | **Math & Chem Studio (`Ctrl+M`)** | Translates natural mathematical expressions (`int(0, inf) e^(-x^2) dx`) and chemical reactions (`6CO2(g) + 6H2O(l) ->[h*nu] C6H12O6(aq) + 6O2(g)`) into LaTeX (`$$...$$`, `\ce{...}`) or Markdown (`~sub~`/`^sup^`). |
+| **Workspaces & Portability** | **Standard, Sandboxed & `.Rproj`** | Creates multi-file `.Rmd`, `.qmd`, `.ipynb`, or native RStudio `.Rproj` projects bound either to host libraries or isolated inside `renv` (R) and `.venv` (Python) sandboxes. |
+| **1:1 RStudio & Jupyter** | **`.mallorn` & `nbformat 4.5`** | Native `.mallorn` / `.Rproj` synchronization and lossless Jupyter `.ipynb` round-trip serialization (cell IDs, execution counts, tags, raw cells, and `Shift+Enter` cell advancement). |
+| **Interactive Compute** | **Live REPL & R Shiny** | Persistent bidirectional `R` and `Python 3` consoles with inline chunk stdout, `Gtk.ColumnView` dataframe viewer, plot gallery, and live R Shiny web application hosting (`Ctrl+Shift+A`). |
+| **Package Management** | **Packages Ribbon Bar** | Dedicated top Ribbon tab featuring live CRAN and PyPI search autocomplete, `uv`/`pak` acceleration, plus GitHub (`owner/repo`) and local archive (`.tar.gz`, `.whl`) installations. |
+| **Local AI Copilot** | **Elrond Assistance (AI)** | Local AI powered by `llama-server` / Ollama / LM Studio and multi-provider cloud AI (Gemini, Claude, OpenAI, DeepSeek, Kimi, Qwen), plus a built-in Model Context Protocol (`--mcp-server`) stdio server. |
 | **Scientific Publishing** | **ODT, ODP, PDF & HTML** | Native export pipelines via Quarto, RMarkdown, Pandoc, and headless LibreOffice for OpenDocument Text (`.odt`) and Presentations (`.odp`). |
 | **Community Plugins** | **`.implugin` Extensions** | Obsidian-style third-party plugins written in JavaScript (`JSC.Context`) using declarative Libadwaita UI builders and **Papirus** symbolic icons. |
 
@@ -28,27 +35,35 @@
 graph TD
     subgraph UI["GTK4 + Libadwaita + Papirus Icons UI"]
         Ribbon["Context-Aware Ribbon & Packages Bar"]
-        Editor["Source Editor (GtkSourceView + Inline Output)"]
-        EnvPane["Environment, Outline & Citations"]
-        Preview["WebKitGTK 6.0 Live Preview (OpenGL / Vulkan)"]
+        Editor["Source Editor (GtkSourceView 5 + Inline Output)"]
+        MathUI["Math & Chemical Studio Modal (Ctrl+M)"]
+        ArekyerUI["Arekyer Galaxy Bridge & Zotero Citations"]
+        Preview["WebKitGTK 6.0 Live Preview & Shiny Viewer"]
         Console["Interactive Console & Terminal Quadrant"]
-        Status["Status Bar (Kernels, Word Count, Elrond RAM/VRAM)"]
     end
 
-    subgraph Core["Imladris Core Services (Vala)"]
+    subgraph Core["Imladris Core Services & Bridges (Vala)"]
+        Arekyer["ArekyerBridge (libsoup-3.0 + libsecret-1)"]
+        MathEng["MathChemEngine (LaTeX / mhchem / Markdown)"]
         Workspace["Workspace & pwd Controller"]
         Sandbox["SandboxController (renv + .venv)"]
-        Mallorn["MallornManager (.mallorn <-> .Rproj)"]
+        Mallorn["MallornManager (.mallorn <-> .Rproj & .ipynb)"]
         Exporter["ExportService (Quarto / Pandoc / LibreOffice)"]
         Plugins["PluginManager (Isolated JSC.Context VM)"]
     end
 
-    subgraph Backends["Local Subprocesses & Daemons"]
-        RSession["Persistent R REPL"]
+    subgraph Backends["Local Subprocesses & Keyring"]
+        Keyring["OS Keyring (org.freedesktop.Secret.Service)"]
+        RSession["Persistent R REPL & Shiny Server"]
         PySession["Persistent Python 3 REPL"]
-        Elrond["Elrond AI Daemon (llama-server Vulkan/CPU)"]
+        Elrond["Elrond AI Daemon (llama-server / Ollama)"]
     end
 
+    ArekyerUI --> Arekyer
+    Arekyer --> Keyring
+    Arekyer --> Editor
+    MathUI --> MathEng
+    MathEng --> Editor
     Ribbon --> Workspace
     Ribbon --> Sandbox
     Editor --> RSession
@@ -56,12 +71,9 @@ graph TD
     Editor --> Elrond
     Console <--> RSession
     Console <--> PySession
-    Elrond --> Status
-    Plugins --> Editor
-    Plugins --> Ribbon
-    Plugins --> RSession
     Workspace --> Mallorn
     Workspace --> Exporter
+    Exporter --> Keyring
 ```
 
 ---
@@ -69,16 +81,18 @@ graph TD
 ## Quick Navigation
 
 ### 1. Getting Started
-* [[Installation and Building|Installation-and-Building]] — Flatpak setup, Meson/Ninja compilation, and OpenGL/Vulkan hardware acceleration settings.
-* [[Projects and Sandboxing|Projects-and-Sandboxing]] — Understanding Standard vs. Sandboxed projects and automatic `pwd` root locking.
-* [[Mallorn Format and RStudio|Mallorn-Format-and-RStudio]] — Sharing `.mallorn` bundles and 1:1 interoperability with RStudio and Jupyter.
+* [[Installation and Building|Installation-and-Building]] — Flatpak setup, Meson/Ninja compilation, and required libraries (`libsecret-1`, `gtk4`, `libadwaita-1`, `webkitgtk-6.0`).
+* [[Projects and Sandboxing|Projects-and-Sandboxing]] — Understanding Standard vs. Sandboxed projects, `.Rproj` creation, and automatic `pwd` root locking.
+* [[Mallorn Format, RStudio and Jupyter Parity|Mallorn-Format-and-RStudio]] — Sharing `.mallorn` bundles, `.Rproj` synchronization, and Jupyter `nbformat 4.5` lossless parity.
 
-### 2. Daily Workflows
+### 2. Core Scientific Workflows
+* [[WIKI 02 // Arekyer: Galaxy-to-Quarto Provenance Bridge|Galaxy-to-Quarto-Bridge]] — Connecting remote Galaxy bioinformatics histories (`usegalaxy.eu`) to reproducible `.qmd` and `.Rmd` manuscripts.
+* [[WIKI 03 // Natural Math and Chemical Reaction Studio|Math-and-Chemical-Studio]] — Writing natural math formulas and chemical equations (`Ctrl+M`) with LaTeX and Markdown output.
 * [[Packages Ribbon Manager|Packages-Ribbon-Manager]] — Installing R (CRAN) and Python (PyPI) packages, GitHub repos, and local archives directly from the Ribbon.
 * [[Exporting ODT, ODP, PDF and HTML|Exporting-ODT-ODP-PDF]] — Rendering documents and slide decks to OpenDocument and publication formats.
 
 ### 3. Elrond Assistance (AI) & Extensions
-* [[Elrond Local AI Copilot|Elrond-Local-AI-Copilot]] — Zero-config setup, `Low`/`Medium`/`High` assistance modes, dataframe schema awareness, and RAM/VRAM monitoring.
+* [[Elrond Local AI Copilot|Elrond-Local-AI-Copilot]] — Local LLM setup, `Low`/`Medium`/`High` assistance modes, and dataframe schema awareness.
 * [[Plugin Development Guide|Plugin-Development-Guide]] — Build your first `.implugin` extension in 5 minutes using JavaScript.
 * [[Plugin API Reference|Plugin-API-Reference]] — Complete documentation for the `imladris.*` JavaScriptCore bridge.
 * [[Architecture and HIG|Architecture-and-HIG]] — Technical design notes and GNOME Human Interface Guidelines compliance.
