@@ -11,6 +11,7 @@ finish-args:
   - --device=dri
   - --filesystem=home
   - --talk-name=org.freedesktop.Flatpak
+  - --talk-name=org.freedesktop.secrets
   - --metadata=X-DConf=default-settings
 cleanup:
   - /include
@@ -24,4 +25,4 @@ modules:
     sources:
       - type: git
         url: https://github.com/Antux912012/imladris.git
-        tag: v0.17.0
+        tag: v0.18.0

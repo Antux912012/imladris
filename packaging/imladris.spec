@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.17.0
+Version:        0.18.0
 Release:        1%{?dist}
 Summary:        Scientific notebook studio and Markdown editor
 
@@ -56,6 +56,15 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Thu Nov 12 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.18.0-1
+- Release 0.18.0: Arekyer Galaxy-to-Quarto Provenance Bridge & MathChemStudio:
+  * Implement Arekyer (Imladris.Bridges.Arekyer) Galaxy-to-Quarto provenance bridge.
+  * Standardize reproducible httr2 (R) and pandas (Python) data loaders.
+  * Integrate libsecret-1 system keyring for secure credentials and isolated subprocess injection.
+  * Introduce MathChemStudio for natural mathematical and chemical formula input with LaTeX/Markdown export.
+  * Implement .Rproj project file creation and management.
+  * Enhance Jupyter Notebook (.ipynb) source structures for full feature parity.
+
 * Mon Nov 09 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.17.0-1
 - Release 0.17.0: Galaxy Project API & BioBlend Integration:
   * Add native Galaxy REST API client for histories, datasets, and user authentication.

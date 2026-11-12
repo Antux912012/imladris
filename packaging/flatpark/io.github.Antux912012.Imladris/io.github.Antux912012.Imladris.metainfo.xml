@@ -60,6 +60,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.18.0" date="2026-11-12">
+      <description>
+        <p>Release v0.18.0 introduces the Arekyer Galaxy-to-Quarto Provenance Bridge, MathChemStudio, Rproj Project scaffolding, and Jupyter Notebook parity: Implements Arekyer (Imladris.Bridges.Arekyer) connecting upstream cloud bioinformatics histories to local reproducible documents with verifiable httr2 and pandas data loaders; integrates secure credential management via libsecret-1 OS keyring with isolated subprocess memory injection; adds MathChemStudio with natural syntax for mathematical and chemical formulas with dual-target LaTeX and Markdown export; enables creation and lifecycle management of native RStudio .Rproj project files; and establishes full feature parity across Jupyter Notebook (.ipynb) source structures.</p>
+      </description>
+    </release>
     <release version="0.17.0" date="2026-11-09">
       <description>
         <p>Release v0.17.0 introduces the native Galaxy Project API &amp; BioBlend Integration: Connects upstream bioinformatics cloud histories directly to the local workbench via asynchronous REST APIs; provides a dedicated Galaxy History Inspector in Quadrant 3 with live dataset state tracking (ok, running, queued, error); implements single-click reproducible code chunk generation into active Quarto (.qmd) and R Markdown (.Rmd) documents for R (httr) and Python (requests and pandas); adds a Libadwaita Galaxy authentication preferences dialog with instant server validation; and hardens credential storage according to GDPR Article 25 and EU Cyber Resilience Act standards.</p>

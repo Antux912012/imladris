@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.17.0',
+  version: '0.18.0',
   default_options: ['warning_level=1']
 )
 
@@ -18,6 +18,7 @@ deps = [
   dependency('javascriptcoregtk-6.0'),
   dependency('libsoup-3.0'),
   dependency('json-glib-1.0'),
+  dependency('libsecret-1', version: '>= 0.20'),
   dependency('gee-0.8'),
   dependency('gio-2.0'),
   dependency('glib-2.0'),
@@ -52,6 +53,7 @@ sources = files(
   'src/core/project_scaffolder.vala',
   'src/core/MallornManager.vala',
   'src/core/ChunkParser.vala',
+  'src/core/MathChemEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/services/RecoveryService.vala',
   'src/services/WorkspaceStateManager.vala',
@@ -65,7 +67,10 @@ sources = files(
   'src/services/MediaHelper.vala',
   'src/services/PackageIndexCache.vala',
   'src/plugins/PluginManager.vala',
+  'src/bridges/galaxy_models.vala',
   'src/bridges/galaxy_client.vala',
+  'src/bridges/galaxy_chunk_generator.vala',
+  'src/bridges/ArekyerBridge.vala',
   'src/ui/galaxy_auth_dialog.vala',
   'src/ui/galaxy_panel.vala',
   'src/core/layout/DockTypes.vala',
@@ -78,6 +83,8 @@ sources = files(
   'src/ui/LayoutSerializer.vala',
   'src/ui/WorkspaceDockManager.vala',
   'src/ui/new_project_dialog.vala',
+  'src/ui/rproj_dialog.vala',
+  'src/ui/MathChemEditorDialog.vala',
   'src/ui/PackagesRibbonBar.vala',
   'src/ui/InlineChunkOutputWidget.vala',
   'src/ui/WebViewFactory.vala',
@@ -133,6 +140,7 @@ test_sources = files(
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
   'src/core/MallornManager.vala',
+  'src/core/MathChemEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/services/SandboxController.vala',
   'src/services/PersistentSessionManager.vala',
@@ -179,6 +187,7 @@ plugin_test_sources = files(
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
   'src/core/MallornManager.vala',
+  'src/core/MathChemEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/services/SandboxController.vala',
   'src/services/PersistentSessionManager.vala',
@@ -207,6 +216,7 @@ dock_test_sources = files(
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
   'src/core/MallornManager.vala',
+  'src/core/MathChemEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/services/SandboxController.vala',
   'src/services/PersistentSessionManager.vala',
@@ -260,6 +270,7 @@ shiny_test_sources = files(
   'src/services/HistoryManager.vala',
   'src/services/ExportService.vala',
   'src/services/MediaHelper.vala',
+  'src/core/MathChemEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
@@ -276,7 +287,12 @@ test('shiny_service_tests', shiny_test_exe, timeout: 30)
 
 galaxy_test_sources = files(
   'tests/test_galaxy_bridge.vala',
+  'src/bridges/galaxy_models.vala',
+  'src/bridges/galaxy_chunk_generator.vala',
   'src/bridges/galaxy_client.vala',
+  'src/bridges/ArekyerBridge.vala',
+  'src/core/PlatformUtils.vala',
+  'src/core/ToolchainManager.vala',
 )
 
 galaxy_test_exe = executable('test_galaxy_bridge',
