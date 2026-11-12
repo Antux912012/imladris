@@ -487,7 +487,8 @@ namespace Imladris {
             welcome_page = build_welcome_page ();
             content_stack.add_named (welcome_page, "welcome");
             content_stack.add_named (tab_view, "editor");
-            content_stack.visible_child_name = "editor";
+            content_stack.visible_child_name = "welcome";
+            tab_bar.visible = false;
 
             toast_overlay.set_child (content_stack);
             toolbar_view.set_content (toast_overlay);
@@ -523,7 +524,8 @@ namespace Imladris {
                 }
             });
 
-            add_document_tab ("Document1.qmd", "markdown");
+            // Launch on Welcome Dashboard; new document tab created only on user action
+            update_ribbon_state_machine (DocumentFormat.QMD, current_project_type);
 
             var pm = Imladris.Plugins.PluginManager.get_default ();
             pm.active_window = this;
