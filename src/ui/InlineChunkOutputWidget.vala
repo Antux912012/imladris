@@ -8,13 +8,14 @@ namespace Imladris.UI {
 
     /**
      * Pillar 11: Inline Document Code Chunk Execution & Output Card
-     * Rendered directly beneath code chunks in GtkSourceView.
+     * Rendered directly beneath code chunks in GtkSourceView with runtime duration telemetry.
      */
     public class InlineChunkOutputWidget : Gtk.Box {
         public int chunk_end_line { get; set; default = -1; }
         private Gtk.TextView log_view;
         private Gtk.Picture plot_picture;
         private Gtk.Expander expander;
+        private Gtk.Label timing_label;
 
         public InlineChunkOutputWidget (int end_line = -1) {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 6);
@@ -29,6 +30,18 @@ namespace Imladris.UI {
             expander = new Gtk.Expander ("Chunk Execution Output") {
                 expanded = true
             };
+
+            var header_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8);
+            var title_label = new Gtk.Label ("Chunk Output") {
+                hexpand = true,
+                xalign = 0.0f
+            };
+            timing_label = new Gtk.Label ("") {
+                css_classes = { "caption", "numeric", "dim-label" }
+            };
+            header_box.append (title_label);
+            header_box.append (timing_label);
+            expander.label_widget = header_box;
 
             var content_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6);
 
@@ -57,8 +70,21 @@ namespace Imladris.UI {
             this.append (expander);
         }
 
-        public void set_output (string text_output, string? plot_path, int execution_count = 1) {
-            expander.label = @"Out [$execution_count]:";
+        public void set_output (string text_output, string? plot_path, int execution_count = 1, double elapsed_ms = -1.0) {
+            var title_label = ((Gtk.Box) expander.label_widget).get_first_child () as Gtk.Label;
+            if (title_label != null) {
+                title_label.label = @"Out [$execution_count]:";
+            }
+            if (elapsed_ms >= 0.0) {
+                if (elapsed_ms >= 1000.0) {
+                    timing_label.label = "✔ " + "%.2f".printf (elapsed_ms / 1000.0) + " s";
+                } else {
+                    timing_label.label = @"✔ $( ((int) elapsed_ms).to_string () ) ms";
+                }
+            } else {
+                timing_label.label = "";
+            }
+
             log_view.get_buffer ().set_text (text_output);
 
             if (plot_path != null && GLib.FileUtils.test (plot_path, GLib.FileTest.EXISTS)) {

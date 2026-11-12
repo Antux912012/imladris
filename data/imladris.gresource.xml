@@ -44,6 +44,16 @@
     <file alias="scalable/places/user-trash-symbolic.svg">icons/papirus/scalable/places/user-trash-symbolic.svg</file>
     <file alias="scalable/actions/folder-download-symbolic.svg">icons/papirus/scalable/actions/folder-download-symbolic.svg</file>
     <file alias="scalable/actions/view-more-horizontal-symbolic.svg">icons/papirus/scalable/actions/view-more-horizontal-symbolic.svg</file>
+    <file alias="scalable/actions/book-open-symbolic.svg">icons/papirus/scalable/actions/book-open-symbolic.svg</file>
+    <file alias="scalable/actions/character-map-symbolic.svg">icons/papirus/scalable/actions/character-map-symbolic.svg</file>
+    <file alias="scalable/actions/emblem-ok-symbolic.svg">icons/papirus/scalable/actions/emblem-ok-symbolic.svg</file>
+    <file alias="scalable/actions/format-text-superscript-symbolic.svg">icons/papirus/scalable/actions/format-text-superscript-symbolic.svg</file>
+    <file alias="scalable/actions/send-symbolic.svg">icons/papirus/scalable/actions/send-symbolic.svg</file>
+    <file alias="scalable/actions/software-properties-symbolic.svg">icons/papirus/scalable/actions/software-properties-symbolic.svg</file>
+    <file alias="scalable/actions/text-html-symbolic.svg">icons/papirus/scalable/actions/text-html-symbolic.svg</file>
+    <file alias="scalable/actions/view-column-symbolic.svg">icons/papirus/scalable/actions/view-column-symbolic.svg</file>
+    <file alias="scalable/actions/view-statistics-symbolic.svg">icons/papirus/scalable/actions/view-statistics-symbolic.svg</file>
+    <file alias="scalable/apps/io.github.Antux912012.Imladris.svg">icons/hicolor/scalable/apps/io.github.Antux912012.Imladris.svg</file>
     <file alias="scalable/mimetypes/x-office-presentation-symbolic.svg">icons/papirus/scalable/mimetypes/x-office-presentation-symbolic.svg</file>
     <file alias="scalable/mimetypes/text-x-r-symbolic.svg">icons/papirus/scalable/mimetypes/text-x-r-symbolic.svg</file>
     <file alias="scalable/mimetypes/text-x-python-symbolic.svg">icons/papirus/scalable/mimetypes/text-x-python-symbolic.svg</file>

@@ -64,7 +64,7 @@ namespace Imladris {
          * Pillar 11: Embeds an inline output card directly below the executed chunk.
          * Uses persistent Gtk.TextMark tracking to survive line insertions above the chunk.
          */
-        public void display_inline_chunk_output (int end_line, string text_output, string? plot_path, int count) {
+        public void display_inline_chunk_output (int end_line, string text_output, string? plot_path, int count, double elapsed_ms = -1.0) {
             string? matched_key = null;
             foreach (var entry in chunk_marks.entries) {
                 Gtk.TextIter mark_iter;
@@ -97,7 +97,7 @@ namespace Imladris {
                 inline_chunk_widgets.set (key, widget);
             }
 
-            widget.set_output (text_output, plot_path, count);
+            widget.set_output (text_output, plot_path, count, elapsed_ms);
         }
 
         public void clear_inline_chunk_outputs () {
@@ -183,6 +183,9 @@ namespace Imladris {
             var settings = web_view.get_settings ();
             settings.enable_developer_extras = true;
             settings.enable_javascript = true;
+            settings.allow_file_access_from_file_urls = true;
+            settings.allow_universal_access_from_file_urls = true;
+            settings.enable_spatial_navigation = false;
 
             int web_process_crashes = 0;
             web_view.web_process_terminated.connect ((reason) => {
@@ -231,8 +234,10 @@ namespace Imladris {
                 vexpand = true
             };
 
+            var sm_phys = Core.SettingsManager.get_default ();
             console_revealer = new Gtk.Revealer () {
                 transition_type = Gtk.RevealerTransitionType.SLIDE_LEFT,
+                transition_duration = sm_phys.animation_physics.get_revealer_duration_ms (),
                 reveal_child = true,
                 hexpand = true,
                 vexpand = true
@@ -253,9 +258,15 @@ namespace Imladris {
 
             right_stack = new Gtk.Stack () {
                 transition_type = Gtk.StackTransitionType.CROSSFADE,
+                transition_duration = sm_phys.animation_physics.get_stack_duration_ms (),
                 hexpand = true,
                 vexpand = true
             };
+
+            sm_phys.physics_changed.connect (() => {
+                console_revealer.transition_duration = sm_phys.animation_physics.get_revealer_duration_ms ();
+                right_stack.transition_duration = sm_phys.animation_physics.get_stack_duration_ms ();
+            });
 
             var stack_switcher = new Gtk.StackSwitcher () {
                 stack = right_stack

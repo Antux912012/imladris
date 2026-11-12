@@ -91,7 +91,7 @@ namespace Imladris.UI {
 
             // 1. Mode, Output Format, and Preset Configuration Group
             var config_group = new Adw.PreferencesGroup () {
-                title = "Notation Mode & Output Format",
+                title = "Notation Mode and Output Format",
                 description = "Write formulas naturally (e.g. (-b +- sqrt(b^2 - 4*a*c))/(2*a) or 2H2(g) + O2(g) ->[heat] 2H2O(l)) and export to LaTeX or Markdown."
             };
 
@@ -175,7 +175,7 @@ namespace Imladris.UI {
             palette_group.add (math_expander);
 
             var chem_expander = new Adw.ExpanderRow () {
-                title = "Chemical Reactions, Arrows, States & Ions",
+                title = "Chemical Reactions, Arrows, States, and Ions",
                 subtitle = "->, <=>, ->[heat], (aq), (s), (g), (l), ^2+, ^2-, (v), (^)",
                 expanded = (initial_mode == Core.FormulaMode.CHEMISTRY)
             };
@@ -183,7 +183,7 @@ namespace Imladris.UI {
             palette_group.add (chem_expander);
 
             var sym_expander = new Adw.ExpanderRow () {
-                title = "Greek Letters & Scientific Operators",
+                title = "Greek Letters and Scientific Operators",
                 subtitle = "alpha, beta, gamma, delta, theta, lambda, pi, sigma, omega, +-, <=, >=, !=",
                 expanded = false
             };

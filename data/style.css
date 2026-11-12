@@ -65,8 +65,8 @@ menubutton.imladris-brand-btn > button:active {
     background-color: alpha(@accent_color, 0.14);
 }
 .ribbon-tab-packages:checked {
-    color: #3584e4;
-    background-color: alpha(#3584e4, 0.16);
+    color: @accent_color;
+    background-color: alpha(@accent_bg_color, 0.16);
 }
 
 /* Environment Target Pill */
@@ -481,31 +481,31 @@ window.eye-friendly,
 .citation-pill {
     border-radius: 6px;
     font-family: monospace;
-    background-color: alpha(#3584e4, 0.15);
-    color: #3584e4;
-    border: 1px solid alpha(#3584e4, 0.3);
+    background-color: alpha(@accent_bg_color, 0.15);
+    color: @accent_color;
+    border: 1px solid alpha(@accent_bg_color, 0.3);
     padding: 2px 6px;
     font-weight: 600;
     transition: all 120ms ease;
 }
 
 .citation-pill:hover {
-    background-color: alpha(#3584e4, 0.28);
+    background-color: alpha(@accent_bg_color, 0.28);
 }
 
 /* Semantic colors */
 .success {
-    color: #2ec27e;
+    color: @success_color;
     font-weight: bold;
 }
 
 .accent-btn {
-    color: #3584e4;
+    color: @accent_color;
     font-weight: 600;
 }
 
 .accent-btn:hover {
-    background-color: alpha(#3584e4, 0.18);
+    background-color: alpha(@accent_bg_color, 0.18);
 }
 
 /* Code cell card styling */
@@ -539,6 +539,44 @@ window.eye-friendly,
     color: @accent_color;
     font-weight: 700;
 }
+
+/* GPU Hardware Acceleration Status Badge */
+.gpu-status-badge {
+    background-color: alpha(@accent_bg_color, 0.14);
+    color: @accent_color;
+    border: 1px solid alpha(@accent_bg_color, 0.30);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Alacritty Crisp Physics Mode (65ms Zero-Lag Micro-Transitions & Crisp Glyph Hinting) */
+window.physics-alacritty .ribbon-tab-btn,
+window.physics-alacritty .ribbon-tool-btn,
+window.physics-alacritty .ribbon-tall-btn,
+window.physics-alacritty .ribbon-compact-btn,
+window.physics-alacritty .target-env-pill,
+window.physics-alacritty .citation-pill,
+window.physics-alacritty .mermaid-palette-btn,
+window.physics-alacritty button {
+    transition-duration: 65ms;
+    transition-timing-function: cubic-bezier(0.2, 0.0, 0.0, 1.0);
+}
+
+window.physics-alacritty textview {
+    font-variant-ligatures: contextual;
+    font-variant-numeric: tabular-nums;
+}
+
+/* PuTTY Instant Terminal Physics Mode (0ms Zero-Latency State Snap) */
+window.physics-putty *,
+window.physics-putty .ribbon-tab-btn,
+window.physics-putty .ribbon-tool-btn,
+window.physics-putty .ribbon-tall-btn,
+window.physics-putty .ribbon-compact-btn,
+window.physics-putty button {
+    transition-duration: 0ms;
+    animation-duration: 0ms;
+}
+
 
 
 

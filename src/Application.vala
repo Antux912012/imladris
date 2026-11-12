@@ -10,7 +10,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.21.0";
+        public const string APP_VERSION = "0.22.0";
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },
@@ -44,6 +44,7 @@ namespace Imladris {
             { "run_all_cells", on_run_all_cells },
             { "run_line_selection", on_run_line_selection },
             { "interrupt_execution", on_interrupt_execution },
+            { "command_palette", on_command_palette },
             { "preferences", on_preferences },
             { "about", on_about },
             { "math_chem_editor", on_math_chem_editor },
@@ -155,6 +156,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.export_html", { "<Control><Shift>k" });
             this.set_accels_for_action ("app.run_shiny_app", { "<Control><Shift>a" });
             this.set_accels_for_action ("app.elrond_assist", { "<Control><Shift>e" });
+            this.set_accels_for_action ("app.command_palette", { "<Control><Shift>p", "<Control>k" });
             this.set_accels_for_action ("app.preferences", { "<Control>comma" });
             this.set_accels_for_action ("app.math_chem_editor", { "<Control>m" });
             this.set_accels_for_action ("app.mermaid_studio", { "<Control><Shift>d", "<Control><Alt>m" });
@@ -377,6 +379,14 @@ namespace Imladris {
         private void on_interrupt_execution () {
             var win = this.active_window as Window;
             if (win != null) win.interrupt_active_execution ();
+        }
+
+        private void on_command_palette () {
+            var win = this.active_window as Window;
+            if (win != null) {
+                var dlg = new UI.CommandPaletteDialog (win);
+                dlg.present (win);
+            }
         }
 
         private void on_preferences () {

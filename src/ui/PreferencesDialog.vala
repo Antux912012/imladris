@@ -57,15 +57,61 @@ namespace Imladris.UI {
             };
 
             var hw_row = new Adw.SwitchRow () {
-                title = "Hardware Acceleration",
-                subtitle = "Use the GPU for WebKit previews. Turn off if you see crashes or artifacts on older hardware, virtual machines or problematic drivers.",
+                title = "OpenGL and Vulkan Hardware Acceleration",
+                subtitle = "Accelerate the GTK4 scene graph, GtkSourceView 5 editor canvas, and WebKitGTK 6.0 previews on the GPU",
                 active = Core.SettingsManager.get_default ().hardware_acceleration_enabled
             };
+
+            var gpu_backends = new Gtk.StringList ({
+                "Auto (OpenGL NGL / Vulkan)",
+                "OpenGL (GSK NGL Shader Pipeline)",
+                "Vulkan (GSK SPIR-V Pipeline)",
+                "Software Fallback (Cairo CPU)"
+            });
+            var gpu_backend_row = new Adw.ComboRow () {
+                title = "GPU Renderer Backend",
+                subtitle = "Selects the GSK hardware pipeline for the window compositor and code editor",
+                model = gpu_backends,
+                selected = (uint) Core.SettingsManager.get_default ().gpu_backend,
+                sensitive = Core.SettingsManager.get_default ().hardware_acceleration_enabled
+            };
+            gpu_backend_row.notify["selected"].connect (() => {
+                Core.SettingsManager.get_default ().gpu_backend = (Core.GpuRendererBackend) gpu_backend_row.selected;
+            });
+
             hw_row.notify["active"].connect (() => {
                 Core.SettingsManager.get_default ().hardware_acceleration_enabled = hw_row.active;
+                gpu_backend_row.sensitive = hw_row.active;
+            });
+
+            var physics_modes = new Gtk.StringList ({
+                "Alacritty Crisp (65ms Zero-Lag Micro-Transitions)",
+                "PuTTY Instant (0ms Zero-Latency Terminal Snap)",
+                "Libadwaita Smooth (180ms Standard GNOME Easing)"
+            });
+            var physics_row = new Adw.ComboRow () {
+                title = "Animation and Terminal Physics",
+                subtitle = "Coherent frame pacing and panel transition latency across editor, ribbon, and console",
+                model = physics_modes,
+                selected = (uint) Core.SettingsManager.get_default ().animation_physics
+            };
+            physics_row.notify["selected"].connect (() => {
+                Core.SettingsManager.get_default ().animation_physics = (Core.AnimationPhysicsMode) physics_row.selected;
+            });
+
+            var steady_cursor_row = new Adw.SwitchRow () {
+                title = "Steady Terminal and Editor Cursor",
+                subtitle = "Keep a non-blinking solid cursor in the editor and REPL console like Alacritty and PuTTY",
+                active = Core.SettingsManager.get_default ().steady_cursor
+            };
+            steady_cursor_row.notify["active"].connect (() => {
+                Core.SettingsManager.get_default ().steady_cursor = steady_cursor_row.active;
             });
 
             hw_group.add (hw_row);
+            hw_group.add (gpu_backend_row);
+            hw_group.add (physics_row);
+            hw_group.add (steady_cursor_row);
             gen_page.add (hw_group);
 
             var about_group = new Adw.PreferencesGroup () {
@@ -103,7 +149,7 @@ namespace Imladris.UI {
 
             var zotero_group = new Adw.PreferencesGroup () {
                 title = "Zotero Citation Engine",
-                description = "Zero-filesystem-hole localhost RPC (127.0.0.1:23119) for Quarto & Markdown"
+                description = "Zero-filesystem-hole localhost RPC (127.0.0.1:23119) for Quarto and Markdown"
             };
 
             var zot_status_row = new Adw.ActionRow () {
@@ -234,7 +280,7 @@ namespace Imladris.UI {
             var ai_config_mgr = AiConfigManager.get_default ();
 
             var ai_page = new Adw.PreferencesPage () {
-                title = "AI &amp; Elrond",
+                title = "AI and Elrond",
                 icon_name = "system-run-symbolic"
             };
 
@@ -278,10 +324,10 @@ namespace Imladris.UI {
                         elrond_level_row.subtitle = "Low: On-Demand Only (Manual 'Write with Elrond' trigger)";
                         break;
                     case 1:
-                        elrond_level_row.subtitle = "Medium: Smart Autocomplete &amp; Dataframe Awareness (Recommended)";
+                        elrond_level_row.subtitle = "Medium: Smart Autocomplete and Dataframe Awareness (Recommended)";
                         break;
                     case 2:
-                        elrond_level_row.subtitle = "High: Full Elrond Copilot &amp; Proactive Code/Graph Suggestions";
+                        elrond_level_row.subtitle = "High: Full Elrond Copilot and Proactive Code/Graph Suggestions";
                         break;
                     default:
                         elrond_level_row.subtitle = "Select assistance level";
@@ -343,7 +389,7 @@ namespace Imladris.UI {
             elrond_group.add (inline_edit_row);
 
             var panel_pos_row = new Adw.ActionRow () {
-                title = "AI Chat &amp; Side Panel Position",
+                title = "AI Chat and Side Panel Position",
                 subtitle = "Keep the LLM chat and preview panel docked on the left or right side of the editor"
             };
 
@@ -386,7 +432,7 @@ namespace Imladris.UI {
             mode_strings.append ("⚙️ Custom Local Server");
 
             var mode_row = new Adw.ComboRow () {
-                title = "Local AI Server &amp; Harness Bridge",
+                title = "Local AI Server and Harness Bridge",
                 subtitle = "Connect to running local inference servers or host agent harnesses",
                 model = mode_strings,
                 selected = (uint) settings.elrond_mode
@@ -423,7 +469,7 @@ namespace Imladris.UI {
 
             // Local AI Ecosystem Setup Guide
             var guide_expander = new Adw.ExpanderRow () {
-                title = "Local AI &amp; Agent Harness Setup Guide",
+                title = "Local AI and Agent Harness Setup Guide",
                 subtitle = "Supported local engines: Ollama, LM Studio, Cherry Studio, and Antigravity"
             };
             guide_expander.add_prefix (new Gtk.Image.from_icon_name ("dialog-information-symbolic"));
@@ -443,7 +489,7 @@ namespace Imladris.UI {
             guide_expander.add_row (guide_lm_row);
 
             var guide_cherry_row = new Adw.ActionRow () {
-                title = "Cherry Studio &amp; LocalAI (Port 23333 or 8080)",
+                title = "Cherry Studio and LocalAI (Port 23333 or 8080)",
                 subtitle = "Runs local OpenAI-compatible inference servers across multiple backends"
             };
             guide_cherry_row.add_prefix (new Gtk.Image.from_icon_name ("ai-custom") { pixel_size = 22 });
@@ -504,7 +550,7 @@ namespace Imladris.UI {
             ai_general_group.add (temp_row);
 
             var config_row = new Adw.ActionRow () {
-                title = "Provider Credentials &amp; Models",
+                title = "Provider Credentials and Models",
                 subtitle = "Configure API keys, custom base URLs, and model identifiers"
             };
             var btn_configure_keys = new Gtk.Button.with_label ("Configure Providers...") {
@@ -521,7 +567,7 @@ namespace Imladris.UI {
 
             // Cloud API Keys Quick Links Group
             var keys_group = new Adw.PreferencesGroup () {
-                title = "API Credentials &amp; Portals",
+                title = "API Credentials and Portals",
                 description = "Quick access to generate and manage developer API keys"
             };
 

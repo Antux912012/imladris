@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.21.0',
+  version: '0.22.0',
   default_options: ['warning_level=1']
 )
 
@@ -57,6 +57,7 @@ sources = files(
   'src/core/ChunkParser.vala',
   'src/core/MathChemEngine.vala',
   'src/core/MermaidFlowEngine.vala',
+  'src/core/QuartoExportEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/services/RecoveryService.vala',
   'src/services/WorkspaceStateManager.vala',
@@ -93,6 +94,8 @@ sources = files(
   'src/ui/rproj_dialog.vala',
   'src/ui/MathChemEditorDialog.vala',
   'src/ui/MermaidFlowStudioDialog.vala',
+  'src/ui/PresentationTemplateDialog.vala',
+  'src/ui/CommandPaletteDialog.vala',
   'src/ui/PackagesRibbonBar.vala',
   'src/ui/InlineChunkOutputWidget.vala',
   'src/ui/WebViewFactory.vala',
@@ -150,6 +153,7 @@ test_sources = files(
   'src/core/MallornManager.vala',
   'src/core/MathChemEngine.vala',
   'src/core/MermaidFlowEngine.vala',
+  'src/core/QuartoExportEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/services/SandboxController.vala',
   'src/services/PersistentSessionManager.vala',
@@ -200,6 +204,7 @@ plugin_test_sources = files(
   'src/core/MallornManager.vala',
   'src/core/MathChemEngine.vala',
   'src/core/MermaidFlowEngine.vala',
+  'src/core/QuartoExportEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/services/SandboxController.vala',
   'src/services/PersistentSessionManager.vala',
@@ -231,6 +236,7 @@ dock_test_sources = files(
   'src/core/MallornManager.vala',
   'src/core/MathChemEngine.vala',
   'src/core/MermaidFlowEngine.vala',
+  'src/core/QuartoExportEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/services/SandboxController.vala',
   'src/services/PersistentSessionManager.vala',

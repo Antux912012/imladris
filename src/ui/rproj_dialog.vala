@@ -59,7 +59,7 @@ namespace Imladris.UI {
 
             // Project Metadata Group
             var meta_group = new Adw.PreferencesGroup () {
-                title = "Project Identity & Location",
+                title = "Project Identity and Location",
                 description = "Configure project directory and RStudio .Rproj manifest properties."
             };
 
@@ -86,7 +86,7 @@ namespace Imladris.UI {
 
             // Document & Toolchain Group
             var toolchain_group = new Adw.PreferencesGroup () {
-                title = "Primary Document & Environment",
+                title = "Primary Document and Environment",
                 description = "Select starter notebook syntax and reproducibility sandbox options."
             };
 

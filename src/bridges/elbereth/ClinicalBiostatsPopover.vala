@@ -227,7 +227,7 @@ namespace Imladris.Bridges.Elbereth {
             box.append (template_selector);
 
             var group = new Adw.PreferencesGroup () {
-                title = "Dataset & Variable Mapping"
+                title = "Dataset and Variable Mapping"
             };
 
             dataset_entry = new Gtk.Entry () { text = "clinical_df", valign = Gtk.Align.CENTER };

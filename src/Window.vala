@@ -157,14 +157,14 @@ namespace Imladris {
             brand_btn.add_css_class ("imladris-brand-btn");
             var brand_content = new Adw.ButtonContent () {
                 icon_name = "document-edit-symbolic",
-                label = "Imladris ▾"
+                label = "Imladris"
             };
             brand_btn.set_child (brand_content);
             tier1_box.append (brand_btn);
 
             ribbon_stack = new Gtk.Stack () {
                 transition_type = Gtk.StackTransitionType.CROSSFADE,
-                transition_duration = 120
+                transition_duration = Core.SettingsManager.get_default ().animation_physics.get_stack_duration_ms ()
             };
 
             string[] categories = {
@@ -202,8 +202,21 @@ namespace Imladris {
 
             tier1_box.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
 
+            var export_formats = new Gtk.StringList ({
+                "Manuscript (HTML)",
+                "Interactive Slides (RevealJS)",
+                "Conference Slides (Beamer PDF)",
+                "Symposium Poster (Typst/PDF)"
+            });
+            var export_format_selector = new Gtk.DropDown (export_formats, null) {
+                valign = Gtk.Align.CENTER,
+                tooltip_text = "Select Scientific Output Format"
+            };
+            export_format_selector.add_css_class ("flat");
+            tier1_box.append (export_format_selector);
+
             var btn_render_quarto = new Gtk.Button () {
-                tooltip_text = "Render Document to HTML / Quarto (Ctrl+Shift+K)",
+                tooltip_text = "Compile Scientific Document / Deck / Poster (Ctrl+Shift+K)",
                 valign = Gtk.Align.CENTER
             };
             btn_render_quarto.add_css_class ("pill-button");
@@ -214,9 +227,34 @@ namespace Imladris {
             };
             btn_render_quarto.set_child (render_content);
             btn_render_quarto.clicked.connect (() => {
-                trigger_render ("html");
+                uint sel = export_format_selector.selected;
+                var sc_fmt = Core.ScientificOutputFormat.HTML_MANUSCRIPT;
+                if (sel == 1) sc_fmt = Core.ScientificOutputFormat.REVEALJS_SLIDES;
+                else if (sel == 2) sc_fmt = Core.ScientificOutputFormat.BEAMER_PDF_SLIDES;
+                else if (sel == 3) sc_fmt = Core.ScientificOutputFormat.TYPST_POSTER_PDF;
+                compile_scientific_document_async.begin (sc_fmt);
             });
             tier1_box.append (btn_render_quarto);
+
+            var btn_deck_template = new Gtk.Button () {
+                tooltip_text = "New Scientific Deck or Poster Template...",
+                valign = Gtk.Align.CENTER
+            };
+            btn_deck_template.add_css_class ("pill-button");
+            var deck_content = new Adw.ButtonContent () {
+                icon_name = "x-office-presentation-symbolic",
+                label = "Deck / Poster"
+            };
+            btn_deck_template.set_child (deck_content);
+            btn_deck_template.clicked.connect (() => {
+                var dlg = new UI.PresentationTemplateDialog ();
+                dlg.template_selected.connect ((t_title, starter_content, suggested_fn) => {
+                    add_document_tab (suggested_fn, "markdown", starter_content);
+                    show_toast (@"Created $t_title ($suggested_fn)");
+                });
+                dlg.present (this);
+            });
+            tier1_box.append (btn_deck_template);
 
             btn_shiny_app = new Gtk.Button () {
                 tooltip_text = "Run Shiny Web Application (Ctrl+Shift+A)",
@@ -430,11 +468,27 @@ namespace Imladris {
             status_badge_lbl.add_css_class ("status-badge");
             status_bar.append (status_badge_lbl);
 
-            status_env_badge_lbl = new Gtk.Label ("[Sandboxed - Reproducible]");
+            status_env_badge_lbl = new Gtk.Label ("Sandboxed • Reproducible");
             status_env_badge_lbl.add_css_class ("status-badge");
             status_env_badge_lbl.add_css_class ("env-badge");
             status_env_badge_lbl.add_css_class ("env-sandboxed");
             status_bar.append (status_env_badge_lbl);
+
+            var sm_hw = Core.SettingsManager.get_default ();
+            var gpu_badge_lbl = new Gtk.Label (sm_hw.gpu_backend.get_badge_label (sm_hw.hardware_acceleration_enabled)) {
+                tooltip_text = sm_hw.get_active_gpu_renderer_summary ()
+            };
+            gpu_badge_lbl.add_css_class ("status-badge");
+            gpu_badge_lbl.add_css_class ("gpu-status-badge");
+            status_bar.append (gpu_badge_lbl);
+
+            sm_hw.physics_changed.connect (() => {
+                bool hw_on = sm_hw.hardware_acceleration_enabled && (sm_hw.gpu_backend != Core.GpuRendererBackend.SOFTWARE_CAIRO);
+                gpu_badge_lbl.label = sm_hw.gpu_backend.get_badge_label (hw_on);
+                gpu_badge_lbl.tooltip_text = sm_hw.get_active_gpu_renderer_summary ();
+                ribbon_stack.transition_duration = sm_hw.animation_physics.get_stack_duration_ms ();
+                content_stack.transition_duration = sm_hw.animation_physics.get_stack_duration_ms ();
+            });
 
             status_kernel_lbl = new Gtk.Label ("Kernels: R • Python 3") {
                 css_classes = { "caption" }
@@ -497,8 +551,9 @@ namespace Imladris {
             toast_overlay = new Adw.ToastOverlay ();
             content_stack = new Gtk.Stack () {
                 transition_type = Gtk.StackTransitionType.CROSSFADE,
-                transition_duration = 150
+                transition_duration = Core.SettingsManager.get_default ().animation_physics.get_stack_duration_ms ()
             };
+            Core.SettingsManager.get_default ().apply_physics ();
             welcome_page = build_welcome_page ();
             content_stack.add_named (welcome_page, "welcome");
             content_stack.add_named (tab_view, "editor");
@@ -920,7 +975,7 @@ namespace Imladris {
 
             var shiny_row = new Adw.ActionRow () {
                 title = "New Shiny Web App (.R)",
-                subtitle = "Interactive reactive web application and dashboard with R & Shiny",
+                subtitle = "Interactive reactive web application and dashboard with R and Shiny",
                 activatable = true
             };
             shiny_row.add_prefix (new Gtk.Image.from_icon_name ("applications-internet-symbolic"));
@@ -1020,11 +1075,11 @@ namespace Imladris {
 
         public void update_environment_badge (ProjectType ptype) {
             if (ptype == ProjectType.SANDBOXED) {
-                status_env_badge_lbl.label = "[Sandboxed - Reproducible]";
+                status_env_badge_lbl.label = "Sandboxed • Reproducible";
                 status_env_badge_lbl.remove_css_class ("env-standard");
                 status_env_badge_lbl.add_css_class ("env-sandboxed");
             } else {
-                status_env_badge_lbl.label = "[System Libraries - Non-Portable]";
+                status_env_badge_lbl.label = "System Environment";
                 status_env_badge_lbl.remove_css_class ("env-sandboxed");
                 status_env_badge_lbl.add_css_class ("env-standard");
             }
@@ -1387,6 +1442,51 @@ namespace Imladris {
 
         public void trigger_render (string target_format) {
             export_document_dialog_async.begin (target_format);
+        }
+
+        public async void compile_scientific_document_async (Core.ScientificOutputFormat format) {
+            var doc = get_active_document ();
+            if (doc == null) return;
+
+            string s_path = "";
+            if (doc.file_location != null) {
+                s_path = doc.file_location.get_path ();
+                yield save_document_async ();
+            } else {
+                string cache_dir = Core.PlatformUtils.get_shared_cache_dir ("render");
+                s_path = GLib.Path.build_filename (cache_dir, "document.qmd");
+                try {
+                    GLib.FileUtils.set_contents (s_path, doc.source_buffer.text);
+                } catch (GLib.Error e) {
+                    show_toast (@"Failed to cache document for rendering: $(e.message)");
+                    return;
+                }
+            }
+
+            var engine = new Core.QuartoExportEngine ();
+            engine.compilation_progress.connect ((line) => {
+                doc.append_console_log (line);
+            });
+            engine.tex_healing_started.connect (() => {
+                show_toast ("Installing TinyTeX and Beamer packages (first-time setup)...");
+            });
+
+            try {
+                string out_path = yield engine.render_document_async (s_path, format);
+                show_toast (@"Rendered $(GLib.Path.get_basename (out_path))");
+
+                if (format == Core.ScientificOutputFormat.HTML_MANUSCRIPT || format == Core.ScientificOutputFormat.REVEALJS_SLIDES) {
+                    string uri = GLib.Filename.to_uri (out_path);
+                    doc.show_live_preview (uri);
+                } else {
+                    // PDF output (Beamer or Typst)
+                    var file = GLib.File.new_for_path (out_path);
+                    var launcher = new Gtk.FileLauncher (file);
+                    launcher.launch.begin (this, null, null);
+                }
+            } catch (GLib.Error e) {
+                show_toast (@"Compilation failed: $(e.message)");
+            }
         }
 
         private void setup_actions () {

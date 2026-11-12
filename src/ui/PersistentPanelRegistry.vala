@@ -1444,6 +1444,7 @@ namespace Imladris.UI {
                 }
             }
 
+            int64 start_us = GLib.get_monotonic_time ();
             if (engine == "r") {
                 string? plot_file = null;
                 bool any_line_streamed = false;
@@ -1458,6 +1459,7 @@ namespace Imladris.UI {
                 Services.PersistentSessionManager.get_default ().execute_r.begin (code, (obj, res) => {
                     Services.PersistentSessionManager.get_default ().disconnect (sig_id);
                     string output = Services.PersistentSessionManager.get_default ().execute_r.end (res, out plot_file).strip ();
+                    double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
                     if (!any_line_streamed && output.length > 0) {
                         doc_page.append_console_log (@"Out [$count]:\n$output");
                         if (output.contains ("Install Toolchain") && main_window != null) {
@@ -1470,7 +1472,7 @@ namespace Imladris.UI {
                         doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
                     }
                     if (inline_chunk_line >= 0) {
-                        doc_page.display_inline_chunk_output (inline_chunk_line, output, plot_file, count);
+                        doc_page.display_inline_chunk_output (inline_chunk_line, output, plot_file, count, elapsed_ms);
                     }
                     refresh_environment_and_outline ();
                     environment_controller.active_engine = "r";
@@ -1490,6 +1492,7 @@ namespace Imladris.UI {
                 Services.PersistentSessionManager.get_default ().execute_python.begin (code, (obj, res) => {
                     Services.PersistentSessionManager.get_default ().disconnect (sig_id);
                     string output = Services.PersistentSessionManager.get_default ().execute_python.end (res, out plot_file).strip ();
+                    double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
                     if (!any_line_streamed && output.length > 0) {
                         doc_page.append_console_log (@"Out [$count]:\n$output");
                         if (output.contains ("Install Toolchain") && main_window != null) {
@@ -1502,7 +1505,7 @@ namespace Imladris.UI {
                         doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
                     }
                     if (inline_chunk_line >= 0) {
-                        doc_page.display_inline_chunk_output (inline_chunk_line, output, plot_file, count);
+                        doc_page.display_inline_chunk_output (inline_chunk_line, output, plot_file, count, elapsed_ms);
                     }
                     refresh_environment_and_outline ();
                     environment_controller.active_engine = "python";
@@ -1511,11 +1514,12 @@ namespace Imladris.UI {
             } else {
                 ExecutionEngine.capture_command_async.begin ({ "bash", "-c", code }, (obj, res) => {
                     string output = ExecutionEngine.capture_command_async.end (res).strip ();
+                    double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
                     if (output.length > 0) {
                         doc_page.append_console_log (@"Out [$count]:\n$output");
                     }
                     if (inline_chunk_line >= 0) {
-                        doc_page.display_inline_chunk_output (inline_chunk_line, output, null, count);
+                        doc_page.display_inline_chunk_output (inline_chunk_line, output, null, count, elapsed_ms);
                     }
                     refresh_environment_and_outline ();
                 });

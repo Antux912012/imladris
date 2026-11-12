@@ -1,8 +1,8 @@
 # Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 pkgname=imladris
-pkgver=0.21.0
+pkgver=0.22.0
 pkgrel=1
-pkgdesc="Polyglot Scientific & Markdown IDE with VS Code-grade IntelliSense, R, Python, and Libadwaita UI"
+pkgdesc="Polyglot Scientific & Markdown IDE with GPU Acceleration, IntelliSense, Slides, Posters, and R/Python"
 arch=('x86_64')
 url="https://github.com/Antux912012/imladris"
 license=('GPL-3.0-or-later')
@@ -24,8 +24,8 @@ optdepends=(
     'python-uv: Ultra-fast Python package installer'
     'llama.cpp: Zero-config local LLM inference engine for Elrond Assistance'
     'llama-cpp: Alternative package name for local LLM inference'
-    'vulkan-icd-loader: Vulkan GPU acceleration for Elrond local AI'
-    'quarto-cli-bin: Quarto document rendering'
+    'vulkan-icd-loader: Vulkan GPU acceleration for Elrond local AI and GSK rendering'
+    'quarto-cli-bin: Quarto document, slide deck, and poster rendering'
     'pandoc: Document export to PDF, HTML, and Word'
     'libreoffice: Presentation and spreadsheet export'
 )
@@ -37,7 +37,7 @@ makedepends=(
     'gcc'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('bd96b71a86a5cbf532571ab6e431f0658d77bcc70be1c7d952557784c1eb0da7')
+sha256sums=('f53af74de1653459f143c6cacd232eaac10b24b4ccb4e401109e2b5105aa2cfb')
 
 build() {
     cd "$srcdir/imladris-$pkgver"

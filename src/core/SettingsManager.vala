@@ -104,6 +104,69 @@ namespace Imladris.Core {
         }
     }
 
+    /**
+     * Hardware Renderer Backend for GTK4 GSK and GtkSourceView 5 Editor Canvas.
+     */
+    public enum GpuRendererBackend {
+        AUTO_GPU = 0,
+        OPENGL = 1,
+        VULKAN = 2,
+        SOFTWARE_CAIRO = 3;
+
+        public string to_gsk_env () {
+            switch (this) {
+                case VULKAN: return "vulkan";
+                case SOFTWARE_CAIRO: return "cairo";
+                case OPENGL:
+                case AUTO_GPU:
+                default:
+                    return (Gtk.get_minor_version () >= 14) ? "ngl" : "gl";
+            }
+        }
+
+        public string get_badge_label (bool hw_enabled) {
+            if (!hw_enabled || this == SOFTWARE_CAIRO) {
+                return "CPU: Cairo";
+            }
+            switch (this) {
+                case VULKAN: return "GPU: Vulkan";
+                case OPENGL: return "GPU: OpenGL";
+                case AUTO_GPU:
+                default:
+                    string? env = GLib.Environment.get_variable ("GSK_RENDERER");
+                    if (env != null && env.down () == "vulkan") return "GPU: Vulkan";
+                    return "GPU: OpenGL";
+            }
+        }
+    }
+
+    /**
+     * Animation and Input Physics Mode inspired by Alacritty and PuTTY terminals.
+     */
+    public enum AnimationPhysicsMode {
+        ALACRITTY_CRISP = 0,
+        PUTTY_INSTANT = 1,
+        ADWAITA_SMOOTH = 2;
+
+        public uint get_revealer_duration_ms () {
+            switch (this) {
+                case PUTTY_INSTANT: return 0;
+                case ADWAITA_SMOOTH: return 180;
+                case ALACRITTY_CRISP:
+                default: return 65;
+            }
+        }
+
+        public uint get_stack_duration_ms () {
+            switch (this) {
+                case PUTTY_INSTANT: return 0;
+                case ADWAITA_SMOOTH: return 150;
+                case ALACRITTY_CRISP:
+                default: return 50;
+            }
+        }
+    }
+
     public enum ElrondMode {
         AUTO_DETECT = 0,
         OLLAMA = 1,
@@ -270,6 +333,7 @@ namespace Imladris.Core {
         public signal void theme_changed (AppTheme theme);
         public signal void accent_color_changed (GnomeAccent accent);
         public signal void ai_settings_changed ();
+        public signal void physics_changed ();
 
         private bool _elrond_enabled = false;
         private AiAssistanceLevel _elrond_level = AiAssistanceLevel.MEDIUM;
@@ -283,6 +347,9 @@ namespace Imladris.Core {
         private bool _inline_editing_enabled = true;
         private SidePanelPosition _chat_panel_position = SidePanelPosition.RIGHT;
         private string _custom_model_path = "";
+        private GpuRendererBackend _gpu_backend = GpuRendererBackend.AUTO_GPU;
+        private AnimationPhysicsMode _animation_physics = AnimationPhysicsMode.ALACRITTY_CRISP;
+        private bool _steady_cursor = true;
         private KeyFile config_keyfile = new KeyFile ();
         private string config_ini_path = "";
 
@@ -419,11 +486,49 @@ namespace Imladris.Core {
         public bool hardware_acceleration_enabled {
             get { return gsettings != null ? gsettings.get_boolean ("hw-acceleration") : _hw_fallback; }
             set {
+                _hw_fallback = value;
                 if (gsettings != null) {
                     gsettings.set_boolean ("hw-acceleration", value);
-                } else if (_hw_fallback != value) {
-                    _hw_fallback = value;
-                    hardware_acceleration_changed (value);
+                }
+                save_ini ();
+                apply_physics ();
+                hardware_acceleration_changed (value);
+                physics_changed ();
+            }
+        }
+
+        public GpuRendererBackend gpu_backend {
+            get { return _gpu_backend; }
+            set {
+                if (_gpu_backend != value) {
+                    _gpu_backend = value;
+                    save_ini ();
+                    apply_physics ();
+                    physics_changed ();
+                }
+            }
+        }
+
+        public AnimationPhysicsMode animation_physics {
+            get { return _animation_physics; }
+            set {
+                if (_animation_physics != value) {
+                    _animation_physics = value;
+                    save_ini ();
+                    apply_physics ();
+                    physics_changed ();
+                }
+            }
+        }
+
+        public bool steady_cursor {
+            get { return _steady_cursor; }
+            set {
+                if (_steady_cursor != value) {
+                    _steady_cursor = value;
+                    save_ini ();
+                    apply_physics ();
+                    physics_changed ();
                 }
             }
         }
@@ -558,6 +663,18 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("ElrondAI", "custom_model_path")) {
                         _custom_model_path = config_keyfile.get_string ("ElrondAI", "custom_model_path");
                     }
+                    if (config_keyfile.has_key ("Hardware", "hw_acceleration")) {
+                        _hw_fallback = config_keyfile.get_boolean ("Hardware", "hw_acceleration");
+                    }
+                    if (config_keyfile.has_key ("Hardware", "gpu_backend")) {
+                        _gpu_backend = (GpuRendererBackend) config_keyfile.get_integer ("Hardware", "gpu_backend");
+                    }
+                    if (config_keyfile.has_key ("Hardware", "animation_physics")) {
+                        _animation_physics = (AnimationPhysicsMode) config_keyfile.get_integer ("Hardware", "animation_physics");
+                    }
+                    if (config_keyfile.has_key ("Hardware", "steady_cursor")) {
+                        _steady_cursor = config_keyfile.get_boolean ("Hardware", "steady_cursor");
+                    }
                 } catch (Error e) {}
             }
         }
@@ -581,8 +698,66 @@ namespace Imladris.Core {
                 config_keyfile.set_boolean ("ElrondAI", "inline_editing", _inline_editing_enabled);
                 config_keyfile.set_string ("ElrondAI", "chat_panel_position", _chat_panel_position.to_string_id ());
                 config_keyfile.set_string ("ElrondAI", "custom_model_path", _custom_model_path);
+                config_keyfile.set_boolean ("Hardware", "hw_acceleration", hardware_acceleration_enabled);
+                config_keyfile.set_integer ("Hardware", "gpu_backend", (int) _gpu_backend);
+                config_keyfile.set_integer ("Hardware", "animation_physics", (int) _animation_physics);
+                config_keyfile.set_boolean ("Hardware", "steady_cursor", _steady_cursor);
                 FileUtils.set_contents (config_ini_path, config_keyfile.to_data ());
             } catch (Error e) {}
+        }
+
+        /**
+         * Applies Alacritty / PuTTY / Libadwaita animation physics, steady cursor settings,
+         * and GPU-acceleration CSS classes to all open application windows.
+         */
+        public void apply_physics () {
+            if (!Gtk.is_initialized ()) return;
+
+            var gtk_settings = Gtk.Settings.get_default ();
+            if (gtk_settings != null) {
+                gtk_settings.gtk_cursor_blink = !_steady_cursor;
+                gtk_settings.gtk_enable_animations = (_animation_physics != AnimationPhysicsMode.PUTTY_INSTANT);
+            }
+
+            var app = GLib.Application.get_default () as Gtk.Application;
+            if (app != null) {
+                bool hw_on = hardware_acceleration_enabled && (_gpu_backend != GpuRendererBackend.SOFTWARE_CAIRO);
+                foreach (var win in app.get_windows ()) {
+                    win.remove_css_class ("physics-alacritty");
+                    win.remove_css_class ("physics-putty");
+                    win.remove_css_class ("physics-adwaita");
+                    win.remove_css_class ("gpu-accelerated");
+
+                    if (hw_on) {
+                        win.add_css_class ("gpu-accelerated");
+                    }
+
+                    switch (_animation_physics) {
+                        case AnimationPhysicsMode.PUTTY_INSTANT:
+                            win.add_css_class ("physics-putty");
+                            break;
+                        case AnimationPhysicsMode.ADWAITA_SMOOTH:
+                            win.add_css_class ("physics-adwaita");
+                            break;
+                        case AnimationPhysicsMode.ALACRITTY_CRISP:
+                        default:
+                            win.add_css_class ("physics-alacritty");
+                            break;
+                    }
+                }
+            }
+        }
+
+        public string get_active_gpu_renderer_summary () {
+            bool hw_on = hardware_acceleration_enabled && (_gpu_backend != GpuRendererBackend.SOFTWARE_CAIRO);
+            string badge = _gpu_backend.get_badge_label (hw_on);
+            string physics_name = "Alacritty Crisp (65ms)";
+            if (_animation_physics == AnimationPhysicsMode.PUTTY_INSTANT) {
+                physics_name = "PuTTY Instant (0ms)";
+            } else if (_animation_physics == AnimationPhysicsMode.ADWAITA_SMOOTH) {
+                physics_name = "Libadwaita Smooth (180ms)";
+            }
+            return @"$badge • $physics_name";
         }
 
         public void apply_theme (AppTheme theme) {

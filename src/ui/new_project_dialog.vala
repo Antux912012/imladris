@@ -36,7 +36,7 @@ namespace Imladris.UI {
             // GROUP 0: Common Metadata (Name & Author)
             // =================================================================
             var meta_group = new Adw.PreferencesGroup () {
-                title = "Metadata & Location",
+                title = "Metadata and Location",
                 description = "Configure the project or standalone file name, author, and target directory."
             };
 

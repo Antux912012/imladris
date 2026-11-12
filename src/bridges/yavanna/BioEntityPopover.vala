@@ -201,7 +201,7 @@ namespace Imladris.Bridges.Yavanna {
             result_group.add (row_title);
 
             row_organism = new Adw.ActionRow () {
-                title = "Organism & Taxon",
+                title = "Organism and Taxon",
                 subtitle = "—"
             };
             row_organism.add_css_class ("property");

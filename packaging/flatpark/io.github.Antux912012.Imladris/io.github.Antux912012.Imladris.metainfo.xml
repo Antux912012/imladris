@@ -60,6 +60,21 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.22.0" date="2026-11-12">
+      <description>
+        <p>Release v0.22.0 introduces hardware-accelerated rendering and a comprehensive GNOME/Libadwaita interface overhaul:</p>
+        <ul>
+          <li>Configures GTK4 GSK hardware acceleration (OpenGL NGL and Vulkan SPIR-V pipelines) via settings.ini before Display initialization with graceful CPU Cairo fallback.</li>
+          <li>Adds configurable animation and frame physics with three profiles: Alacritty Crisp (65ms zero-lag micro-transitions), PuTTY Instant (0ms zero-latency snap), and Libadwaita Smooth (180ms easing).</li>
+          <li>Introduces non-blinking steady terminal/editor cursor mode synchronizing across source editor and REPL consoles.</li>
+          <li>Implements Universal Command Palette (Ctrl+Shift+P / Ctrl+K) providing fuzzy-matched execution of workbench actions, statistical bridges, and hardware toggles.</li>
+          <li>Integrates inline code chunk execution runtime duration telemetry directly into document cards (Out [n]: ✔ ms/s).</li>
+          <li>Resolves Pango markup entities and unescaped ampersands across all preferences, popovers, and headerbars according to GNOME HIG standards.</li>
+          <li>Bundles 9 missing symbolic SVG icons directly into GResource (book-open, character-map, emblem-ok, format-text-superscript, send, software-properties, text-html, view-column, view-statistics).</li>
+          <li>Synchronizes GtkSourceView 5 syntax color schemes and dynamic styling with user-selected GNOME accent colors.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.21.0" date="2026-11-12">
       <description>
         <p>Release v0.21.0 introduces zero-latency, 100% offline VS Code-grade polyglot IntelliSense and intelligent bracket/quote pairing: Implements non-AI deterministic completion engine (CodeIntelliSenseEngine) with multi-paradigm symbol catalogs for R (base, stats, tidyverse, survival, DESeq2), Python (builtins, pandas, numpy, matplotlib, scipy.stats), Quarto hash-pipe (#|) cell options, YAML frontmatter directives, and LaTeX/mhchem math macros; features live buffer AST scanning for user-defined variables and functions, active REPL session object introspection, and dataframe column accessors (df$col); adds VS Code subsequence fuzzy scoring with prefix boost; integrates BracketAutoPairController for smart auto-closure of brackets (), [], {} and quotes "", '', ``, cursor overtype skip-over, and selection wrapping; provides manual completion invocation via Ctrl+Space; and includes preference toggles in SettingsManager.</p>

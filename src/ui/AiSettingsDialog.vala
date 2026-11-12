@@ -258,7 +258,7 @@ namespace Imladris.UI {
             // Page 2: Open Weights & Enterprise (DeepSeek, Kimi, Qwen, NVIDIA NIM)
             // ==========================================
             var enterprise_page = new Adw.PreferencesPage () {
-                title = "Open & Enterprise",
+                title = "Open and Enterprise",
                 icon_name = "system-run-symbolic"
             };
 
@@ -480,7 +480,7 @@ namespace Imladris.UI {
             // Page 3: Local & Custom AI (Ollama, LM Studio, Custom)
             // ==========================================
             var local_page = new Adw.PreferencesPage () {
-                title = "Local & Custom",
+                title = "Local and Custom",
                 icon_name = "computer-symbolic"
             };
 

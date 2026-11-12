@@ -88,7 +88,7 @@ namespace Imladris.UI {
             comp_group.add (r_switch);
 
             tidy_switch = new Adw.SwitchRow () {
-                title = "R Tidyverse & RMarkdown Bundle",
+                title = "R Tidyverse and RMarkdown Bundle",
                 subtitle = "Pre-compiled binary packages: tidyverse, data.table, rmarkdown, and knitr (Zero compilation time).",
                 active = true
             };
@@ -122,7 +122,7 @@ namespace Imladris.UI {
             // GROUP 3: Action & Live Progress
             // =================================================================
             var action_group = new Adw.PreferencesGroup () {
-                title = "Installation & Logs"
+                title = "Installation and Logs"
             };
 
             var action_row = new Adw.ActionRow () {
