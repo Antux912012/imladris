@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.18.0
+Version:        0.21.0
 Release:        1%{?dist}
 Summary:        Scientific notebook studio and Markdown editor
 
@@ -17,6 +17,7 @@ BuildRequires:  pkgconfig(gtk4) >= 4.12
 BuildRequires:  pkgconfig(libadwaita-1) >= 1.5
 BuildRequires:  pkgconfig(gtksourceview-5) >= 5.10
 BuildRequires:  pkgconfig(webkitgtk-6.0)
+BuildRequires:  pkgconfig(libsecret-1) >= 0.20
 BuildRequires:  pkgconfig(libsoup-3.0)
 BuildRequires:  pkgconfig(json-glib-1.0)
 BuildRequires:  pkgconfig(gee-0.8)
@@ -56,6 +57,14 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Thu Nov 12 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.21.0-1
+- Release 0.21.0: VS Code-grade Offline Polyglot IntelliSense & Bracket Auto-Pairing:
+  * Non-AI deterministic completion engine (CodeIntelliSenseEngine) for R, Python, Quarto #| options, YAML, and LaTeX.
+  * Live buffer variable and function AST scanning and active REPL session variable introspection.
+  * Real-time DataFrame column completion ($) and R package namespace navigation (::).
+  * BracketAutoPairController for smart auto-closure of (), [], {}, "", \'\', ``, overtype skip-over, and selection wrapping.
+  * Manual completion invocation via Ctrl+Space and preference toggles in SettingsManager.
+
 * Thu Nov 12 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.18.0-1
 - Release 0.18.0: Arekyer Galaxy-to-Quarto Provenance Bridge & MathChemStudio:
   * Implement Arekyer (Imladris.Bridges.Arekyer) Galaxy-to-Quarto provenance bridge.
