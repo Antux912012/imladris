@@ -172,20 +172,36 @@ menubutton.imladris-brand-btn > button:active {
     border-radius: 2px;
 }
 
-/* Bottom Status Bar */
+/* Bottom Status Bar (GNOME / Pantheon HIG Harmonized) */
 .imladris-statusbar {
     background-color: @headerbar_bg_color;
+    color: @headerbar_fg_color;
     border-top: 1px solid @borders;
-    min-height: 28px;
-    padding: 2px 10px;
+    min-height: 30px;
+    padding: 2px 12px;
     font-size: 0.80rem;
 }
 .status-badge {
-    background-color: alpha(@accent_bg_color, 0.18);
+    background-color: alpha(@accent_bg_color, 0.16);
     color: @accent_color;
-    border-radius: 4px;
+    border: 1px solid alpha(@accent_color, 0.28);
+    border-radius: 6px;
     padding: 1px 8px;
     font-weight: 600;
+    font-size: 0.76rem;
+}
+.status-badge.env-sandboxed {
+    background-color: alpha(@success_color, 0.15);
+    color: @success_color;
+    border-color: alpha(@success_color, 0.32);
+}
+.status-badge.env-standard {
+    background-color: alpha(@warning_color, 0.15);
+    color: @warning_color;
+    border-color: alpha(@warning_color, 0.32);
+}
+.numeric {
+    font-variant-numeric: tabular-nums;
 }
 
 /* =====================================================================
@@ -396,7 +412,9 @@ window.eye-friendly,
 }
 
 .eye-friendly .imladris-topbar {
-    background-color: #3c3630;
+    background-color: #ebe2d8;
+    color: #383431;
+    border-bottom-color: #dcd0c2;
 }
 
 .eye-friendly GtkSourceView {
@@ -429,6 +447,7 @@ window.eye-friendly,
 
 .eye-friendly .imladris-statusbar {
     background-color: #ebe2d8;
+    color: #383431;
 }
 
 /* ========================================================================= */
@@ -445,10 +464,10 @@ window.eye-friendly,
 /* Floating status pill indicator */
 .pill-indicator {
     border-radius: 9999px;
-    background-color: alpha(@window_fg_color, 0.06);
-    border: 1px solid alpha(@window_fg_color, 0.12);
-    padding: 2px 10px;
-    font-size: 0.82rem;
+    background-color: alpha(@window_bg_color, 0.88);
+    border: 1px solid alpha(@window_fg_color, 0.14);
+    padding: 3px 12px;
+    font-size: 0.80rem;
     font-weight: 500;
 }
 
@@ -497,14 +516,29 @@ window.eye-friendly,
     margin-bottom: 12px;
 }
 
-/* Sleek Libadwaita Floating Statusbar */
-.imladris-statusbar {
-    background-color: @headerbar_bg_color;
-    color: @headerbar_fg_color;
-    border-top: 1px solid @borders;
-    min-height: 32px;
-    padding: 2px 12px;
-    font-size: 0.8rem;
+/* Visual Flow & Mindmap Studio Palette Sidebar */
+.mermaid-palette-sidebar {
+    background-color: @window_bg_color;
 }
+
+.mermaid-palette-btn {
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.mermaid-palette-btn:hover {
+    background-color: alpha(@accent_bg_color, 0.12);
+    color: @accent_color;
+}
+
+.mermaid-palette-btn:checked {
+    background-color: alpha(@accent_bg_color, 0.22);
+    color: @accent_color;
+    font-weight: 700;
+}
+
 
 

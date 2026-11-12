@@ -143,6 +143,7 @@ namespace Imladris {
             brand_menu.append_section ("File & Export", io_sec);
 
             var prefs_sec = new GLib.Menu ();
+            prefs_sec.append ("Visual Flow & Mindmap Studio...", "app.mermaid_studio");
             prefs_sec.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
             prefs_sec.append ("Data Science Toolchains...", "app.toolchain_setup");
             prefs_sec.append ("Preferences", "app.preferences");
@@ -387,12 +388,17 @@ namespace Imladris {
             status_env_badge_lbl = new Gtk.Label ("[Sandboxed - Reproducible]");
             status_env_badge_lbl.add_css_class ("status-badge");
             status_env_badge_lbl.add_css_class ("env-badge");
+            status_env_badge_lbl.add_css_class ("env-sandboxed");
             status_bar.append (status_env_badge_lbl);
 
-            status_kernel_lbl = new Gtk.Label ("Kernels: R • Python 3");
+            status_kernel_lbl = new Gtk.Label ("Kernels: R • Python 3") {
+                css_classes = { "caption" }
+            };
             status_bar.append (status_kernel_lbl);
 
-            status_words_lbl = new Gtk.Label ("Words: 0 | Lines: 1");
+            status_words_lbl = new Gtk.Label ("Words: 0 | Lines: 1") {
+                css_classes = { "caption", "numeric" }
+            };
             status_bar.append (status_words_lbl);
 
             var elrond_sep = new Gtk.Separator (Gtk.Orientation.VERTICAL) {
@@ -422,7 +428,10 @@ namespace Imladris {
 
             status_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
 
-            zoom_lbl = new Gtk.Label ("100%");
+            zoom_lbl = new Gtk.Label ("100%") {
+                css_classes = { "caption", "numeric" },
+                width_chars = 4
+            };
             zoom_scale = new Gtk.Scale.with_range (Gtk.Orientation.HORIZONTAL, 50, 200, 10) {
                 draw_value = false,
                 width_request = 110
@@ -1634,10 +1643,9 @@ namespace Imladris {
             });
             var btn_emoji = RibbonFactory.create_tool_button ("face-smile-symbolic", "Emoji", "Insert Emoji", false, false, true, null, null, emoji_popover);
 
-            var btn_mermaid = RibbonFactory.create_tool_button ("view-list-symbolic", "Mermaid", "Insert Mermaid Diagram");
+            var btn_mermaid = RibbonFactory.create_tool_button ("view-list-symbolic", "Mermaid Flow", "Open Visual Flow & Mindmap Studio (Ctrl+Shift+D)");
             ((Gtk.Button) btn_mermaid).clicked.connect (() => {
-                var d = get_active_document ();
-                if (d != null) d.source_buffer.insert_at_cursor ("\n```{mermaid}\nflowchart TD\n  A[Start] --> B[Process]\n  B --> C[Result]\n```\n", -1);
+                show_mermaid_flow_studio_dialog ();
             });
 
             var btn_plot = RibbonFactory.create_tool_button ("x-office-presentation-symbolic", "ggplot", "Insert ggplot2 snippet");
@@ -2353,6 +2361,35 @@ namespace Imladris {
                     doc.source_buffer.end_user_action ();
                     doc.refresh_live_preview ();
                     show_toast ("Inserted formula into document");
+                    if (save_document) {
+                        save_document_async.begin ();
+                    }
+                }
+            });
+            dlg.present (this);
+        }
+
+        public void show_mermaid_flow_studio_dialog () {
+            string sel = get_active_selected_text ();
+            var dlg = new UI.MermaidFlowStudioDialog (sel.length > 0 ? sel : null);
+            dlg.diagram_inserted.connect ((formatted_mermaid, save_document) => {
+                var doc = get_active_document ();
+                if (doc == null) {
+                    add_document_tab ("Diagram.qmd", "markdown");
+                    doc = get_active_document ();
+                }
+                if (doc != null) {
+                    doc.source_buffer.begin_user_action ();
+                    Gtk.TextIter start, end;
+                    if (doc.source_buffer.get_selection_bounds (out start, out end)) {
+                        doc.source_buffer.delete (ref start, ref end);
+                        doc.source_buffer.insert (ref start, formatted_mermaid, formatted_mermaid.length);
+                    } else {
+                        doc.source_buffer.insert_at_cursor (formatted_mermaid, formatted_mermaid.length);
+                    }
+                    doc.source_buffer.end_user_action ();
+                    doc.refresh_live_preview ();
+                    show_toast ("Inserted Mermaid diagram into document");
                     if (save_document) {
                         save_document_async.begin ();
                     }

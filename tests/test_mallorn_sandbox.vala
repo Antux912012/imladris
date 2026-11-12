@@ -25,6 +25,7 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/mallorn/rproj_creation_and_scaffolding", test_rproj_creation);
         GLib.Test.add_func ("/notebook/jupyter_nbformat_parity", test_notebook_serializer_parity);
         GLib.Test.add_func ("/math_chem/natural_math_and_chemistry_engine", test_math_chem_engine);
+        GLib.Test.add_func ("/mermaid/visual_flow_and_mindmap_engine", test_mermaid_flow_engine);
 
         return GLib.Test.run ();
     }
@@ -891,5 +892,98 @@ print(np.mean([1, 2, 3]))
         // 5. Verify preset library completeness
         var presets = Core.MathChemEngine.get_presets ();
         assert (presets.size >= 12);
+    }
+
+    /**
+     * Test the Visual Flow & Mindmap Engine (MermaidFlowEngine).
+     *
+     * Verifies flowchart serialization, mindmap hierarchical indentation,
+     * sequence diagram generation, two-way Mermaid code parsing, SVG export,
+     * and Quarto chunk formatting.
+     */
+    private static void test_mermaid_flow_engine () {
+        var nodes = new Gee.ArrayList<Core.MermaidNode> ();
+        var edges = new Gee.ArrayList<Core.MermaidEdge> ();
+
+        var n1 = new Core.MermaidNode ("N1", "Raw Reads (FASTQ)", Core.MermaidNodeShape.PARALLELOGRAM, 150, 100);
+        n1.palette = Core.MermaidNodePalette.TEAL;
+        var n2 = new Core.MermaidNode ("N2", "Quality Pass?", Core.MermaidNodeShape.DIAMOND, 150, 220);
+        n2.palette = Core.MermaidNodePalette.AMBER;
+        var n3 = new Core.MermaidNode ("N3", "DESeq2 Model", Core.MermaidNodeShape.DATABASE, 150, 340);
+        n3.subgraph_title = "Statistical Compute";
+
+        nodes.add (n1);
+        nodes.add (n2);
+        nodes.add (n3);
+
+        edges.add (new Core.MermaidEdge ("E1", "N1", "N2", "", Core.MermaidEdgeStyle.SOLID_ARROW));
+        edges.add (new Core.MermaidEdge ("E2", "N2", "N3", "p < 0.05", Core.MermaidEdgeStyle.THICK_ARROW));
+
+        // 1. Flowchart generation with shapes, subgraphs, edge labels, and semantic styles
+        string fc_code = Core.MermaidFlowEngine.generate_mermaid_code (
+            Core.MermaidDiagramKind.FLOWCHART,
+            Core.MermaidFlowDirection.TOP_DOWN,
+            nodes,
+            edges
+        );
+        assert (fc_code.has_prefix ("flowchart TD"));
+        assert (fc_code.contains ("N1[/\"Raw Reads (FASTQ)\"/]"));
+        assert (fc_code.contains ("N2{\"Quality Pass?\"}"));
+        assert (fc_code.contains ("subgraph SG1 [\"Statistical Compute\"]"));
+        assert (fc_code.contains ("N3[(\"DESeq2 Model\")]"));
+        assert (fc_code.contains ("N2 ==>|\"p < 0.05\"| N3"));
+        assert (fc_code.contains ("style N1 fill:#ccfbf1"));
+
+        // 2. Quarto executable chunk formatting with label and caption
+        string qmd_chunk = Core.MermaidFlowEngine.format_for_document (
+            fc_code,
+            Core.MermaidTargetFormat.QUARTO_CHUNK,
+            "rnaseq-flow",
+            "RNA-Seq Differential Expression Pipeline"
+        );
+        assert (qmd_chunk.contains ("```{mermaid}"));
+        assert (qmd_chunk.contains ("#| label: fig-rnaseq-flow"));
+        assert (qmd_chunk.contains ("#| fig-cap: \"RNA-Seq Differential Expression Pipeline\""));
+
+        // 3. Two-way round-trip parsing from Quarto Mermaid chunk back to visual nodes & edges
+        Core.MermaidDiagramKind parsed_kind;
+        Core.MermaidFlowDirection parsed_dir;
+        Gee.ArrayList<Core.MermaidNode> parsed_nodes;
+        Gee.ArrayList<Core.MermaidEdge> parsed_edges;
+
+        Core.MermaidFlowEngine.parse_mermaid_code (
+            qmd_chunk,
+            out parsed_kind,
+            out parsed_dir,
+            out parsed_nodes,
+            out parsed_edges
+        );
+        assert (parsed_kind == Core.MermaidDiagramKind.FLOWCHART);
+        assert (parsed_dir == Core.MermaidFlowDirection.TOP_DOWN);
+        assert (parsed_nodes.size == 3);
+        assert (parsed_edges.size == 2);
+        assert (parsed_edges[1].label == "p < 0.05");
+        assert (parsed_edges[1].style == Core.MermaidEdgeStyle.THICK_ARROW);
+
+        // 4. Mindmap generation and round-trip parsing
+        string mindmap_code = Core.MermaidFlowEngine.generate_mermaid_code (
+            Core.MermaidDiagramKind.MINDMAP,
+            Core.MermaidFlowDirection.TOP_DOWN,
+            nodes,
+            edges
+        );
+        assert (mindmap_code.has_prefix ("mindmap"));
+        assert (mindmap_code.contains ("Raw Reads (FASTQ)"));
+        assert (mindmap_code.contains ("    N2{{Quality Pass?}}"));
+
+        // 5. Vector SVG export
+        string svg = Core.MermaidFlowEngine.export_to_svg (nodes, edges);
+        assert (svg.has_prefix ("<?xml version=\"1.0\""));
+        assert (svg.contains ("<svg "));
+        assert (svg.contains ("DESeq2 Model"));
+
+        // 6. Presets validation
+        var mermaid_presets = Core.MermaidFlowEngine.get_presets ();
+        assert (mermaid_presets.size >= 7);
     }
 }

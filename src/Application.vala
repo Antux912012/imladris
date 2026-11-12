@@ -47,6 +47,7 @@ namespace Imladris {
             { "preferences", on_preferences },
             { "about", on_about },
             { "math_chem_editor", on_math_chem_editor },
+            { "mermaid_studio", on_mermaid_studio },
             { "insert_image", on_insert_image },
             { "insert_video", on_insert_video },
             { "print", on_print_document },
@@ -156,6 +157,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.elrond_assist", { "<Control><Shift>e" });
             this.set_accels_for_action ("app.preferences", { "<Control>comma" });
             this.set_accels_for_action ("app.math_chem_editor", { "<Control>m" });
+            this.set_accels_for_action ("app.mermaid_studio", { "<Control><Shift>d", "<Control><Alt>m" });
             this.set_accels_for_action ("app.insert_image", { "<Control><Alt>i", "<Control><Shift>m" });
             this.set_accels_for_action ("win.zotero_picker", { "<Control><Shift>i" });
             this.set_accels_for_action ("app.insert_video", { "<Control><Shift>v" });
@@ -390,6 +392,11 @@ namespace Imladris {
         private void on_math_chem_editor () {
             var win = this.active_window as Window;
             if (win != null) win.show_math_chem_editor_dialog ();
+        }
+
+        private void on_mermaid_studio () {
+            var win = this.active_window as Window;
+            if (win != null) win.show_mermaid_flow_studio_dialog ();
         }
 
         private void on_insert_image () {
