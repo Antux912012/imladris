@@ -60,6 +60,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.20.0" date="2026-11-12">
+      <description>
+        <p>Release v0.20.0 introduces the Elbereth Clinical Biostatistics, Power Calculation &amp; Survival Studio with critical stability and workflow improvements: Adds Elbereth popover supporting ICH E9 sample size calculations (two-sample t-test, binomial proportions, and Schoenfeld 1983 log-rank survival) with live Cairo Power Curve plotting, regulatory SAP justifications, and automated R/Python verification chunks; integrates CDISC ADSL Table 1, ADTTE survival (Kaplan-Meier + Cox PH), subgroup forest plots, and differential expression volcano plots; resolves R Markdown comma-delimited chunk header parsing ({r, echo=FALSE}) and #| eval: false execution skipping; connects REPL-generated plots to Quadrant 4 Plot Gallery; fixes inline chunk output clearing and tab-delimited (.tsv) dataset imports; auto-generates cryptographic SHA-256 GxP provenance manifests on export; and adds clinical trial SAP and RNA-Seq starter templates.</p>
+      </description>
+    </release>
     <release version="0.19.0" date="2026-11-12">
       <description>
         <p>Release v0.19.0 transforms Imladris into an enterprise-grade production workbench: Introduces Taniquetil (AlphaFold DB structural biology bridge) with native Cairo pLDDT per-residue confidence track and Bio3D/PAE code generation; integrates Yavanna Bio-Entity &amp; Oligo resolver; implements cryptographic SHA-256 GxP and EU CRA provenance attestation service (imladris-provenance.lock.json); resolves multi-thread MCP server memory safety through GLib MainContext marshaling; adds asynchronous FIFO execution queues to PersistentSessionManager eliminating G_IO_ERROR_PENDING stream collisions; and delivers vectorized 1,000-row pagination with column data type profiling in DataGridViewer.</p>
