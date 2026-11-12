@@ -24,8 +24,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Visit the Official Landing Page</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Read the Technical Wiki</a></strong> ·
-  <strong><a href="docs/ARCHITECTURE.md">🏗️ System Architecture</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.18.0">⬇️ Download v0.18.0 (.deb / Flatpak)</a></strong>
+  <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.19.0">⬇️ Download v0.19.0 (.deb / Flatpak)</a></strong>
 </p>
 
 ---
@@ -45,6 +45,9 @@ The application transitions dynamically between two editing layouts:
 ## 2. Key Features
 
 * **Arekyer Galaxy-to-Quarto Provenance Bridge (`Imladris.Bridges.Arekyer`)**: Connects upstream cloud bioinformatics histories (**Galaxy Project**, such as `usegalaxy.eu`, `usegalaxy.org`, `usegalaxy.org.au`) directly to local reproducible `.qmd` and `.Rmd` manuscripts. Injects standardized R (`httr2` / `readr`) and Python (`requests` / `pandas`) data-fetching code blocks with verifiable dataset UUID/HID headers. Stores Galaxy API keys exclusively in the OS keyring (`libsecret-1` / `org.freedesktop.Secret.Service`) and injects `GALAXY_API_KEY` into isolated compilation subprocesses.
+* **Taniquetil AlphaFold Structural Biology Bridge (`Imladris.Bridges.Taniquetil`)**: Inspects 3D macromolecular structures from the DeepMind / EMBL-EBI **AlphaFold Protein Structure Database** (AFDB) and RCSB PDB directly from the header bar. Renders an interactive Cairo per-residue **pLDDT confidence distribution track** (`#0053D6` Very High, `#65CBF3` Confident, `#FFDB13` Low, `#FF7D45` Disordered) and injects reproducible **R (`bio3d`)** and **Python (PAE matrix / `biotite`)** code blocks into manuscripts.
+* **Yavanna Bio-Entity Resolver & RT-qPCR Primer Calculator (`Imladris.Bridges.Yavanna`)**: Resolves UniProtKB protein accessions and Ensembl GRCh38 gene coordinates asynchronously via `libsoup-3.0` and `json-glib-1.0`. Computes DNA/RNA sequence length, GC content, Melting Temperature ($T_m$), and Molecular Weight in memory and injects verified reverse-complement tables.
+* **Cryptographic GxP & EU Cyber Resilience Act (CRA) Provenance Attestation**: Computes SHA-256 digests across the source manuscript, environment lockfiles (`renv.lock`, `uv.lock`, `environment.yml`, `_quarto.yml`), and extracted bio-entity records, writing a verifiable `<document>.provenance.lock.json` sidecar manifest upon every compilation.
 * **Natural Math & Chemical Reaction Studio (`Ctrl+M`)**: Translates human-readable mathematical expressions (for example, `(-b +- sqrt(b^2 - 4*a*c)) / (2*a)`, `int(0, inf) e^(-x^2) dx`) and chemical equations (for example, `6CO2(g) + 6H2O(l) ->[h*nu][chlorophyll] C6H12O6(aq) + 6O2(g)`, `[Fe(CN)6]^4-`) into **LaTeX** (`$$...$$`, `$...$`, `\ce{...}`, `\begin{equation}`, `\begin{align}`) or **Markdown** (`~sub~` / `^sup^` and Unicode scientific notation) with instant offline preview.
 * **Visual Flow & Mindmap Studio (`Ctrl+Shift+D`)**: Interactive Cairo 2D vector canvas (inspired by draw.io and MindNode) for graphically designing **Flowcharts**, **Mindmaps**, **Sequence Diagrams**, and **State Machines** using drag-and-drop shapes, interactive connection ports, semantic GNOME color palettes, swimlane subgraphs, and two-way synchronization with Quarto ` ```{mermaid} ` and Markdown ` ```mermaid ` code blocks.
 * **Reproducible Project Environments & Native `.Rproj` Scaffolding**: Creates and synchronizes standard RStudio `.Rproj` project manifests alongside portable `.mallorn` bundles (`tar.zst`), managing isolated `renv` (R) and `.venv` (Python) sandboxes with automatic `pwd` root locking.

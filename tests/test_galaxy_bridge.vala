@@ -237,6 +237,16 @@ public class TestGalaxyBridge {
         assert ("galaxy_df_43" in chunk);
     }
 
+    /**
+     * Verifies the cryptographic SHA-256 calculation for provenance attestation.
+     */
+    public static void test_provenance_attestation_checksum () {
+        string test_doc = "--- \ntitle: 'Study'\n---\n# AREKYER PROVENANCE RECORD\n";
+        string sha = Imladris.Core.ProvenanceAttestationService.compute_sha256_string (test_doc);
+        assert (sha.length == 64);
+        assert (sha == GLib.Checksum.compute_for_string (GLib.ChecksumType.SHA256, test_doc));
+    }
+
     public static int main (string[] args) {
         Test.init (ref args);
 
@@ -249,6 +259,7 @@ public class TestGalaxyBridge {
         Test.add_func ("/galaxy_bridge/history_model", test_history_model);
         Test.add_func ("/galaxy_bridge/secret_schema", test_secret_schema);
         Test.add_func ("/galaxy_bridge/arekyer_bridge", test_arekyer_bridge);
+        Test.add_func ("/galaxy_bridge/provenance_attestation_checksum", test_provenance_attestation_checksum);
 
         return Test.run ();
     }

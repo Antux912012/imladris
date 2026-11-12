@@ -205,8 +205,8 @@ namespace Imladris {
             string? env_key = GLib.Environment.get_variable ("GALAXY_API_KEY");
             if (env_key != null && env_key.strip ().length > 0) {
                 this.api_key = env_key;
-            } else {
-                // Asynchronously attempt to load from Secret Service
+            } else if (GLib.Environment.get_variable ("DBUS_SESSION_BUS_ADDRESS") != null) {
+                // Asynchronously attempt to load from Secret Service when session bus exists
                 load_api_key_async.begin (this.server_url, (obj, res) => {
                     try {
                         string? retrieved_key = load_api_key_async.end (res);

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.18.0',
+  version: '0.19.0',
   default_options: ['warning_level=1']
 )
 
@@ -73,6 +73,8 @@ sources = files(
   'src/bridges/galaxy_chunk_generator.vala',
   'src/bridges/ArekyerBridge.vala',
   'src/bridges/yavanna/BioEntityPopover.vala',
+  'src/bridges/taniquetil/AlphaFoldBridgePopover.vala',
+  'src/core/ProvenanceAttestationService.vala',
   'src/ui/galaxy_auth_dialog.vala',
   'src/ui/galaxy_panel.vala',
   'src/core/layout/DockTypes.vala',
@@ -297,6 +299,7 @@ galaxy_test_sources = files(
   'src/bridges/galaxy_chunk_generator.vala',
   'src/bridges/galaxy_client.vala',
   'src/bridges/ArekyerBridge.vala',
+  'src/core/ProvenanceAttestationService.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
 )

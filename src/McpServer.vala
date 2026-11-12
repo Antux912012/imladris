@@ -1,7 +1,31 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/**
+ * Single Responsibility: Manages Model Context Protocol (MCP) JSON-RPC requests.
+ *
+ * Architectural Position:
+ * External integration gateway. Receives standard input JSON-RPC calls from AI clients
+ * and controls editor documents and pipelines.
+ * Downstream consumers: External AI assistants, local MCP client tooling.
+ * Upstream dependencies: json-glib-1.0, gio-2.0, GtkSourceView-5.
+ *
+ * Concurrency Constraints:
+ * Reads standard input on a background thread. Dispatches all GTK and buffer manipulations
+ * onto the GLib default MainContext to prevent cross-thread memory corruption.
+ */
+
+using GLib;
+using Json;
+
 namespace Imladris {
+
+    private class SyncCallState {
+        public GLib.Mutex mutex = GLib.Mutex ();
+        public GLib.Cond cond = GLib.Cond ();
+        public bool completed = false;
+        public string result = "";
+    }
 
     public class McpServer : GLib.Object {
 
@@ -63,7 +87,7 @@ namespace Imladris {
                     string tool_name = params_obj.get_string_member ("name");
                     Json.Object? args = params_obj.has_member ("arguments") ? params_obj.get_object_member ("arguments") : null;
 
-                    string tool_result = execute_tool (tool_name, args, window);
+                    string tool_result = dispatch_tool_on_main_thread (tool_name, args, window);
 
                     builder.set_member_name ("result");
                     builder.begin_object ();
@@ -92,7 +116,22 @@ namespace Imladris {
                 generator.set_root (builder.get_root ());
                 return generator.to_data (null);
             } catch (GLib.Error e) {
-                return "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"" + e.message + "\"}}";
+                var err_builder = new Json.Builder ();
+                err_builder.begin_object ();
+                err_builder.set_member_name ("jsonrpc");
+                err_builder.add_string_value ("2.0");
+                err_builder.set_member_name ("error");
+                err_builder.begin_object ();
+                err_builder.set_member_name ("code");
+                err_builder.add_int_value (-32700);
+                err_builder.set_member_name ("message");
+                err_builder.add_string_value (e.message);
+                err_builder.end_object ();
+                err_builder.end_object ();
+
+                var generator = new Json.Generator ();
+                generator.set_root (err_builder.get_root ());
+                return generator.to_data (null);
             }
         }
 
@@ -138,6 +177,37 @@ namespace Imladris {
             b.end_object ();
         }
 
+        /**
+         * Dispatches tool invocation onto the GLib main context thread safely.
+         */
+        private static string dispatch_tool_on_main_thread (string name, Json.Object? args, Window? window) {
+            var main_context = GLib.MainContext.default ();
+            if (main_context.is_owner ()) {
+                return execute_tool (name, args, window);
+            }
+
+            var state = new SyncCallState ();
+
+            state.mutex.lock ();
+            main_context.invoke (() => {
+                string r = execute_tool (name, args, window);
+                state.mutex.lock ();
+                state.result = r;
+                state.completed = true;
+                state.cond.signal ();
+                state.mutex.unlock ();
+                return GLib.Source.REMOVE;
+            });
+
+            while (!state.completed) {
+                state.cond.wait (state.mutex);
+            }
+            string final_result = state.result;
+            state.mutex.unlock ();
+
+            return final_result;
+        }
+
         private static string execute_tool (string name, Json.Object? args, Window? window) {
             if (window == null) {
                 return "Error: No active Imladris window.";
@@ -162,7 +232,12 @@ namespace Imladris {
                 if (doc == null) return "No active document open.";
                 string cmd = (args != null && args.has_member ("command")) ? args.get_string_member ("command") : "";
                 if (cmd.length == 0) return "Error: No command provided.";
-                string[] parts = cmd.split (" ");
+                string[] parts;
+                try {
+                    GLib.Shell.parse_argv (cmd, out parts);
+                } catch (GLib.ShellError e) {
+                    return @"Error: Invalid command syntax: $(e.message)";
+                }
                 ExecutionEngine.run_command_async.begin (parts, doc);
                 return @"▶ Executing command asynchronously: $cmd";
             } else if (name == "render_document") {

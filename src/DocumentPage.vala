@@ -57,24 +57,44 @@ namespace Imladris {
             return DocumentFormat.from_short_code (doc_type);
         }
 
-        private Gee.HashMap<int, UI.InlineChunkOutputWidget> inline_chunk_widgets = new Gee.HashMap<int, UI.InlineChunkOutputWidget> ();
+        private Gee.HashMap<string, Gtk.TextMark> chunk_marks = new Gee.HashMap<string, Gtk.TextMark> ();
+        private Gee.HashMap<string, UI.InlineChunkOutputWidget> inline_chunk_widgets = new Gee.HashMap<string, UI.InlineChunkOutputWidget> ();
 
         /**
-         * Pillar 11: Embeds an inline output card directly below the executed chunk
+         * Pillar 11: Embeds an inline output card directly below the executed chunk.
+         * Uses persistent Gtk.TextMark tracking to survive line insertions above the chunk.
          */
         public void display_inline_chunk_output (int end_line, string text_output, string? plot_path, int count) {
-            UI.InlineChunkOutputWidget? widget = inline_chunk_widgets.get (end_line);
+            string? matched_key = null;
+            foreach (var entry in chunk_marks.entries) {
+                Gtk.TextIter mark_iter;
+                source_buffer.get_iter_at_mark (out mark_iter, entry.value);
+                int mark_line = mark_iter.get_line ();
+                if (mark_line == end_line || mark_line == end_line + 1) {
+                    matched_key = entry.key;
+                    break;
+                }
+            }
+
+            UI.InlineChunkOutputWidget? widget = null;
+            if (matched_key != null) {
+                widget = inline_chunk_widgets.get (matched_key);
+            }
+
             if (widget == null) {
                 Gtk.TextIter iter;
                 source_buffer.get_iter_at_line (out iter, end_line);
                 iter.forward_to_line_end ();
 
-                // Insert newline and child anchor
                 source_buffer.insert (ref iter, "\n", 1);
                 var anchor = source_buffer.create_child_anchor (iter);
                 widget = new UI.InlineChunkOutputWidget (end_line);
                 source_view.add_child_at_anchor (widget, anchor);
-                inline_chunk_widgets.set (end_line, widget);
+
+                string key = GLib.Uuid.string_random ();
+                var mark = source_buffer.create_mark (null, iter, false);
+                chunk_marks.set (key, mark);
+                inline_chunk_widgets.set (key, widget);
             }
 
             widget.set_output (text_output, plot_path, count);

@@ -1,6 +1,22 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/**
+ * Single Responsibility: Manages persistent R and Python background processes.
+ *
+ * Architectural Position:
+ * Kernel execution provider. Maintains long-running interactive subprocesses for
+ * data inspection, plotting, and variable persistence across document views.
+ * Downstream consumers: Imladris.UI.DataGridViewer, Imladris.EnvironmentPanel.
+ * Upstream dependencies: gio-2.0, glib-2.0.
+ *
+ * Concurrency Constraints:
+ * Serializes command evaluations using asynchronous FIFO queues. Eliminates
+ * G_IO_ERROR_PENDING stream collision exceptions when multiple UI subsystems query data.
+ */
+
+using GLib;
+
 namespace Imladris.Services {
 
     public class PersistentSessionManager : GLib.Object {
@@ -33,8 +49,58 @@ namespace Imladris.Services {
         private bool r_initialized = false;
         private bool py_initialized = false;
 
+        // Async FIFO Queues for Serialized Stream Reads
+        private class SourceFuncWrapper {
+            public GLib.SourceFunc cb;
+            public SourceFuncWrapper (owned GLib.SourceFunc c) {
+                this.cb = (owned) c;
+            }
+        }
+
+        private bool r_busy = false;
+        private GLib.Queue<SourceFuncWrapper> r_wait_queue = new GLib.Queue<SourceFuncWrapper> ();
+
+        private bool py_busy = false;
+        private GLib.Queue<SourceFuncWrapper> py_wait_queue = new GLib.Queue<SourceFuncWrapper> ();
+
         public PersistentSessionManager () {
             this._current_working_dir = GLib.Environment.get_current_dir ();
+        }
+
+        private async void lock_r () {
+            if (!r_busy) {
+                r_busy = true;
+                return;
+            }
+            r_wait_queue.push_tail (new SourceFuncWrapper (lock_r.callback));
+            yield;
+        }
+
+        private void unlock_r () {
+            var next = r_wait_queue.pop_head ();
+            if (next != null) {
+                GLib.Idle.add ((owned) next.cb);
+            } else {
+                r_busy = false;
+            }
+        }
+
+        private async void lock_py () {
+            if (!py_busy) {
+                py_busy = true;
+                return;
+            }
+            py_wait_queue.push_tail (new SourceFuncWrapper (lock_py.callback));
+            yield;
+        }
+
+        private void unlock_py () {
+            var next = py_wait_queue.pop_head ();
+            if (next != null) {
+                GLib.Idle.add ((owned) next.cb);
+            } else {
+                py_busy = false;
+            }
         }
 
         /**
@@ -83,6 +149,15 @@ namespace Imladris.Services {
          * remain alive across calls.
          */
         public async string execute_r (string code, out string? generated_plot) {
+            yield lock_r ();
+            try {
+                return yield execute_r_internal (code, out generated_plot);
+            } finally {
+                unlock_r ();
+            }
+        }
+
+        private async string execute_r_internal (string code, out string? generated_plot) {
             generated_plot = null;
             ensure_r_session ();
 
@@ -91,7 +166,8 @@ namespace Imladris.Services {
             }
 
             string plot_dir = Core.PlatformUtils.get_shared_cache_dir ("plots");
-            string plot_file = GLib.Path.build_filename (plot_dir, @"plot_$(GLib.Random.next_int ()).png");
+            string plot_id = GLib.Uuid.string_random ().replace ("-", "");
+            string plot_file = GLib.Path.build_filename (plot_dir, @"plot_$(plot_id).png");
 
             bool has_plot = code.contains ("plot(") || code.contains ("plot (") ||
                             code.contains ("ggplot") || code.contains ("qplot") ||
@@ -108,7 +184,7 @@ namespace Imladris.Services {
                 cmd_sb.append (code + "\n");
             }
 
-            string sentinel = @"__IMLADRIS_R_DONE_$(GLib.Random.next_int ())__";
+            string sentinel = @"__IMLADRIS_R_DONE_$(plot_id)__";
             cmd_sb.append_printf ("cat('\\n%s\\n')\n", sentinel);
 
             try {
@@ -149,6 +225,15 @@ namespace Imladris.Services {
          * remain alive in the workspace.
          */
         public async string execute_python (string code, out string? generated_plot) {
+            yield lock_py ();
+            try {
+                return yield execute_python_internal (code, out generated_plot);
+            } finally {
+                unlock_py ();
+            }
+        }
+
+        private async string execute_python_internal (string code, out string? generated_plot) {
             generated_plot = null;
             ensure_python_session ();
 
@@ -157,32 +242,41 @@ namespace Imladris.Services {
             }
 
             string plot_dir = Core.PlatformUtils.get_shared_cache_dir ("plots");
-            string plot_file = GLib.Path.build_filename (plot_dir, @"plot_$(GLib.Random.next_int ()).png");
+            string plot_id = GLib.Uuid.string_random ().replace ("-", "");
+            string plot_file = GLib.Path.build_filename (plot_dir, @"plot_$(plot_id).png");
 
             bool has_plot = code.contains ("plt.") || code.contains ("matplotlib") ||
                             code.contains (".plot(") || code.contains ("sns.") ||
                             code.contains ("seaborn");
 
-            var cmd_sb = new GLib.StringBuilder ();
-            if (has_plot) {
-                cmd_sb.append ("try:\n");
-                cmd_sb.append ("    import matplotlib\n    matplotlib.use('Agg')\n    import matplotlib.pyplot as plt\n");
-                string[] lines = code.split ("\n");
-                foreach (var l in lines) {
-                    cmd_sb.append ("    " + l + "\n");
-                }
-                cmd_sb.append_printf ("    plt.savefig('%s', dpi=120, bbox_inches='tight')\n", plot_file.replace ("\\", "/"));
-                cmd_sb.append ("finally:\n");
-                cmd_sb.append ("    try:\n        import matplotlib.pyplot as plt\n        plt.close('all')\n    except Exception:\n        pass\n\n");
-            } else {
-                cmd_sb.append (code + "\n\n");
-            }
+            string b64_code = GLib.Base64.encode (code.data);
+            string sentinel = @"__IMLADRIS_PY_DONE_$(plot_id)__";
 
-            string sentinel = @"__IMLADRIS_PY_DONE_$(GLib.Random.next_int ())__";
-            cmd_sb.append_printf ("print('\\n%s')\n", sentinel);
+            string payload = """
+import sys, os, base64, traceback
+_imladris_plot_path = r"%s"
+_imladris_has_plot_intent = %s
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    _imladris_has_mpl = True
+except Exception:
+    _imladris_has_mpl = False
+
+try:
+    _imladris_src = base64.b64decode("%s").decode('utf-8')
+    exec(compile(_imladris_src, '<imladris-cell>', 'exec'), globals())
+    if _imladris_has_mpl and _imladris_has_plot_intent and plt.get_fignums():
+        plt.savefig(_imladris_plot_path, dpi=120, bbox_inches='tight')
+        plt.close('all')
+except Exception:
+    traceback.print_exc(file=sys.stdout)
+print("%s", flush=True)
+""".printf (plot_file, has_plot ? "True" : "False", b64_code, sentinel);
 
             try {
-                py_stdin.put_string (cmd_sb.str, null);
+                py_stdin.put_string (payload + "\n", null);
                 py_stdin.flush ();
 
                 var output_sb = new GLib.StringBuilder ();

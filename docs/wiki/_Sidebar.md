@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.githu
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-### 🌿 Imladris IDE (v0.18.0)
+### 🌿 Imladris IDE (v0.19.0)
 
 * [[Home|Home]]
 * 🌐 [Official Landing Page](https://antux912012.github.io/imladris/)
@@ -15,7 +15,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 #### 🧬 Scientific Workflows
 * [[WIKI 02 // Arekyer: Galaxy Bridge|Galaxy-to-Quarto-Bridge]]
-* [[WIKI 03 // Math & Chem Studio|Math-and-Chemical-Studio]]
+* [[WIKI 03 // Taniquetil & Yavanna: Structural Biology|Structural-Biology-and-Bio-Entities]]
+* [[Math & Chemical Studio|Math-and-Chemical-Studio]]
 * [[Packages Ribbon Manager|Packages-Ribbon-Manager]]
 * [[Exporting ODT, ODP & PDF|Exporting-ODT-ODP-PDF]]
 

@@ -279,6 +279,21 @@ namespace Imladris {
             btn_yavanna_header.add_css_class ("flat");
             tier1_box.append (btn_yavanna_header);
 
+            // Taniquetil AlphaFold Structural Biology Bridge
+            var taniquetil_popover = new Imladris.Bridges.Taniquetil.AlphaFoldBridgePopover ();
+            taniquetil_popover.insert_snippet_requested.connect ((snippet) => {
+                insert_in_active_editor (snippet);
+                show_toast ("Inserted AlphaFold structural provenance record");
+            });
+            var btn_taniquetil_header = new Gtk.MenuButton () {
+                icon_name = "network-cellular-symbolic",
+                tooltip_text = "Taniquetil AlphaFold & Macromolecular Bridge",
+                valign = Gtk.Align.CENTER,
+                popover = taniquetil_popover
+            };
+            btn_taniquetil_header.add_css_class ("flat");
+            tier1_box.append (btn_taniquetil_header);
+
             btn_collapse_ribbon = new Gtk.ToggleButton () {
                 icon_name = "ribbon-toggle-symbolic",
                 tooltip_text = "Show / Hide Ribbon Toolbar (Ctrl+F1)",

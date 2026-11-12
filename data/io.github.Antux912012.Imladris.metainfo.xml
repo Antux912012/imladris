@@ -60,6 +60,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.19.0" date="2026-11-12">
+      <description>
+        <p>Release v0.19.0 transforms Imladris into an enterprise-grade production workbench: Introduces Taniquetil (AlphaFold DB structural biology bridge) with native Cairo pLDDT per-residue confidence track and Bio3D/PAE code generation; integrates Yavanna Bio-Entity &amp; Oligo resolver; implements cryptographic SHA-256 GxP and EU CRA provenance attestation service (imladris-provenance.lock.json); resolves multi-thread MCP server memory safety through GLib MainContext marshaling; adds asynchronous FIFO execution queues to PersistentSessionManager eliminating G_IO_ERROR_PENDING stream collisions; and delivers vectorized 1,000-row pagination with column data type profiling in DataGridViewer.</p>
+      </description>
+    </release>
     <release version="0.18.0" date="2026-11-12">
       <description>
         <p>Release v0.18.0 introduces the Arekyer Galaxy-to-Quarto Provenance Bridge, MathChemStudio, Rproj Project scaffolding, and Jupyter Notebook parity: Implements Arekyer (Imladris.Bridges.Arekyer) connecting upstream cloud bioinformatics histories to local reproducible documents with verifiable httr2 and pandas data loaders; integrates secure credential management via libsecret-1 OS keyring with isolated subprocess memory injection; adds MathChemStudio with natural syntax for mathematical and chemical formulas with dual-target LaTeX and Markdown export; enables creation and lifecycle management of native RStudio .Rproj project files; and establishes full feature parity across Jupyter Notebook (.ipynb) source structures.</p>

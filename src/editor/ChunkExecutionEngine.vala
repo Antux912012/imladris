@@ -1,6 +1,20 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/**
+ * Single Responsibility: Inline code chunk execution and plot capture engine.
+ *
+ * Architectural Position:
+ * Document-level execution orchestrator. Intercepts markdown chunks (`{r}`, `{python}`),
+ * wraps them with graphics redirection harnesses, and collects outputs.
+ * Downstream consumers: Imladris.DocumentPage.
+ * Upstream dependencies: Imladris.ReplBridge, gio-2.0, glib-2.0.
+ *
+ * Concurrency Constraints:
+ * Uses event-driven signal matching to detect sentinel arrival. Avoids CPU busy-waiting
+ * polling loops on the main context.
+ */
+
 using GLib;
 using Gtk;
 
@@ -117,27 +131,51 @@ print(f"\n%s")
             // Route execution to active bridge
             ReplBridge active_bridge = (lang == LanguageRuntime.R) ? r_bridge : python_bridge;
 
-            // Capture output streams via signal connection temporarily
+            // Capture output streams via signal connection
             var output_buffer = new GLib.StringBuilder ();
             var error_buffer = new GLib.StringBuilder ();
 
+            bool done = false;
+            uint timeout_id = 0;
+            GLib.SourceFunc? resume_cb = null;
+
             ulong out_id = active_bridge.output_received.connect ((text) => {
                 output_buffer.append (text);
+                if (!done && output_buffer.str.contains (sentinel)) {
+                    done = true;
+                    if (resume_cb != null) {
+                        GLib.Idle.add ((owned) resume_cb);
+                        resume_cb = null;
+                    }
+                }
             });
+
             ulong err_id = active_bridge.error_received.connect ((text) => {
                 error_buffer.append (text);
             });
 
+            timeout_id = GLib.Timeout.add (30000, () => {
+                timeout_id = 0;
+                if (!done) {
+                    done = true;
+                    if (resume_cb != null) {
+                        GLib.Idle.add ((owned) resume_cb);
+                        resume_cb = null;
+                    }
+                }
+                return GLib.Source.REMOVE;
+            });
+
             try {
                 yield active_bridge.send_command (wrapped_code);
-
-                // Wait for sentinel with timeout
-                int elapsed = 0;
-                while (!output_buffer.str.contains (sentinel) && elapsed < 30000 && active_bridge.is_running) {
-                    yield Nap.sleep (50);
-                    elapsed += 50;
+                if (!done && active_bridge.is_running) {
+                    resume_cb = execute_chunk.callback;
+                    yield;
                 }
             } finally {
+                if (timeout_id != 0) {
+                    GLib.Source.remove (timeout_id);
+                }
                 active_bridge.disconnect (out_id);
                 active_bridge.disconnect (err_id);
             }
