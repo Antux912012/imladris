@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Publish to FlatPark
+
+on:
+  release:
+    types: [published]
+  schedule:
+    # Daily sync check at 06:00 UTC to ensure FlatPark is always synchronized
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (for example: v0.18.0)'
+        required: false
+        default: ''
+
+concurrency:
+  group: flatpark-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-to-flatpark:
+    name: Notify FlatPark of New Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify or Publish to FlatPark
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/verify-flatpark-release.sh
+          ./scripts/verify-flatpark-release.sh
+
+      - name: Execute FlatPark Publish Action
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
+        uses: flatpark/publish-action@v1
+        continue-on-error: true
+        with:
+          app-id: io.github.Antux912012.Imladris
+          tag: ${{ github.event.inputs.tag || github.event.release.tag_name }}
