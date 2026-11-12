@@ -72,6 +72,7 @@ sources = files(
   'src/bridges/galaxy_client.vala',
   'src/bridges/galaxy_chunk_generator.vala',
   'src/bridges/ArekyerBridge.vala',
+  'src/bridges/yavanna/BioEntityPopover.vala',
   'src/ui/galaxy_auth_dialog.vala',
   'src/ui/galaxy_panel.vala',
   'src/core/layout/DockTypes.vala',

@@ -264,6 +264,21 @@ namespace Imladris {
             });
             tier1_box.append (btn_zotero_header);
 
+            // Yavanna Bio-Entity & RT-qPCR Oligo Inspector
+            var yavanna_popover = new Imladris.Bridges.Yavanna.BioEntityPopover ();
+            yavanna_popover.insert_snippet_requested.connect ((snippet) => {
+                insert_in_active_editor (snippet);
+                show_toast ("Inserted biological provenance record into document");
+            });
+            var btn_yavanna_header = new Gtk.MenuButton () {
+                icon_name = "applications-science-symbolic",
+                tooltip_text = "Yavanna Bio-Entity & Oligo Inspector",
+                valign = Gtk.Align.CENTER,
+                popover = yavanna_popover
+            };
+            btn_yavanna_header.add_css_class ("flat");
+            tier1_box.append (btn_yavanna_header);
+
             btn_collapse_ribbon = new Gtk.ToggleButton () {
                 icon_name = "ribbon-toggle-symbolic",
                 tooltip_text = "Show / Hide Ribbon Toolbar (Ctrl+F1)",
