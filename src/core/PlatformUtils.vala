@@ -148,6 +148,49 @@ namespace Imladris.Core {
             if (GLib.FileUtils.test (r_bin, GLib.FileTest.EXISTS)) {
                 launcher.setenv ("QUARTO_R", r_bin, true);
             }
+
+            inject_galaxy_credentials (launcher);
+        }
+
+        private static Secret.Schema? _galaxy_secret_schema = null;
+
+        public static Secret.Schema get_galaxy_secret_schema () {
+            if (_galaxy_secret_schema == null) {
+                _galaxy_secret_schema = new Secret.Schema (
+                    "org.ardatech.Imladris.GalaxyApiKey",
+                    Secret.SchemaFlags.NONE,
+                    "server_url", Secret.SchemaAttributeType.STRING
+                );
+            }
+            return _galaxy_secret_schema;
+        }
+
+        /**
+         * Injects cached Galaxy API credentials into child subprocess environment.
+         * Ensures child processes (quarto render, Rscript, python3) access remote
+         * Galaxy datasets without hardcoding secrets in manuscripts.
+         */
+        public static void inject_galaxy_credentials (GLib.SubprocessLauncher launcher) {
+            string? cached_key = GLib.Environment.get_variable ("GALAXY_API_KEY");
+            string? cached_url = GLib.Environment.get_variable ("GALAXY_SERVER_URL");
+
+            if (cached_key == null || cached_key.length == 0) {
+                try {
+                    string server = (cached_url != null && cached_url.length > 0) ? cached_url : "https://usegalaxy.eu";
+                    cached_key = Secret.password_lookup_sync (
+                        get_galaxy_secret_schema (),
+                        null,
+                        "server_url", server
+                    );
+                } catch (GLib.Error e) {}
+            }
+
+            if (cached_key != null && cached_key.length > 0) {
+                launcher.setenv ("GALAXY_API_KEY", cached_key, true);
+            }
+            if (cached_url != null && cached_url.length > 0) {
+                launcher.setenv ("GALAXY_SERVER_URL", cached_url, true);
+            }
         }
 
         /**

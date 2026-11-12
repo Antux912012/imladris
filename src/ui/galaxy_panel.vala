@@ -2,23 +2,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /**
- * Single Responsibility: Renders Galaxy histories and datasets in the workbench quadrant.
+ * Single Responsibility: Renders Galaxy Project histories and datasets in the workbench quadrant.
  *
  * Architectural Position:
- * Persistent UI panel docked inside Quadrant 3 / Quadrant 2.
+ * Persistent UI inspector docked in Quadrant 2 or Quadrant 3.
  * Upstream caller: Imladris.UI.PersistentPanelRegistry and DocumentPage.
- * Downstream dependency: Imladris.Bridges.GalaxyClient and Adw/GTK4 list widgets.
+ * Downstream dependency: Imladris.GalaxyClient, Imladris.GalaxyChunkGenerator, and Libadwaita list widgets.
  *
  * Concurrency Constraints:
- * Runs on the GLib MainContext thread. Dispatches network requests asynchronously
- * through GalaxyClient without blocking the UI.
+ * Executes on the GLib MainContext thread. Dispatches network requests asynchronously
+ * through GalaxyClient without blocking the GTK UI frame loop.
  */
 
 using GLib;
 using Gtk;
 using Adw;
-using Gee;
-using Imladris.Bridges;
 
 namespace Imladris.UI {
 
@@ -29,26 +27,50 @@ namespace Imladris.UI {
     public class GalaxyPanel : Gtk.Box {
 
         private GalaxyClient client;
-        private Gtk.Label status_badge;
+        private Gtk.Image status_icon;
+        private Gtk.Label status_label;
         private Gtk.Button btn_refresh;
         private Gtk.Button btn_settings;
+        private Gtk.DropDown history_dropdown;
         private Gtk.SearchEntry search_entry;
-        private Gtk.ListBox histories_list;
-        private Gtk.Stack main_stack;
+        private Gtk.ListView dataset_list_view;
+        private Gtk.Stack content_stack;
         private Gtk.Spinner loading_spinner;
         private Adw.StatusPage empty_status_page;
 
-        private Gee.ArrayList<GalaxyHistory> loaded_histories;
-        private Gee.HashMap<string, Gtk.ListBox> dataset_lists;
+        private GLib.ListStore history_store;
+        private GLib.ListStore dataset_store;
+        private Gtk.CustomFilter dataset_filter;
+        private Gtk.FilterListModel filter_model;
+        private Gtk.SingleSelection selection_model;
 
+        private string active_history_name = "Galaxy History";
+        private string active_history_id = "";
+
+        /**
+         * Emitted when user clicks to inject an R or Python code chunk into the manuscript.
+         */
+        public signal void inject_code_chunk_requested (string code_chunk);
+
+        /**
+         * Emitted when user requests a workbench toast notification.
+         */
+        public signal void toast_notification_requested (string message);
+
+        /**
+         * Backwards-compatible signal alias for legacy workbench listeners.
+         */
         public signal void insert_chunk_requested (string code_chunk);
 
+        /**
+         * Constructs a new GalaxyPanel inspector instance.
+         */
         public GalaxyPanel () {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
 
             this.client = GalaxyClient.get_default ();
-            this.loaded_histories = new Gee.ArrayList<GalaxyHistory> ();
-            this.dataset_lists = new Gee.HashMap<string, Gtk.ListBox> ();
+            this.history_store = new GLib.ListStore (typeof (GalaxyHistory));
+            this.dataset_store = new GLib.ListStore (typeof (GalaxyDataset));
 
             this.hexpand = true;
             this.vexpand = true;
@@ -56,14 +78,17 @@ namespace Imladris.UI {
             setup_ui ();
             connect_signals ();
 
-            // Initial automatic probe
+            // Probe connection on launch if credentials exist
             if (client.api_key.length > 0) {
                 probe_connection_and_refresh ();
             } else {
-                update_status_display (false);
+                update_status_display (false, "Disconnected");
             }
         }
 
+        /**
+         * Initializes and arranges all sub-widgets inside the vertical panel.
+         */
         private void setup_ui () {
             // 1. Top Subtoolbar
             var toolbar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
@@ -72,17 +97,25 @@ namespace Imladris.UI {
                 margin_start = 8,
                 margin_end = 8
             };
+            toolbar.add_css_class ("toolbar");
             toolbar.add_css_class ("dock-subtoolbar");
 
-            status_badge = new Gtk.Label ("○ Galaxy Offline") {
-                css_classes = { "caption", "dim-label" }
+            status_icon = new Gtk.Image.from_icon_name ("network-offline-symbolic") {
+                pixel_size = 14
+            };
+
+            status_label = new Gtk.Label ("Disconnected") {
+                css_classes = { "caption", "dim-label" },
+                hexpand = true,
+                xalign = 0,
+                ellipsize = Pango.EllipsizeMode.END
             };
 
             btn_refresh = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
-                tooltip_text = "Refresh Histories from Galaxy",
+                tooltip_text = "Reload Histories from Galaxy",
                 css_classes = { "flat" }
             };
-            btn_refresh.clicked.connect (refresh_histories);
+            btn_refresh.clicked.connect (on_refresh_clicked);
 
             btn_settings = new Gtk.Button.from_icon_name ("emblem-system-symbolic") {
                 tooltip_text = "Configure Galaxy Connection",
@@ -90,419 +123,477 @@ namespace Imladris.UI {
             };
             btn_settings.clicked.connect (open_auth_dialog);
 
-            search_entry = new Gtk.SearchEntry () {
-                placeholder_text = "Filter histories and datasets...",
-                hexpand = true
-            };
-            search_entry.search_changed.connect (on_search_changed);
-
-            toolbar.append (status_badge);
-            toolbar.append (search_entry);
+            toolbar.append (status_icon);
+            toolbar.append (status_label);
             toolbar.append (btn_refresh);
             toolbar.append (btn_settings);
-
             this.append (toolbar);
 
-            // 2. Main Content Stack (Empty / Loading / Histories List)
-            main_stack = new Gtk.Stack () {
+            // 2. History Selector DropDown
+            var selector_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
+                margin_start = 8,
+                margin_end = 8,
+                margin_top = 4,
+                margin_bottom = 4
+            };
+
+            var dropdown_factory = new Gtk.SignalListItemFactory ();
+            dropdown_factory.setup.connect ((item) => {
+                var list_item = (Gtk.ListItem) item;
+                var lbl = new Gtk.Label ("") {
+                    xalign = 0,
+                    ellipsize = Pango.EllipsizeMode.END
+                };
+                list_item.set_child (lbl);
+            });
+            dropdown_factory.bind.connect ((item) => {
+                var list_item = (Gtk.ListItem) item;
+                var lbl = (Gtk.Label) list_item.get_child ();
+                var hist = (GalaxyHistory) list_item.get_item ();
+                if (lbl != null && hist != null) {
+                    lbl.set_text (hist.name);
+                }
+            });
+
+            history_dropdown = new Gtk.DropDown (history_store, null) {
+                factory = dropdown_factory,
+                list_factory = dropdown_factory,
+                hexpand = true
+            };
+            history_dropdown.notify["selected-item"].connect (on_history_selection_changed);
+            selector_box.append (history_dropdown);
+            this.append (selector_box);
+
+            // 3. Search & Filter Entry
+            var search_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+                margin_start = 8,
+                margin_end = 8,
+                margin_top = 2,
+                margin_bottom = 4
+            };
+
+            search_entry = new Gtk.SearchEntry () {
+                placeholder_text = "Filter datasets by name or format...",
+                hexpand = true
+            };
+            search_entry.search_changed.connect (on_search_query_changed);
+            search_box.append (search_entry);
+            this.append (search_box);
+
+            // 4. Content Stack (Spinner, Empty page, and Dataset List)
+            content_stack = new Gtk.Stack () {
                 transition_type = Gtk.StackTransitionType.CROSSFADE,
                 hexpand = true,
                 vexpand = true
             };
 
-            // Loading View
-            var loading_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 12) {
-                valign = Gtk.Align.CENTER,
-                halign = Gtk.Align.CENTER
-            };
             loading_spinner = new Gtk.Spinner () {
-                spinning = true,
+                spinning = false,
+                halign = Gtk.Align.CENTER,
+                valign = Gtk.Align.CENTER,
                 width_request = 36,
                 height_request = 36
             };
-            var loading_lbl = new Gtk.Label ("Connecting to Galaxy server...") {
-                css_classes = { "dim-label" }
-            };
-            loading_box.append (loading_spinner);
-            loading_box.append (loading_lbl);
-            main_stack.add_named (loading_box, "loading");
+            content_stack.add_named (loading_spinner, "loading");
 
-            // Empty / Offline View
             empty_status_page = new Adw.StatusPage () {
                 icon_name = "applications-internet-symbolic",
-                title = "Galaxy Bridge",
-                description = "Connect an active Galaxy server to inspect histories and inject reproducible code chunks."
+                title = "No Datasets Found",
+                description = "Configure your Galaxy connection or select an active history."
             };
-            var btn_connect_prompt = new Gtk.Button.with_label ("Configure Galaxy API") {
-                halign = Gtk.Align.CENTER,
-                css_classes = { "suggested-action", "pill" },
-                margin_top = 8
-            };
-            btn_connect_prompt.clicked.connect (open_auth_dialog);
-            empty_status_page.set_child (btn_connect_prompt);
-            main_stack.add_named (empty_status_page, "empty");
+            content_stack.add_named (empty_status_page, "empty");
 
-            // Histories List View
-            histories_list = new Gtk.ListBox () {
-                selection_mode = Gtk.SelectionMode.NONE,
-                css_classes = { "navigation-sidebar" },
-                hexpand = true
+            // 5. ListView with Custom Filter and SignalListItemFactory
+            dataset_filter = new Gtk.CustomFilter (dataset_filter_func);
+            filter_model = new Gtk.FilterListModel (dataset_store, dataset_filter);
+            selection_model = new Gtk.SingleSelection (filter_model);
+
+            var list_factory = new Gtk.SignalListItemFactory ();
+            list_factory.setup.connect (on_factory_setup);
+            list_factory.bind.connect (on_factory_bind);
+            list_factory.unbind.connect (on_factory_unbind);
+
+            dataset_list_view = new Gtk.ListView (selection_model, list_factory) {
+                css_classes = { "rich-list", "separators" }
             };
 
-            var scrolled = new Gtk.ScrolledWindow () {
+            var scrolled_view = new Gtk.ScrolledWindow () {
                 hscrollbar_policy = Gtk.PolicyType.NEVER,
                 vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
-                child = histories_list,
+                child = dataset_list_view,
                 hexpand = true,
                 vexpand = true
             };
-            main_stack.add_named (scrolled, "histories");
+            content_stack.add_named (scrolled_view, "datasets");
 
-            main_stack.set_visible_child_name ("empty");
-            this.append (main_stack);
+            content_stack.set_visible_child_name ("empty");
+            this.append (content_stack);
         }
 
+        /**
+         * Connects event handlers to client state notifications.
+         */
         private void connect_signals () {
-            client.authenticated_changed.connect ((auth) => {
-                update_status_display (auth);
-            });
-        }
-
-        private void update_status_display (bool is_online) {
-            if (is_online) {
-                string short_url = client.server_url.replace ("https://", "").replace ("http://", "");
-                status_badge.label = @"● $(short_url)";
-                status_badge.remove_css_class ("dim-label");
-                status_badge.add_css_class ("success");
-            } else {
-                status_badge.label = "○ Galaxy Offline";
-                status_badge.remove_css_class ("success");
-                status_badge.add_css_class ("dim-label");
-            }
-        }
-
-        public void probe_connection_and_refresh () {
-            main_stack.set_visible_child_name ("loading");
-            client.test_connection_async.begin (null, null, (obj, res) => {
-                try {
-                    client.test_connection_async.end (res);
-                    update_status_display (true);
-                    refresh_histories ();
-                } catch (GLib.Error e) {
-                    update_status_display (false);
-                    empty_status_page.description = @"Connection error: $(e.message). Verify server URL and API key.";
-                    main_stack.set_visible_child_name ("empty");
+            client.authenticated_changed.connect ((auth_state) => {
+                string server_name = extract_host (client.server_url);
+                if (auth_state) {
+                    update_status_display (true, @"$(server_name) • Connected");
+                } else {
+                    update_status_display (false, @"$(server_name) • Offline");
                 }
             });
-        }
 
-        public void refresh_histories () {
-            btn_refresh.sensitive = false;
-            main_stack.set_visible_child_name ("loading");
-
-            client.fetch_histories_async.begin ((obj, res) => {
-                btn_refresh.sensitive = true;
-                try {
-                    loaded_histories = client.fetch_histories_async.end (res);
-                    populate_histories_list ();
-                } catch (GLib.Error e) {
-                    empty_status_page.description = @"Failed to fetch histories: $(e.message)";
-                    main_stack.set_visible_child_name ("empty");
-                }
+            client.error_occurred.connect ((msg) => {
+                update_status_display (false, "Error: " + msg);
             });
         }
 
-        private void populate_histories_list () {
-            clear_histories_list ();
-
-            if (loaded_histories.size == 0) {
-                empty_status_page.description = "No histories found on the configured Galaxy server.";
-                main_stack.set_visible_child_name ("empty");
-                return;
+        /**
+         * Filter predicate evaluated by Gtk.CustomFilter for real-time search.
+         */
+        private bool dataset_filter_func (GLib.Object item) {
+            var ds = item as GalaxyDataset;
+            if (ds == null) {
+                return false;
             }
 
-            foreach (var history in loaded_histories) {
-                var row = create_history_row (history);
-                histories_list.append (row);
-            }
-
-            main_stack.set_visible_child_name ("histories");
-        }
-
-        private void clear_histories_list () {
-            Gtk.Widget? child = histories_list.get_first_child ();
-            while (child != null) {
-                Gtk.Widget? next = child.get_next_sibling ();
-                histories_list.remove (child);
-                child = next;
-            }
-            dataset_lists.clear ();
-        }
-
-        private Gtk.Widget create_history_row (GalaxyHistory history) {
-            var row_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
-                margin_top = 4,
-                margin_bottom = 4,
-                margin_start = 6,
-                margin_end = 6,
-                css_classes = { "card" }
-            };
-
-            // History Header Row
-            var header_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
-                margin_top = 8,
-                margin_bottom = 8,
-                margin_start = 8,
-                margin_end = 8
-            };
-
-            var exp_icon = new Gtk.Image.from_icon_name ("pan-end-symbolic");
-
-            var title_lbl = new Gtk.Label (history.name) {
-                halign = Gtk.Align.START,
-                hexpand = true,
-                ellipsize = Pango.EllipsizeMode.END,
-                css_classes = { "heading" }
-            };
-
-            var btn_fetch = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
-                tooltip_text = "Reload Datasets",
-                css_classes = { "flat" }
-            };
-
-            header_box.append (exp_icon);
-            header_box.append (title_lbl);
-            header_box.append (btn_fetch);
-            row_box.append (header_box);
-
-            // Container for Datasets
-            var datasets_container = new Gtk.Box (Gtk.Orientation.VERTICAL, 2) {
-                margin_start = 16,
-                margin_end = 8,
-                margin_bottom = 6,
-                visible = false
-            };
-
-            var datasets_list = new Gtk.ListBox () {
-                selection_mode = Gtk.SelectionMode.NONE,
-                css_classes = { "boxed-list" }
-            };
-            dataset_lists.set (history.id, datasets_list);
-            datasets_container.append (datasets_list);
-
-            row_box.append (datasets_container);
-
-            // Toggle Expand Gesture
-            var click_gesture = new Gtk.GestureClick ();
-            click_gesture.pressed.connect ((n_press, x, y) => {
-                bool is_expanded = datasets_container.visible;
-                datasets_container.visible = !is_expanded;
-                exp_icon.icon_name = !is_expanded ? "pan-down-symbolic" : "pan-end-symbolic";
-
-                if (!is_expanded && !history.is_loaded) {
-                    load_history_datasets (history, datasets_container, datasets_list);
-                }
-            });
-            header_box.add_controller (click_gesture);
-
-            btn_fetch.clicked.connect (() => {
-                datasets_container.visible = true;
-                exp_icon.icon_name = "pan-down-symbolic";
-                load_history_datasets (history, datasets_container, datasets_list);
-            });
-
-            return row_box;
-        }
-
-        private void load_history_datasets (
-            GalaxyHistory history,
-            Gtk.Box container,
-            Gtk.ListBox list_widget
-        ) {
-            clear_list_box (list_widget);
-
-            var spin = new Gtk.Spinner () {
-                spinning = true,
-                margin_top = 8,
-                margin_bottom = 8,
-                halign = Gtk.Align.CENTER
-            };
-            list_widget.append (spin);
-
-            client.fetch_datasets_async.begin (history.id, (obj, res) => {
-                clear_list_box (list_widget);
-                try {
-                    var datasets = client.fetch_datasets_async.end (res);
-                    history.datasets.clear ();
-                    foreach (var ds in datasets) {
-                        history.datasets.add (ds);
-                        var ds_row = create_dataset_row (history, ds);
-                        list_widget.append (ds_row);
-                    }
-                    history.is_loaded = true;
-
-                    if (datasets.size == 0) {
-                        var empty_lbl = new Gtk.Label ("History is empty.") {
-                            css_classes = { "dim-label" },
-                            margin_top = 6,
-                            margin_bottom = 6
-                        };
-                        list_widget.append (empty_lbl);
-                    }
-                } catch (GLib.Error e) {
-                    var err_lbl = new Gtk.Label (@"Failed to load datasets: $(e.message)") {
-                        css_classes = { "error" },
-                        margin_top = 6,
-                        margin_bottom = 6
-                    };
-                    list_widget.append (err_lbl);
-                }
-            });
-        }
-
-        private Gtk.Widget create_dataset_row (GalaxyHistory history, GalaxyDataset dataset) {
-            var row_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
-                margin_top = 4,
-                margin_bottom = 4,
-                margin_start = 6,
-                margin_end = 6
-            };
-
-            // State Indicator Icon
-            var state_icon = new Gtk.Image.from_icon_name (dataset.state.get_symbolic_icon ()) {
-                tooltip_text = @"State: $(dataset.state.to_id_string ())"
-            };
-            state_icon.add_css_class (dataset.state.get_badge_css_class ());
-
-            // Name and Meta Column
-            var text_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 2) {
-                hexpand = true
-            };
-
-            var name_lbl = new Gtk.Label (dataset.name) {
-                halign = Gtk.Align.START,
-                ellipsize = Pango.EllipsizeMode.END,
-                css_classes = { "caption" }
-            };
-
-            string meta_info = dataset.extension.up ();
-            if (dataset.file_size > 0) {
-                meta_info += @" · $(dataset.get_formatted_size ())";
-            }
-            var meta_lbl = new Gtk.Label (meta_info) {
-                halign = Gtk.Align.START,
-                css_classes = { "caption", "dim-label" }
-            };
-
-            text_box.append (name_lbl);
-            text_box.append (meta_lbl);
-
-            // Action Buttons
-            var btn_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
-
-            var btn_r = new Gtk.Button.with_label ("R") {
-                tooltip_text = "Insert Reproducible R Fetch Chunk into active document",
-                css_classes = { "flat", "caption" }
-            };
-            btn_r.clicked.connect (() => {
-                string chunk = dataset.generate_r_quarto_chunk (client.server_url);
-                insert_chunk_requested (chunk);
-            });
-
-            var btn_py = new Gtk.Button.with_label ("Py") {
-                tooltip_text = "Insert Reproducible Python Fetch Chunk into active document",
-                css_classes = { "flat", "caption" }
-            };
-            btn_py.clicked.connect (() => {
-                string chunk = dataset.generate_python_quarto_chunk (client.server_url);
-                insert_chunk_requested (chunk);
-            });
-
-            var btn_more = new Gtk.MenuButton () {
-                icon_name = "view-more-horizontal-symbolic",
-                tooltip_text = "More Actions",
-                css_classes = { "flat" }
-            };
-
-            // Setup Contextual Popover
-            var popover = new Gtk.Popover ();
-            var menu_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
-                margin_top = 6,
-                margin_bottom = 6,
-                margin_start = 6,
-                margin_end = 6
-            };
-
-            var btn_copy_url = new Gtk.Button.with_label ("Copy Download URL") {
-                css_classes = { "flat" }
-            };
-            btn_copy_url.clicked.connect (() => {
-                string url = dataset.download_url.length > 0 ? dataset.download_url : @"$(client.server_url)/api/datasets/$(dataset.id)/display";
-                var clipboard = this.get_clipboard ();
-                clipboard.set_text (url);
-                popover.popdown ();
-            });
-
-            var btn_copy_id = new Gtk.Button.with_label ("Copy Dataset ID") {
-                css_classes = { "flat" }
-            };
-            btn_copy_id.clicked.connect (() => {
-                var clipboard = this.get_clipboard ();
-                clipboard.set_text (dataset.id);
-                popover.popdown ();
-            });
-
-            menu_box.append (btn_copy_url);
-            menu_box.append (btn_copy_id);
-            popover.set_child (menu_box);
-            btn_more.popover = popover;
-
-            btn_box.append (btn_r);
-            btn_box.append (btn_py);
-            btn_box.append (btn_more);
-
-            row_box.append (state_icon);
-            row_box.append (text_box);
-            row_box.append (btn_box);
-
-            return row_box;
-        }
-
-        private void clear_list_box (Gtk.ListBox box) {
-            Gtk.Widget? child = box.get_first_child ();
-            while (child != null) {
-                Gtk.Widget? next = child.get_next_sibling ();
-                box.remove (child);
-                child = next;
-            }
-        }
-
-        private void on_search_changed () {
             string query = search_entry.text.strip ().down ();
             if (query.length == 0) {
-                populate_histories_list ();
+                return true;
+            }
+
+            return (ds.name.down ().contains (query) || ds.extension.down ().contains (query));
+        }
+
+        /**
+         * Handles user changes in the search entry box.
+         */
+        private void on_search_query_changed () {
+            dataset_filter.changed (Gtk.FilterChange.DIFFERENT);
+        }
+
+        /**
+         * Setups individual list row item containers.
+         */
+        private void on_factory_setup (GLib.Object item) {
+            var list_item = (Gtk.ListItem) item;
+
+            var row_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
+                margin_start = 8,
+                margin_end = 8,
+                margin_top = 6,
+                margin_bottom = 6
+            };
+            row_box.add_css_class ("galaxy-dataset-row");
+
+            // State Pill Badge
+            var state_badge = new Gtk.Label ("●") {
+                valign = Gtk.Align.CENTER
+            };
+            state_badge.add_css_class ("caption");
+            row_box.append (state_badge);
+
+            // Title and Details Container
+            var info_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 2) {
+                hexpand = true,
+                valign = Gtk.Align.CENTER
+            };
+
+            var title_label = new Gtk.Label ("") {
+                xalign = 0,
+                ellipsize = Pango.EllipsizeMode.END,
+                use_markup = true
+            };
+            title_label.add_css_class ("bold");
+
+            var meta_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
+
+            var ext_label = new Gtk.Label ("") {
+                xalign = 0
+            };
+            ext_label.add_css_class ("caption");
+            ext_label.add_css_class ("monospace");
+
+            var size_label = new Gtk.Label ("") {
+                xalign = 0
+            };
+            size_label.add_css_class ("caption");
+            size_label.add_css_class ("dim-label");
+
+            meta_box.append (ext_label);
+            meta_box.append (size_label);
+
+            info_box.append (title_label);
+            info_box.append (meta_box);
+            row_box.append (info_box);
+
+            // Action Buttons for Chunk Injection
+            var action_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+                valign = Gtk.Align.CENTER
+            };
+
+            var btn_r = new Gtk.Button.with_label ("+ R") {
+                tooltip_text = "Inject reproducible R Quarto chunk into manuscript",
+                css_classes = { "suggested-action", "flat", "small-button" }
+            };
+
+            var btn_py = new Gtk.Button.with_label ("+ Py") {
+                tooltip_text = "Inject reproducible Python Quarto chunk into manuscript",
+                css_classes = { "accent", "flat", "small-button" }
+            };
+
+            action_box.append (btn_r);
+            action_box.append (btn_py);
+            row_box.append (action_box);
+
+            list_item.set_child (row_box);
+        }
+
+        /**
+         * Binds domain dataset properties to UI row widgets and attaches action handlers.
+         */
+        private void on_factory_bind (GLib.Object item) {
+            var list_item = (Gtk.ListItem) item;
+            var row_box = (Gtk.Box) list_item.get_child ();
+            var ds = (GalaxyDataset) list_item.get_item ();
+
+            if (row_box == null || ds == null) {
                 return;
             }
 
-            clear_histories_list ();
-            foreach (var history in loaded_histories) {
-                bool history_matches = query in history.name.down ();
-                bool has_matching_dataset = false;
+            // Retrieve child widgets
+            var state_badge = (Gtk.Label) row_box.get_first_child ();
+            var info_box = (Gtk.Box) state_badge.get_next_sibling ();
+            var action_box = (Gtk.Box) info_box.get_next_sibling ();
 
-                foreach (var ds in history.datasets) {
-                    if (query in ds.name.down () || query in ds.extension.down ()) {
-                        has_matching_dataset = true;
-                        break;
-                    }
-                }
+            var title_label = (Gtk.Label) info_box.get_first_child ();
+            var meta_box = (Gtk.Box) title_label.get_next_sibling ();
+            var ext_label = (Gtk.Label) meta_box.get_first_child ();
+            var size_label = (Gtk.Label) ext_label.get_next_sibling ();
 
-                if (history_matches || has_matching_dataset) {
-                    var row = create_history_row (history);
-                    histories_list.append (row);
-                }
+            var btn_r = (Gtk.Button) action_box.get_first_child ();
+            var btn_py = (Gtk.Button) btn_r.get_next_sibling ();
+
+            // Set state indicator badge color and symbol
+            var state_enum = ds.get_state_enum ();
+            state_badge.set_text ("●");
+            state_badge.tooltip_text = @"State: $(ds.state)";
+            if (state_enum == GalaxyDatasetState.OK) {
+                state_badge.css_classes = { "caption", "success" };
+            } else if (state_enum == GalaxyDatasetState.RUNNING || state_enum == GalaxyDatasetState.QUEUED) {
+                state_badge.css_classes = { "caption", "warning" };
+            } else if (state_enum == GalaxyDatasetState.ERROR) {
+                state_badge.css_classes = { "caption", "error" };
+            } else {
+                state_badge.css_classes = { "caption", "dim-label" };
+            }
+
+            // Set labels
+            title_label.set_markup (@"<b>#$(ds.hid):</b> $(GLib.Markup.escape_text (ds.name))");
+            ext_label.set_text (@"[$(ds.extension.up ())]");
+            size_label.set_text (ds.get_formatted_size ());
+
+            // Connect button signals
+            ulong r_id = btn_r.clicked.connect (() => {
+                string chunk = GalaxyChunkGenerator.generate_chunk (
+                    ds,
+                    client.server_url,
+                    active_history_name,
+                    TargetLanguage.R_QUARTO
+                );
+                inject_code_chunk_requested (chunk);
+                insert_chunk_requested (chunk);
+                toast_notification_requested (@"Injected R chunk for dataset #$(ds.hid)");
+            });
+
+            ulong py_id = btn_py.clicked.connect (() => {
+                string chunk = GalaxyChunkGenerator.generate_chunk (
+                    ds,
+                    client.server_url,
+                    active_history_name,
+                    TargetLanguage.PYTHON_QUARTO
+                );
+                inject_code_chunk_requested (chunk);
+                insert_chunk_requested (chunk);
+                toast_notification_requested (@"Injected Python chunk for dataset #$(ds.hid)");
+            });
+
+            // Store signal connection IDs on the list item for clean detachment
+            list_item.set_data<ulong> ("r_signal", r_id);
+            list_item.set_data<ulong> ("py_signal", py_id);
+            list_item.set_data<Gtk.Button> ("r_btn", btn_r);
+            list_item.set_data<Gtk.Button> ("py_btn", btn_py);
+        }
+
+        /**
+         * Disconnects signal handlers to prevent memory leaks during list item recycling.
+         */
+        private void on_factory_unbind (GLib.Object item) {
+            var list_item = (Gtk.ListItem) item;
+            var btn_r = list_item.get_data<Gtk.Button> ("r_btn");
+            var btn_py = list_item.get_data<Gtk.Button> ("py_btn");
+            ulong r_id = list_item.get_data<ulong> ("r_signal");
+            ulong py_id = list_item.get_data<ulong> ("py_signal");
+
+            if (btn_r != null && r_id > 0) {
+                btn_r.disconnect (r_id);
+            }
+            if (btn_py != null && py_id > 0) {
+                btn_py.disconnect (py_id);
+            }
+
+            list_item.set_data<ulong> ("r_signal", 0);
+            list_item.set_data<ulong> ("py_signal", 0);
+            list_item.set_data ("r_btn", null);
+            list_item.set_data ("py_btn", null);
+        }
+
+        /**
+         * Updates status bar icon and textual description.
+         */
+        private void update_status_display (bool online, string message) {
+            status_label.label = message;
+            if (online) {
+                status_icon.icon_name = "network-wireless-signal-excellent-symbolic";
+                status_label.remove_css_class ("dim-label");
+                status_label.remove_css_class ("error");
+                status_label.add_css_class ("success");
+            } else {
+                status_icon.icon_name = "network-offline-symbolic";
+                status_label.remove_css_class ("success");
+                status_label.add_css_class ("dim-label");
             }
         }
 
+        /**
+         * Extracts clean host name from server URL for compact UI display.
+         */
+        private string extract_host (string url) {
+            string host = url.replace ("https://", "").replace ("http://", "");
+            int slash_idx = host.index_of_char ('/');
+            if (slash_idx > 0) {
+                host = host.substring (0, slash_idx);
+            }
+            return host.length > 0 ? host : "Galaxy";
+        }
+
+        /**
+         * Initiates asynchronous verification of Galaxy credentials and downloads histories.
+         */
+        public void probe_connection_and_refresh () {
+            string host = extract_host (client.server_url);
+            update_status_display (false, @"Connecting to $(host)...");
+
+            client.verify_connection_async.begin (null, (obj, res) => {
+                try {
+                    string identity = client.verify_connection_async.end (res);
+                    update_status_display (true, @"$(host) • $(identity)");
+                    refresh_histories ();
+                } catch (GLib.Error e) {
+                    update_status_display (false, @"$(host) • Disconnected");
+                }
+            });
+        }
+
+        /**
+         * Refreshes remote Galaxy histories asynchronously.
+         */
+        public void refresh_histories () {
+            show_loading (true);
+
+            client.fetch_histories_async.begin (null, (obj, res) => {
+                show_loading (false);
+
+                try {
+                    var histories = client.fetch_histories_async.end (res);
+                    history_store.remove_all ();
+
+                    for (int i = 0; i < histories.length; i++) {
+                        history_store.append (histories[i]);
+                    }
+
+                    if (histories.length > 0) {
+                        history_dropdown.selected = 0;
+                        var first_hist = histories[0];
+                        load_history_datasets (first_hist.id, first_hist.name);
+                    } else {
+                        dataset_store.remove_all ();
+                        content_stack.set_visible_child_name ("empty");
+                    }
+                } catch (GLib.Error e) {
+                    update_status_display (false, @"Refresh error: $(e.message)");
+                    content_stack.set_visible_child_name ("empty");
+                }
+            });
+        }
+
+        /**
+         * Triggered when the user changes the active history in the dropdown.
+         */
+        private void on_history_selection_changed () {
+            var selected_obj = history_dropdown.selected_item as GalaxyHistory;
+            if (selected_obj != null) {
+                load_history_datasets (selected_obj.id, selected_obj.name);
+            }
+        }
+
+        /**
+         * Downloads datasets for the selected history.
+         */
+        private void load_history_datasets (string history_id, string history_name) {
+            this.active_history_id = history_id;
+            this.active_history_name = history_name;
+
+            show_loading (true);
+
+            client.fetch_history_datasets_async.begin (history_id, null, (obj, res) => {
+                show_loading (false);
+
+                try {
+                    var datasets = client.fetch_history_datasets_async.end (res);
+                    dataset_store.remove_all ();
+
+                    for (int i = 0; i < datasets.length; i++) {
+                        dataset_store.append (datasets[i]);
+                    }
+
+                    if (datasets.length > 0) {
+                        content_stack.set_visible_child_name ("datasets");
+                    } else {
+                        empty_status_page.title = "No Datasets in History";
+                        empty_status_page.description = @"History '$(history_name)' contains no files.";
+                        content_stack.set_visible_child_name ("empty");
+                    }
+                } catch (GLib.Error e) {
+                    empty_status_page.title = "Fetch Failed";
+                    empty_status_page.description = e.message;
+                    content_stack.set_visible_child_name ("empty");
+                }
+            });
+        }
+
+        /**
+         * Toggles spinner visibility in the content stack.
+         */
+        private void show_loading (bool loading) {
+            if (loading) {
+                loading_spinner.spinning = true;
+                content_stack.set_visible_child_name ("loading");
+            } else {
+                loading_spinner.spinning = false;
+            }
+        }
+
+        /**
+         * Toolbar refresh button click handler.
+         */
+        private void on_refresh_clicked () {
+            probe_connection_and_refresh ();
+        }
+
+        /**
+         * Opens the Galaxy authentication configuration modal dialog.
+         */
         private void open_auth_dialog () {
             var dialog = new GalaxyAuthDialog ();
             dialog.credentials_saved.connect (() => {

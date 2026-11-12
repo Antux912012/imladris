@@ -168,6 +168,20 @@ namespace Imladris.UI {
             });
             notebook_cell_toolbar.append (run_cell_btn);
 
+            var run_advance_btn = new Gtk.Button () {
+                tooltip_text = "Execute active cell and advance to next (Shift+Enter)"
+            };
+            run_advance_btn.add_css_class ("flat");
+            run_advance_btn.add_css_class ("ribbon-compact-btn");
+            var radv_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
+            radv_box.append (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            radv_box.append (new Gtk.Label ("Run & Advance"));
+            run_advance_btn.set_child (radv_box);
+            run_advance_btn.clicked.connect (() => {
+                execute_active_cell_and_advance ();
+            });
+            notebook_cell_toolbar.append (run_advance_btn);
+
             var run_all_btn = new Gtk.Button () {
                 tooltip_text = "Execute all code cells sequentially"
             };
@@ -181,6 +195,34 @@ namespace Imladris.UI {
                 execute_all_cells ();
             });
             notebook_cell_toolbar.append (run_all_btn);
+
+            var clear_out_btn = new Gtk.Button () {
+                tooltip_text = "Clear all console and cell outputs"
+            };
+            clear_out_btn.add_css_class ("flat");
+            clear_out_btn.add_css_class ("ribbon-compact-btn");
+            var clr_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
+            clr_box.append (new Gtk.Image.from_icon_name ("edit-clear-symbolic"));
+            clr_box.append (new Gtk.Label ("Clear Outputs"));
+            clear_out_btn.set_child (clr_box);
+            clear_out_btn.clicked.connect (() => {
+                clear_all_outputs ();
+            });
+            notebook_cell_toolbar.append (clear_out_btn);
+
+            var restart_k_btn = new Gtk.Button () {
+                tooltip_text = "Restart execution kernel and reset state"
+            };
+            restart_k_btn.add_css_class ("flat");
+            restart_k_btn.add_css_class ("ribbon-compact-btn");
+            var rst_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
+            rst_box.append (new Gtk.Image.from_icon_name ("view-refresh-symbolic"));
+            rst_box.append (new Gtk.Label ("Restart Kernel"));
+            restart_k_btn.set_child (rst_box);
+            restart_k_btn.clicked.connect (() => {
+                restart_kernel ();
+            });
+            notebook_cell_toolbar.append (restart_k_btn);
 
             var add_py_btn = new Gtk.Button.with_label ("+ Python Cell");
             add_py_btn.add_css_class ("flat");
@@ -197,6 +239,26 @@ namespace Imladris.UI {
                 doc_page.insert_code_chunk ("r", "echo: true");
             });
             notebook_cell_toolbar.append (add_r_btn);
+
+            var add_md_btn = new Gtk.Button.with_label ("+ Markdown Cell");
+            add_md_btn.add_css_class ("flat");
+            add_md_btn.add_css_class ("ribbon-compact-btn");
+            add_md_btn.clicked.connect (() => {
+                doc_page.insert_markdown_cell ();
+            });
+            notebook_cell_toolbar.append (add_md_btn);
+
+            var add_math_chem_btn = new Gtk.Button.with_label ("+ Math / Chem") {
+                tooltip_text = "Open Math & Chemical Reaction Studio (Ctrl+M)"
+            };
+            add_math_chem_btn.add_css_class ("flat");
+            add_math_chem_btn.add_css_class ("ribbon-compact-btn");
+            add_math_chem_btn.clicked.connect (() => {
+                if (main_window != null) {
+                    main_window.show_math_chem_editor_dialog ();
+                }
+            });
+            notebook_cell_toolbar.append (add_math_chem_btn);
 
             source_editor_panel.append (notebook_cell_toolbar);
             source_editor_panel.append (doc_page.editor_scroller);
@@ -1129,13 +1191,25 @@ namespace Imladris.UI {
                 }
             });
 
-            // 16. GALAXY PROJECT PANEL (Galaxy History & Dataset Bridge)
+            // 16. GALAXY PROJECT PANEL (Arekyer Galaxy-to-Quarto Provenance Bridge)
             galaxy_panel = new GalaxyPanel ();
-            galaxy_panel.insert_chunk_requested.connect ((chunk) => {
-                doc_page.source_buffer.begin_user_action ();
-                doc_page.source_buffer.insert_at_cursor (chunk, -1);
-                doc_page.source_buffer.end_user_action ();
+            galaxy_panel.inject_code_chunk_requested.connect ((chunk_text) => {
+                var buffer = doc_page.source_buffer as GtkSource.Buffer;
+                if (buffer == null) return;
+
+                var arekyer = Imladris.Bridges.Arekyer.ArekyerBridge.get_default ();
+                arekyer.inject_into_buffer (buffer, chunk_text);
+
+                doc_page.source_view.grab_focus ();
+                if (main_window != null) {
+                    main_window.show_toast ("Injected Galaxy provenance chunk into manuscript.");
+                }
                 refresh_environment_and_outline ();
+            });
+            galaxy_panel.toast_notification_requested.connect ((msg) => {
+                if (main_window != null) {
+                    main_window.show_toast (msg);
+                }
             });
             panels.set (PanelId.GALAXY, galaxy_panel);
 
@@ -1224,6 +1298,71 @@ namespace Imladris.UI {
             }
         }
 
+        /**
+         * Jupyter Parity: Executes active cell and advances cursor to next cell (Shift+Enter).
+         * If at the end of the document, appends a new code cell of the same language.
+         */
+        public void execute_active_cell_and_advance () {
+            string text = doc_page.source_buffer.text;
+            Gtk.TextIter cursor;
+            doc_page.source_buffer.get_iter_at_mark (out cursor, doc_page.source_buffer.get_insert ());
+            int cursor_line = cursor.get_line ();
+
+            var chunk = Core.ChunkParser.find_chunk_at_line (text, cursor_line);
+            if (chunk == null) {
+                execute_current_line_or_selection ();
+                return;
+            }
+
+            if (chunk.code.length > 0) {
+                run_code_snippet_in_console (chunk.language, chunk.code, chunk.end_line);
+            }
+
+            var all_chunks = Core.ChunkParser.parse_chunks (text);
+            Core.CodeChunk? next_chunk = null;
+            foreach (var ch in all_chunks) {
+                if (ch.start_line > chunk.end_line) {
+                    next_chunk = ch;
+                    break;
+                }
+            }
+
+            if (next_chunk != null) {
+                Gtk.TextIter next_iter;
+                doc_page.source_buffer.get_iter_at_line (out next_iter, next_chunk.start_line + 1);
+                doc_page.source_buffer.place_cursor (next_iter);
+                doc_page.source_view.scroll_to_iter (next_iter, 0.1, false, 0.0, 0.0);
+            } else {
+                Gtk.TextIter end_iter;
+                doc_page.source_buffer.get_end_iter (out end_iter);
+                doc_page.source_buffer.place_cursor (end_iter);
+                doc_page.insert_code_chunk (chunk.language);
+            }
+        }
+
+        /**
+         * Jupyter Parity: Restarts active REPL session kernel and resets state.
+         */
+        public void restart_kernel () {
+            Services.PersistentSessionManager.get_default ().restart_all_sessions ();
+            execution_counter = 0;
+            doc_page.append_console_log ("\n--- Kernel Restarted: Session State Cleared ---");
+            if (main_window != null) {
+                main_window.show_toast ("Kernel restarted");
+            }
+            refresh_environment_and_outline ();
+        }
+
+        /**
+         * Jupyter Parity: Clears console view logs and execution outputs.
+         */
+        public void clear_all_outputs () {
+            doc_page.console_view.buffer.set_text ("", -1);
+            if (main_window != null) {
+                main_window.show_toast ("Cleared all outputs");
+            }
+        }
+
         public void execute_cells_above () {
             string text = doc_page.source_buffer.text;
             Gtk.TextIter cursor;
@@ -1233,6 +1372,20 @@ namespace Imladris.UI {
             var chunks = Core.ChunkParser.parse_chunks (text);
             foreach (var ch in chunks) {
                 if (ch.end_line < cursor_line && ch.code.length > 0) {
+                    run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
+                }
+            }
+        }
+
+        public void execute_cells_below () {
+            string text = doc_page.source_buffer.text;
+            Gtk.TextIter cursor;
+            doc_page.source_buffer.get_iter_at_mark (out cursor, doc_page.source_buffer.get_insert ());
+            int cursor_line = cursor.get_line ();
+
+            var chunks = Core.ChunkParser.parse_chunks (text);
+            foreach (var ch in chunks) {
+                if (ch.end_line >= cursor_line && ch.code.length > 0) {
                     run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
                 }
             }
@@ -1915,7 +2068,16 @@ namespace Imladris.UI {
                     if (fname.length > 0) {
                         string target = GLib.Path.build_filename (current_browser_dir, fname);
                         try {
-                            GLib.FileUtils.set_contents (target, "");
+                            if (fname.has_suffix (".Rproj")) {
+                                string p_name = fname.substring (0, fname.length - 6);
+                                MallornManager.create_rproj_file (current_browser_dir, p_name);
+                            } else if (fname.has_suffix (".ipynb")) {
+                                string starter = Core.NotebookSerializer.get_default_ipynb_markdown_template ();
+                                string ipynb_json = Core.NotebookSerializer.markdown_to_ipynb (starter, "python");
+                                GLib.FileUtils.set_contents (target, ipynb_json);
+                            } else {
+                                GLib.FileUtils.set_contents (target, "");
+                            }
                             populate_files_browser ();
                             if (main_window != null) main_window.open_file_from_path.begin (target);
                         } catch (GLib.Error e) {}

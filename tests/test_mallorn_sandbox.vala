@@ -22,6 +22,9 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/core/runtime_resolution_tiers", test_runtime_resolution_tiers);
         GLib.Test.add_func ("/sessions/host_r_session", test_host_r_session);
         GLib.Test.add_func ("/media/image_and_video_processing", test_media_processing);
+        GLib.Test.add_func ("/mallorn/rproj_creation_and_scaffolding", test_rproj_creation);
+        GLib.Test.add_func ("/notebook/jupyter_nbformat_parity", test_notebook_serializer_parity);
+        GLib.Test.add_func ("/math_chem/natural_math_and_chemistry_engine", test_math_chem_engine);
 
         return GLib.Test.run ();
     }
@@ -584,5 +587,309 @@ print(np.mean([1, 2, 3]))
         DirUtils.remove (ext_dir);
         DirUtils.remove (ext_dir2);
         DirUtils.remove (tmp_dir);
+    }
+
+    /**
+     * Test RStudio project file creation and directory scaffolding.
+     *
+     * This test validates that MallornManager creates valid .Rproj files
+     * and directory structures for computational workflows.
+     */
+    private static void test_rproj_creation () {
+        string tmp_dir = Path.build_filename (Environment.get_tmp_dir (), @"test_rproj_$(GLib.Random.next_int ())");
+        try {
+            DirUtils.create_with_parents (tmp_dir, 0755);
+
+            // 1. Test direct .Rproj file creation with default configuration
+            var default_cfg = new ProjectConfig () {
+                project_name = "DirectProject",
+                author = "Lead Researcher",
+                format = DocumentFormat.RSCRIPT,
+                sandboxed = false
+            };
+
+            MallornManager.create_rproj_file (tmp_dir, "DirectProject", default_cfg);
+            string rproj_path = Path.build_filename (tmp_dir, "DirectProject.Rproj");
+            assert (FileUtils.test (rproj_path, FileTest.EXISTS));
+
+            string rproj_content;
+            FileUtils.get_contents (rproj_path, out rproj_content);
+            assert (rproj_content.contains ("Version: 1.0"));
+            assert (rproj_content.contains ("RestoreWorkspace: Default"));
+            assert (rproj_content.contains ("SaveWorkspace: Default"));
+            assert (rproj_content.contains ("AlwaysSaveHistory: Default"));
+            assert (rproj_content.contains ("EnableCodeIndexing: Yes"));
+            assert (rproj_content.contains ("Encoding: UTF-8"));
+            assert (rproj_content.contains ("RnwWeave: knitr"));
+            assert (rproj_content.contains ("LaTeX: pdfLaTeX"));
+            assert (rproj_content.contains ("AutoAppendNewline: Yes"));
+            assert (rproj_content.contains ("StripTrailingWhitespace: Yes"));
+            assert (rproj_content.contains ("ImladrisProjectName: DirectProject"));
+            assert (rproj_content.contains ("ImladrisAuthor: Lead Researcher"));
+
+            // 2. Test full RStudio project scaffolding (Standard mode)
+            string std_proj_name = "ClinicalTrial";
+            File std_rproj_file = MallornManager.create_rproj_project (tmp_dir, std_proj_name, DocumentFormat.RSCRIPT, false);
+            string std_dir = std_rproj_file.get_parent ().get_path ();
+
+            assert (FileUtils.test (std_dir, FileTest.IS_DIR));
+            assert (FileUtils.test (Path.build_filename (std_dir, @"$std_proj_name.Rproj"), FileTest.EXISTS));
+            assert (FileUtils.test (Path.build_filename (std_dir, ".Rprofile"), FileTest.EXISTS));
+            assert (FileUtils.test (Path.build_filename (std_dir, "data"), FileTest.IS_DIR));
+            assert (FileUtils.test (Path.build_filename (std_dir, "scripts"), FileTest.IS_DIR));
+            assert (FileUtils.test (Path.build_filename (std_dir, ".mallorn.json"), FileTest.EXISTS));
+            assert (FileUtils.test (Path.build_filename (std_dir, "imladris.toml"), FileTest.EXISTS));
+            assert (FileUtils.test (Path.build_filename (std_dir, "main.R"), FileTest.EXISTS));
+
+            string std_rprofile_content;
+            FileUtils.get_contents (Path.build_filename (std_dir, ".Rprofile"), out std_rprofile_content);
+            assert (std_rprofile_content.contains ("options(repos = c(CRAN = \"https://cloud.r-project.org/\"))"));
+
+            // 3. Test full RStudio project scaffolding (Sandboxed mode)
+            string proj_name = "GenomicsStudy";
+            File rproj_file = MallornManager.create_rproj_project (tmp_dir, proj_name, DocumentFormat.QMD, true);
+            string scaffolded_dir = rproj_file.get_parent ().get_path ();
+
+            assert (FileUtils.test (scaffolded_dir, FileTest.IS_DIR));
+            assert (FileUtils.test (Path.build_filename (scaffolded_dir, @"$proj_name.Rproj"), FileTest.EXISTS));
+            assert (FileUtils.test (Path.build_filename (scaffolded_dir, ".Rprofile"), FileTest.EXISTS));
+            assert (FileUtils.test (Path.build_filename (scaffolded_dir, "data"), FileTest.IS_DIR));
+            assert (FileUtils.test (Path.build_filename (scaffolded_dir, "scripts"), FileTest.IS_DIR));
+            assert (FileUtils.test (Path.build_filename (scaffolded_dir, ".mallorn.json"), FileTest.EXISTS));
+            assert (FileUtils.test (Path.build_filename (scaffolded_dir, "imladris.toml"), FileTest.EXISTS));
+            assert (FileUtils.test (Path.build_filename (scaffolded_dir, "analysis.qmd"), FileTest.EXISTS));
+            assert (Services.SandboxController.is_r_sandbox_active (scaffolded_dir));
+
+            // 4. Test project configuration reading from scaffolded DCF manifest
+            string manifest_file = Path.build_filename (scaffolded_dir, @"$proj_name.Rproj");
+            string manifest_text;
+            FileUtils.get_contents (manifest_file, out manifest_text);
+            var loaded_cfg = MallornManager.parse_manifest (manifest_text);
+            assert (loaded_cfg != null);
+            assert (loaded_cfg.project_name == proj_name);
+            assert (loaded_cfg.sandboxed == true);
+            assert (loaded_cfg.format == DocumentFormat.QMD);
+
+        } catch (GLib.Error e) {
+            GLib.error ("Rproj creation test failed: %s", e.message);
+        }
+    }
+
+    /**
+     * Test Jupyter Notebook nbformat 4.5 serialization and deserialization parity.
+     *
+     * This test validates cell ID preservation, tags, execution counts,
+     * kernel specifications, and round-trip conversion without data loss.
+     */
+    private static void test_notebook_serializer_parity () {
+        try {
+            // 1. Verify default starter templates
+            string py_template = Core.NotebookSerializer.get_default_ipynb_markdown_template ("python");
+            assert (py_template.contains ("title:"));
+            assert (py_template.contains ("kernelspec:"));
+            assert (py_template.contains ("Python 3"));
+            assert (py_template.contains ("name: python3"));
+            assert (py_template.contains ("```{python}"));
+
+            string r_template = Core.NotebookSerializer.get_default_ipynb_markdown_template ("r");
+            assert (r_template.contains ("title:"));
+            assert (r_template.contains ("name: ir"));
+            assert (r_template.contains ("```{r}"));
+
+            // 2. Test Markdown to IPYNB JSON serialization
+            string input_markdown =
+                "---\n" +
+                "title: \"Gene Expression Analysis\"\n" +
+                "jupyter:\n" +
+                "  kernelspec:\n" +
+                "    display_name: \"Python 3 (ipykernel)\"\n" +
+                "    language: python\n" +
+                "    name: python3\n" +
+                "---\n" +
+                "\n" +
+                "# Section 1: Overview\n" +
+                "\n" +
+                "This cell contains markdown documentation text.\n" +
+                "\n" +
+                "```{python}\n" +
+                "#| cell_id: cell_0001\n" +
+                "#| execution_count: 42\n" +
+                "#| tags: [parameters, export]\n" +
+                "import numpy as np\n" +
+                "x = np.linspace(0, 10, 100)\n" +
+                "```\n" +
+                "\n" +
+                "```{r}\n" +
+                "#| cell_id: cell_0002\n" +
+                "#| execution_count: 7\n" +
+                "library(ggplot2)\n" +
+                "```\n";
+
+            string generated_ipynb = Core.NotebookSerializer.markdown_to_ipynb (input_markdown);
+            assert (generated_ipynb.contains ("\"nbformat\""));
+            assert (generated_ipynb.contains ("\"nbformat_minor\""));
+            assert (generated_ipynb.contains ("\"cell_0001\""));
+            assert (generated_ipynb.contains ("\"parameters\""));
+            assert (generated_ipynb.contains ("\"export\""));
+            assert (generated_ipynb.contains ("\"cell_0002\""));
+
+            // Parse generated JSON with Json.Parser to inspect DOM structure
+            var parser = new Json.Parser ();
+            parser.load_from_data (generated_ipynb);
+            var root = parser.get_root ().get_object ();
+
+            assert (root.has_member ("cells"));
+            assert (root.has_member ("metadata"));
+            assert (root.get_int_member ("nbformat") == 4);
+            assert (root.get_int_member ("nbformat_minor") == 5);
+
+            var cells = root.get_array_member ("cells");
+            assert (cells.get_length () == 3);
+
+            // Cell 0: Markdown
+            var cell0 = cells.get_object_element (0);
+            assert (cell0.get_string_member ("cell_type") == "markdown");
+            assert (cell0.has_member ("id"));
+            assert (cell0.get_string_member ("id").length >= 8);
+
+            // Cell 1: Python Code
+            var cell1 = cells.get_object_element (1);
+            assert (cell1.get_string_member ("cell_type") == "code");
+            assert (cell1.get_string_member ("id") == "cell_0001");
+            assert (cell1.get_int_member ("execution_count") == 42);
+
+            var cell1_meta = cell1.get_object_member ("metadata");
+            assert (cell1_meta.has_member ("tags"));
+            var tags = cell1_meta.get_array_member ("tags");
+            assert (tags.get_length () == 2);
+            assert (tags.get_string_element (0) == "parameters");
+            assert (tags.get_string_element (1) == "export");
+
+            // Cell 2: R Code
+            var cell2 = cells.get_object_element (2);
+            assert (cell2.get_string_member ("cell_type") == "code");
+            assert (cell2.get_string_member ("id") == "cell_0002");
+            assert (cell2.get_int_member ("execution_count") == 7);
+
+            // 3. Test round-trip: IPYNB JSON to Markdown deserialization
+            string converted_md = Core.NotebookSerializer.ipynb_to_markdown (generated_ipynb);
+            assert (converted_md.contains ("# Section 1: Overview"));
+            assert (converted_md.contains ("```{python}"));
+            assert (converted_md.contains ("#| cell_id: cell_0001"));
+            assert (converted_md.contains ("#| execution_count: 42"));
+            assert (converted_md.contains ("#| tags: [\"parameters\", \"export\"]"));
+            assert (converted_md.contains ("x = np.linspace(0, 10, 100)"));
+            assert (converted_md.contains ("```{r}"));
+            assert (converted_md.contains ("#| cell_id: cell_0002"));
+            assert (converted_md.contains ("#| execution_count: 7"));
+
+            // 4. Test secondary round-trip (idempotency check)
+            string round_trip_ipynb = Core.NotebookSerializer.markdown_to_ipynb (converted_md);
+            var parser2 = new Json.Parser ();
+            parser2.load_from_data (round_trip_ipynb);
+            var root2 = parser2.get_root ().get_object ();
+            var cells2 = root2.get_array_member ("cells");
+            assert (cells2.get_length () == 3);
+
+            var round_cell1 = cells2.get_object_element (1);
+            assert (round_cell1.get_string_member ("id") == "cell_0001");
+            assert (round_cell1.get_int_member ("execution_count") == 42);
+
+        } catch (GLib.Error e) {
+            GLib.error ("Notebook serializer parity test failed: %s", e.message);
+        }
+    }
+
+    /**
+     * Test the Natural Math & Chemical Reaction Engine and live document preview adapter.
+     *
+     * Verifies mode auto-detection, natural math to LaTeX/Markdown conversion,
+     * natural chemical reaction to LaTeX/mhchem/Markdown/Unicode conversion,
+     * offline HTML rendering, and DocumentAdapter rendering of math and chemistry.
+     */
+    private static void test_math_chem_engine () {
+        // 1. Mode Auto-Detection
+        assert (Core.MathChemEngine.detect_mode ("6CO2(g) + 6H2O(l) ->[h*nu] C6H12O6(aq) + 6O2(g)") == Core.FormulaMode.CHEMISTRY);
+        assert (Core.MathChemEngine.detect_mode ("CH3COOH + H2O <=> CH3COO^- + H3O^+") == Core.FormulaMode.CHEMISTRY);
+        assert (Core.MathChemEngine.detect_mode ("H2SO4") == Core.FormulaMode.CHEMISTRY);
+        assert (Core.MathChemEngine.detect_mode ("(-b +- sqrt(b^2 - 4*a*c)) / (2*a)") == Core.FormulaMode.MATH);
+        assert (Core.MathChemEngine.detect_mode ("int(0, inf) e^(-x^2) dx = sqrt(pi)/2") == Core.FormulaMode.MATH);
+
+        // 2. Natural Math to LaTeX Display & Inline
+        string quad_latex = Core.MathChemEngine.natural_math_to_latex ("(-b +- sqrt(b^2 - 4*a*c)) / (2*a)");
+        assert (quad_latex.contains ("\\frac{"));
+        assert (quad_latex.contains ("\\pm"));
+        assert (quad_latex.contains ("\\sqrt{"));
+
+        string int_latex = Core.MathChemEngine.natural_math_to_latex ("int(0, inf) e^(-x^2) dx = sqrt(pi)/2");
+        assert (int_latex.contains ("\\int_{0}^{\\infty}"));
+        assert (int_latex.contains ("\\pi"));
+
+        string sum_latex = Core.MathChemEngine.natural_math_to_latex ("sum(i=1, n) x_i");
+        assert (sum_latex.contains ("\\sum_{i=1}^{n}"));
+
+        string mat_latex = Core.MathChemEngine.natural_math_to_latex ("matrix([a, b], [c, d])");
+        assert (mat_latex.contains ("\\begin{pmatrix}"));
+        assert (mat_latex.contains ("a & b \\\\ c & d"));
+        assert (mat_latex.contains ("\\end{pmatrix}"));
+
+        string display_block = Core.MathChemEngine.convert (
+            "frac(a, b)",
+            Core.FormulaMode.MATH,
+            Core.FormulaOutputFormat.LATEX_DISPLAY
+        );
+        assert (display_block.has_prefix ("$$\n"));
+        assert (display_block.contains ("\\frac{a}{b}"));
+        assert (display_block.has_suffix ("\n$$"));
+
+        // 3. Natural Chemistry to LaTeX, mhchem (\ce{...}), Markdown Sub/Sup, and Unicode
+        string photo_input = "6CO2(g) + 6H2O(l) ->[h*nu][chlorophyll] C6H12O6(aq) + 6O2(g)";
+        string photo_latex = Core.MathChemEngine.natural_chem_to_latex (photo_input);
+        assert (photo_latex.contains ("\\text{CO}_{2}_{\\text{(g)}}"));
+        assert (photo_latex.contains ("\\xrightarrow[\\text{chlorophyll}]{h\\nu}"));
+        assert (photo_latex.contains ("\\text{C}_{6}\\text{H}_{12}\\text{O}_{6}_{\\text{(aq)}}"));
+
+        string mhchem_out = Core.MathChemEngine.convert (
+            "CH3COOH(aq) + H2O(l) <=> CH3COO^-(aq) + H3O^+(aq)",
+            Core.FormulaMode.CHEMISTRY,
+            Core.FormulaOutputFormat.LATEX_MHCHEM
+        );
+        assert (mhchem_out.has_prefix ("$$\\ce{"));
+        assert (mhchem_out.has_suffix ("}$$"));
+
+        string md_sub_sup = Core.MathChemEngine.convert (
+            "2H2(g) + O2(g) -> 2H2O(l)",
+            Core.FormulaMode.CHEMISTRY,
+            Core.FormulaOutputFormat.MARKDOWN_SUBSUP
+        );
+        assert (md_sub_sup.contains ("2H~2~(g)"));
+        assert (md_sub_sup.contains ("2H~2~O(l)"));
+        assert (md_sub_sup.contains ("→"));
+
+        string md_unicode = Core.MathChemEngine.convert (
+            "SO4^2- + 2H^+ -> H2SO4",
+            Core.FormulaMode.CHEMISTRY,
+            Core.FormulaOutputFormat.MARKDOWN_UNICODE
+        );
+        assert (md_unicode.contains ("SO₄²⁻"));
+        assert (md_unicode.contains ("H₂SO₄"));
+
+        // 4. Offline HTML Rendering & DocumentAdapter integration
+        string html_preview = Core.MathChemEngine.render_latex_to_html (photo_latex, true);
+        assert (html_preview.contains ("math-display-card"));
+        assert (html_preview.contains ("chem-arrow-stack"));
+
+        string doc_md = "# Reaction Notes\n\n$$\n\\frac{a}{b}\n$$\n\nInline water H~2~O and ion SO~4~^2-^ plus $\\alpha + \\beta$.\n\n| Reagent | Molarity |\n|---|---|\n| NaCl | 1.0 M |\n";
+        string doc_html = Adapters.DocumentAdapter.render_html (doc_md, DocumentFormat.QMD);
+        assert (doc_html.contains ("math-display-card"));
+        assert (doc_html.contains ("math-frac"));
+        assert (doc_html.contains ("<sub>2</sub>"));
+        assert (doc_html.contains ("<sup>2-</sup>"));
+        assert (doc_html.contains ("<table"));
+        assert (doc_html.contains ("NaCl"));
+
+        // 5. Verify preset library completeness
+        var presets = Core.MathChemEngine.get_presets ();
+        assert (presets.size >= 12);
     }
 }

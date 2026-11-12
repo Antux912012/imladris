@@ -6,6 +6,8 @@ namespace Imladris.Adapters {
     public class DocumentAdapter : GLib.Object {
 
         private static GLib.Regex? chunk_regex = null;
+        private static GLib.Regex? display_math_regex = null;
+        private static GLib.Regex? equation_env_regex = null;
 
         public static Imladris.DocumentFormat detect_format (string? filename) {
             if (filename == null || filename == "") return Imladris.DocumentFormat.MD;
@@ -48,10 +50,37 @@ namespace Imladris.Adapters {
 
             // Convert Code chunk annotations ```{r} or ```{python} to styled blocks
             string processed_body = transform_code_chunks (body);
+            processed_body = transform_display_math (processed_body);
             processed_body = transform_media_tags (processed_body);
             builder.append (basic_markdown_to_html (processed_body));
 
             return builder.str;
+        }
+
+        private static string transform_display_math (string text) {
+            string result = text;
+            try {
+                if (display_math_regex == null) {
+                    display_math_regex = new GLib.Regex ("\\$\\$([\\s\\S]*?)\\$\\$");
+                }
+                result = display_math_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
+                    string expr = match_info.fetch (1).strip ();
+                    res.append (Core.MathChemEngine.render_latex_to_html (expr, true));
+                    res.append ("\n");
+                    return false;
+                });
+
+                if (equation_env_regex == null) {
+                    equation_env_regex = new GLib.Regex ("\\\\begin\\{equation\\}([\\s\\S]*?)\\\\end\\{equation\\}");
+                }
+                result = equation_env_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
+                    string expr = match_info.fetch (1).strip ();
+                    res.append (Core.MathChemEngine.render_latex_to_html (expr, true));
+                    res.append ("\n");
+                    return false;
+                });
+            } catch (GLib.RegexError e) {}
+            return result;
         }
 
         private static GLib.Regex? img_regex = null;
@@ -117,7 +146,12 @@ namespace Imladris.Adapters {
         private static GLib.Regex? inline_bold_regex = null;
         private static GLib.Regex? inline_italic_regex = null;
         private static GLib.Regex? inline_strike_regex = null;
+        private static GLib.Regex? inline_sub_regex = null;
+        private static GLib.Regex? inline_sup_regex = null;
         private static GLib.Regex? inline_link_regex = null;
+        private static GLib.Regex? inline_math_regex = null;
+        private static GLib.Regex? inline_ce_regex = null;
+        private static GLib.Regex? ordered_list_regex = null;
 
         private static string format_inline_markdown (string line) {
             string escaped = GLib.Markup.escape_text (line);
@@ -126,12 +160,30 @@ namespace Imladris.Adapters {
                 if (inline_bold_regex == null) inline_bold_regex = new GLib.Regex ("\\*\\*([^\\*]+)\\*\\*");
                 if (inline_italic_regex == null) inline_italic_regex = new GLib.Regex ("(?<!\\*)\\*([^\\*]+)\\*(?!\\*)");
                 if (inline_strike_regex == null) inline_strike_regex = new GLib.Regex ("~~([^~]+)~~");
+                if (inline_sub_regex == null) inline_sub_regex = new GLib.Regex ("(?<!~)~([^~\\s]+)~(?!~)");
+                if (inline_sup_regex == null) inline_sup_regex = new GLib.Regex ("\\^([^\\^\\s]+)\\^");
                 if (inline_link_regex == null) inline_link_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
+                if (inline_ce_regex == null) inline_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
+                if (inline_math_regex == null) inline_math_regex = new GLib.Regex ("(?<!\\$)\\$([^\\$\\n]+)\\$(?!\\$)");
+
+                // Render inline \ce{...} and $...$ math/chemistry expressions first
+                escaped = inline_ce_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
+                    string expr = "\\ce{" + match_info.fetch (1) + "}";
+                    res.append (Core.MathChemEngine.render_latex_to_html (expr, false));
+                    return false;
+                });
+                escaped = inline_math_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
+                    string expr = match_info.fetch (1);
+                    res.append (Core.MathChemEngine.render_latex_to_html (expr, false));
+                    return false;
+                });
 
                 escaped = inline_code_regex.replace (escaped, -1, 0, "<code>\\1</code>");
                 escaped = inline_bold_regex.replace (escaped, -1, 0, "<strong>\\1</strong>");
                 escaped = inline_italic_regex.replace (escaped, -1, 0, "<em>\\1</em>");
                 escaped = inline_strike_regex.replace (escaped, -1, 0, "<del>\\1</del>");
+                escaped = inline_sub_regex.replace (escaped, -1, 0, "<sub>\\1</sub>");
+                escaped = inline_sup_regex.replace (escaped, -1, 0, "<sup>\\1</sup>");
                 escaped = inline_link_regex.replace (escaped, -1, 0, "<a href=\"\\2\">\\1</a>");
             } catch (GLib.RegexError e) {}
             return escaped;
@@ -142,6 +194,8 @@ namespace Imladris.Adapters {
             var res = new StringBuilder ();
             bool in_pre = false;
             bool in_ul = false;
+            bool in_ol = false;
+            bool in_table = false;
 
             foreach (var line in lines) {
                 string trimmed_line = line.strip ();
@@ -152,12 +206,18 @@ namespace Imladris.Adapters {
                     trimmed_line.has_prefix ("<video") || trimmed_line.has_prefix ("</video") ||
                     trimmed_line.has_prefix ("<figcaption") || trimmed_line.has_prefix ("</figcaption") ||
                     trimmed_line.has_prefix ("<img")) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
+                    if (in_table) { res.append ("</tbody></table>\n"); in_table = false; }
                     res.append (line);
                     res.append ("\n");
                     continue;
                 }
 
                 if (line.has_prefix ("```")) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
+                    if (in_table) { res.append ("</tbody></table>\n"); in_table = false; }
                     if (!in_pre) {
                         string lang = line.substring (3).strip ();
                         res.append_printf ("<pre><code class=\"language-%s\">", lang != "" ? lang : "text");
@@ -175,25 +235,98 @@ namespace Imladris.Adapters {
                     continue;
                 }
 
-                if (line.has_prefix ("### ")) {
+                // Markdown table rows: | col1 | col2 |
+                if (trimmed_line.has_prefix ("|") && trimmed_line.has_suffix ("|") && trimmed_line.length > 2) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
+
+                    string inner_row = trimmed_line.substring (1, trimmed_line.length - 2);
+                    string[] cells = inner_row.split ("|");
+
+                    // Check if separator row (e.g. |---|---|)
+                    bool is_sep = true;
+                    foreach (var cell in cells) {
+                        string c = cell.strip ().replace ("-", "").replace (":", "");
+                        if (c.length > 0) {
+                            is_sep = false;
+                            break;
+                        }
+                    }
+                    if (is_sep) {
+                        continue;
+                    }
+
+                    if (!in_table) {
+                        res.append ("<table style=\"border-collapse: collapse; width: 100%; margin: 12px 0;\">\n<thead><tr>");
+                        foreach (var cell in cells) {
+                            res.append_printf ("<th style=\"border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left;\">%s</th>",
+                                format_inline_markdown (cell.strip ()));
+                        }
+                        res.append ("</tr></thead>\n<tbody>\n");
+                        in_table = true;
+                    } else {
+                        res.append ("<tr>");
+                        foreach (var cell in cells) {
+                            res.append_printf ("<td style=\"border: 1px solid #cbd5e1; padding: 6px 10px;\">%s</td>",
+                                format_inline_markdown (cell.strip ()));
+                        }
+                        res.append ("</tr>\n");
+                    }
+                    continue;
+                } else if (in_table) {
+                    res.append ("</tbody></table>\n");
+                    in_table = false;
+                }
+
+                if (line.has_prefix ("#### ")) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
+                    res.append_printf ("<h4>%s</h4>\n", format_inline_markdown (line.substring (5)));
+                } else if (line.has_prefix ("### ")) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
                     res.append_printf ("<h3>%s</h3>\n", format_inline_markdown (line.substring (4)));
                 } else if (line.has_prefix ("## ")) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
                     res.append_printf ("<h2>%s</h2>\n", format_inline_markdown (line.substring (3)));
                 } else if (line.has_prefix ("# ")) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
                     res.append_printf ("<h1>%s</h1>\n", format_inline_markdown (line.substring (2)));
+                } else if (trimmed_line == "---" || trimmed_line == "***") {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
+                    res.append ("<hr/>\n");
+                } else if (line.has_prefix ("> ")) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
+                    res.append_printf ("<blockquote style=\"border-left: 4px solid #6366f1; margin: 10px 0; padding: 4px 14px; color: #64748b;\">%s</blockquote>\n",
+                        format_inline_markdown (line.substring (2)));
                 } else if (line.has_prefix ("- ") || line.has_prefix ("* ")) {
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
                     if (!in_ul) {
                         res.append ("<ul>\n");
                         in_ul = true;
                     }
                     res.append_printf ("  <li>%s</li>\n", format_inline_markdown (line.substring (2)));
+                } else if (is_ordered_list_item (trimmed_line, out ordered_item_text)) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (!in_ol) {
+                        res.append ("<ol>\n");
+                        in_ol = true;
+                    }
+                    res.append_printf ("  <li>%s</li>\n", format_inline_markdown (ordered_item_text));
                 } else {
                     if (in_ul) {
                         res.append ("</ul>\n");
                         in_ul = false;
                     }
-                    string trimmed = line.strip ();
-                    if (trimmed == "") {
+                    if (in_ol) {
+                        res.append ("</ol>\n");
+                        in_ol = false;
+                    }
+                    if (trimmed_line == "") {
                         res.append ("\n");
                     } else {
                         res.append_printf ("<p>%s</p>\n", format_inline_markdown (line));
@@ -202,9 +335,28 @@ namespace Imladris.Adapters {
             }
 
             if (in_ul) res.append ("</ul>\n");
+            if (in_ol) res.append ("</ol>\n");
+            if (in_table) res.append ("</tbody></table>\n");
             if (in_pre) res.append ("</code></pre>\n");
 
             return res.str;
+        }
+
+        private static string ordered_item_text = "";
+
+        private static bool is_ordered_list_item (string trimmed_line, out string item_content) {
+            item_content = "";
+            try {
+                if (ordered_list_regex == null) {
+                    ordered_list_regex = new GLib.Regex ("^[0-9]+\\.\\s+(.+)$");
+                }
+                GLib.MatchInfo mi;
+                if (ordered_list_regex.match (trimmed_line, 0, out mi)) {
+                    item_content = mi.fetch (1);
+                    return true;
+                }
+            } catch (GLib.RegexError e) {}
+            return false;
         }
     }
 }

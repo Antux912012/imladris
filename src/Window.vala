@@ -118,6 +118,7 @@ namespace Imladris {
             var brand_menu = new GLib.Menu ();
             var new_sec = new GLib.Menu ();
             new_sec.append ("New Project or Document...", "app.new_project_modal");
+            new_sec.append ("New RStudio Project (.Rproj)...", "app.new_rproj");
             new_sec.append ("New Quarto Document (.qmd)", "app.new_qmd");
             new_sec.append ("New R Markdown (.Rmd)", "app.new_rmd");
             new_sec.append ("New Jupyter Notebook (.ipynb)", "app.new_ipynb");
@@ -142,6 +143,7 @@ namespace Imladris {
             brand_menu.append_section ("File & Export", io_sec);
 
             var prefs_sec = new GLib.Menu ();
+            prefs_sec.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
             prefs_sec.append ("Data Science Toolchains...", "app.toolchain_setup");
             prefs_sec.append ("Preferences", "app.preferences");
             prefs_sec.append ("About Imladris", "app.about");
@@ -536,7 +538,9 @@ namespace Imladris {
                         add_document_tab (title, rec.doc_type, rec.content, f);
                     }
                 });
-                // Find toast overlay if present or notify via document log
+                if (toast_overlay != null) {
+                    toast_overlay.add_toast (toast);
+                }
                 var d = get_active_document ();
                 if (d != null) {
                     d.append_console_log (@"⚠ Crash Recovery: $(recs.size) unsaved snapshot(s) found in cache.");
@@ -875,9 +879,22 @@ namespace Imladris {
             ipynb_row.add_prefix (new Gtk.Image.from_icon_name ("utilities-terminal-symbolic"));
             ipynb_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
             ipynb_row.activated.connect (() => {
-                add_document_tab ("notebook.ipynb", "json", "{\n \"cells\": [],\n \"metadata\": {},\n \"nbformat\": 4,\n \"nbformat_minor\": 2\n}\n");
+                string template = Core.NotebookSerializer.get_default_ipynb_markdown_template ();
+                add_document_tab ("notebook.ipynb", "markdown", template);
             });
             group.add (ipynb_row);
+
+            var rproj_row = new Adw.ActionRow () {
+                title = "New RStudio Project (.Rproj)...",
+                subtitle = "Scaffold a 1:1 RStudio project directory with .Rproj, .Rprofile, and data/",
+                activatable = true
+            };
+            rproj_row.add_prefix (new Gtk.Image.from_icon_name ("folder-symbolic"));
+            rproj_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            rproj_row.activated.connect (() => {
+                show_new_rproj_modal ();
+            });
+            group.add (rproj_row);
 
             var wizard_row = new Adw.ActionRow () {
                 title = "New Project Wizard...",
@@ -922,6 +939,21 @@ namespace Imladris {
                 }
                 update_environment_badge (config.project_type);
                 open_file_from_path.begin (file.get_path ());
+            });
+            dlg.present (this);
+        }
+
+        public void show_new_rproj_modal () {
+            var dlg = new UI.RprojCreationDialog ();
+            dlg.rproj_created.connect ((rproj_file, primary_file, config) => {
+                this.current_project_type = config.project_type;
+                this.current_project_dir = rproj_file.get_parent ().get_path ();
+                Services.PersistentSessionManager.get_default ().set_working_directory (
+                    this.current_project_dir, config.project_type
+                );
+                update_environment_badge (config.project_type);
+                open_file_from_path.begin (primary_file.get_path ());
+                show_toast (@"Created RStudio project $(rproj_file.get_basename ())");
             });
             dlg.present (this);
         }
@@ -995,7 +1027,7 @@ namespace Imladris {
                 string text = Adapters.DocumentAdapter.load_to_editor_buffer (raw_text, fmt);
 
                 string lang = "markdown";
-                if (name.has_suffix (".ipynb")) lang = "json";
+                if (name.has_suffix (".ipynb")) lang = "markdown";
                 else if (name.has_suffix (".ts")) lang = "typescript";
                 else if (name.has_suffix (".html") || name.has_suffix (".htm")) lang = "html";
                 else if (name.has_suffix (".rmd") || name.has_suffix (".Rmd")) lang = "rmd";
@@ -1528,13 +1560,17 @@ namespace Imladris {
             });
             var btn_chunk = RibbonFactory.create_tool_button ("utilities-terminal-symbolic", "Code Chunk", "Insert Code Chunk", false, false, true, null, null, code_popover);
 
-            var btn_math = RibbonFactory.create_tool_button ("insert-text-symbolic", "LaTeX Math", "Insert LaTeX Math Block ($$...$$)");
+            var btn_math = RibbonFactory.create_tool_button ("insert-text-symbolic", "Math Studio", "Open Natural Math & Formula Studio (Ctrl+M)");
             ((Gtk.Button) btn_math).clicked.connect (() => {
-                var d = get_active_document ();
-                if (d != null) d.source_buffer.insert_at_cursor ("\n$$\n\\frac{a}{b}\n$$\n", -1);
+                show_math_chem_editor_dialog (Core.FormulaMode.MATH);
             });
 
-            box.append (RibbonFactory.create_linked_group ({ btn_table, btn_chunk, btn_math }));
+            var btn_chem = RibbonFactory.create_tool_button ("applications-science-symbolic", "Chem Reaction", "Open Natural Chemical Formula & Reaction Studio");
+            ((Gtk.Button) btn_chem).clicked.connect (() => {
+                show_math_chem_editor_dialog (Core.FormulaMode.CHEMISTRY);
+            });
+
+            box.append (RibbonFactory.create_linked_group ({ btn_table, btn_chunk, btn_math, btn_chem }));
             box.append (RibbonFactory.create_vseparator ());
 
             // Group 2: Citations, References & Footnotes
@@ -1655,7 +1691,7 @@ namespace Imladris {
 
             btn_run_below = RibbonFactory.create_tool_button ("media-skip-forward-symbolic", "Run Below", "Run Active and Below Chunks");
             ((Gtk.Button) btn_run_below).clicked.connect (() => {
-                run_active_chunk ();
+                run_chunks_below ();
             });
 
             box.append (RibbonFactory.create_linked_group ({ btn_run_chunk, btn_run_all, btn_run_above, btn_run_below }));
@@ -2286,6 +2322,50 @@ namespace Imladris {
             var doc = get_active_document ();
             if (doc != null) {
                 doc.run_chunks_above ();
+            }
+        }
+
+        public void run_chunks_below () {
+            var doc = get_active_document ();
+            if (doc != null) {
+                doc.run_chunks_below ();
+            }
+        }
+
+        public void show_math_chem_editor_dialog (Core.FormulaMode initial_mode = Core.FormulaMode.AUTO) {
+            string sel = get_active_selected_text ();
+            var dlg = new UI.MathChemEditorDialog (initial_mode, sel.length > 0 ? sel : null);
+            dlg.formula_inserted.connect ((formatted_output, save_document) => {
+                var doc = get_active_document ();
+                if (doc == null) {
+                    add_document_tab ("Formulas.qmd", "markdown");
+                    doc = get_active_document ();
+                }
+                if (doc != null) {
+                    doc.source_buffer.begin_user_action ();
+                    Gtk.TextIter start, end;
+                    if (doc.source_buffer.get_selection_bounds (out start, out end)) {
+                        doc.source_buffer.delete (ref start, ref end);
+                        doc.source_buffer.insert (ref start, formatted_output, formatted_output.length);
+                    } else {
+                        doc.source_buffer.insert_at_cursor (formatted_output, formatted_output.length);
+                    }
+                    doc.source_buffer.end_user_action ();
+                    doc.refresh_live_preview ();
+                    show_toast ("Inserted formula into document");
+                    if (save_document) {
+                        save_document_async.begin ();
+                    }
+                }
+            });
+            dlg.present (this);
+        }
+
+        public void print_active_document () {
+            var doc = get_active_document ();
+            if (doc != null && doc.web_view != null) {
+                var print_op = new WebKit.PrintOperation (doc.web_view);
+                print_op.run_dialog (this);
             }
         }
 

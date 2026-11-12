@@ -15,6 +15,7 @@ namespace Imladris.Services {
 
             try {
                 var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
+                Core.PlatformUtils.inject_galaxy_credentials (launcher);
                 launcher.set_cwd (working_dir);
 
                 string[] full_raw = new string[1 + sub_args.length];

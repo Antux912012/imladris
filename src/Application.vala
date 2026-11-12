@@ -10,10 +10,11 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.17.0";
+        public const string APP_VERSION = "0.18.0";
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },
+            { "new_rproj", on_new_rproj },
             { "new_md", on_new_md },
             { "new_qmd", on_new_qmd },
             { "new_rmd", on_new_rmd },
@@ -45,6 +46,7 @@ namespace Imladris {
             { "interrupt_execution", on_interrupt_execution },
             { "preferences", on_preferences },
             { "about", on_about },
+            { "math_chem_editor", on_math_chem_editor },
             { "insert_image", on_insert_image },
             { "insert_video", on_insert_video },
             { "print", on_print_document },
@@ -127,23 +129,14 @@ namespace Imladris {
             recursively_delete_directory (GLib.File.new_for_path (data_dir));
             recursively_delete_directory (GLib.File.new_for_path (cache_dir));
 
-            try {
+            var schema_source = GLib.SettingsSchemaSource.get_default ();
+            if (schema_source != null && schema_source.lookup ("io.github.Antux912012.Imladris", true) != null) {
                 var settings = new GLib.Settings ("io.github.Antux912012.Imladris");
-                settings.reset ("app-theme");
+                settings.reset ("hw-acceleration");
+                settings.reset ("theme");
                 settings.reset ("accent-color");
-                settings.reset ("hardware-acceleration");
-                settings.reset ("ai-provider");
-                settings.reset ("ai-model");
-                settings.reset ("ai-stream");
-                settings.reset ("ai-temperature");
-                settings.reset ("restore-session");
-                settings.reset ("active-session-id");
-                settings.reset ("last-opened-project");
-                settings.reset ("ribbon-visible");
-                settings.reset ("default-workbench-mode");
-                settings.reset ("active-tab-id");
-                settings.reset ("elrond-level");
-            } catch (GLib.Error e) {}
+                settings.reset ("galaxy-server-url");
+            }
 
             stdout.printf ("[GDPR Art. 17] All local user data, cache, and state files erased successfully.\n");
         }
@@ -162,6 +155,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.run_shiny_app", { "<Control><Shift>a" });
             this.set_accels_for_action ("app.elrond_assist", { "<Control><Shift>e" });
             this.set_accels_for_action ("app.preferences", { "<Control>comma" });
+            this.set_accels_for_action ("app.math_chem_editor", { "<Control>m" });
             this.set_accels_for_action ("app.insert_image", { "<Control><Alt>i", "<Control><Shift>m" });
             this.set_accels_for_action ("win.zotero_picker", { "<Control><Shift>i" });
             this.set_accels_for_action ("app.insert_video", { "<Control><Shift>v" });
@@ -225,6 +219,11 @@ namespace Imladris {
             if (win != null) win.show_new_project_modal ();
         }
 
+        private void on_new_rproj () {
+            var win = this.active_window as Window;
+            if (win != null) win.show_new_rproj_modal ();
+        }
+
         private void on_new_md () {
             var win = this.active_window as Window;
             if (win != null) win.add_document_tab ("notes.md", "markdown");
@@ -242,7 +241,10 @@ namespace Imladris {
 
         private void on_new_ipynb () {
             var win = this.active_window as Window;
-            if (win != null) win.add_document_tab ("notebook.ipynb", "json");
+            if (win != null) {
+                string template = Core.NotebookSerializer.get_default_ipynb_markdown_template ();
+                win.add_document_tab ("notebook.ipynb", "markdown", template);
+            }
         }
 
         private void on_new_r () {
@@ -385,6 +387,11 @@ namespace Imladris {
             if (win != null) win.show_about_dialog ();
         }
 
+        private void on_math_chem_editor () {
+            var win = this.active_window as Window;
+            if (win != null) win.show_math_chem_editor_dialog ();
+        }
+
         private void on_insert_image () {
             var win = this.active_window as Window;
             if (win != null) win.prompt_insert_media.begin (false);
@@ -396,7 +403,8 @@ namespace Imladris {
         }
 
         private void on_print_document () {
-            message ("Print requested");
+            var win = this.active_window as Window;
+            if (win != null) win.print_active_document ();
         }
 
         private void setup_papirus_icon_theme () {

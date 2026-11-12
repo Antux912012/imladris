@@ -129,6 +129,22 @@ namespace Imladris.UI {
             row_sandboxed.add_suffix (btn_create_sandboxed);
             proj_group.add (row_sandboxed);
 
+            // Target: Native RStudio .Rproj Project
+            var row_rproj = new Adw.ActionRow () {
+                title = "Create RStudio Project (.Rproj)",
+                subtitle = "Scaffolds a 1:1 RStudio-compatible project with .Rproj, .Rprofile, and data/ directories."
+            };
+            row_rproj.add_prefix (new Gtk.Image.from_icon_name ("utilities-terminal-symbolic"));
+            var btn_create_rproj = new Gtk.Button.with_label ("Create .Rproj") {
+                valign = Gtk.Align.CENTER
+            };
+            btn_create_rproj.add_css_class ("flat");
+            btn_create_rproj.clicked.connect (() => {
+                create_rproj_direct_project ();
+            });
+            row_rproj.add_suffix (btn_create_rproj);
+            proj_group.add (row_rproj);
+
             portability_warning_lbl = new Gtk.Label (
                 "ℹ Note: Standard projects use system libraries. Sandboxed projects include lockfiles for 1:1 RStudio & Jupyter export."
             ) {
@@ -280,6 +296,45 @@ namespace Imladris.UI {
                 this.close ();
             } catch (GLib.Error e) {
                 GLib.warning ("Failed to scaffold workspace project: %s", e.message);
+            }
+        }
+
+        private void create_rproj_direct_project () {
+            string raw_name = title_row.text.strip ();
+            if (raw_name.length == 0) raw_name = "Untitled_R_Project";
+            string base_dir = this.custom_project_dir != ""
+                ? this.custom_project_dir
+                : GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents");
+
+            DocumentFormat fmt = get_selected_project_format ();
+            if (fmt != DocumentFormat.RMD && fmt != DocumentFormat.QMD) {
+                fmt = DocumentFormat.RSCRIPT;
+            }
+
+            try {
+                File rproj_file = MallornManager.create_rproj_project (
+                    base_dir,
+                    raw_name,
+                    fmt,
+                    selected_project_type == ProjectType.SANDBOXED
+                );
+                string project_dir = rproj_file.get_parent ().get_path ();
+                string starter_filename = (fmt == DocumentFormat.RMD)
+                    ? "analysis.Rmd"
+                    : ((fmt == DocumentFormat.QMD) ? "analysis.qmd" : "main.R");
+                File primary_file = File.new_for_path (GLib.Path.build_filename (project_dir, starter_filename));
+
+                var cfg = new ProjectConfig () {
+                    project_name = ProjectScaffolder.sanitize_dirname (raw_name),
+                    custom_project_dir = project_dir,
+                    format = fmt,
+                    project_type = selected_project_type
+                };
+
+                item_created (primary_file, cfg, false);
+                this.close ();
+            } catch (GLib.Error e) {
+                GLib.warning ("Failed to scaffold .Rproj: %s", e.message);
             }
         }
 

@@ -42,6 +42,8 @@ namespace Imladris {
             sb.append ("Encoding: UTF-8\n");
             sb.append ("RnwWeave: knitr\n");
             sb.append ("LaTeX: pdfLaTeX\n");
+            sb.append ("AutoAppendNewline: Yes\n");
+            sb.append ("StripTrailingWhitespace: Yes\n");
             sb.append ("\n");
             sb.append ("# Imladris Extended Metadata\n");
             sb.append_printf ("ImladrisVersion: %s\n", config.imladris_version != "" ? config.imladris_version : MALLORN_SPEC_VERSION);
@@ -55,6 +57,115 @@ namespace Imladris {
             }
             sb.append_printf ("ImladrisSandboxed: %s\n", config.sandboxed ? "true" : "false");
             return sb.str;
+        }
+
+        /**
+         * Creates a standard RStudio .Rproj manifest file in the designated directory.
+         *
+         * @param target_dir Directory where the .Rproj file will reside.
+         * @param project_name Base name of the project.
+         * @param config Optional ProjectConfig with metadata overrides.
+         * @return File object referencing the created .Rproj file.
+         */
+        public static File create_rproj_file (string target_dir, string project_name, ProjectConfig? config = null) throws GLib.Error {
+            File dir = File.new_for_path (target_dir);
+            if (!dir.query_exists ()) {
+                dir.make_directory_with_parents (null);
+            }
+
+            string clean_name = ProjectScaffolder.sanitize_dirname (project_name);
+            var cfg = config != null ? config.clone () : new ProjectConfig () {
+                project_name = clean_name,
+                format = DocumentFormat.RSCRIPT
+            };
+
+            string manifest = generate_rproj_manifest (cfg);
+            string rproj_path = Path.build_filename (target_dir, clean_name + ".Rproj");
+            FileUtils.set_contents (rproj_path, manifest);
+
+            return File.new_for_path (rproj_path);
+        }
+
+        /**
+         * Scaffolds an entire RStudio-compatible project directory structure with .Rproj,
+         * .Rprofile, data/ and scripts/ directories, and starter code.
+         *
+         * @param parent_dir Directory where the project directory will be created.
+         * @param project_name Name of the R project.
+         * @param primary_format Starting format (RSCRIPT, RMD, or QMD).
+         * @param sandboxed Whether to initialize renv isolated package environment.
+         * @return File object referencing the created .Rproj file.
+         */
+        public static File create_rproj_project (
+            string parent_dir,
+            string project_name,
+            DocumentFormat primary_format = DocumentFormat.RSCRIPT,
+            bool sandboxed = false
+        ) throws GLib.Error {
+            string clean_name = ProjectScaffolder.sanitize_dirname (project_name);
+            string project_dir = Path.build_filename (parent_dir, clean_name);
+
+            File pdir = File.new_for_path (project_dir);
+            if (!pdir.query_exists ()) {
+                pdir.make_directory_with_parents (null);
+            }
+
+            // Subdirectories: data, scripts, output
+            string data_dir = Path.build_filename (project_dir, "data");
+            string scripts_dir = Path.build_filename (project_dir, "scripts");
+            string output_dir = Path.build_filename (project_dir, "output");
+
+            File.new_for_path (data_dir).make_directory_with_parents (null);
+            File.new_for_path (scripts_dir).make_directory_with_parents (null);
+            File.new_for_path (output_dir).make_directory_with_parents (null);
+
+            var cfg = new ProjectConfig () {
+                project_name = clean_name,
+                custom_project_dir = project_dir,
+                format = primary_format,
+                project_type = sandboxed ? ProjectType.SANDBOXED : ProjectType.STANDARD
+            };
+
+            // Write 1:1 .Rproj manifest
+            File rproj_file = create_rproj_file (project_dir, clean_name, cfg);
+
+            // Write .Rprofile for RStudio environment parity
+            string rprofile_path = Path.build_filename (project_dir, ".Rprofile");
+            string rprofile_content = """# ==============================================================================
+# Rprofile initialized by Imladris for RStudio Parity
+# ==============================================================================
+
+options(repos = c(CRAN = "https://cloud.r-project.org/"))
+options(stringsAsFactors = FALSE)
+message("✔ RStudio project environment initialized for: %s")
+""".printf (clean_name);
+            FileUtils.set_contents (rprofile_path, rprofile_content);
+
+            // Write starter primary file
+            string starter_filename = (primary_format == DocumentFormat.RMD)
+                ? "analysis.Rmd"
+                : ((primary_format == DocumentFormat.QMD) ? "analysis.qmd" : "main.R");
+
+            string starter_path = Path.build_filename (project_dir, starter_filename);
+            File starter_file = File.new_for_path (starter_path);
+            if (!starter_file.query_exists ()) {
+                string template = ProjectScaffolder.build_template (cfg, project_dir, data_dir, "images", "references.bib");
+                FileUtils.set_contents (starter_path, template);
+            }
+
+            // Sync with .mallorn manifests
+            write_project_manifests (project_dir, cfg);
+
+            // If sandboxed, initialize renv
+            if (sandboxed) {
+                try {
+                    Services.SandboxController.init_r_sandbox (project_dir);
+                } catch (GLib.Error e) {
+                    // Non-fatal if host Rscript unavailable
+                }
+            }
+
+            return rproj_file;
         }
 
         /**

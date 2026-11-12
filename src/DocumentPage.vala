@@ -134,6 +134,7 @@ namespace Imladris {
 
             var editor_context_menu = new GLib.Menu ();
             editor_context_menu.append ("Write with Elrond Assistance (AI)", "app.elrond_assist");
+            editor_context_menu.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
             source_view.extra_menu = editor_context_menu;
 
             editor_scroller = new Gtk.ScrolledWindow () {
@@ -331,14 +332,24 @@ namespace Imladris {
         private void setup_cell_execution_shortcut () {
             var key_ctrl = new Gtk.EventControllerKey ();
             key_ctrl.key_pressed.connect ((keyval, keycode, state) => {
-                if ((state & Gdk.ModifierType.CONTROL_MASK) != 0 &&
-                    (keyval == Gdk.Key.Return || keyval == Gdk.Key.KP_Enter)) {
-                    if ((state & Gdk.ModifierType.SHIFT_MASK) != 0) {
-                        panel_registry.execute_active_cell ();
-                    } else {
-                        panel_registry.execute_current_line_or_selection ();
+                if (keyval == Gdk.Key.Return || keyval == Gdk.Key.KP_Enter) {
+                    if ((state & Gdk.ModifierType.CONTROL_MASK) != 0) {
+                        if ((state & Gdk.ModifierType.SHIFT_MASK) != 0) {
+                            panel_registry.execute_active_cell ();
+                        } else {
+                            panel_registry.execute_current_line_or_selection ();
+                        }
+                        return true;
                     }
-                    return true;
+                    if ((state & Gdk.ModifierType.SHIFT_MASK) != 0) {
+                        Gtk.TextIter iter;
+                        source_buffer.get_iter_at_mark (out iter, source_buffer.get_insert ());
+                        var chunk = Core.ChunkParser.find_chunk_at_line (source_buffer.text, iter.get_line ());
+                        if (chunk != null) {
+                            panel_registry.execute_active_cell_and_advance ();
+                            return true;
+                        }
+                    }
                 }
                 return false;
             });
@@ -380,6 +391,8 @@ namespace Imladris {
             source_buffer.create_tag ("italic", "style", Pango.Style.ITALIC);
             source_buffer.create_tag ("underline", "underline", Pango.Underline.SINGLE);
             source_buffer.create_tag ("strike", "strikethrough", true);
+            source_buffer.create_tag ("strikethrough", "strikethrough", true);
+            source_buffer.create_tag ("code", "family", "monospace");
             source_buffer.create_tag ("h1", "scale", 1.7, "weight", Pango.Weight.BOLD);
             source_buffer.create_tag ("h2", "scale", 1.4, "weight", Pango.Weight.BOLD);
             source_buffer.create_tag ("h3", "scale", 1.2, "weight", Pango.Weight.BOLD);
@@ -587,6 +600,7 @@ print("Python Interpreter:", sys.version.split()[0])
     white-space: pre-wrap;
     margin: 8px 12px;
   }
+  %s
 </style>
 </head>
 <body>
@@ -600,6 +614,7 @@ print("Python Interpreter:", sys.version.split()[0])
                 card_bg, card_border,
                 text_color, header_color,
                 card_bg, card_border,
+                Core.MathChemEngine.get_math_chem_css (),
                 fmt.to_badge_label (), body_html
             );
 
@@ -890,16 +905,41 @@ print("Python Interpreter:", sys.version.split()[0])
 
         public void apply_tag_or_syntax (string tag_name, string md_wrapper) {
             Gtk.TextIter start, end;
+            source_buffer.begin_user_action ();
             if (source_buffer.get_selection_bounds (out start, out end)) {
-                source_buffer.apply_tag_by_name (tag_name, start, end);
+                string selected = source_buffer.get_text (start, end, false);
+                if (md_wrapper.length > 0) {
+                    string wrapped = md_wrapper + selected + md_wrapper;
+                    source_buffer.delete (ref start, ref end);
+                    source_buffer.insert (ref start, wrapped, wrapped.length);
+                } else if (source_buffer.tag_table.lookup (tag_name) != null) {
+                    source_buffer.apply_tag_by_name (tag_name, start, end);
+                }
             } else {
                 source_buffer.insert_at_cursor (@"$md_wrapper$md_wrapper", -1);
             }
+            source_buffer.end_user_action ();
         }
 
         public void insert_code_chunk (string engine, string options = "") {
             string opt_line = options.length > 0 ? @"#| $options\n" : "";
             string snippet = @"\n```{$engine}\n$opt_line\n```\n";
+            source_buffer.insert_at_cursor (snippet, -1);
+        }
+
+        /**
+         * Jupyter Parity: Inserts a markdown narrative section at cursor.
+         */
+        public void insert_markdown_cell (string placeholder = "New Section") {
+            string snippet = @"\n\n### $placeholder\n\nEnter markdown notes, formulas, or equations here.\n\n";
+            source_buffer.insert_at_cursor (snippet, -1);
+        }
+
+        /**
+         * Jupyter Parity: Inserts a raw text block at cursor.
+         */
+        public void insert_raw_cell (string content = "") {
+            string snippet = @"\n```{raw}\n$content\n```\n";
             source_buffer.insert_at_cursor (snippet, -1);
         }
 
@@ -944,6 +984,10 @@ print("Python Interpreter:", sys.version.split()[0])
 
         public void run_chunks_above () {
             panel_registry.execute_cells_above ();
+        }
+
+        public void run_chunks_below () {
+            panel_registry.execute_cells_below ();
         }
 
         public void clear_console () {

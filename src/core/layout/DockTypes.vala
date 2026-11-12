@@ -113,7 +113,7 @@ namespace Imladris.Core.Layout {
                 case PACKAGES: return "Packages";
                 case HELP: return "Help";
                 case SHINY_VIEWER: return "Viewer";
-                case GALAXY: return "Galaxy";
+                case GALAXY: return "Arekyer Bridge";
                 default: return "Panel";
             }
         }

@@ -34,9 +34,11 @@ The application automatically transitions between two editing layouts. Single-pa
 * **Interactive Dataframe Viewer**: Inspects structured data tables using `Gtk.ColumnView` with column sorting, regex filtering, and clipboard export.
 * **R Shiny Reactive Server Integration**: Intercepts and runs Shiny web applications with live outputs routed to Quadrant 4, a standalone window, or an external browser.
 * **Export Pipeline**: Generates publication-ready documents in PDF, standalone HTML, OpenDocument Text (`.odt`), and OpenDocument Presentation (`.odp`) formats through Quarto and Pandoc.
-* **Reproducible Project Environments**: Manages isolated `renv` (R) and `.venv` (Python) sandboxes with status badge indicators and export profiles.
+* **Reproducible Project Environments & RStudio `.Rproj` Creation**: Scaffolds native `.Rproj` project manifests and manages isolated `renv` (R) and `.venv` (Python) sandboxes with status badge indicators and export profiles.
+* **Jupyter Notebook (`nbformat 4.5`) Parity**: Provides lossless round-trip serialization of `.ipynb` cell IDs, execution counts, cell tags, raw cells, and kernel specifications with `Shift+Enter` cell execution and advancement.
+* **Natural Math & Chemical Reaction Studio**: Converts human-written mathematical expressions (for example, `(-b +- sqrt(b^2 - 4*a*c)) / (2*a)`, `int(0, inf) e^(-x^2) dx`) and chemical formulas/reactions (for example, `6CO2(g) + 6H2O(l) ->[h*nu][chlorophyll] C6H12O6(aq) + 6O2(g)`) into LaTeX (`$$...$$`, `$...$`, `\ce{...}`, `\begin{equation}`) or Markdown (`~sub~`/`^sup^`, Unicode scientific symbols) with offline live rendering.
 * **Local Elrond AI Copilot**: Integrates a local `llama-server` engine on loopback (`127.0.0.1:8088`) for offline code completion and data science synthesis.
-* **Galaxy Project Bioinformatics Bridge**: Connects to remote Galaxy servers (e.g., `usegalaxy.eu`), inspects active histories/datasets in Quadrant 3, and generates reproducible R (`httr`) or Python (`requests`/`pandas`) data-fetching chunks into active documents.
+* **Arekyer Galaxy-to-Quarto Provenance Bridge**: Connects remote Galaxy bioinformatics histories directly to local Quarto (`.qmd`) and RMarkdown (`.Rmd`) manuscripts. Injects verifiable data-fetching code blocks (`httr2` for R, `pandas` for Python) with dataset UUID/SHA metadata, and manages API keys securely in the OS keyring (`libsecret-1`) with isolated subprocess injection at compile time.
 * **Model Context Protocol (MCP)**: Provides a JSON-RPC stdio server (`imladris --mcp-server`) for agentic tool use and document analysis.
 
 ---
@@ -105,6 +107,7 @@ Imladris follows a modular architecture that separates UI presentation, core dom
 * `webkitgtk-6.0` >= 2.40
 * `libsoup-3.0` >= 3.0
 * `json-glib-1.0` >= 1.6
+* `libsecret-1` >= 0.20
 * `libgee-0.8` >= 0.20
 * `gio-2.0` / `glib-2.0` >= 2.76
 
@@ -188,10 +191,12 @@ imladris path/to/document.qmd
 | `Ctrl+F1` | Collapse or expand the top ribbon toolbar |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo or redo the previous buffer edit |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | Zoom in, zoom out, or reset zoom level |
+| `Ctrl+M` | Open the Math & Chemical Reaction Studio |
 | `Ctrl+Shift+E` | Trigger Elrond Assistance code generation |
 | `Ctrl+Shift+P` | Focus the Packages Ribbon tab |
 | `Ctrl+Shift+A` | Run or stop the active R Shiny web application |
 | `Ctrl+Enter` | Execute the current code line or selection |
+| `Shift+Enter` | Execute the active code chunk and advance to the next chunk |
 | `Ctrl+Shift+Enter` | Execute the active fenced code chunk |
 | `Ctrl+Comma` | Open the Preferences dialog |
 | `Ctrl+Q` | Terminate the application |

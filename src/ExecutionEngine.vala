@@ -11,6 +11,7 @@ namespace Imladris {
             GLib.SubprocessFlags flags
         ) throws GLib.Error {
             var launcher = new GLib.SubprocessLauncher (flags);
+            Core.PlatformUtils.inject_galaxy_credentials (launcher);
             string prog = argv[0];
             string? resolved_path = null;
             string? env_prefix = null;

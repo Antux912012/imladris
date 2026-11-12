@@ -180,7 +180,7 @@ namespace Imladris.UI {
                 description = "Configure Galaxy instance endpoint and API credentials for reproducible data fetching."
             };
 
-            var galaxy_client = Imladris.Bridges.GalaxyClient.get_default ();
+            var galaxy_client = Imladris.GalaxyClient.get_default ();
 
             var g_server_row = new Adw.EntryRow () {
                 title = "Galaxy Server URL",
