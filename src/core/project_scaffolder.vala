@@ -515,5 +515,108 @@ server <- function(input, output, session) {
 shinyApp(ui = ui, server = server)
 """.printf (app_title, app_title);
         }
+
+        public static string get_clinical_sap_qmd_template (string title = "Statistical Analysis Plan", string author = "Clinical Biostatistician") {
+            return """---
+title: "%s"
+subtitle: "Randomized Controlled Trial Statistical Analysis Plan (ICH E9 / CONSORT)"
+author: "%s"
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+    code-fold: show
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Introduction & Study Objectives
+
+This Statistical Analysis Plan (SAP) specifies the primary, secondary, and safety statistical hypotheses and estimation methods for the trial.
+
+## Primary Objective & Endpoint
+
+The primary objective is to evaluate whether the investigational regimen improves overall survival or objective response compared to control.
+
+# Study Design & Sample Size Justification
+
+```{r sample-size-justification}
+# ELBERETH ICH E9 SAMPLE SIZE JUSTIFICATION
+alpha <- 0.05
+power <- 0.80
+hr <- 0.65
+p_event <- 0.60
+dropout <- 0.10
+
+z_alpha <- qnorm(1 - alpha / 2)
+z_beta <- qnorm(power)
+req_events <- ceiling(4 * (z_alpha + z_beta)^2 / (log(hr)^2))
+n_evaluable <- ceiling(req_events / p_event)
+n_enrolled <- ceiling(n_evaluable / (1 - dropout))
+
+cat(sprintf("Required Target Events: %%d\n", req_events))
+cat(sprintf("Minimum Evaluable Sample Size: %%d subjects\n", n_evaluable))
+cat(sprintf("Total Enrollment Target (accounting for 10%%%% attrition): %%d subjects\n", n_enrolled))
+```
+
+# Analysis Populations & Baseline Demographics (Table 1)
+
+```{r baseline-table-1}
+# Summary of patient baseline demographics (ADSL)
+data(mtcars)
+summary(mtcars[, c("mpg", "cyl", "hp", "wt")])
+```
+
+# Primary Time-to-Event Efficacy Analysis (Kaplan-Meier & Cox PH)
+
+```{r survival-analysis}
+library(survival)
+# Simulation of clinical trial survival data
+set.seed(42)
+n <- 100
+arm <- rbinom(n, 1, 0.5)
+surv_time <- rexp(n, rate = 0.05 * exp(-0.4 * arm))
+event <- rbinom(n, 1, 0.7)
+
+km_fit <- survfit(Surv(surv_time, event) ~ arm)
+cox_fit <- coxph(Surv(surv_time, event) ~ arm)
+summary(cox_fit)
+```
+""".printf (title, author);
+        }
+
+        public static string get_rnaseq_biomarker_qmd_template (string title = "RNA-Seq Differential Expression Report", string author = "Bioinformatician") {
+            return """---
+title: "%s"
+subtitle: "Transcriptomic Profiling & Survival Biomarker Discovery"
+author: "%s"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: show
+---
+
+# Multi-Omics Profiling
+
+Differential expression analysis using negative binomial generalized linear models.
+
+```{r volcano-differential-expression}
+# Simulated RNA-Seq differential expression table
+set.seed(123)
+n_genes <- 1000
+log2fc <- rnorm(n_genes, 0, 1.5)
+pvals <- runif(n_genes, 1e-6, 1.0)
+padj <- p.adjust(pvals, method = "BH")
+
+sig <- padj < 0.05 & abs(log2fc) >= 1.0
+cat(sprintf("Total genes profiled: %%d\n", n_genes))
+cat(sprintf("Significant differentially expressed genes: %%d\n", sum(sig)))
+```
+""".printf (title, author);
+        }
     }
 }

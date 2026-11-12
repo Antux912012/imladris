@@ -294,6 +294,21 @@ namespace Imladris {
             btn_taniquetil_header.add_css_class ("flat");
             tier1_box.append (btn_taniquetil_header);
 
+            // Elbereth Clinical Biostatistics, Power & Survival Studio
+            var elbereth_popover = new Imladris.Bridges.Elbereth.ClinicalBiostatsPopover ();
+            elbereth_popover.insert_snippet_requested.connect ((snippet) => {
+                insert_in_active_editor (snippet);
+                show_toast ("Inserted clinical biostatistics record into document");
+            });
+            var btn_elbereth_header = new Gtk.MenuButton () {
+                icon_name = "view-statistics-symbolic",
+                tooltip_text = "Elbereth Clinical Biostatistics, Power & Survival Studio",
+                valign = Gtk.Align.CENTER,
+                popover = elbereth_popover
+            };
+            btn_elbereth_header.add_css_class ("flat");
+            tier1_box.append (btn_elbereth_header);
+
             btn_collapse_ribbon = new Gtk.ToggleButton () {
                 icon_name = "ribbon-toggle-symbolic",
                 tooltip_text = "Show / Hide Ribbon Toolbar (Ctrl+F1)",
@@ -635,6 +650,10 @@ namespace Imladris {
 
         public void insert_in_active_editor (string text) {
             var doc = get_active_document ();
+            if (doc == null) {
+                add_document_tab ("Analysis.qmd", "markdown");
+                doc = get_active_document ();
+            }
             if (doc != null && doc.source_buffer != null) {
                 doc.source_buffer.begin_user_action ();
                 doc.source_buffer.insert_at_cursor (text, -1);
@@ -1217,6 +1236,21 @@ namespace Imladris {
                     );
                     if (ok) {
                         doc.append_console_log (@"✔ Successfully exported to $(file.get_path ())");
+                        // Generate GxP / EU CRA Cryptographic Provenance Manifest
+                        string pdir = (current_project_dir != "") ? current_project_dir : GLib.Path.get_dirname (src_path);
+                        Core.ProvenanceAttestationService.generate_attestation_async.begin (
+                            src_path,
+                            doc.source_buffer.text,
+                            pdir,
+                            (obj, att_res) => {
+                                try {
+                                    string manifest_path = Core.ProvenanceAttestationService.generate_attestation_async.end (att_res);
+                                    doc.append_console_log (@"🔒 [GxP Provenance Lockfile Generated: $(GLib.Path.get_basename (manifest_path))]");
+                                } catch (GLib.Error err) {
+                                    doc.append_console_log (@"⚠ Provenance generation notice: $(err.message)");
+                                }
+                            }
+                        );
                     } else {
                         doc.append_console_log (@"✖ Export to $(format.up ()) failed. Check console output.");
                     }
@@ -1809,7 +1843,33 @@ namespace Imladris {
             btn_export_rstudio = RibbonFactory.create_tool_button ("utilities-terminal-symbolic", "RStudio", "Export Project for RStudio", false, false, true, null, "app.export_rstudio");
             btn_export_jupyter = RibbonFactory.create_tool_button ("applications-science-symbolic", "Jupyter", "Export Project for Jupyter Notebook", false, false, true, null, "app.export_jupyter");
 
-            box.append (RibbonFactory.create_linked_group ({ btn_export_mallorn, btn_export_rstudio, btn_export_jupyter }));
+            var btn_gxp_lock = RibbonFactory.create_tool_button ("security-high-symbolic", "GxP Lock", "Generate Cryptographic GxP SHA-256 Provenance Manifest");
+            ((Gtk.Button) btn_gxp_lock).clicked.connect (() => {
+                var d = get_active_document ();
+                if (d != null) {
+                    string s_path = d.file_location != null ? d.file_location.get_path () : "/tmp/document.qmd";
+                    string pdir = (current_project_dir != "") ? current_project_dir : GLib.Path.get_dirname (s_path);
+                    Core.ProvenanceAttestationService.generate_attestation_async.begin (
+                        s_path,
+                        d.source_buffer.text,
+                        pdir,
+                        (obj, att_res) => {
+                            try {
+                                string manifest_path = Core.ProvenanceAttestationService.generate_attestation_async.end (att_res);
+                                d.append_console_log (@"🔒 [GxP Provenance Lockfile Generated: $manifest_path]");
+                                show_toast (@"Generated $(GLib.Path.get_basename (manifest_path))");
+                            } catch (GLib.Error err) {
+                                d.append_console_log (@"✖ Failed to generate provenance manifest: $(err.message)");
+                                show_toast (@"Provenance error: $(err.message)");
+                            }
+                        }
+                    );
+                } else {
+                    show_toast ("No active document for provenance generation");
+                }
+            });
+
+            box.append (RibbonFactory.create_linked_group ({ btn_export_mallorn, btn_export_rstudio, btn_export_jupyter, btn_gxp_lock }));
             box.append (RibbonFactory.create_vseparator ());
 
             // Group 3: Live Preview & Diagnostics

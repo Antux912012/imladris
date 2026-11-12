@@ -74,6 +74,7 @@ sources = files(
   'src/bridges/ArekyerBridge.vala',
   'src/bridges/yavanna/BioEntityPopover.vala',
   'src/bridges/taniquetil/AlphaFoldBridgePopover.vala',
+  'src/bridges/elbereth/ClinicalBiostatsPopover.vala',
   'src/core/ProvenanceAttestationService.vala',
   'src/ui/galaxy_auth_dialog.vala',
   'src/ui/galaxy_panel.vala',
@@ -159,6 +160,7 @@ test_sources = files(
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/bridges/elbereth/ClinicalBiostatsPopover.vala',
 )
 
 test_exe = executable('test_mallorn_sandbox',

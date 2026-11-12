@@ -100,6 +100,21 @@ namespace Imladris {
             widget.set_output (text_output, plot_path, count);
         }
 
+        public void clear_inline_chunk_outputs () {
+            foreach (var w in inline_chunk_widgets.values) {
+                if (w != null && w.get_parent () != null) {
+                    w.unparent ();
+                }
+            }
+            foreach (var mark in chunk_marks.values) {
+                if (mark != null) {
+                    source_buffer.delete_mark (mark);
+                }
+            }
+            inline_chunk_widgets.clear ();
+            chunk_marks.clear ();
+        }
+
         public signal void stats_changed (int words, int lines, string lang_badge);
 
         public DocumentPage (string title, string lang_id, Window? win = null) {

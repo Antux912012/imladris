@@ -240,19 +240,29 @@ for _k in list(globals().keys()):
                     if (file != null) {
                         string path = file.get_path ();
                         string base_name = file.get_basename ();
-                        string var_name = base_name.replace (".csv", "").replace (".tsv", "").replace (".txt", "").replace ("-", "_").replace (" ", "_");
+                        string lower_base = base_name.down ();
+                        string var_name = base_name.replace (".tabular", "").replace (".csv", "").replace (".tsv", "").replace (".txt", "").replace ("-", "_").replace (" ", "_");
                         if (var_name.length == 0 || !var_name.get_char (0).isalpha ()) {
                             var_name = "dataset_" + var_name;
                         }
 
+                        string safe_path = path.replace ("\\", "\\\\").replace ("\"", "\\\"");
+                        bool is_tab = lower_base.has_suffix (".tsv") || lower_base.has_suffix (".tabular") || lower_base.has_suffix (".txt");
+
                         if (active_engine == "r") {
-                            string r_code = @"$var_name <- read.csv(\"$path\")\nView($var_name)\n";
+                            string r_cmd = is_tab
+                                ? @"read.delim(\"$safe_path\", stringsAsFactors = FALSE)"
+                                : @"read.csv(\"$safe_path\")";
+                            string r_code = @"$var_name <- $r_cmd\nView($var_name)\n";
                             PersistentSessionManager.get_default ().execute_r.begin (r_code, (o, r) => {
                                 refresh_environment.begin ();
                                 view_dataframe_requested (var_name, "r");
                             });
                         } else {
-                            string py_code = @"import pandas as pd\n$var_name = pd.read_csv(\"$path\")\n";
+                            string py_cmd = is_tab
+                                ? @"pd.read_csv(\"$safe_path\", sep=\"\\t\")"
+                                : @"pd.read_csv(\"$safe_path\")";
+                            string py_code = @"import pandas as pd\n$var_name = $py_cmd\n";
                             PersistentSessionManager.get_default ().execute_python.begin (py_code, (o, r) => {
                                 refresh_environment.begin ();
                                 view_dataframe_requested (var_name, "python");

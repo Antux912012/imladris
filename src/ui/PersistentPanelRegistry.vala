@@ -1292,7 +1292,7 @@ namespace Imladris.UI {
             string text = doc_page.source_buffer.text;
             var chunks = Core.ChunkParser.parse_chunks (text);
             foreach (var ch in chunks) {
-                if (ch.code.length > 0) {
+                if (ch.eval_enabled && ch.code.length > 0) {
                     run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
                 }
             }
@@ -1358,6 +1358,7 @@ namespace Imladris.UI {
          */
         public void clear_all_outputs () {
             doc_page.console_view.buffer.set_text ("", -1);
+            doc_page.clear_inline_chunk_outputs ();
             if (main_window != null) {
                 main_window.show_toast ("Cleared all outputs");
             }
@@ -1371,7 +1372,7 @@ namespace Imladris.UI {
 
             var chunks = Core.ChunkParser.parse_chunks (text);
             foreach (var ch in chunks) {
-                if (ch.end_line < cursor_line && ch.code.length > 0) {
+                if (ch.end_line < cursor_line && ch.eval_enabled && ch.code.length > 0) {
                     run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
                 }
             }
@@ -1385,7 +1386,7 @@ namespace Imladris.UI {
 
             var chunks = Core.ChunkParser.parse_chunks (text);
             foreach (var ch in chunks) {
-                if (ch.end_line >= cursor_line && ch.code.length > 0) {
+                if (ch.end_line >= cursor_line && ch.eval_enabled && ch.code.length > 0) {
                     run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
                 }
             }
@@ -1464,7 +1465,7 @@ namespace Imladris.UI {
                         }
                     }
                     if (plot_file != null) {
-                        load_plot_image (plot_file);
+                        register_generated_plot (plot_file);
                         string base_plot = GLib.Path.get_basename (plot_file);
                         doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
                     }
@@ -1496,7 +1497,7 @@ namespace Imladris.UI {
                         }
                     }
                     if (plot_file != null) {
-                        load_plot_image (plot_file);
+                        register_generated_plot (plot_file);
                         string base_plot = GLib.Path.get_basename (plot_file);
                         doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
                     }
@@ -1913,6 +1914,15 @@ namespace Imladris.UI {
         // =================================================================
         // PLOTS GALLERY & EXPORT HELPERS
         // =================================================================
+        public void register_generated_plot (string plot_file_path) {
+            if (!GLib.FileUtils.test (plot_file_path, GLib.FileTest.EXISTS)) return;
+            if (plot_gallery.size == 0 || plot_gallery.get (plot_gallery.size - 1) != plot_file_path) {
+                plot_gallery.add (plot_file_path);
+            }
+            active_plot_idx = plot_gallery.size - 1;
+            update_plot_view ();
+        }
+
         private void update_plot_view () {
             if (plot_gallery.size == 0) {
                 btn_prev_plot.sensitive = false;

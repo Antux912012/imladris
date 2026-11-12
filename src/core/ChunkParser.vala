@@ -9,13 +9,17 @@ namespace Imladris.Core {
         public string language { owned get; set; }
         public string code { owned get; set; }
         public string header { owned get; set; }
+        public bool eval_enabled { get; set; default = true; }
+        public string chunk_label { owned get; set; default = ""; }
 
-        public CodeChunk (int start_line, int end_line, string language, string code, string header = "") {
+        public CodeChunk (int start_line, int end_line, string language, string code, string header = "", bool eval_enabled = true, string chunk_label = "") {
             this.start_line = start_line;
             this.end_line = end_line;
             this.language = language;
             this.code = code;
             this.header = header;
+            this.eval_enabled = eval_enabled;
+            this.chunk_label = chunk_label;
         }
     }
 
@@ -32,6 +36,8 @@ namespace Imladris.Core {
             int start_line = -1;
             string language = "r";
             string header = "";
+            string chunk_label = "";
+            bool eval_enabled = true;
             var code_sb = new GLib.StringBuilder ();
 
             for (int i = 0; i < lines.length; i++) {
@@ -47,28 +53,72 @@ namespace Imladris.Core {
                             tag = tag.substring (1, close_brace - 1).strip ();
                         }
                     }
-                    int space_idx = tag.index_of (" ");
-                    if (space_idx > 0) {
-                        tag = tag.substring (0, space_idx);
+
+                    string lower_header = tag.down ().replace (" ", "");
+                    eval_enabled = !(lower_header.contains ("eval=false") || lower_header.contains ("eval=f"));
+
+                    // Split engine identifier on earliest space, comma, semicolon, or tab
+                    int split_idx = -1;
+                    for (int c_idx = 0; c_idx < tag.length; c_idx++) {
+                        char ch = tag[c_idx];
+                        if (ch == ' ' || ch == ',' || ch == ';' || ch == '\t') {
+                            split_idx = c_idx;
+                            break;
+                        }
                     }
-                    if (tag.length > 0) {
+
+                    chunk_label = "";
+                    if (split_idx > 0) {
+                        string rest = tag.substring (split_idx + 1).strip ();
+                        if (rest.has_prefix (",")) {
+                            rest = rest.substring (1).strip ();
+                        }
+                        int comma_idx = rest.index_of (",");
+                        string candidate = (comma_idx >= 0) ? rest.substring (0, comma_idx).strip () : rest;
+                        if (!candidate.contains ("=") && candidate.length > 0) {
+                            chunk_label = candidate;
+                        }
+                        tag = tag.substring (0, split_idx);
+                    }
+
+                    string lang_clean = tag.down ().strip ();
+                    if (lang_clean == "py" || lang_clean == "python3") {
+                        lang_clean = "python";
+                    } else if (lang_clean == "sh" || lang_clean == "shell" || lang_clean == "zsh") {
+                        lang_clean = "bash";
+                    }
+
+                    if (lang_clean.length > 0) {
                         inside_chunk = true;
                         start_line = i;
                         header = trimmed;
                         code_sb.truncate (0);
-                        language = tag.down ();
+                        language = lang_clean;
                         continue;
                     }
                 }
 
                 if (inside_chunk && trimmed == "```") {
                     inside_chunk = false;
-                    list.add (new CodeChunk (start_line, i, language, code_sb.str.strip (), header));
+                    list.add (new CodeChunk (
+                        start_line,
+                        i,
+                        language,
+                        code_sb.str.strip (),
+                        header,
+                        eval_enabled,
+                        chunk_label
+                    ));
                     continue;
                 }
 
                 if (inside_chunk) {
-                    if (!trimmed.has_prefix ("#|")) {
+                    if (trimmed.has_prefix ("#|")) {
+                        string opt_lower = trimmed.substring (2).strip ().down ().replace (" ", "");
+                        if (opt_lower.has_prefix ("eval:false") || opt_lower.has_prefix ("eval:no") || opt_lower.has_prefix ("eval:f")) {
+                            eval_enabled = false;
+                        }
+                    } else {
                         code_sb.append (lines[i] + "\n");
                     }
                 }

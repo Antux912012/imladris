@@ -302,6 +302,41 @@ print(np.mean([1, 2, 3]))
 
         var ch_outside = Core.ChunkParser.find_chunk_at_line (doc, 2);
         assert (ch_outside == null);
+
+        // Test comma-delimited headers, labels, and eval: false
+        string complex_doc = """# Clinical Manuscript
+```{r, table1_demographics, echo=FALSE, eval=FALSE}
+summary(mtcars)
+```
+
+```{python py_sim, eval: false}
+#| eval: false
+print("eval false via hash-pipe")
+```
+
+```{r, label="valid_eval"}
+#| eval: true
+x <- 42
+```
+""";
+        var comp_chunks = Core.ChunkParser.parse_chunks (complex_doc);
+        assert (comp_chunks.size == 3);
+        assert (comp_chunks[0].language == "r");
+        assert (comp_chunks[0].chunk_label == "table1_demographics");
+        assert (!comp_chunks[0].eval_enabled);
+
+        assert (comp_chunks[1].language == "python");
+        assert (comp_chunks[1].chunk_label == "py_sim");
+        assert (!comp_chunks[1].eval_enabled);
+
+        assert (comp_chunks[2].language == "r");
+        assert (comp_chunks[2].eval_enabled);
+
+        // Test Elbereth biostatistical normal quantile math
+        double z_975 = Bridges.Elbereth.ClinicalBiostatsPopover.normal_quantile (0.975);
+        assert (GLib.Math.fabs (z_975 - 1.95996) < 0.001);
+        double cdf_0 = Bridges.Elbereth.ClinicalBiostatsPopover.normal_cdf (0.0);
+        assert (GLib.Math.fabs (cdf_0 - 0.5) < 0.0001);
     }
 
     private static void test_repl_bridge_and_chunk_engine () {
