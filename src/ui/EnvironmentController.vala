@@ -48,6 +48,10 @@ namespace Imladris.UI {
 
         public string active_engine { get; set; default = "r"; }
 
+        public Gee.ArrayList<EnvVariableItem> get_cached_variables () {
+            return last_items;
+        }
+
         public EnvironmentController (Gtk.Window? win) {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
             this.parent_window = win;

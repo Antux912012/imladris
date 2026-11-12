@@ -775,6 +775,12 @@ print("Python Interpreter:", sys.version.split()[0])
 
         private void setup_completion () {
             var completion = source_view.get_completion ();
+            completion.select_on_show = true;
+            completion.show_icons = true;
+            completion.remember_info_visibility = true;
+
+            var intellisense_provider = new Editor.CodeIntelliSenseProvider (this);
+            completion.add_provider (intellisense_provider);
 
             var citation_provider = new Editor.CitationCompletionProvider (this);
             completion.add_provider (citation_provider);
@@ -791,6 +797,8 @@ print("Python Interpreter:", sys.version.split()[0])
             var snippets_provider = new GtkSource.CompletionSnippets ();
             snippets_provider.priority = 20;
             completion.add_provider (snippets_provider);
+
+            Editor.BracketAutoPairController.attach (source_view, source_buffer);
         }
 
         public string get_selected_text () {

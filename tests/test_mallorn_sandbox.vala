@@ -26,6 +26,7 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/notebook/jupyter_nbformat_parity", test_notebook_serializer_parity);
         GLib.Test.add_func ("/math_chem/natural_math_and_chemistry_engine", test_math_chem_engine);
         GLib.Test.add_func ("/mermaid/visual_flow_and_mindmap_engine", test_mermaid_flow_engine);
+        GLib.Test.add_func ("/editor/vscode_polyglot_intellisense", test_vscode_polyglot_intellisense);
 
         return GLib.Test.run ();
     }
@@ -1020,5 +1021,77 @@ x <- 42
         // 6. Presets validation
         var mermaid_presets = Core.MermaidFlowEngine.get_presets ();
         assert (mermaid_presets.size >= 7);
+    }
+
+    private static void test_vscode_polyglot_intellisense () {
+        string sample_qmd = """---
+title: "Clinical Trial"
+---
+
+# Introduction
+Let $\alpha = 0.05$.
+
+```{r}
+#| echo: true
+clinical_cohort <- read.csv("patients.csv")
+clinical_cohort$patient_age <- 65
+ggplot(mtcars, aes(x = mpg, y = hp))
+```
+
+```{python}
+import pandas as pd
+df_omics = pd.read_csv("counts.tsv")
+```
+""";
+
+        // 1. YAML Frontmatter context detection & completion
+        var yaml_ctx = Editor.CodeIntelliSenseEngine.detect_context (sample_qmd, 1, "ti");
+        assert (yaml_ctx == Editor.IntelliSenseContext.YAML_FRONTMATTER);
+        var yaml_items = Editor.CodeIntelliSenseEngine.query_completions (sample_qmd, 1, "ti");
+        assert (yaml_items.size > 0);
+        assert (yaml_items[0].label == "title:");
+
+        // 2. LaTeX Math macro completion
+        var latex_ctx = Editor.CodeIntelliSenseEngine.detect_context (sample_qmd, 5, "Let $\\alp");
+        assert (latex_ctx == Editor.IntelliSenseContext.LATEX_MATH_CHEM);
+        var latex_items = Editor.CodeIntelliSenseEngine.query_completions (sample_qmd, 5, "Let $\\alp");
+        assert (latex_items.size > 0);
+        assert (latex_items[0].label == "\\alpha");
+
+        // 3. Quarto '#|' Hash-Pipe option completion
+        var opt_ctx = Editor.CodeIntelliSenseEngine.detect_context (sample_qmd, 8, "#| warn");
+        assert (opt_ctx == Editor.IntelliSenseContext.QUARTO_HASH_PIPE);
+        var opt_items = Editor.CodeIntelliSenseEngine.query_completions (sample_qmd, 8, "#| warn");
+        assert (opt_items.size > 0);
+        assert (opt_items[0].insert_text == "warning: false");
+
+        // 4. R DataFrame '$' Column completion (built-in mtcars + buffer-discovered clinical_cohort$patient_age)
+        var r_cols = Editor.CodeIntelliSenseEngine.query_completions (sample_qmd, 10, "mtcars$mp");
+        assert (r_cols.size > 0);
+        assert (r_cols[0].insert_text == "mtcars$mpg");
+
+        var user_cols = Editor.CodeIntelliSenseEngine.query_completions (sample_qmd, 10, "clinical_cohort$pat");
+        assert (user_cols.size > 0);
+        assert (user_cols[0].insert_text == "clinical_cohort$patient_age");
+
+        // 5. R Namespace '::' completion
+        var ns_items = Editor.CodeIntelliSenseEngine.query_completions (sample_qmd, 10, "survival::cox");
+        assert (ns_items.size > 0);
+        assert (ns_items[0].label == "survival::coxph");
+
+        // 6. Python dot-member completion & buffer variable discovery
+        var py_items = Editor.CodeIntelliSenseEngine.query_completions (sample_qmd, 16, "pd.read_c");
+        assert (py_items.size > 0);
+        assert (py_items[0].label == "pd.read_csv");
+
+        var py_var_items = Editor.CodeIntelliSenseEngine.query_completions (sample_qmd, 16, "df_om");
+        assert (py_var_items.size > 0);
+        assert (py_var_items[0].label == "df_omics");
+
+        // 7. Fuzzy Match Scoring
+        assert (Editor.CodeIntelliSenseEngine.compute_match_score ("read_csv", "rdcsv") > 0);
+        assert (Editor.CodeIntelliSenseEngine.compute_match_score ("differential_expression", "diffexp") > 0);
+        assert (Editor.CodeIntelliSenseEngine.compute_match_score ("ggplot", "ggp") > 50);
+        assert (Editor.CodeIntelliSenseEngine.compute_match_score ("hello", "xyz") == 0);
     }
 }

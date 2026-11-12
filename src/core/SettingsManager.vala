@@ -278,6 +278,8 @@ namespace Imladris.Core {
         private string _custom_local_endpoint = "http://127.0.0.1:8080/v1";
         private string _active_model_name = "Qwen2.5-Coder-3B";
         private bool _inline_completion_enabled = true;
+        private bool _code_intellisense_enabled = true;
+        private bool _auto_close_brackets = true;
         private bool _inline_editing_enabled = true;
         private SidePanelPosition _chat_panel_position = SidePanelPosition.RIGHT;
         private string _custom_model_path = "";
@@ -357,6 +359,26 @@ namespace Imladris.Core {
                     _inline_completion_enabled = value;
                     save_ini ();
                     ai_settings_changed ();
+                }
+            }
+        }
+
+        public bool code_intellisense_enabled {
+            get { return _code_intellisense_enabled; }
+            set {
+                if (_code_intellisense_enabled != value) {
+                    _code_intellisense_enabled = value;
+                    save_ini ();
+                }
+            }
+        }
+
+        public bool auto_close_brackets {
+            get { return _auto_close_brackets; }
+            set {
+                if (_auto_close_brackets != value) {
+                    _auto_close_brackets = value;
+                    save_ini ();
                 }
             }
         }
@@ -520,6 +542,12 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("ElrondAI", "inline_completion")) {
                         _inline_completion_enabled = config_keyfile.get_boolean ("ElrondAI", "inline_completion");
                     }
+                    if (config_keyfile.has_key ("Editor", "code_intellisense")) {
+                        _code_intellisense_enabled = config_keyfile.get_boolean ("Editor", "code_intellisense");
+                    }
+                    if (config_keyfile.has_key ("Editor", "auto_close_brackets")) {
+                        _auto_close_brackets = config_keyfile.get_boolean ("Editor", "auto_close_brackets");
+                    }
                     if (config_keyfile.has_key ("ElrondAI", "inline_editing")) {
                         _inline_editing_enabled = config_keyfile.get_boolean ("ElrondAI", "inline_editing");
                     }
@@ -548,6 +576,8 @@ namespace Imladris.Core {
                 config_keyfile.set_string ("ElrondAI", "custom_local_endpoint", _custom_local_endpoint);
                 config_keyfile.set_string ("ElrondAI", "model_name", _active_model_name);
                 config_keyfile.set_boolean ("ElrondAI", "inline_completion", _inline_completion_enabled);
+                config_keyfile.set_boolean ("Editor", "code_intellisense", _code_intellisense_enabled);
+                config_keyfile.set_boolean ("Editor", "auto_close_brackets", _auto_close_brackets);
                 config_keyfile.set_boolean ("ElrondAI", "inline_editing", _inline_editing_enabled);
                 config_keyfile.set_string ("ElrondAI", "chat_panel_position", _chat_panel_position.to_string_id ());
                 config_keyfile.set_string ("ElrondAI", "custom_model_path", _custom_model_path);

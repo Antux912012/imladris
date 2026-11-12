@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.20.0',
+  version: '0.21.0',
   default_options: ['warning_level=1']
 )
 
@@ -48,6 +48,8 @@ sources = files(
   'src/Window.vala',
   'src/console/ReplBridge.vala',
   'src/editor/ChunkExecutionEngine.vala',
+  'src/editor/CodeIntelliSenseEngine.vala',
+  'src/editor/CodeIntelliSenseProvider.vala',
   'src/core/frontmatter_parser.vala',
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
@@ -157,6 +159,7 @@ test_sources = files(
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
   'src/editor/ChunkExecutionEngine.vala',
+  'src/editor/CodeIntelliSenseEngine.vala',
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
@@ -206,6 +209,7 @@ plugin_test_sources = files(
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
   'src/editor/ChunkExecutionEngine.vala',
+  'src/editor/CodeIntelliSenseEngine.vala',
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
@@ -236,6 +240,7 @@ dock_test_sources = files(
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
   'src/editor/ChunkExecutionEngine.vala',
+  'src/editor/CodeIntelliSenseEngine.vala',
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',

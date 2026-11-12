@@ -60,6 +60,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.21.0" date="2026-11-12">
+      <description>
+        <p>Release v0.21.0 introduces zero-latency, 100% offline VS Code-grade polyglot IntelliSense and intelligent bracket/quote pairing: Implements non-AI deterministic completion engine (CodeIntelliSenseEngine) with multi-paradigm symbol catalogs for R (base, stats, tidyverse, survival, DESeq2), Python (builtins, pandas, numpy, matplotlib, scipy.stats), Quarto hash-pipe (#|) cell options, YAML frontmatter directives, and LaTeX/mhchem math macros; features live buffer AST scanning for user-defined variables and functions, active REPL session object introspection, and dataframe column accessors (df$col); adds VS Code subsequence fuzzy scoring with prefix boost; integrates BracketAutoPairController for smart auto-closure of brackets (), [], {} and quotes "", '', ``, cursor overtype skip-over, and selection wrapping; provides manual completion invocation via Ctrl+Space; and includes preference toggles in SettingsManager.</p>
+      </description>
+    </release>
     <release version="0.20.0" date="2026-11-12">
       <description>
         <p>Release v0.20.0 introduces the Elbereth Clinical Biostatistics, Power Calculation &amp; Survival Studio with critical stability and workflow improvements: Adds Elbereth popover supporting ICH E9 sample size calculations (two-sample t-test, binomial proportions, and Schoenfeld 1983 log-rank survival) with live Cairo Power Curve plotting, regulatory SAP justifications, and automated R/Python verification chunks; integrates CDISC ADSL Table 1, ADTTE survival (Kaplan-Meier + Cox PH), subgroup forest plots, and differential expression volcano plots; resolves R Markdown comma-delimited chunk header parsing ({r, echo=FALSE}) and #| eval: false execution skipping; connects REPL-generated plots to Quadrant 4 Plot Gallery; fixes inline chunk output clearing and tab-delimited (.tsv) dataset imports; auto-generates cryptographic SHA-256 GxP provenance manifests on export; and adds clinical trial SAP and RNA-Seq starter templates.</p>

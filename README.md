@@ -25,7 +25,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Read the Technical Wiki</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.20.0">⬇️ Download v0.20.0 (.deb / Flatpak)</a></strong>
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.21.0">⬇️ Download v0.21.0 (.deb / Flatpak)</a></strong>
 </p>
 
 ---
@@ -281,6 +281,7 @@ imladris path/to/document.qmd
 | `Ctrl+O` | Open an existing document or `.Rproj` / `.mallorn` project |
 | `Ctrl+S` | Save the active document buffer |
 | `Ctrl+M` | Open the Natural Math & Chemical Reaction Studio |
+| `Ctrl+Space` | Trigger VS Code-grade offline Polyglot IntelliSense |
 | `Ctrl+F1` | Collapse or expand the top context ribbon toolbar |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo or redo the previous buffer edit |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | Zoom in, zoom out, or reset editor zoom level |
