@@ -275,16 +275,22 @@ yay -S imladris
 
 #### Fedora / RHEL (.rpm):
 ```bash
-sudo dnf install ./imladris-0.23.0-1.x86_64.rpm
+sudo dnf install ./imladris-0.24.0-1.x86_64.rpm
 ```
 
 #### Debian / Ubuntu (.deb):
 ```bash
-sudo dpkg -i imladris_0.23.0_amd64.deb
+sudo dpkg -i imladris_0.24.0_amd64.deb
 sudo apt-get install -f
 ```
 
-Standalone packages and bundles (`.flatpak`, `.deb`, `.rpm`, and source `.tar.gz`) are available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.23.0](https://github.com/Antux912012/imladris/releases/tag/v0.23.0).
+#### AppImage (`.AppImage`):
+```bash
+chmod +x ./Imladris-0.24.0-x86_64.AppImage
+./Imladris-0.24.0-x86_64.AppImage
+```
+
+Standalone packages and bundles (`.flatpak`, `.deb`, `.rpm`, `.AppImage`, and source `.tar.gz`) are available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.24.0](https://github.com/Antux912012/imladris/releases/tag/v0.24.0).
 
 ### Debug Profile Build & Verification:
 ```bash
@@ -352,7 +358,19 @@ imladris path/to/document.qmd
 
 ---
 
-## 9. Privacy, Compliance, and License
+## 9. Acknowledgments & Project Inspirations
+
+Imladris is built on the shoulders of remarkable open-source scientific, desktop, and AI projects:
+
+* **[Quarto](https://github.com/quarto-dev/quarto-cli)** (`quarto-dev/quarto-cli`) — Scientific & technical publishing engine powering `.qmd` notebooks, presentations, and posters.
+* **[Posit / RStudio & Positron](https://github.com/posit-dev/positron)** (`posit-dev/positron`, `rstudio/rstudio`) — Inspiration for polyglot R/Python scientific notebook workflows and inline chunk execution.
+* **[Apostrophe](https://github.com/somas/apostrophe)** & **[GNOME Text Editor](https://gitlab.gnome.org/GNOME/gnome-text-editor)** — Inspiration for distraction-free GTK4/Libadwaita Markdown writing and GNOME HIG polish.
+* **[llama.cpp](https://github.com/ggml-org/llama.cpp)** (`ggml-org/llama.cpp`) — Zero-config local LLM inference powering offline Elrond Assistance.
+* **[WebKitGTK](https://webkitgtk.org/)** & **[GtkSourceView 5](https://gitlab.gnome.org/GNOME/gtksourceview)** — Native live HTML/Markdown/Quarto previewing and syntax-highlighted polyglot editing.
+
+---
+
+## 10. Privacy, Compliance, and License
 
 ### GDPR Compliance (Regulation (EU) 2016/679):
 * **Data Minimization (Art. 5(1)(c))**: Imladris collects zero telemetry, zero analytics, and zero background crash reports.
