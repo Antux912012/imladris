@@ -126,15 +126,18 @@ namespace Imladris.Core {
          * Injects environment variables for a micromamba / conda-managed prefix.
          * Sets PATH, CONDA_PREFIX, PKG_CONFIG_PATH, R_HOME, QUARTO_PYTHON, and QUARTO_R.
          */
-        public static void configure_managed_env (GLib.SubprocessLauncher launcher, string env_prefix) {
-            string bin_dir = GLib.Path.build_filename (env_prefix, "bin");
-            string lib_dir = GLib.Path.build_filename (env_prefix, "lib");
-            string pkg_dir = GLib.Path.build_filename (lib_dir, "pkgconfig");
-            string r_home = GLib.Path.build_filename (lib_dir, "R");
+        public static void configure_managed_env (GLib.SubprocessLauncher launcher, string? env_prefix) {
+            bool has_prefix = (env_prefix != null && env_prefix != "");
+            string? bin_dir = has_prefix ? GLib.Path.build_filename (env_prefix, "bin") : null;
+            string? lib_dir = has_prefix ? GLib.Path.build_filename (env_prefix, "lib") : null;
+            string? pkg_dir = has_prefix ? GLib.Path.build_filename (lib_dir, "pkgconfig") : null;
+            string? r_home = has_prefix ? GLib.Path.build_filename (lib_dir, "R") : null;
 
             string? current_path = GLib.Environment.get_variable ("PATH");
             var path_parts = new GLib.GenericArray<string> ();
-            path_parts.add (bin_dir);
+            if (bin_dir != null) {
+                path_parts.add (bin_dir);
+            }
 
             string home_dir = GLib.Environment.get_home_dir ();
             string data_dir = GLib.Environment.get_user_data_dir ();
@@ -163,17 +166,19 @@ namespace Imladris.Core {
 
             launcher.set_environ (GLib.Environment.list_variables ());
             launcher.setenv ("PATH", path_val, true);
-            launcher.setenv ("CONDA_PREFIX", env_prefix, true);
-            launcher.setenv ("PKG_CONFIG_PATH", pkg_dir, true);
-            launcher.setenv ("R_HOME", r_home, true);
+            if (has_prefix) {
+                launcher.setenv ("CONDA_PREFIX", env_prefix, true);
+                launcher.setenv ("PKG_CONFIG_PATH", pkg_dir, true);
+                launcher.setenv ("R_HOME", r_home, true);
 
-            string py_bin = GLib.Path.build_filename (bin_dir, "python3");
-            if (GLib.FileUtils.test (py_bin, GLib.FileTest.EXISTS)) {
-                launcher.setenv ("QUARTO_PYTHON", py_bin, true);
-            }
-            string r_bin = GLib.Path.build_filename (bin_dir, "R");
-            if (GLib.FileUtils.test (r_bin, GLib.FileTest.EXISTS)) {
-                launcher.setenv ("QUARTO_R", r_bin, true);
+                string py_bin = GLib.Path.build_filename (bin_dir, "python3");
+                if (GLib.FileUtils.test (py_bin, GLib.FileTest.EXISTS)) {
+                    launcher.setenv ("QUARTO_PYTHON", py_bin, true);
+                }
+                string r_bin = GLib.Path.build_filename (bin_dir, "R");
+                if (GLib.FileUtils.test (r_bin, GLib.FileTest.EXISTS)) {
+                    launcher.setenv ("QUARTO_R", r_bin, true);
+                }
             }
 
             inject_galaxy_credentials (launcher);

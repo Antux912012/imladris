@@ -148,10 +148,8 @@ namespace Imladris.Core {
             if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
                 string[] host_cmd = { "quarto", "render", qmd_path, "--to", target_flag };
                 argv = Core.PlatformUtils.build_host_command (host_cmd, working_dir);
-            } else if (source == Core.RuntimeSource.MANAGED_GLOBAL || source == Core.RuntimeSource.PROJECT_SANDBOX) {
-                Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
-                argv = raw_args;
             } else {
+                Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                 argv = raw_args;
             }
 

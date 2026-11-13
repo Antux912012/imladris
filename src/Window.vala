@@ -303,6 +303,7 @@ namespace Imladris {
             sci_list.append (row_cite);
 
             var row_doi_bib = new Adw.ActionRow () {
+                use_markup = false,
                 title = "DOI & .bib Bibliography Manager",
                 subtitle = "Ctrl+Shift+B",
                 activatable = true

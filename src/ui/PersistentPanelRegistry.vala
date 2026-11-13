@@ -1558,7 +1558,7 @@ namespace Imladris.UI {
                     environment_controller.active_engine = "python";
                     environment_controller.refresh_environment.begin ();
                 });
-            } else {
+            } else if (engine == "bash" || engine == "sh" || engine == "zsh") {
                 ExecutionEngine.capture_command_async.begin ({ "bash", "-c", code }, (obj, res) => {
                     string output = ExecutionEngine.capture_command_async.end (res).strip ();
                     double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
@@ -1570,6 +1570,12 @@ namespace Imladris.UI {
                     }
                     refresh_environment_and_outline ();
                 });
+            } else {
+                string msg = @"✖ Unsupported chunk engine '$engine'. Supported interactive engines: r, python, bash/sh.";
+                doc_page.append_console_log (msg);
+                if (inline_chunk_line >= 0) {
+                    doc_page.display_inline_chunk_output (inline_chunk_line, msg, null, count, 0.0);
+                }
             }
         }
 

@@ -26,6 +26,8 @@ BuildRequires:  pkgconfig(glib-2.0)
 
 Requires:       hicolor-icon-theme
 Requires:       python3
+Requires:       curl
+Requires:       bzip2
 Recommends:     pandoc
 Recommends:     libreoffice-writer
 Recommends:     texlive-scheme-basic

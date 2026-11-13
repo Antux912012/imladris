@@ -157,6 +157,14 @@ namespace Imladris.Services {
             }
         }
 
+        private static string encode_hex (uint8[] data) {
+            var sb = new GLib.StringBuilder ();
+            for (int i = 0; i < data.length; i++) {
+                sb.append_printf ("%02x", data[i]);
+            }
+            return sb.str;
+        }
+
         private async string execute_r_internal (string code, out string? generated_plot) {
             generated_plot = null;
             ensure_r_session ();
@@ -172,23 +180,20 @@ namespace Imladris.Services {
             bool has_plot = code.contains ("plot(") || code.contains ("plot (") ||
                             code.contains ("ggplot") || code.contains ("qplot") ||
                             code.contains ("hist(") || code.contains ("barplot(") ||
-                            code.contains ("boxplot(") || code.contains ("pairs(");
-
-            var cmd_sb = new GLib.StringBuilder ();
-            if (has_plot) {
-                cmd_sb.append_printf ("png('%s', width = 800, height = 500, res = 120)\n", plot_file.replace ("\\", "/"));
-                cmd_sb.append ("tryCatch({\n");
-                cmd_sb.append (code + "\n");
-                cmd_sb.append ("}, finally = { if (dev.cur() > 1) dev.off() })\n");
-            } else {
-                cmd_sb.append (code + "\n");
-            }
+                            code.contains ("boxplot(") || code.contains ("pairs(") ||
+                            code.contains ("heatmap(") || code.contains ("pheatmap(") ||
+                            code.contains ("image(") || code.contains ("matplot(") ||
+                            code.contains ("qqnorm(") || code.contains ("curve(") ||
+                            code.contains ("xyplot(") || code.contains ("bwplot(") ||
+                            code.contains ("dotchart(") || code.contains ("pie(") ||
+                            code.contains ("print(");
 
             string sentinel = @"__IMLADRIS_R_DONE_$(plot_id)__";
-            cmd_sb.append_printf ("cat('\\n%s\\n')\n", sentinel);
+            string hex_code = encode_hex (code.data);
+            string payload = @"$(sentinel)|$(has_plot ? "1" : "0")|$(hex_code)|$(plot_file.replace ("\\", "/"))\n";
 
             try {
-                r_stdin.put_string (cmd_sb.str, null);
+                r_stdin.put_string (payload, null);
                 r_stdin.flush ();
 
                 var output_sb = new GLib.StringBuilder ();
@@ -254,32 +259,10 @@ namespace Imladris.Services {
 
             string b64_code = GLib.Base64.encode (code.data);
             string sentinel = @"__IMLADRIS_PY_DONE_$(plot_id)__";
-
-            string payload = """
-import sys, os, base64, traceback
-_imladris_plot_path = r"%s"
-_imladris_has_plot_intent = %s
-try:
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    _imladris_has_mpl = True
-except Exception:
-    _imladris_has_mpl = False
-
-try:
-    _imladris_src = base64.b64decode("%s").decode('utf-8')
-    exec(compile(_imladris_src, '<imladris-cell>', 'exec'), globals())
-    if _imladris_has_mpl and _imladris_has_plot_intent and plt.get_fignums():
-        plt.savefig(_imladris_plot_path, dpi=120, bbox_inches='tight')
-        plt.close('all')
-except Exception:
-    traceback.print_exc(file=sys.stdout)
-print("%s", flush=True)
-""".printf (plot_file, has_plot ? "True" : "False", b64_code, sentinel);
+            string payload = @"$(sentinel)|$(has_plot ? "1" : "0")|$(b64_code)|$(plot_file)\n";
 
             try {
-                py_stdin.put_string (payload + "\n", null);
+                py_stdin.put_string (payload, null);
                 py_stdin.flush ();
 
                 var output_sb = new GLib.StringBuilder ();
@@ -358,21 +341,22 @@ print("%s", flush=True)
                     launcher.set_cwd (cwd);
                 }
 
+                string r_driver = "options(width = 120, warn = 1); .imladris_env <- globalenv(); .imladris_con <- file('stdin', open = 'r'); while (length(.line <- readLines(.imladris_con, n = 1L, warn = FALSE)) > 0L) { if (!nzchar(.line)) next; .parts <- strsplit(.line, '|', fixed = TRUE)[[1L]]; if (length(.parts) < 4L) next; .sentinel <- .parts[1L]; .has_plot <- (.parts[2L] == '1'); .hex <- .parts[3L]; .plot_file <- paste(.parts[4L:length(.parts)], collapse = '|'); .code <- if (nzchar(.hex)) { .idx <- seq.int(1L, nchar(.hex), by = 2L); .s <- rawToChar(as.raw(strtoi(substring(.hex, .idx, .idx + 1L), 16L))); Encoding(.s) <- 'UTF-8'; .s } else ''; tryCatch({ .exprs <- parse(text = .code); if (.has_plot) grDevices::png(.plot_file, width = 800, height = 500, res = 120); tryCatch({ for (.e in .exprs) { .res <- withVisible(eval(.e, envir = .imladris_env)); if (.res$visible) print(.res$value) } }, finally = { if (.has_plot && grDevices::dev.cur() > 1L) grDevices::dev.off() }) }, error = function(e) { cat(sprintf('Error: %s\\n', conditionMessage(e))) }); flush.console(); cat(sprintf('\\n%s\\n', .sentinel)); flush.console() }";
+
                 string[] raw_argv = {
                     (resolved_path != null) ? resolved_path : "R",
-                    "--no-save",
+                    "--slave",
                     "--no-restore",
-                    "--quiet",
-                    "--interactive"
+                    "--no-save",
+                    "-e",
+                    r_driver
                 };
 
                 string[] argv;
                 if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
-                    argv = Core.PlatformUtils.build_host_command ({ "R", "--no-save", "--no-restore", "--quiet", "--interactive" }, cwd);
-                } else if (source == Core.RuntimeSource.MANAGED_GLOBAL || source == Core.RuntimeSource.PROJECT_SANDBOX) {
-                    Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
-                    argv = raw_argv;
+                    argv = Core.PlatformUtils.build_host_command ({ "R", "--slave", "--no-restore", "--no-save", "-e", r_driver }, cwd);
                 } else {
+                    Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                     argv = raw_argv;
                 }
 
@@ -380,9 +364,6 @@ print("%s", flush=True)
                 r_stdin = new GLib.DataOutputStream (r_process.get_stdin_pipe ());
                 r_stdout = new GLib.DataInputStream (r_process.get_stdout_pipe ());
                 r_initialized = true;
-
-                r_stdin.put_string ("options(prompt = '', continue = '', width = 120, warn = 1)\n", null);
-                r_stdin.flush ();
             } catch (GLib.Error e) {
                 r_initialized = false;
                 GLib.warning ("Failed to launch persistent R session: %s", e.message);
@@ -415,19 +396,52 @@ print("%s", flush=True)
                     launcher.set_cwd (cwd);
                 }
 
+                string py_driver = """
+import sys, base64, traceback
+_imladris_ns = {'__name__': '__main__'}
+for _raw in sys.stdin:
+    _raw = _raw.strip()
+    if not _raw:
+        continue
+    _parts = _raw.split('|', 3)
+    if len(_parts) != 4:
+        continue
+    _sentinel, _has_plot, _b64, _plot_path = _parts
+    try:
+        _src = base64.b64decode(_b64).decode('utf-8')
+        _code = compile(_src, '<imladris-cell>', 'exec')
+        _has_mpl = False
+        if _has_plot == '1':
+            try:
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+                _has_mpl = True
+            except Exception:
+                _has_mpl = False
+        exec(_code, _imladris_ns)
+        if _has_mpl and plt.get_fignums():
+            plt.savefig(_plot_path, dpi=120, bbox_inches='tight')
+            plt.close('all')
+    except Exception:
+        traceback.print_exc(file=sys.stdout)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    print(_sentinel, flush=True)
+""";
+
                 string[] raw_argv = {
                     (resolved_path != null) ? resolved_path : "python3",
-                    "-i",
-                    "-u"
+                    "-u",
+                    "-c",
+                    py_driver
                 };
 
                 string[] argv;
                 if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
-                    argv = Core.PlatformUtils.build_host_command ({ "python3", "-i", "-u" }, cwd);
-                } else if (source == Core.RuntimeSource.MANAGED_GLOBAL || source == Core.RuntimeSource.PROJECT_SANDBOX) {
-                    Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
-                    argv = raw_argv;
+                    argv = Core.PlatformUtils.build_host_command ({ "python3", "-u", "-c", py_driver }, cwd);
                 } else {
+                    Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                     argv = raw_argv;
                 }
 
@@ -435,9 +449,6 @@ print("%s", flush=True)
                 py_stdin = new GLib.DataOutputStream (py_process.get_stdin_pipe ());
                 py_stdout = new GLib.DataInputStream (py_process.get_stdout_pipe ());
                 py_initialized = true;
-
-                py_stdin.put_string ("import sys\nsys.ps1 = ''\nsys.ps2 = ''\n", null);
-                py_stdin.flush ();
             } catch (GLib.Error e) {
                 py_initialized = false;
                 GLib.warning ("Failed to launch persistent Python session: %s", e.message);

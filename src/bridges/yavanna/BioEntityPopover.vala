@@ -107,7 +107,7 @@ namespace Imladris.Bridges.Yavanna {
             var title_icon = new Gtk.Image.from_icon_name ("applications-science-symbolic") {
                 pixel_size = 18
             };
-            var title_label = new Gtk.Label ("<b>Yavanna Bio-Entity & Oligo Inspector</b>") {
+            var title_label = new Gtk.Label ("<b>Yavanna Bio-Entity &amp; Oligo Inspector</b>") {
                 use_markup = true,
                 xalign = 0,
                 hexpand = true

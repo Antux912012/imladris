@@ -34,10 +34,8 @@ namespace Imladris.Services {
                     host_raw[0] = tool_name;
                     for (int i = 0; i < sub_args.length; i++) host_raw[i + 1] = sub_args[i];
                     argv = Core.PlatformUtils.build_host_command (host_raw, working_dir);
-                } else if (source == Core.RuntimeSource.MANAGED_GLOBAL || source == Core.RuntimeSource.PROJECT_SANDBOX) {
-                    Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
-                    argv = full_raw;
                 } else {
+                    Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                     argv = full_raw;
                 }
 

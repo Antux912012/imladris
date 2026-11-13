@@ -164,7 +164,7 @@ Priority: optional
 Architecture: ${ARCH}
 Installed-Size: ${INSTALLED_SIZE}
 Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
-Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.12), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3
+Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.12), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3, curl, bzip2
 Recommends: pandoc, libreoffice-writer | libreoffice, texlive-latex-base | typst, llama.cpp | llama-cpp
 Homepage: https://antux912012.github.io/imladris/
 Description: Native Polyglot Studio with AI Assistance, Auto-Completion and MCP Server

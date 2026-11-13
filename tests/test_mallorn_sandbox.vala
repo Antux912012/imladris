@@ -17,6 +17,7 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/export/odt_and_odp_pipeline", test_export_pipeline_odt_odp);
         GLib.Test.add_func ("/export/qmd_pdf_html_odt_rtf", test_export_qmd_pdf_html_odt_rtf);
         GLib.Test.add_func ("/export/html_css_latex_render", test_html_css_latex_render);
+        GLib.Test.add_func ("/sessions/python_and_r_repl_execution", test_persistent_python_and_r_repl);
         GLib.Test.add_func ("/chunks/chunk_parser", test_chunk_parser);
         GLib.Test.add_func ("/execution/repl_bridge_and_chunk_engine", test_repl_bridge_and_chunk_engine);
         GLib.Test.add_func ("/core/platform_utils", test_platform_utils);
@@ -1142,5 +1143,52 @@ df_omics = pd.read_csv("counts.tsv")
         assert ("content: \"$not_math$\"" in rendered);
         assert (".math-display-card" in rendered);
         assert (!("$$E = mc^2$$" in rendered));
+    }
+
+    static void test_persistent_python_and_r_repl () {
+        var mgr = Services.PersistentSessionManager.get_default ();
+        var loop = new GLib.MainLoop ();
+        bool done = false;
+
+        Idle.add (() => {
+            run_repl_checks.begin (mgr, () => {
+                done = true;
+                loop.quit ();
+            });
+            return false;
+        });
+
+        uint timeout_id = Timeout.add_seconds (15, () => {
+            assert_not_reached ();
+        });
+        while (!done) {
+            loop.run ();
+        }
+        Source.remove (timeout_id);
+        mgr.restart_all_sessions ();
+    }
+
+    static async void run_repl_checks (Services.PersistentSessionManager mgr) {
+        if (Core.PlatformUtils.is_program_available ("python3")) {
+            string? p1 = null;
+            yield mgr.execute_python ("x_val = 40\ntry:\n    y_val = 2\nexcept Exception:\n    y_val = 0", out p1);
+            string? p2 = null;
+            string out2 = yield mgr.execute_python ("print(x_val + y_val)", out p2);
+            assert (out2.strip () == "42");
+            string? p3 = null;
+            string out3 = yield mgr.execute_python ("x = (", out p3);
+            assert (out3.contains ("SyntaxError"));
+        }
+
+        if (Core.PlatformUtils.is_program_available ("R")) {
+            string? r1 = null;
+            yield mgr.execute_r ("imladris_x <- 21", out r1);
+            string? r2 = null;
+            string rout2 = yield mgr.execute_r ("imladris_x * 2", out r2);
+            assert (rout2.contains ("42"));
+            string? r3 = null;
+            string rout3 = yield mgr.execute_r ("x <- (", out r3);
+            assert (rout3.contains ("Error:"));
+        }
     }
 }

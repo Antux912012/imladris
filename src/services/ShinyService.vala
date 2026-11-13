@@ -146,14 +146,29 @@ shiny::runApp('%s', port = %d, host = '127.0.0.1', launch.browser = FALSE)
 """.printf (port, sanitized_target, port);
 
             try {
+                string? resolved_r = null;
+                string? env_prefix = null;
+                var source = Core.PlatformUtils.resolve_runtime ("R", target_dir, out resolved_r, out env_prefix);
+                if (source == Core.RuntimeSource.MISSING) {
+                    this.status = ShinyAppStatus.ERROR;
+                    status_changed (this.status);
+                    log_received ("R interpreter not found. Install R via Data Science Toolchains or system packages.", true);
+                    return;
+                }
+
                 var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE);
                 launcher.set_cwd (target_dir);
 
+                string[] raw_argv = {
+                    (resolved_r != null) ? resolved_r : "R",
+                    "--vanilla", "--quiet", "-e", r_cmd
+                };
                 string[] argv;
-                if (Core.PlatformUtils.is_flatpak ()) {
-                    argv = { "flatpak-spawn", "--host", "R", "--vanilla", "--quiet", "-e", r_cmd };
+                if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
+                    argv = Core.PlatformUtils.build_host_command ({ "R", "--vanilla", "--quiet", "-e", r_cmd }, target_dir);
                 } else {
-                    argv = { "R", "--vanilla", "--quiet", "-e", r_cmd };
+                    Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
+                    argv = raw_argv;
                 }
 
                 cancellable = new Cancellable ();

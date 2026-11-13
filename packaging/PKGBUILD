@@ -17,6 +17,8 @@ depends=(
     'libgee'
     'glib2'
     'hicolor-icon-theme'
+    'curl'
+    'bzip2'
 )
 optdepends=(
     'r: R language execution and package management'
