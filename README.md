@@ -275,22 +275,22 @@ yay -S imladris
 
 #### Fedora / RHEL (.rpm):
 ```bash
-sudo dnf install ./imladris-0.24.1-1.x86_64.rpm
+sudo dnf install ./imladris-0.24.2-1.x86_64.rpm
 ```
 
 #### Debian / Ubuntu (.deb):
 ```bash
-sudo dpkg -i imladris_0.24.1_amd64.deb
+sudo dpkg -i imladris_0.24.2_amd64.deb
 sudo apt-get install -f
 ```
 
 #### AppImage (`.AppImage`):
 ```bash
-chmod +x ./Imladris-0.24.1-x86_64.AppImage
-./Imladris-0.24.1-x86_64.AppImage
+chmod +x ./Imladris-0.24.2-x86_64.AppImage
+./Imladris-0.24.2-x86_64.AppImage
 ```
 
-Standalone packages and bundles (`.flatpak`, `.deb`, `.rpm`, `.AppImage`, and source `.tar.gz`) are available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.24.1](https://github.com/Antux912012/imladris/releases/tag/v0.24.1).
+Standalone packages and bundles (`.flatpak`, `.deb`, `.rpm`, `.AppImage`, and source `.tar.gz`) are available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.24.2](https://github.com/Antux912012/imladris/releases/tag/v0.24.2).
 
 ### Debug Profile Build & Verification:
 ```bash

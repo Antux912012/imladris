@@ -2,7 +2,7 @@
 Name=Papirus
 Comment=Imladris Fallback Papirus Theme
 Inherits=hicolor
-Directories=scalable/actions,scalable/apps,scalable/categories,scalable/places,scalable/mimetypes,scalable/emblems
+Directories=scalable/actions,scalable/apps,scalable/categories,scalable/devices,scalable/emblems,scalable/emotes,scalable/mimetypes,scalable/places,scalable/status,scalable/ui
 
 [scalable/actions]
 Context=Actions
@@ -25,8 +25,22 @@ MinSize=8
 MaxSize=512
 Type=Scalable
 
-[scalable/places]
-Context=Places
+[scalable/devices]
+Context=Devices
+Size=16
+MinSize=8
+MaxSize=512
+Type=Scalable
+
+[scalable/emblems]
+Context=Emblems
+Size=16
+MinSize=8
+MaxSize=512
+Type=Scalable
+
+[scalable/emotes]
+Context=Emotes
 Size=16
 MinSize=8
 MaxSize=512
@@ -39,8 +53,22 @@ MinSize=8
 MaxSize=512
 Type=Scalable
 
-[scalable/emblems]
-Context=Emblems
+[scalable/places]
+Context=Places
+Size=16
+MinSize=8
+MaxSize=512
+Type=Scalable
+
+[scalable/status]
+Context=Status
+Size=16
+MinSize=8
+MaxSize=512
+Type=Scalable
+
+[scalable/ui]
+Context=Ui
 Size=16
 MinSize=8
 MaxSize=512

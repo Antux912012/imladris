@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.24.1
+Version:        0.24.2
 Release:        1%{?dist}
 Summary:        Scientific notebook studio with GPU acceleration, slide decks and posters
 

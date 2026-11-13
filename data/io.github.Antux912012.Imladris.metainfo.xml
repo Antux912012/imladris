@@ -68,6 +68,14 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.24.2" date="2026-11-13">
+      <description>
+        <p>Release v0.24.2 bundles all missing Papirus symbolic icons inside the application resource archive:</p>
+        <ul>
+          <li>Complete Bundled Icon Pack: Embeds all 118 required Papirus symbolic SVG icons via GResource so toolbar, dock, and dialog icons render reliably on any desktop icon theme.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.24.1" date="2026-11-13">
       <description>
         <p>Release v0.24.1 updates the project homepage and website metadata:</p>
