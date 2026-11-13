@@ -292,22 +292,34 @@ namespace Imladris.UI {
                 tab_list_box.append (tab_btn);
             }
 
-            // Clear viewport children without destroying persistent panels
-            Gtk.Widget? vp_child = viewport_box.get_first_child ();
-            while (vp_child != null) {
-                var next = vp_child.get_next_sibling ();
-                viewport_box.remove (vp_child);
-                vp_child = next;
-            }
-
             // Check minimized or empty state
             if (qconfig.size_state == QuadrantSizeState.MINIMIZED || qconfig.tabs.size == 0 || qconfig.active_tab == null) {
+                Gtk.Widget? vp_child = viewport_box.get_first_child ();
+                while (vp_child != null) {
+                    var next = vp_child.get_next_sibling ();
+                    viewport_box.remove (vp_child);
+                    vp_child = next;
+                }
                 body_overlay.visible = false;
                 this.vexpand = false;
             } else {
+                var target_panel = registry.get_panel (qconfig.active_tab);
+                // Avoid unparenting/reparenting if the active panel is already the sole child,
+                // as detaching a WebKit.WebView forces an unmap/unrealize/map cycle in GTK4.
+                Gtk.Widget? vp_child = viewport_box.get_first_child ();
+                bool already_mounted = (target_panel != null && vp_child == target_panel && target_panel.get_next_sibling () == null);
+                if (!already_mounted) {
+                    while (vp_child != null) {
+                        var next = vp_child.get_next_sibling ();
+                        viewport_box.remove (vp_child);
+                        vp_child = next;
+                    }
+                    registry.mount_panel (qconfig.active_tab, viewport_box);
+                } else {
+                    target_panel.visible = true;
+                }
                 body_overlay.visible = true;
                 this.vexpand = true;
-                registry.mount_panel (qconfig.active_tab, viewport_box);
             }
         }
     }

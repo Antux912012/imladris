@@ -555,8 +555,28 @@ namespace Imladris.Core.Layout {
                         }
                     }
                 }
+
+                // Reconcile newly introduced panels (e.g., LIVE_PREVIEW) into older saved layouts
+                ensure_panel_present (PanelId.LIVE_PREVIEW, QuadrantId.Q4_BOTTOM_RIGHT);
+                ensure_panel_present (PanelId.SHINY_VIEWER, QuadrantId.Q4_BOTTOM_RIGHT);
             } catch (GLib.Error e) {
                 warning ("Failed to load RStudio dock layout state: %s", e.message);
+            }
+        }
+
+        private void ensure_panel_present (PanelId pid, QuadrantId fallback_quad) {
+            foreach (var qid in QuadrantId.all ()) {
+                var q = quadrants.get (qid);
+                if (q != null && q.tabs.contains (pid)) {
+                    return;
+                }
+            }
+            var target = quadrants.get (fallback_quad);
+            if (target != null) {
+                target.tabs.add (pid);
+                if (target.active_tab == null) {
+                    target.active_tab = pid;
+                }
             }
         }
     }

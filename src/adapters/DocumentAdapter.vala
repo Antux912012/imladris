@@ -193,12 +193,23 @@ namespace Imladris.Adapters {
             var lines = text.split ("\n");
             var res = new StringBuilder ();
             bool in_pre = false;
+            bool in_html_pre = false;
+            bool in_callout = false;
             bool in_ul = false;
             bool in_ol = false;
             bool in_table = false;
 
             foreach (var line in lines) {
                 string trimmed_line = line.strip ();
+                if (in_html_pre) {
+                    res.append (line);
+                    res.append ("\n");
+                    if (line.contains ("</pre>")) {
+                        in_html_pre = false;
+                    }
+                    continue;
+                }
+
                 if (trimmed_line.has_prefix ("<div") || trimmed_line.has_prefix ("</div") ||
                     trimmed_line.has_prefix ("<pre") || trimmed_line.has_prefix ("</pre") ||
                     trimmed_line.has_prefix ("<header") || trimmed_line.has_prefix ("</header") ||
@@ -211,6 +222,32 @@ namespace Imladris.Adapters {
                     if (in_table) { res.append ("</tbody></table>\n"); in_table = false; }
                     res.append (line);
                     res.append ("\n");
+                    if (line.contains ("<pre") && !line.contains ("</pre>")) {
+                        in_html_pre = true;
+                    }
+                    continue;
+                }
+
+                // Quarto fenced callout blocks: ::: {.callout-note} ... :::
+                if (trimmed_line.has_prefix (":::")) {
+                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
+                    if (in_table) { res.append ("</tbody></table>\n"); in_table = false; }
+                    if (!in_callout && trimmed_line.length > 3) {
+                        string lower = trimmed_line.down ();
+                        string accent = "#3584e4";
+                        string label = "Note";
+                        if (lower.contains ("callout-warning")) { accent = "#e5a50a"; label = "Warning"; }
+                        else if (lower.contains ("callout-tip")) { accent = "#26a269"; label = "Tip"; }
+                        else if (lower.contains ("callout-important")) { accent = "#c01c28"; label = "Important"; }
+                        else if (lower.contains ("callout-caution")) { accent = "#e66100"; label = "Caution"; }
+                        else if (lower.contains ("panel-tabset")) { accent = "#6366f1"; label = "Tabset"; }
+                        res.append_printf ("<div style=\"border-left: 4px solid %s; background: rgba(148,163,184,0.08); border-radius: 6px; padding: 10px 14px; margin: 12px 0;\">\n<div style=\"font-weight: 700; font-size: 12px; text-transform: uppercase; color: %s; margin-bottom: 4px;\">%s</div>\n", accent, accent, label);
+                        in_callout = true;
+                    } else if (in_callout) {
+                        res.append ("</div>\n");
+                        in_callout = false;
+                    }
                     continue;
                 }
 
@@ -338,6 +375,7 @@ namespace Imladris.Adapters {
             if (in_ol) res.append ("</ol>\n");
             if (in_table) res.append ("</tbody></table>\n");
             if (in_pre) res.append ("</code></pre>\n");
+            if (in_callout) res.append ("</div>\n");
 
             return res.str;
         }

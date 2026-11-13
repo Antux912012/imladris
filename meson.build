@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.23.0',
+  version: '0.24.0',
   default_options: ['warning_level=1']
 )
 

@@ -41,11 +41,12 @@ namespace Imladris {
                 GLib.Environment.set_variable ("WEBKIT_DISABLE_DMABUF_RENDERER", "1", true);
             } else if (gpu_backend == 2) {
                 GLib.Environment.set_variable ("GSK_RENDERER", "vulkan", true);
-            } else {
+            } else if (gpu_backend == 1) {
                 uint minor = Gtk.get_minor_version ();
                 string gl_renderer = (minor >= 14 && minor < 18) ? "ngl" : "gl";
                 GLib.Environment.set_variable ("GSK_RENDERER", gl_renderer, true);
             }
+            // When gpu_backend == 0 (Auto) and hw_accel == true, let GTK4 pick its native default renderer.
         }
 
         GtkSource.init ();

@@ -635,7 +635,7 @@ namespace Imladris {
             tab_view.notify["selected-page"].connect (() => {
                 var d = get_active_document ();
                 if (d != null) {
-                    string fname = d.file_location != null ? d.file_location.get_basename () : @"untitled.$(d.doc_type)";
+                    string fname = d.file_location != null ? d.file_location.get_basename () : (d.initial_title.contains (".") ? d.initial_title : @"untitled.$(d.doc_type)");
                     Services.WorkspaceStateManager.get_default ().resolve_mode_for_file (fname);
                     d.set_split_orientation (Services.WorkspaceStateManager.get_default ().active_split);
                     var fmt = d.get_document_format ();

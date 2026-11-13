@@ -68,6 +68,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.24.0" date="2026-11-13">
+      <description>
+        <p>Release v0.24.0 resolves Live Preview rendering across .qmd, .md, .Rmd, and .html documents on GTK4 and WebKitGTK 6.0:</p>
+        <ul>
+          <li>WebKitGTK 6.0 &amp; GTK4 Compatibility: Prevents GSK_RENDERER=gl overrides in Auto mode and avoids HardwareAccelerationPolicy.ALWAYS stalls when DMA-BUF rendering is disabled.</li>
+          <li>Lifecycle-Safe Dock Reparenting: Preserves mounted WebKitWebView state in RStudioDockGrid without forced unmap/unrealize cycles, and defers initial HTML/URI loads until the WebView is mapped with a valid allocation.</li>
+          <li>Quarto (.qmd) &amp; RMarkdown (.Rmd) State Machine: Preserves extension identity for unsaved buffers, activates Live Preview across any quadrant, and reconciles missing panels in existing dock-layout.json files.</li>
+          <li>Quarto HTML Adapter Fixes: Prevents multi-line code chunks from being mangled as Markdown paragraphs and adds support for Quarto fenced callout blocks.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.23.0" date="2026-11-13">
       <description>
         <p>Release v0.23.0 delivers a comprehensive GNOME/Libadwaita interface overhaul, redesigned Elrond AI copilot and code assistance, new workspace customization options in Preferences, and rock-solid WebKitGTK 6.0 preview rendering:</p>

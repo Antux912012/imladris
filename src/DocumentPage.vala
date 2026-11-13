@@ -39,6 +39,9 @@ namespace Imladris {
         public Gtk.ScrolledWindow editor_scroller { get; private set; }
         public Gtk.Box right_box { get; private set; }
         public string doc_id { get; private set; }
+        public string initial_title { get; private set; default = ""; }
+        private bool pending_preview_refresh = false;
+        private string? pending_preview_uri = null;
 
         // Phase 1.1.3 Portal Registry & 4-Quadrant RStudio Docking Grid
         public RStudioDockLayoutState dock_layout_state { get; private set; }
@@ -54,6 +57,9 @@ namespace Imladris {
         public DocumentFormat get_document_format () {
             if (file_location != null) {
                 return DocumentFormat.from_filename (file_location.get_basename ());
+            }
+            if (initial_title.contains (".")) {
+                return DocumentFormat.from_filename (initial_title);
             }
             return DocumentFormat.from_short_code (doc_type);
         }
@@ -121,6 +127,7 @@ namespace Imladris {
         public DocumentPage (string title, string lang_id, Window? win = null) {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
             this.doc_type = lang_id;
+            this.initial_title = title;
             this.parent_window = win;
             this.doc_id = GLib.Uuid.string_random ();
 
@@ -197,6 +204,38 @@ namespace Imladris {
                     s.hardware_acceleration_policy = WebKit.HardwareAccelerationPolicy.NEVER;
                     GLib.Idle.add (() => {
                         refresh_live_preview ();
+                        return GLib.Source.REMOVE;
+                    });
+                } else {
+                    string fallback = "<!DOCTYPE html><html><body style='font-family:system-ui,sans-serif;padding:24px;color:#b91c1c;background:#fef2f2;'><h3>Live Preview WebProcess Crashed</h3><p>WebKitGTK WebProcess terminated repeatedly. Try disabling Hardware Acceleration in Preferences → Workspace.</p></body></html>";
+                    web_view.load_html (fallback, "file:///");
+                }
+            });
+
+            web_view.load_failed.connect ((load_event, failing_uri, err) => {
+                GLib.warning ("WebKit load_failed (%s): %s", failing_uri, err.message);
+                string err_html = "<!DOCTYPE html><html><body style='font-family:system-ui,sans-serif;padding:24px;color:#991b1b;background:#fef2f2;'><h3>Preview Load Failed</h3><p><code>%s</code></p><p>%s</p></body></html>".printf (
+                    GLib.Markup.escape_text (failing_uri),
+                    GLib.Markup.escape_text (err.message)
+                );
+                web_view.load_html (err_html, "file:///");
+                return true;
+            });
+
+            // Flush deferred preview loads once GTK4 realizes and maps the WebView with a valid allocation
+            web_view.map.connect (() => {
+                if (pending_preview_uri != null || pending_preview_refresh) {
+                    GLib.Idle.add (() => {
+                        if (!web_view.get_mapped ()) return GLib.Source.REMOVE;
+                        if (pending_preview_uri != null) {
+                            string target_uri = pending_preview_uri;
+                            pending_preview_uri = null;
+                            pending_preview_refresh = false;
+                            web_view.load_uri (target_uri);
+                        } else if (pending_preview_refresh) {
+                            pending_preview_refresh = false;
+                            refresh_live_preview ();
+                        }
                         return GLib.Source.REMOVE;
                     });
                 }
@@ -539,6 +578,13 @@ print("Python Interpreter:", sys.version.split()[0])
         }
 
         public void refresh_live_preview (string? preloaded_text = null) {
+            if (!web_view.get_mapped ()) {
+                pending_preview_refresh = true;
+                return;
+            }
+            pending_preview_refresh = false;
+            pending_preview_uri = null;
+
             string raw = preloaded_text != null ? preloaded_text : source_buffer.text;
             string? base_uri = null;
             if (file_location != null) {
@@ -548,12 +594,12 @@ print("Python Interpreter:", sys.version.split()[0])
                 base_uri = "file:///";
             }
 
-            if (doc_type == "html") {
+            var fmt = get_document_format ();
+            if (doc_type == "html" || fmt == DocumentFormat.HTML) {
                 web_view.load_html (raw, base_uri);
                 return;
             }
 
-            var fmt = DocumentFormat.from_filename (file_location != null ? file_location.get_basename () : @"untitled.$doc_type");
             string body_html = Adapters.DocumentAdapter.render_html (raw, fmt);
 
             var app_theme = Core.SettingsManager.get_default ().app_theme;
@@ -677,8 +723,8 @@ print("Python Interpreter:", sys.version.split()[0])
 
         public void set_split_orientation (Services.SplitMode split) {
             if (current_layout_mode == Services.LayoutMode.RSTUDIO) {
-                // In RStudio mode, activate the corresponding panel in Q4
-                dock_layout_state.activate_tab (QuadrantId.Q4_BOTTOM_RIGHT, PanelId.LIVE_PREVIEW);
+                // In RStudio mode, activate the corresponding panel regardless of which quadrant hosts it
+                dock_layout_state.activate_panel (PanelId.LIVE_PREVIEW);
                 return;
             }
 
@@ -733,7 +779,7 @@ print("Python Interpreter:", sys.version.split()[0])
 
         public void show_live_preview (string? uri = null) {
             if (current_layout_mode == Services.LayoutMode.RSTUDIO) {
-                dock_layout_state.activate_tab (QuadrantId.Q4_BOTTOM_RIGHT, PanelId.LIVE_PREVIEW);
+                dock_layout_state.activate_panel (PanelId.LIVE_PREVIEW);
             } else {
                 console_revealer.visible = true;
                 console_revealer.reveal_child = true;
@@ -744,7 +790,14 @@ print("Python Interpreter:", sys.version.split()[0])
                 }
             }
             if (uri != null) {
-                web_view.load_uri (uri);
+                if (web_view.get_mapped ()) {
+                    pending_preview_uri = null;
+                    pending_preview_refresh = false;
+                    web_view.load_uri (uri);
+                } else {
+                    pending_preview_uri = uri;
+                    pending_preview_refresh = false;
+                }
             } else {
                 refresh_live_preview ();
             }

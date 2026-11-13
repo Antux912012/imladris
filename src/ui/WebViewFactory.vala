@@ -35,10 +35,14 @@ namespace Imladris.UI {
         }
 
         private static void apply_policy (WebKit.Settings settings, bool hw_accel) {
-            settings.hardware_acceleration_policy = hw_accel
+            // Avoid forcing HardwareAccelerationPolicy.ALWAYS when DMA-BUF is disabled,
+            // as WebKitGTK 6.0 on Wayland/Flatpak can stall frame presentation in that mode.
+            bool dmabuf_disabled = GLib.Environment.get_variable ("WEBKIT_DISABLE_DMABUF_RENDERER") == "1";
+            bool enable_hw = hw_accel && !dmabuf_disabled;
+            settings.hardware_acceleration_policy = enable_hw
                 ? WebKit.HardwareAccelerationPolicy.ALWAYS
                 : WebKit.HardwareAccelerationPolicy.NEVER;
-            settings.enable_webgl = hw_accel;
+            settings.enable_webgl = enable_hw;
             settings.allow_file_access_from_file_urls = true;
             settings.allow_universal_access_from_file_urls = true;
         }

@@ -1,6 +1,6 @@
 # Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 pkgname=imladris
-pkgver=0.23.0
+pkgver=0.24.0
 pkgrel=1
 pkgdesc="Polyglot Scientific & Markdown IDE with GNOME/Libadwaita UI, Elrond AI, GPU Acceleration, and R/Python"
 arch=('x86_64')

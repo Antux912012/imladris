@@ -1,6 +1,6 @@
 pkgbase = imladris
 	pkgdesc = Polyglot Scientific & Markdown IDE with GNOME/Libadwaita UI, Elrond AI, GPU Acceleration, and R/Python
-	pkgver = 0.23.0
+	pkgver = 0.24.0
 	pkgrel = 1
 	url = https://github.com/Antux912012/imladris
 	arch = x86_64

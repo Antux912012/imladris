@@ -206,6 +206,10 @@ namespace Imladris.UI {
          * Detaches the persistent widget from its previous parent container (if any)
          * and mounts it inside the target viewport without destroying the widget or undo stack.
          */
+        public Gtk.Widget? get_panel (PanelId id) {
+            return panels.get (id);
+        }
+
         public void mount_panel (PanelId id, Gtk.Box target_viewport) {
             var widget = panels.get (id);
             if (widget == null) return;
