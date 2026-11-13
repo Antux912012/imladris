@@ -2286,7 +2286,7 @@ namespace Imladris {
                 developers = devs,
                 copyright = "© 2026 Antonio De Gaetano",
                 license_type = Gtk.License.GPL_3_0,
-                website = "https://github.com/Antux912012/imladris",
+                website = "https://antux912012.github.io/imladris/",
                 issue_url = "https://github.com/Antux912012/imladris/issues",
                 support_url = "https://github.com/Antux912012/imladris/discussions",
                 comments = "A GNOME-native home for scientific writing, notebooks and data work.\n\n✨ Proudly developed with Gemini Assistance."

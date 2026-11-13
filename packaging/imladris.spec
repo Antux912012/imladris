@@ -1,10 +1,10 @@
 Name:           imladris
-Version:        0.24.0
+Version:        0.24.1
 Release:        1%{?dist}
 Summary:        Scientific notebook studio with GPU acceleration, slide decks and posters
 
 License:        GPL-3.0-or-later
-URL:            https://github.com/Antux912012/imladris
+URL:            https://antux912012.github.io/imladris/
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  gcc

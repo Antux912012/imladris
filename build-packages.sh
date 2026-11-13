@@ -164,7 +164,7 @@ Installed-Size: ${INSTALLED_SIZE}
 Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.12), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2
 Recommends: llama.cpp | llama-cpp
-Homepage: https://github.com/Antux912012/imladris
+Homepage: https://antux912012.github.io/imladris/
 Description: Native Polyglot Studio with AI Assistance, Auto-Completion and MCP Server
  Imladris is a native Linux Markdown and Polyglot Studio built with
  Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0.

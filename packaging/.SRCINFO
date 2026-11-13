@@ -1,8 +1,8 @@
 pkgbase = imladris
 	pkgdesc = Polyglot Scientific & Markdown IDE with GNOME/Libadwaita UI, Elrond AI, GPU Acceleration, and R/Python
-	pkgver = 0.24.0
+	pkgver = 0.24.1
 	pkgrel = 1
-	url = https://github.com/Antux912012/imladris
+	url = https://antux912012.github.io/imladris/
 	arch = x86_64
 	license = GPL-3.0-or-later
 	makedepends = meson>=0.60
@@ -29,7 +29,7 @@ pkgbase = imladris
 	optdepends = quarto-cli-bin: Quarto document, slide deck, and poster rendering
 	optdepends = pandoc: Document export to PDF, HTML, and Word
 	optdepends = libreoffice: Presentation and spreadsheet export
-	source = imladris-0.23.0.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v0.23.0.tar.gz
+	source = imladris-0.24.1.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v0.24.1.tar.gz
 	sha256sums = e31bf0ebf27305ce9475b9ef67ef33a5b6bcbf098831a275fa28f1f9fc20de0c
 
 pkgname = imladris

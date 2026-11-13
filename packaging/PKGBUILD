@@ -1,10 +1,10 @@
 # Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 pkgname=imladris
-pkgver=0.24.0
+pkgver=0.24.1
 pkgrel=1
 pkgdesc="Polyglot Scientific & Markdown IDE with GNOME/Libadwaita UI, Elrond AI, GPU Acceleration, and R/Python"
 arch=('x86_64')
-url="https://github.com/Antux912012/imladris"
+url="https://antux912012.github.io/imladris/"
 license=('GPL-3.0-or-later')
 depends=(
     'gtk4>=4.12'

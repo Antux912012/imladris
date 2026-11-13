@@ -1,7 +1,7 @@
 id: io.github.Antux912012.Imladris
 name: Imladris
 summary: Scientific notebook studio and Markdown IDE with local AI
-website: https://github.com/Antux912012/imladris
+website: https://antux912012.github.io/imladris/
 source_url: https://github.com/Antux912012/imladris
 build:
   manifest: io.github.Antux912012.Imladris.yml

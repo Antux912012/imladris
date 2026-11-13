@@ -57,7 +57,7 @@
     </screenshot>
   </screenshots>
   <launchable type="desktop-id">io.github.Antux912012.Imladris.desktop</launchable>
-  <url type="homepage">https://github.com/Antux912012/imladris</url>
+  <url type="homepage">https://antux912012.github.io/imladris/</url>
   <url type="bugtracker">https://github.com/Antux912012/imladris/issues</url>
   <url type="vcs-browser">https://github.com/Antux912012/imladris</url>
   <provides>
@@ -68,6 +68,14 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.24.1" date="2026-11-13">
+      <description>
+        <p>Release v0.24.1 updates the project homepage and website metadata:</p>
+        <ul>
+          <li>Homepage Redirect Fix: Points AppStream, FlatPark, About dialog, and distribution package URLs to the official landing page.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.24.0" date="2026-11-13">
       <description>
         <p>Release v0.24.0 resolves Live Preview rendering across .qmd, .md, .Rmd, and .html documents on GTK4 and WebKitGTK 6.0:</p>
