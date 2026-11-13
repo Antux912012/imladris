@@ -20,8 +20,8 @@ deps = [
   dependency('json-glib-1.0'),
   dependency('libsecret-1', version: '>= 0.20'),
   dependency('gee-0.8'),
-  dependency('gio-2.0'),
-  dependency('glib-2.0'),
+  dependency('gio-2.0', version: '>= 2.76'),
+  dependency('glib-2.0', version: '>= 2.76'),
   m_dep,
 ]
 
@@ -65,6 +65,7 @@ sources = files(
   'src/services/PersistentSessionManager.vala',
   'src/services/HistoryManager.vala',
   'src/services/ZoteroService.vala',
+  'src/services/DoiBibService.vala',
   'src/services/ShinyService.vala',
   'src/editor/CitationCompletionProvider.vala',
   'src/services/ExportService.vala',
@@ -104,6 +105,7 @@ sources = files(
   'src/ui/AccentColorSelectorWidget.vala',
   'src/ui/AiSettingsDialog.vala',
   'src/ui/ToolchainSetupDialog.vala',
+  'src/ui/DoiBibDialog.vala',
   'src/core/SettingsManager.vala',
   'src/core/AiConfigManager.vala',
   'src/core/PlatformUtils.vala',
@@ -267,6 +269,7 @@ test('dock_environment_tests', dock_test_exe, timeout: 30)
 zotero_test_sources = files(
   'tests/test_zotero_service.vala',
   'src/services/ZoteroService.vala',
+  'src/services/DoiBibService.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
 )

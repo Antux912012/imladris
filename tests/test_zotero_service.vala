@@ -99,6 +99,42 @@ public class TestZoteroService {
         assert (uri == "zotero://select/items/@knuth1984");
     }
 
+    public static void test_doi_to_bib_and_nested_braces () {
+        // 1. DOI extraction
+        assert (DoiBibService.extract_doi ("https://doi.org/10.1038/s41586-020-2649-2") == "10.1038/s41586-020-2649-2");
+        assert (DoiBibService.extract_doi ("doi:10.1126/science.abc1234.") == "10.1126/science.abc1234");
+        assert (DoiBibService.extract_doi ("not a doi") == null);
+
+        // 2. Crossref JSON -> BibTeX
+        string cr_json = """{
+            "status": "ok",
+            "message": {
+                "type": "journal-article",
+                "DOI": "10.1038/s41586-020-2649-2",
+                "title": ["Array programming with {NumPy}"],
+                "author": [{"family": "Harris", "given": "Charles R."}],
+                "container-title": ["Nature"],
+                "published-print": {"date-parts": [[2020, 9, 17]]},
+                "volume": "585",
+                "issue": "7825",
+                "page": "357-362"
+            }
+        }""";
+        string? bib = DoiBibService.crossref_json_to_bibtex (cr_json);
+        assert (bib != null);
+        assert (bib.has_prefix ("@article{harris2020array,"));
+        assert ("journal = {Nature}" in bib);
+        assert ("pages = {357--362}" in bib);
+        assert ("doi = {10.1038/s41586-020-2649-2}" in bib);
+
+        // 3. Nested brace BibTeX parsing in ZoteroService
+        string nested_bib = "@article{harris2020array,\n  author = {Harris, Charles R.},\n  title = {Array programming with {NumPy} and {RNA} Polymerase {II}},\n  year = {2020}\n}\n";
+        var parsed = ZoteroService.get_default ().search_offline_bib ("Polymerase", nested_bib);
+        assert (parsed.size == 1);
+        assert (parsed[0].citekey == "harris2020array");
+        assert ("Polymerase II" in parsed[0].title);
+    }
+
     public static int main (string[] args) {
         Test.init (ref args);
 
@@ -106,6 +142,7 @@ public class TestZoteroService {
         Test.add_func ("/zotero/bib_merging", test_bib_merging);
         Test.add_func ("/zotero/yaml_frontmatter", test_yaml_frontmatter);
         Test.add_func ("/zotero/select_uri", test_zotero_select_uri);
+        Test.add_func ("/doi/crossref_to_bibtex_and_nested_braces", test_doi_to_bib_and_nested_braces);
 
         return Test.run ();
     }

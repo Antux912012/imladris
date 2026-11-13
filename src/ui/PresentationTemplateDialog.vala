@@ -109,6 +109,7 @@ format:
     transition: slide
     slide-number: true
     chalkboard: false
+    embed-resources: true
     html-math-method: katex
 ---
 

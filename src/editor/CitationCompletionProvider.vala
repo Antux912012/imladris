@@ -58,8 +58,10 @@ namespace Imladris.Editor {
         public void activate (GtkSource.CompletionContext context, GtkSource.CompletionProposal proposal) {
             var p = proposal as CitationCompletionProposal;
             if (p != null) {
-                Gtk.TextIter cursor;
-                context.get_bounds (out cursor, null);
+                Gtk.TextIter begin_iter, cursor;
+                if (!context.get_bounds (out begin_iter, out cursor)) {
+                    return;
+                }
                 var buffer = context.get_buffer ();
 
                 // Find the '@' preceding cursor to replace typed filter prefix
@@ -84,18 +86,10 @@ namespace Imladris.Editor {
                 }
                 buffer.end_user_action ();
 
-                // Auto-sync references.bib in background
+                // Auto-sync references.bib in background without resetting cursor/marks
                 if (doc_page != null) {
                     string project_dir = doc_page.current_project_dir;
-                    Gtk.TextIter b_start, b_end;
-                    buffer.get_bounds (out b_start, out b_end);
-                    string full_text = buffer.get_text (b_start, b_end, false);
-                    string updated_text = ZoteroService.get_default ().ensure_yaml_bibliography (full_text, "references.bib");
-                    if (updated_text != full_text) {
-                        buffer.begin_user_action ();
-                        buffer.set_text (updated_text);
-                        buffer.end_user_action ();
-                    }
+                    ensure_buffer_bibliography_line (buffer, "references.bib");
                     ZoteroService.get_default ().sync_citation_to_project_async.begin (p.citekey, project_dir);
                 }
             }
@@ -124,8 +118,10 @@ namespace Imladris.Editor {
         public async GLib.ListModel populate_async (GtkSource.CompletionContext context, GLib.Cancellable? cancellable) throws GLib.Error {
             var store = new GLib.ListStore (typeof (CitationCompletionProposal));
 
-            Gtk.TextIter cursor_iter;
-            context.get_bounds (out cursor_iter, null);
+            Gtk.TextIter begin_iter, cursor_iter;
+            if (!context.get_bounds (out begin_iter, out cursor_iter)) {
+                return store;
+            }
             var buffer = context.get_buffer ();
 
             Gtk.TextIter line_start = cursor_iter;
@@ -140,12 +136,25 @@ namespace Imladris.Editor {
             string query = line_prefix.substring (at_idx + 1).strip ();
             bool inside_brackets = (at_idx > 0 && line_prefix[at_idx - 1] == '[');
 
-            // Read references.bib content asynchronously if available
+            // Read local .bib content asynchronously if available (from frontmatter, file dir, or project dir)
             string? fallback_bib = null;
             if (doc_page != null) {
-                string pdir = doc_page.current_project_dir;
-                if (pdir != "") {
-                    string bib_path = GLib.Path.build_filename (pdir, "references.bib");
+                string base_dir = doc_page.current_project_dir;
+                if (base_dir == "" && doc_page.file_location != null) {
+                    var parent = doc_page.file_location.get_parent ();
+                    if (parent != null) base_dir = parent.get_path () ?? "";
+                }
+                if (base_dir != "") {
+                    string bib_name = "references.bib";
+                    Gtk.TextIter b_start, b_end;
+                    buffer.get_bounds (out b_start, out b_end);
+                    Core.FrontmatterData? fm;
+                    string fm_body;
+                    Core.FrontmatterParser.split_frontmatter (buffer.get_text (b_start, b_end, false), out fm, out fm_body);
+                    if (fm != null && fm.bibliography != null && fm.bibliography.strip () != "") {
+                        bib_name = fm.bibliography.strip ();
+                    }
+                    string bib_path = GLib.Path.is_absolute (bib_name) ? bib_name : GLib.Path.build_filename (base_dir, bib_name);
                     var f = GLib.File.new_for_path (bib_path);
                     try {
                         uint8[] data;
@@ -153,7 +162,7 @@ namespace Imladris.Editor {
                         yield f.load_contents_async (cancellable, out data, out etag);
                         fallback_bib = Core.PlatformUtils.data_to_string (data);
                     } catch (GLib.Error e) {
-                        // references.bib missing or cancelled
+                        // .bib missing or cancelled
                     }
                 }
             }
@@ -164,6 +173,36 @@ namespace Imladris.Editor {
             }
 
             return store;
+        }
+
+        public static void ensure_buffer_bibliography_line (Gtk.TextBuffer buffer, string bib_filename = "references.bib") {
+            Gtk.TextIter b_start, b_end;
+            buffer.get_bounds (out b_start, out b_end);
+            string full_text = buffer.get_text (b_start, b_end, false);
+            try {
+                var reg_yaml = new GLib.Regex ("^---\\r?\\n([\\s\\S]*?)\\r?\\n---");
+                GLib.MatchInfo mi;
+                if (!reg_yaml.match (full_text, 0, out mi)) {
+                    buffer.begin_user_action ();
+                    buffer.insert (ref b_start, @"---\nbibliography: $bib_filename\n---\n\n", -1);
+                    buffer.end_user_action ();
+                    return;
+                }
+                string yaml_content = mi.fetch (1);
+                var reg_bib = new GLib.Regex ("^bibliography\\s*:", GLib.RegexCompileFlags.MULTILINE);
+                if (reg_bib.match (yaml_content)) {
+                    return;
+                }
+                int start_pos, end_pos;
+                if (mi.fetch_pos (1, out start_pos, out end_pos)) {
+                    int char_offset = full_text.substring (0, end_pos).char_count ();
+                    Gtk.TextIter insert_iter;
+                    buffer.get_iter_at_offset (out insert_iter, char_offset);
+                    buffer.begin_user_action ();
+                    buffer.insert (ref insert_iter, @"\nbibliography: $bib_filename", -1);
+                    buffer.end_user_action ();
+                }
+            } catch (GLib.RegexError e) {}
         }
     }
 }

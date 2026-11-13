@@ -49,6 +49,8 @@ namespace Imladris {
     public enum DocumentFormat {
         MD,
         HTML,
+        CSS,
+        BIB,
         RSCRIPT,
         RMD,
         QMD,
@@ -59,6 +61,8 @@ namespace Imladris {
             switch (this) {
                 case MD:       return ".md";
                 case HTML:     return ".html";
+                case CSS:      return ".css";
+                case BIB:      return ".bib";
                 case RSCRIPT:  return ".R";
                 case RMD:      return ".Rmd";
                 case QMD:      return ".qmd";
@@ -71,7 +75,9 @@ namespace Imladris {
         public string get_display_name () {
             switch (this) {
                 case MD:       return "Simple Markdown (.md)";
-                case HTML:     return "Simple HTML (.html)";
+                case HTML:     return "HTML5 + CSS + LaTeX (.html)";
+                case CSS:      return "CSS Stylesheet (.css)";
+                case BIB:      return "BibTeX Bibliography (.bib)";
                 case RSCRIPT:  return "R Script (.R)";
                 case RMD:      return "R Markdown (.Rmd)";
                 case QMD:      return "Quarto Document (.qmd)";
@@ -88,6 +94,8 @@ namespace Imladris {
         public string to_syntax_lang () {
             switch (this) {
                 case HTML:     return "html";
+                case CSS:      return "css";
+                case BIB:      return "bibtex";
                 case RSCRIPT:  return "r";
                 case RMD:      return "rmd";
                 case IPYNB:    return "json";
@@ -102,6 +110,8 @@ namespace Imladris {
             switch (this) {
                 case MD:       return "Md";
                 case HTML:     return "Html";
+                case CSS:      return "Css";
+                case BIB:      return "Bib";
                 case RSCRIPT:  return "RScript";
                 case RMD:      return "Rmd";
                 case QMD:      return "Qmd";
@@ -115,6 +125,8 @@ namespace Imladris {
             string c = code.strip ().down ();
             if (c == "md" || c == "markdown") return MD;
             if (c == "html" || c == "htm") return HTML;
+            if (c == "css") return CSS;
+            if (c == "bib" || c == "bibtex") return BIB;
             if (c == "rscript" || c == "r") return RSCRIPT;
             if (c == "rmd" || c == "rmarkdown") return RMD;
             if (c == "qmd" || c == "quarto") return QMD;
@@ -130,6 +142,8 @@ namespace Imladris {
             if (lower.has_suffix (".rmd")) return RMD;
             if (lower.has_suffix (".r")) return RSCRIPT;
             if (lower.has_suffix (".py")) return PYSCRIPT;
+            if (lower.has_suffix (".css")) return CSS;
+            if (lower.has_suffix (".bib")) return BIB;
             if (lower.has_suffix (".html") || lower.has_suffix (".htm")) return HTML;
             return MD;
         }

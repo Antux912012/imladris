@@ -592,13 +592,13 @@ namespace Imladris.Core {
 
         public GnomeAccent accent_color {
             get {
-                if (gsettings != null) {
+                if (gsettings != null && gsettings.settings_schema.has_key ("accent-color")) {
                     string val = gsettings.get_string ("accent-color");
                     if (val.length > 0) {
                         return GnomeAccent.from_string_id (val);
                     }
                 }
-                if (gnome_interface_settings != null) {
+                if (gnome_interface_settings != null && gnome_interface_settings.settings_schema.has_key ("accent-color")) {
                     string sys_val = gnome_interface_settings.get_string ("accent-color");
                     if (sys_val.length > 0) {
                         return GnomeAccent.from_string_id (sys_val);
@@ -607,10 +607,12 @@ namespace Imladris.Core {
                 return _accent_fallback;
             }
             set {
-                if (gsettings != null) {
+                if (gsettings != null && gsettings.settings_schema.has_key ("accent-color")) {
                     gsettings.set_string ("accent-color", value.to_string_id ());
                 }
-                if (gnome_interface_settings != null && gnome_interface_settings.is_writable ("accent-color")) {
+                if (gnome_interface_settings != null
+                    && gnome_interface_settings.settings_schema.has_key ("accent-color")
+                    && gnome_interface_settings.is_writable ("accent-color")) {
                     gnome_interface_settings.set_string ("accent-color", value.to_string_id ());
                 }
                 if (_accent_fallback != value) {
@@ -631,26 +633,30 @@ namespace Imladris.Core {
                     gsettings.changed["theme"].connect (() => {
                         apply_theme (app_theme);
                     });
-                    gsettings.changed["accent-color"].connect (() => {
-                        apply_accent_color (accent_color);
-                    });
+                    if (gsettings.settings_schema.has_key ("accent-color")) {
+                        gsettings.changed["accent-color"].connect (() => {
+                            apply_accent_color (accent_color);
+                        });
+                    }
                 } else {
                     GLib.debug ("GSettings schema %s not installed; preferences will not persist.", SCHEMA_ID);
                 }
 
                 if (source.lookup ("org.gnome.desktop.interface", true) != null) {
                     gnome_interface_settings = new GLib.Settings ("org.gnome.desktop.interface");
-                    string sys_accent = gnome_interface_settings.get_string ("accent-color");
-                    if (sys_accent.length > 0) {
-                        _accent_fallback = GnomeAccent.from_string_id (sys_accent);
-                    }
-                    gnome_interface_settings.changed["accent-color"].connect (() => {
-                        var new_accent = GnomeAccent.from_string_id (gnome_interface_settings.get_string ("accent-color"));
-                        if (_accent_fallback != new_accent) {
-                            _accent_fallback = new_accent;
-                            apply_accent_color (new_accent);
+                    if (gnome_interface_settings.settings_schema.has_key ("accent-color")) {
+                        string sys_accent = gnome_interface_settings.get_string ("accent-color");
+                        if (sys_accent.length > 0) {
+                            _accent_fallback = GnomeAccent.from_string_id (sys_accent);
                         }
-                    });
+                        gnome_interface_settings.changed["accent-color"].connect (() => {
+                            var new_accent = GnomeAccent.from_string_id (gnome_interface_settings.get_string ("accent-color"));
+                            if (_accent_fallback != new_accent) {
+                                _accent_fallback = new_accent;
+                                apply_accent_color (new_accent);
+                            }
+                        });
+                    }
                 }
             }
 

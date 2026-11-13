@@ -173,6 +173,9 @@ namespace Imladris.Core {
                 pkgs.add ("r-irkernel");
                 pkgs.add ("r-remotes");
                 pkgs.add ("r-pak");
+                pkgs.add ("r-rmarkdown");
+                pkgs.add ("r-knitr");
+                pkgs.add ("r-shiny");
                 pkgs.add ("compilers");
                 pkgs.add ("make");
                 pkgs.add ("pkg-config");
@@ -183,8 +186,6 @@ namespace Imladris.Core {
                 if (install_tidyverse) {
                     pkgs.add ("r-tidyverse");
                     pkgs.add ("r-data.table");
-                    pkgs.add ("r-rmarkdown");
-                    pkgs.add ("r-knitr");
                 }
             }
 

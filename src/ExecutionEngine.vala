@@ -54,10 +54,13 @@ namespace Imladris {
                 );
                 string? output = null;
                 yield proc.communicate_utf8_async (null, null, out output, null);
+                bool ok = proc.get_successful ();
                 if (output != null && output.strip ().length > 0) {
                     page.append_console_log (output.strip ());
-                } else {
+                } else if (ok) {
                     page.append_console_log ("✔ Completed successfully.");
+                } else {
+                    page.append_console_log (@"✖ Command exited with status $(proc.get_exit_status ()).");
                 }
             } catch (GLib.Error e) {
                 page.append_console_log (@"✖ Execution Notice: $(e.message)");
@@ -79,7 +82,7 @@ namespace Imladris {
                 if (output != null && output.strip ().length > 0) {
                     return output.strip ();
                 }
-                return "✔ Completed (no output).";
+                return proc.get_successful () ? "✔ Completed (no output)." : @"✖ Command exited with status $(proc.get_exit_status ()).";
             } catch (GLib.Error e) {
                 return @"✖ Execution Notice: $(e.message)";
             }

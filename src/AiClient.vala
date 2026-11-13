@@ -230,16 +230,18 @@ namespace Imladris {
                 if (content.contains ("<think>") && content.contains ("</think>")) {
                     int start_idx = content.index_of ("<think>");
                     int end_idx = content.index_of ("</think>");
-                    string thought = content.substring (start_idx + 7, end_idx - (start_idx + 7)).strip ();
-                    string ans = content.substring (end_idx + 8).strip ();
-                    if (thought.length > 0) {
-                        return @"💭 *Reasoning Process:*\n$thought\n\n$ans";
+                    if (start_idx >= 0 && end_idx >= start_idx + 7) {
+                        string thought = content.substring (start_idx + 7, end_idx - (start_idx + 7)).strip ();
+                        string ans = content.substring (end_idx + 8).strip ();
+                        if (thought.length > 0) {
+                            return @"💭 *Reasoning Process:*\n$thought\n\n$ans";
+                        }
                     }
                 }
 
                 return content;
-            } else if (first_choice.has_member ("text")) {
-                return first_choice.get_string_member ("text");
+            } else if (first_choice.has_member ("text") && !first_choice.get_null_member ("text")) {
+                return first_choice.get_string_member ("text") ?? "";
             }
 
             return "";

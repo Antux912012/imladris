@@ -21,7 +21,7 @@ namespace Imladris.Core {
 
     public class ProvenanceAttestationService : GLib.Object {
 
-        public const string VERSION = "0.21.0";
+        public const string VERSION = "0.24.2";
 
         public static string compute_sha256_string (string content) {
             return GLib.Checksum.compute_for_string (GLib.ChecksumType.SHA256, content);

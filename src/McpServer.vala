@@ -231,8 +231,12 @@ namespace Imladris {
                 return GLib.Source.REMOVE;
             });
 
+            int64 deadline = GLib.get_monotonic_time () + 5 * 1000 * 1000;
             while (!state.completed) {
-                state.cond.wait (state.mutex);
+                if (!state.cond.wait_until (state.mutex, deadline)) {
+                    state.result = "Error: Main thread dispatch timed out.";
+                    break;
+                }
             }
             string final_result = state.result;
             state.mutex.unlock ();
@@ -251,18 +255,18 @@ namespace Imladris {
                 return @"Language: $(doc.doc_type)\nLines: $(doc.source_buffer.get_line_count ())\n\nContent:\n$(doc.source_buffer.text)";
             } else if (name == "insert_text") {
                 if (doc == null) return "No active document open.";
-                string txt = (args != null && args.has_member ("text")) ? args.get_string_member ("text") : "";
+                string txt = (args != null && args.has_member ("text") && !args.get_null_member ("text")) ? (args.get_string_member ("text") ?? "") : "";
                 doc.source_buffer.insert_at_cursor (txt, -1);
                 return "✔ Text inserted successfully at cursor.";
             } else if (name == "insert_code_chunk") {
                 if (doc == null) return "No active document open.";
-                string engine = (args != null && args.has_member ("engine")) ? args.get_string_member ("engine") : "python";
-                string opt = (args != null && args.has_member ("options")) ? args.get_string_member ("options") : "";
+                string engine = (args != null && args.has_member ("engine") && !args.get_null_member ("engine")) ? (args.get_string_member ("engine") ?? "python") : "python";
+                string opt = (args != null && args.has_member ("options") && !args.get_null_member ("options")) ? (args.get_string_member ("options") ?? "") : "";
                 doc.insert_code_chunk (engine, opt);
                 return @"✔ Code chunk {$engine} inserted successfully.";
             } else if (name == "execute_code") {
                 if (doc == null) return "No active document open.";
-                string cmd = (args != null && args.has_member ("command")) ? args.get_string_member ("command") : "";
+                string cmd = (args != null && args.has_member ("command") && !args.get_null_member ("command")) ? (args.get_string_member ("command") ?? "") : "";
                 if (cmd.length == 0) return "Error: No command provided.";
                 string[] parts;
                 try {
@@ -273,7 +277,7 @@ namespace Imladris {
                 ExecutionEngine.run_command_async.begin (parts, doc);
                 return @"▶ Executing command asynchronously: $cmd";
             } else if (name == "render_document") {
-                string fmt = (args != null && args.has_member ("format")) ? args.get_string_member ("format") : "html";
+                string fmt = (args != null && args.has_member ("format") && !args.get_null_member ("format")) ? (args.get_string_member ("format") ?? "html") : "html";
                 window.trigger_render (fmt);
                 return @"▶ Render pipeline triggered for target: $fmt";
             } else if (name == "get_open_tabs") {

@@ -56,6 +56,7 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Render to PDF", "Compile document to PDF via typst or wkhtmltopdf", "document-send-symbolic", "app.export_pdf", "Publish"));
             all_items.add (new CommandPaletteItem ("Export to OpenDocument Text (.odt)", "Export formatted manuscript for LibreOffice Writer", "x-office-document-symbolic", "app.export_odt", "Publish"));
             all_items.add (new CommandPaletteItem ("Export to OpenDocument Presentation (.odp)", "Export slides for LibreOffice Impress", "x-office-presentation-symbolic", "app.export_odp", "Publish"));
+            all_items.add (new CommandPaletteItem ("Export to Rich Text Format (.rtf)", "Export cross-platform formatted document (.rtf)", "document-save-as-symbolic", "app.export_rtf", "Publish"));
             all_items.add (new CommandPaletteItem ("Export .mallorn Reproducible Bundle", "Package project with lockfile and data into single archive", "package-x-generic-symbolic", "app.export_mallorn", "Publish"));
             all_items.add (new CommandPaletteItem ("Export for RStudio", "Generate .Rproj and renv lockfile manifest", "utilities-terminal-symbolic", "app.export_rstudio", "Publish"));
             all_items.add (new CommandPaletteItem ("Export for Jupyter", "Convert document to .ipynb notebook JSON", "applications-science-symbolic", "app.export_jupyter", "Publish"));
@@ -66,7 +67,11 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Yavanna Bio-Entity Inspector", "NCBI Taxonomy, Ensembl genes, and RT-qPCR oligo melting curves", "applications-science-symbolic", "bridge.yavanna", "Scientific"));
             all_items.add (new CommandPaletteItem ("Math and Chemical Reaction Studio", "Natural scientific notation to LaTeX and Markdown formulas (Ctrl+M)", "accessories-text-editor-symbolic", "app.math_chem_editor", "Scientific"));
             all_items.add (new CommandPaletteItem ("Visual Flow and Mermaid Studio", "Mindmaps, flowcharts, and sequence diagrams studio", "view-grid-symbolic", "app.mermaid_studio", "Scientific"));
-            all_items.add (new CommandPaletteItem ("Insert Zotero Citation", "Pick references from local Zotero HTTP connector (Ctrl+Shift+I)", "accessories-dictionary-symbolic", "win.open_zotero", "Scientific"));
+            all_items.add (new CommandPaletteItem ("Insert Zotero Citation", "Pick references from local Zotero HTTP connector (Ctrl+Shift+I)", "accessories-dictionary-symbolic", "win.zotero_picker", "Scientific"));
+            all_items.add (new CommandPaletteItem ("Bibliography & DOI Manager (.bib)", "Generate .bib entries from DOI links (Ctrl+Shift+B)", "document-edit-symbolic", "win.doi_bib_manager", "Scientific"));
+            all_items.add (new CommandPaletteItem ("New HTML5 + CSS + LaTeX Document", "Create HTML document with embedded CSS and LaTeX math", "text-html-symbolic", "app.new_html", "File"));
+            all_items.add (new CommandPaletteItem ("New BibTeX Bibliography (.bib)", "Create a new .bib bibliography file", "x-office-document-symbolic", "app.new_bib", "File"));
+            all_items.add (new CommandPaletteItem ("New CSS Stylesheet (.css)", "Create a new CSS stylesheet file", "preferences-desktop-theme-symbolic", "app.new_css", "File"));
             all_items.add (new CommandPaletteItem ("Provision Data Science Toolchains", "Install pre-compiled R 4.4, Python 3.12, and Quarto binaries", "preferences-system-symbolic", "app.toolchain_setup", "Scientific"));
 
             // Hardware & Physics Controls

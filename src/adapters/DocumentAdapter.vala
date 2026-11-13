@@ -57,6 +57,68 @@ namespace Imladris.Adapters {
             return builder.str;
         }
 
+        private static GLib.Regex? html_protected_tag_regex = null;
+        private static GLib.Regex? html_inline_math_regex = null;
+
+        /**
+         * Renders LaTeX math ($...$, $$...$$, \begin{equation}...\end{equation}) inside
+         * raw HTML documents while preserving <style>, <script>, <pre>, and <code> blocks,
+         * and injects MathChemEngine CSS when needed.
+         */
+        public static string render_html_with_latex (string raw_html) {
+            if (!raw_html.contains ("$") && !raw_html.contains ("\\begin{equation}")) {
+                return raw_html;
+            }
+
+            var protected_blocks = new Gee.ArrayList<string> ();
+            string working = raw_html;
+
+            try {
+                if (html_protected_tag_regex == null) {
+                    html_protected_tag_regex = new GLib.Regex ("<(style|script|pre|code)(\\s[^>]*)?>[\\s\\S]*?</\\1>", GLib.RegexCompileFlags.CASELESS);
+                }
+                working = html_protected_tag_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
+                    int idx = protected_blocks.size;
+                    protected_blocks.add (match_info.fetch (0));
+                    res.append_printf ("__IMLADRIS_HTML_PROT_%d__", idx);
+                    return false;
+                });
+            } catch (GLib.RegexError e) {}
+
+            working = transform_display_math (working);
+
+            try {
+                if (html_inline_math_regex == null) {
+                    html_inline_math_regex = new GLib.Regex ("(?<!\\\\)\\$([^\\$\\n]+?)\\$");
+                }
+                working = html_inline_math_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
+                    string expr = match_info.fetch (1).strip ();
+                    if (expr.length == 0) {
+                        res.append (match_info.fetch (0));
+                    } else {
+                        res.append (Core.MathChemEngine.render_latex_to_html (expr, false));
+                    }
+                    return false;
+                });
+            } catch (GLib.RegexError e) {}
+
+            for (int i = 0; i < protected_blocks.size; i++) {
+                working = working.replace (@"__IMLADRIS_HTML_PROT_$(i)__", protected_blocks[i]);
+            }
+
+            if (!working.contains (".math-display-card")) {
+                string math_css = "<style id=\"imladris-math-css\">\n" + Core.MathChemEngine.get_math_chem_css () + "\n</style>\n";
+                int head_close = working.down ().index_of ("</head>");
+                if (head_close >= 0) {
+                    working = working.substring (0, head_close) + math_css + working.substring (head_close);
+                } else {
+                    working = math_css + working;
+                }
+            }
+
+            return working;
+        }
+
         private static string transform_display_math (string text) {
             string result = text;
             try {

@@ -13,6 +13,7 @@ namespace Imladris.Core {
 
     public enum ScientificOutputFormat {
         HTML_MANUSCRIPT,
+        PDF_MANUSCRIPT,
         REVEALJS_SLIDES,
         BEAMER_PDF_SLIDES,
         TYPST_POSTER_PDF;
@@ -20,6 +21,7 @@ namespace Imladris.Core {
         public string to_quarto_flag () {
             switch (this) {
                 case HTML_MANUSCRIPT:   return "html";
+                case PDF_MANUSCRIPT:    return "pdf";
                 case REVEALJS_SLIDES:   return "revealjs";
                 case BEAMER_PDF_SLIDES: return "beamer";
                 case TYPST_POSTER_PDF:  return "typst";
@@ -30,6 +32,7 @@ namespace Imladris.Core {
         public string to_display_label () {
             switch (this) {
                 case HTML_MANUSCRIPT:   return "Manuscript (HTML)";
+                case PDF_MANUSCRIPT:    return "Article / Report (PDF)";
                 case REVEALJS_SLIDES:   return "Interactive Slides (RevealJS)";
                 case BEAMER_PDF_SLIDES: return "Conference Slides (Beamer PDF)";
                 case TYPST_POSTER_PDF:  return "Symposium Poster (Typst/PDF)";
@@ -39,6 +42,7 @@ namespace Imladris.Core {
 
         public string get_extension () {
             switch (this) {
+                case PDF_MANUSCRIPT:
                 case BEAMER_PDF_SLIDES:
                 case TYPST_POSTER_PDF:
                     return ".pdf";
@@ -83,11 +87,18 @@ namespace Imladris.Core {
 
             compilation_progress (@"▶ Starting $(format.to_display_label ()) compilation for $base_name...");
 
+            string? resolved_quarto_check = null;
+            string? env_prefix_check = null;
+            if (Core.PlatformUtils.resolve_runtime ("quarto", working_dir, out resolved_quarto_check, out env_prefix_check) == Core.RuntimeSource.MISSING) {
+                throw new ExportError.QUARTO_MISSING ("Quarto CLI was not found in the project, managed toolchain, or system PATH.");
+            }
+
             string exec_log = "";
             bool success = yield execute_quarto_render_pass (qmd_path, format, working_dir, out exec_log);
 
-            if (!success && format == ScientificOutputFormat.BEAMER_PDF_SLIDES) {
-                bool needs_tex = exec_log.contains ("xelatex not found") ||
+            if (!success && (format == ScientificOutputFormat.BEAMER_PDF_SLIDES || format == ScientificOutputFormat.PDF_MANUSCRIPT)) {
+                bool needs_tex = exec_log.contains ("No LaTeX installation found") ||
+                                 exec_log.contains ("xelatex not found") ||
                                  exec_log.contains ("pdflatex not found") ||
                                  exec_log.contains ("lualatex not found") ||
                                  exec_log.contains ("LaTeX Error") ||
@@ -97,9 +108,9 @@ namespace Imladris.Core {
 
                 if (needs_tex) {
                     tex_healing_started ();
-                    compilation_progress ("[Imladris TeX Healer] Missing LaTeX/Beamer packages detected. Provisioning isolated TinyTeX runtime...");
+                    compilation_progress ("[Imladris TeX Healer] Missing LaTeX packages detected. Provisioning isolated TinyTeX runtime...");
                     yield heal_tinytex_runtime (working_dir);
-                    compilation_progress ("▶ TinyTeX provisioned. Retrying Beamer PDF compilation...");
+                    compilation_progress ("▶ TinyTeX provisioned. Retrying PDF compilation...");
                     success = yield execute_quarto_render_pass (qmd_path, format, working_dir, out exec_log);
                 }
             }
@@ -107,6 +118,12 @@ namespace Imladris.Core {
             if (!success) {
                 compilation_progress (@"✖ Render failed: $exec_log");
                 throw new ExportError.RENDER_FAILED (@"Quarto render failed: $exec_log");
+            }
+
+            if (!GLib.FileUtils.test (expected_output, GLib.FileTest.EXISTS)) {
+                string missing_msg = @"Quarto exited without creating $(GLib.Path.get_basename (expected_output))";
+                compilation_progress (@"✖ Render failed: $missing_msg");
+                throw new ExportError.RENDER_FAILED (missing_msg);
             }
 
             compilation_progress (@"✔ Successfully generated: $(GLib.Path.get_basename (expected_output))");
@@ -163,23 +180,23 @@ namespace Imladris.Core {
         }
 
         private async void heal_tinytex_runtime (string working_dir) throws GLib.Error {
-            var tm = Core.ToolchainManager.get_default ();
-            string mamba_bin = tm.mamba_bin;
-            string base_prefix = tm.default_env;
+            string? resolved_quarto = null;
+            string? env_prefix = null;
+            var source = Core.PlatformUtils.resolve_runtime ("quarto", working_dir, out resolved_quarto, out env_prefix);
 
             var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
             launcher.set_cwd (working_dir);
 
+            string[] raw_args = { (resolved_quarto != null) ? resolved_quarto : "quarto", "install", "tinytex", "--no-prompt" };
             string[] argv;
-            if (GLib.FileUtils.test (mamba_bin, GLib.FileTest.IS_EXECUTABLE) && GLib.FileUtils.test (base_prefix, GLib.FileTest.IS_DIR)) {
-                argv = { mamba_bin, "run", "-p", base_prefix, "quarto", "install", "tinytex", "--no-prompt" };
+            if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
+                string[] host_cmd = { "quarto", "install", "tinytex", "--no-prompt" };
+                argv = Core.PlatformUtils.build_host_command (host_cmd, working_dir);
+            } else if (source == Core.RuntimeSource.MANAGED_GLOBAL || source == Core.RuntimeSource.PROJECT_SANDBOX) {
+                Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
+                argv = raw_args;
             } else {
-                if (Core.PlatformUtils.is_flatpak ()) {
-                    string[] host_cmd = { "quarto", "install", "tinytex", "--no-prompt" };
-                    argv = Core.PlatformUtils.build_host_command (host_cmd, working_dir);
-                } else {
-                    argv = { "quarto", "install", "tinytex", "--no-prompt" };
-                }
+                argv = raw_args;
             }
 
             try {

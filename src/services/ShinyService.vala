@@ -132,7 +132,7 @@ namespace Imladris.Services {
 
             // Assign ephemeral port
             int port = 3838 + (int) (GLib.Random.next_int () % 5000);
-            string sanitized_target = target_file_or_dir.replace ("\\", "/");
+            string sanitized_target = target_file_or_dir.replace ("\\", "/").replace ("'", "\\'");
 
             // Standard R Shiny execution command
             string r_cmd = """
@@ -164,7 +164,11 @@ shiny::runApp('%s', port = %d, host = '127.0.0.1', launch.browser = FALSE)
                 read_stream_loop.begin (stdout_stream, false);
                 read_stream_loop.begin (stderr_stream, true);
 
+                var spawned_proc = app_process;
                 app_process.wait_async.begin (cancellable, (obj, res) => {
+                    if (spawned_proc != this.app_process) {
+                        return;
+                    }
                     this.status = ShinyAppStatus.STOPPED;
                     this.active_url = null;
                     status_changed (this.status);

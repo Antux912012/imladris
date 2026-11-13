@@ -13,6 +13,7 @@ finish-args:
   - --env=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
   - --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
   - --talk-name=org.freedesktop.Flatpak
+  - --talk-name=org.freedesktop.secrets
 cleanup:
   - /include
   - /lib/pkgconfig

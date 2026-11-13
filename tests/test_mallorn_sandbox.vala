@@ -15,6 +15,8 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/sandbox/restore_environment", test_sandbox_restore);
         GLib.Test.add_func ("/sessions/persistent_session_and_pwd_sync", test_persistent_session_and_pwd_sync);
         GLib.Test.add_func ("/export/odt_and_odp_pipeline", test_export_pipeline_odt_odp);
+        GLib.Test.add_func ("/export/qmd_pdf_html_odt_rtf", test_export_qmd_pdf_html_odt_rtf);
+        GLib.Test.add_func ("/export/html_css_latex_render", test_html_css_latex_render);
         GLib.Test.add_func ("/chunks/chunk_parser", test_chunk_parser);
         GLib.Test.add_func ("/execution/repl_bridge_and_chunk_engine", test_repl_bridge_and_chunk_engine);
         GLib.Test.add_func ("/core/platform_utils", test_platform_utils);
@@ -1093,5 +1095,52 @@ df_omics = pd.read_csv("counts.tsv")
         assert (Editor.CodeIntelliSenseEngine.compute_match_score ("differential_expression", "diffexp") > 0);
         assert (Editor.CodeIntelliSenseEngine.compute_match_score ("ggplot", "ggp") > 50);
         assert (Editor.CodeIntelliSenseEngine.compute_match_score ("hello", "xyz") == 0);
+    }
+
+    static void test_export_qmd_pdf_html_odt_rtf () {
+        assert (Core.ScientificOutputFormat.PDF_MANUSCRIPT.to_quarto_flag () == "pdf");
+        assert (Core.ScientificOutputFormat.PDF_MANUSCRIPT.get_extension () == ".pdf");
+
+        string tmp_dir = GLib.Path.build_filename (GLib.Environment.get_tmp_dir (), "imladris_test_export_formats");
+        GLib.DirUtils.create_with_parents (tmp_dir, 0755);
+
+        string qmd_content = "---\ntitle: \"Clinical Trial Report\"\nauthor: \"Dr. Elrond\"\n---\n\n# Summary\n\nResult with `p < 0.05`.\n\n```{r}\nsummary(cars)\n```\n";
+        string fake_unsaved_qmd = GLib.Path.build_filename (tmp_dir, "unsaved_report.qmd");
+        string html_out = GLib.Path.build_filename (tmp_dir, "out.html");
+        string odt_out = GLib.Path.build_filename (tmp_dir, "out.odt");
+        string rtf_out = GLib.Path.build_filename (tmp_dir, "out.rtf");
+
+        try {
+            Services.ExportService.export_to_html (fake_unsaved_qmd, html_out, qmd_content);
+            assert (GLib.FileUtils.test (html_out, GLib.FileTest.EXISTS));
+            string html_data;
+            GLib.FileUtils.get_contents (html_out, out html_data);
+            assert (html_data.contains ("Clinical Trial Report"));
+
+            Services.ExportService.export_to_odt (fake_unsaved_qmd, odt_out, qmd_content);
+            assert (GLib.FileUtils.test (odt_out, GLib.FileTest.EXISTS));
+
+            Services.ExportService.export_to_rtf (fake_unsaved_qmd, rtf_out, qmd_content);
+            assert (GLib.FileUtils.test (rtf_out, GLib.FileTest.EXISTS));
+            string rtf_data;
+            GLib.FileUtils.get_contents (rtf_out, out rtf_data);
+            assert (rtf_data.has_prefix ("{\\rtf1"));
+            assert (rtf_data.contains ("Clinical Trial Report"));
+        } catch (GLib.Error e) {
+            assert_not_reached ();
+        } finally {
+            GLib.FileUtils.remove (html_out);
+            GLib.FileUtils.remove (odt_out);
+            GLib.FileUtils.remove (rtf_out);
+            GLib.DirUtils.remove (tmp_dir);
+        }
+    }
+
+    static void test_html_css_latex_render () {
+        string raw_html = "<!DOCTYPE html><html><head><style>body { color: #123; content: \"$not_math$\"; }</style></head><body><p>Inline $\\alpha$ and display:</p>$$E = mc^2$$</body></html>";
+        string rendered = Adapters.DocumentAdapter.render_html_with_latex (raw_html);
+        assert ("content: \"$not_math$\"" in rendered);
+        assert (".math-display-card" in rendered);
+        assert (!("$$E = mc^2$$" in rendered));
     }
 }

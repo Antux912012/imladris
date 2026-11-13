@@ -551,7 +551,10 @@ Analyze the report narrative and active dataframe columns to suggest the optimal
             var msg = new Soup.Message ("POST", completions_url);
             msg.set_request_body_from_bytes ("application/json", new Bytes (payload.data));
 
-            Bytes bytes = yield soup_session.send_and_read_async (msg, Priority.DEFAULT, cancellable);
+            Bytes? bytes = yield soup_session.send_and_read_async (msg, Priority.DEFAULT, cancellable);
+            if (msg.status_code < 200 || msg.status_code >= 300 || bytes == null) {
+                return "";
+            }
             var parser = new Json.Parser ();
             yield parser.load_from_stream_async (new MemoryInputStream.from_bytes (bytes), cancellable);
 
@@ -561,18 +564,19 @@ Analyze the report narrative and active dataframe columns to suggest the optimal
             }
 
             var root_obj = root.get_object ();
-            if (!root_obj.has_member ("choices")) return "";
+            if (!root_obj.has_member ("choices") || root_obj.get_null_member ("choices")) return "";
 
             var choices = root_obj.get_array_member ("choices");
             if (choices.get_length () == 0) return "";
 
             var choice = choices.get_object_element (0);
-            if (!choice.has_member ("message")) return "";
+            if (choice == null || !choice.has_member ("message") || choice.get_null_member ("message")) return "";
 
             var message = choice.get_object_member ("message");
-            if (!message.has_member ("content")) return "";
+            if (message == null || !message.has_member ("content") || message.get_null_member ("content")) return "";
 
-            return clean_completion_output (message.get_string_member ("content"));
+            string? raw_content = message.get_string_member ("content");
+            return (raw_content != null) ? clean_completion_output (raw_content) : "";
         }
 
         // =========================================================================
@@ -591,10 +595,23 @@ Analyze the report narrative and active dataframe columns to suggest the optimal
                 var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                 var proc = launcher.spawnv (argv);
                 var cancellable = new GLib.Cancellable ();
-                uint timeout_id = GLib.Timeout.add (1500, () => {
-                    cancellable.cancel ();
-                    return GLib.Source.REMOVE;
+                var done_mutex = GLib.Mutex ();
+                var done_cond = GLib.Cond ();
+                bool finished = false;
+
+                var watchdog = new GLib.Thread<void*> ("imladris-bin-watchdog", () => {
+                    int64 end_time = GLib.get_monotonic_time () + 1500 * 1000;
+                    done_mutex.lock ();
+                    while (!finished) {
+                        if (!done_cond.wait_until (done_mutex, end_time)) {
+                            cancellable.cancel ();
+                            break;
+                        }
+                    }
+                    done_mutex.unlock ();
+                    return null;
                 });
+
                 bool ok = false;
                 try {
                     proc.wait (cancellable);
@@ -602,7 +619,11 @@ Analyze the report narrative and active dataframe columns to suggest the optimal
                 } catch (GLib.IOError.CANCELLED e) {
                     proc.force_exit ();
                 }
-                GLib.Source.remove (timeout_id);
+                done_mutex.lock ();
+                finished = true;
+                done_cond.signal ();
+                done_mutex.unlock ();
+                watchdog.join ();
                 return ok;
             } catch (Error e) {
                 return false;

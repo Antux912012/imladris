@@ -38,6 +38,7 @@ namespace Imladris.Core {
         private static bool? _is_flatpak_cached = null;
         private static GLib.HashTable<string, bool> _availability_cache = null;
         private static GLib.HashTable<string, string?> _path_cache = null;
+        private static GLib.Mutex _cache_mutex;
 
         /**
          * Returns true if Imladris is running inside a Flatpak container sandbox.
@@ -132,7 +133,33 @@ namespace Imladris.Core {
             string r_home = GLib.Path.build_filename (lib_dir, "R");
 
             string? current_path = GLib.Environment.get_variable ("PATH");
-            string path_val = (current_path != null && current_path != "") ? @"$bin_dir:$current_path" : bin_dir;
+            var path_parts = new GLib.GenericArray<string> ();
+            path_parts.add (bin_dir);
+
+            string home_dir = GLib.Environment.get_home_dir ();
+            string data_dir = GLib.Environment.get_user_data_dir ();
+            string[] tinytex_candidates = {
+                GLib.Path.build_filename (data_dir, "TinyTeX", "bin", "x86_64-linux"),
+                GLib.Path.build_filename (data_dir, "TinyTeX", "bin", "aarch64-linux"),
+                GLib.Path.build_filename (home_dir, ".TinyTeX", "bin", "x86_64-linux"),
+                GLib.Path.build_filename (home_dir, ".TinyTeX", "bin", "aarch64-linux"),
+                GLib.Path.build_filename (home_dir, "TinyTeX", "bin", "x86_64-linux"),
+                GLib.Path.build_filename (home_dir, "TinyTeX", "bin", "aarch64-linux")
+            };
+            foreach (string tt_bin in tinytex_candidates) {
+                if (GLib.FileUtils.test (tt_bin, GLib.FileTest.IS_DIR)) {
+                    path_parts.add (tt_bin);
+                }
+            }
+
+            if (current_path != null && current_path != "") {
+                path_parts.add (current_path);
+            }
+            string[] path_arr = new string[path_parts.length];
+            for (int i = 0; i < path_parts.length; i++) {
+                path_arr[i] = path_parts[i];
+            }
+            string path_val = string.joinv (":", path_arr);
 
             launcher.set_environ (GLib.Environment.list_variables ());
             launcher.setenv ("PATH", path_val, true);
@@ -155,6 +182,7 @@ namespace Imladris.Core {
         private static Secret.Schema? _galaxy_secret_schema = null;
 
         public static Secret.Schema get_galaxy_secret_schema () {
+            _cache_mutex.lock ();
             if (_galaxy_secret_schema == null) {
                 _galaxy_secret_schema = new Secret.Schema (
                     "org.ardatech.Imladris.GalaxyApiKey",
@@ -162,7 +190,9 @@ namespace Imladris.Core {
                     "server_url", Secret.SchemaAttributeType.STRING
                 );
             }
-            return _galaxy_secret_schema;
+            var schema = _galaxy_secret_schema;
+            _cache_mutex.unlock ();
+            return schema;
         }
 
         /**
@@ -197,19 +227,25 @@ namespace Imladris.Core {
          * Checks if a program is available in any tier (Project sandbox, Managed global, or Host).
          */
         public static bool is_program_available (string program, string? project_dir = null) {
-            init_caches ();
-
             string cache_key = (project_dir != null && project_dir != "") ? @"$program@$project_dir" : program;
+            _cache_mutex.lock ();
+            init_caches ();
             if (_availability_cache.contains (cache_key)) {
-                return _availability_cache.lookup (cache_key);
+                bool cached = _availability_cache.lookup (cache_key);
+                _cache_mutex.unlock ();
+                return cached;
             }
+            _cache_mutex.unlock ();
 
             string? resolved = null;
             string? env_pfx = null;
             RuntimeSource src = resolve_runtime (program, project_dir, out resolved, out env_pfx);
             bool available = (src != RuntimeSource.MISSING);
 
+            _cache_mutex.lock ();
+            init_caches ();
             _availability_cache.insert (cache_key, available);
+            _cache_mutex.unlock ();
             return available;
         }
 
@@ -217,18 +253,24 @@ namespace Imladris.Core {
          * Returns the resolved binary path for a program according to the 4-tier resolution hierarchy.
          */
         public static string? find_program (string program, string? project_dir = null) {
-            init_caches ();
-
             string cache_key = (project_dir != null && project_dir != "") ? @"$program@$project_dir" : program;
+            _cache_mutex.lock ();
+            init_caches ();
             if (_path_cache.contains (cache_key)) {
-                return _path_cache.lookup (cache_key);
+                string? cached = _path_cache.lookup (cache_key);
+                _cache_mutex.unlock ();
+                return cached;
             }
+            _cache_mutex.unlock ();
 
             string? resolved = null;
             string? env_pfx = null;
             resolve_runtime (program, project_dir, out resolved, out env_pfx);
 
+            _cache_mutex.lock ();
+            init_caches ();
             _path_cache.insert (cache_key, resolved);
+            _cache_mutex.unlock ();
             return resolved;
         }
 
@@ -311,12 +353,14 @@ namespace Imladris.Core {
          * Clears runtime caches when a new toolchain is installed or removed.
          */
         public static void clear_caches () {
+            _cache_mutex.lock ();
             if (_availability_cache != null) {
                 _availability_cache.remove_all ();
             }
             if (_path_cache != null) {
                 _path_cache.remove_all ();
             }
+            _cache_mutex.unlock ();
         }
 
         private static void init_caches () {

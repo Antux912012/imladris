@@ -25,12 +25,16 @@ namespace Imladris {
             { "new_py", on_new_py },
             { "new_ts", on_new_ts },
             { "new_html", on_new_html },
+            { "new_css", on_new_css },
+            { "new_bib", on_new_bib },
             { "open", on_open_document },
             { "save", on_save_document },
             { "export_pdf", on_export_pdf },
             { "export_html", on_export_html },
             { "export_odt", on_export_odt },
             { "export_odp", on_export_odp },
+            { "export_rtf", on_export_rtf },
+            { "render_scientific", on_render_scientific },
             { "export_mallorn", on_export_mallorn },
             { "export_rstudio", on_export_rstudio },
             { "export_jupyter", on_export_jupyter },
@@ -129,7 +133,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.open", { "<Control>o" });
             this.set_accels_for_action ("app.save", { "<Control>s" });
             this.set_accels_for_action ("app.package_installer", { "<Control><Alt>k" });
-            this.set_accels_for_action ("app.export_html", { "<Control><Shift>k" });
+            this.set_accels_for_action ("app.render_scientific", { "<Control><Shift>k" });
             this.set_accels_for_action ("app.run_shiny_app", { "<Control><Shift>a" });
             this.set_accels_for_action ("app.elrond_assist", { "<Control><Shift>e" });
             this.set_accels_for_action ("app.command_palette", { "<Control><Shift>p", "<Control>k" });
@@ -138,6 +142,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.mermaid_studio", { "<Control><Shift>d", "<Control><Alt>m" });
             this.set_accels_for_action ("app.insert_image", { "<Control><Alt>i", "<Control><Shift>m" });
             this.set_accels_for_action ("win.zotero_picker", { "<Control><Shift>i" });
+            this.set_accels_for_action ("win.doi_bib_manager", { "<Control><Shift>b" });
             this.set_accels_for_action ("app.insert_video", { "<Control><Shift>v" });
             this.set_accels_for_action ("app.quit", { "<Control>q" });
             this.set_accels_for_action ("win.undo", { "<Control>z" });
@@ -259,7 +264,62 @@ namespace Imladris {
 
         private void on_new_html () {
             var win = this.active_window as Window;
-            if (win != null) win.add_document_tab ("index.html", "html");
+            if (win != null) {
+                string html_starter = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scientific HTML Report</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1e293b;
+      --accent: #0284c7;
+      --card: #f8fafc;
+      --border: #e2e8f0;
+    }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      line-height: 1.65;
+    }
+    h1 { color: #0f172a; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+    .callout {
+      background: var(--card);
+      border-left: 4px solid var(--accent);
+      padding: 14px 18px;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Scientific HTML Report</h1>
+  <p>Inline LaTeX math: $\alpha + \beta = \gamma$ and chemical formulas $\ce{H2O}$.</p>
+  <div class="callout">
+    <strong>Display Equation:</strong>
+    $$E = mc^2$$
+  </div>
+</body>
+</html>
+""";
+                win.add_document_tab ("index.html", "html", html_starter);
+            }
+        }
+
+        private void on_new_css () {
+            var win = this.active_window as Window;
+            if (win != null) win.add_document_tab ("style.css", "css", "/* Imladris Stylesheet */\nbody {\n  font-family: system-ui, sans-serif;\n  line-height: 1.6;\n}\n");
+        }
+
+        private void on_new_bib () {
+            var win = this.active_window as Window;
+            if (win != null) win.add_document_tab ("references.bib", "bibtex", "% BibTeX Bibliography managed by Imladris\n% Use Ctrl+Shift+B (DOI / .bib Manager) to generate entries from a DOI link.\n\n");
         }
 
         private void on_open_document () {
@@ -290,6 +350,16 @@ namespace Imladris {
         private void on_export_odp () {
             var win = this.active_window as Window;
             if (win != null) win.export_document_dialog_async.begin ("odp");
+        }
+
+        private void on_export_rtf () {
+            var win = this.active_window as Window;
+            if (win != null) win.export_document_dialog_async.begin ("rtf");
+        }
+
+        private void on_render_scientific () {
+            var win = this.active_window as Window;
+            if (win != null) win.trigger_selected_scientific_render ();
         }
 
         private void on_export_mallorn () {

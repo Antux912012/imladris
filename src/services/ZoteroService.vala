@@ -42,7 +42,6 @@ namespace Imladris.Services {
         private static GLib.Regex? reg_yaml_cache = null;
         private static GLib.Regex? reg_bib_check_cache = null;
         private static GLib.Regex? reg_entry_cache = null;
-        private static GLib.HashTable<string, GLib.Regex>? reg_field_cache = null;
 
         public ZoteroService () {
             session = new Soup.Session () {
@@ -88,33 +87,49 @@ namespace Imladris.Services {
          */
         public async Gee.ArrayList<CitationItem> search_citations_async (string query, string? fallback_bib_content = null) {
             string trimmed = query.strip ();
+            var merged = new Gee.ArrayList<CitationItem> ();
+            var seen_keys = new Gee.HashSet<string> ();
 
-            // Tier 1A: Try Better BibTeX JSON-RPC first (Best for Quarto / R Markdown)
+            // Tier 1: Local .bib entries (always include parallel to Zotero)
+            if (fallback_bib_content != null && fallback_bib_content.length > 0) {
+                foreach (var item in search_offline_bib (trimmed, fallback_bib_content)) {
+                    if (!seen_keys.contains (item.citekey)) {
+                        seen_keys.add (item.citekey);
+                        merged.add (item);
+                    }
+                }
+            }
+
+            // Tier 2A: Better BibTeX JSON-RPC
             try {
                 var bbt_results = yield search_better_bibtex_async (trimmed);
+                foreach (var item in bbt_results) {
+                    if (!seen_keys.contains (item.citekey)) {
+                        seen_keys.add (item.citekey);
+                        merged.add (item);
+                    }
+                }
                 if (bbt_results.size > 0) {
-                    return bbt_results;
+                    return merged;
                 }
             } catch (GLib.Error e) {
                 // Fall through
             }
 
-            // Tier 1B: Try Native Zotero 7+ Local API
+            // Tier 2B: Native Zotero 7+ Local API
             try {
                 var native_results = yield search_native_zotero_async (trimmed);
-                if (native_results.size > 0) {
-                    return native_results;
+                foreach (var item in native_results) {
+                    if (!seen_keys.contains (item.citekey)) {
+                        seen_keys.add (item.citekey);
+                        merged.add (item);
+                    }
                 }
             } catch (GLib.Error e) {
                 // Fall through
             }
 
-            // Tier 2: Offline Fallback using references.bib content
-            if (fallback_bib_content != null && fallback_bib_content.length > 0) {
-                return search_offline_bib (trimmed, fallback_bib_content);
-            }
-
-            return new Gee.ArrayList<CitationItem> ();
+            return merged;
         }
 
         /**
@@ -171,25 +186,31 @@ namespace Imladris.Services {
                         if (item_node.get_node_type () == Json.NodeType.OBJECT) {
                             var item_obj = item_node.get_object ();
                             string citekey = "";
-                            if (item_obj.has_member ("citekey")) {
-                                citekey = item_obj.get_string_member ("citekey");
-                            } else if (item_obj.has_member ("citation-key")) {
-                                citekey = item_obj.get_string_member ("citation-key");
+                            if (item_obj.has_member ("citekey") && !item_obj.get_null_member ("citekey")) {
+                                citekey = item_obj.get_string_member ("citekey") ?? "";
+                            } else if (item_obj.has_member ("citation-key") && !item_obj.get_null_member ("citation-key")) {
+                                citekey = item_obj.get_string_member ("citation-key") ?? "";
                             }
 
-                            string title = item_obj.has_member ("title") ? item_obj.get_string_member ("title") : "Untitled";
+                            string title = (item_obj.has_member ("title") && !item_obj.get_null_member ("title"))
+                                ? (item_obj.get_string_member ("title") ?? "Untitled")
+                                : "Untitled";
                             string authors = "";
-                            if (item_obj.has_member ("author")) {
+                            if (item_obj.has_member ("author") && !item_obj.get_null_member ("author")) {
                                 var auth_node = item_obj.get_member ("author");
                                 if (auth_node.get_node_type () == Json.NodeType.ARRAY) {
                                     var auth_arr = auth_node.get_array ();
                                     var auth_list = new Gee.ArrayList<string> ();
                                     for (uint a = 0; a < auth_arr.get_length (); a++) {
-                                        var a_obj = auth_arr.get_object_element (a);
-                                        if (a_obj.has_member ("family")) {
-                                            auth_list.add (a_obj.get_string_member ("family"));
-                                        } else if (a_obj.has_member ("literal")) {
-                                            auth_list.add (a_obj.get_string_member ("literal"));
+                                        var a_node = auth_arr.get_element (a);
+                                        if (a_node.get_node_type () != Json.NodeType.OBJECT) continue;
+                                        var a_obj = a_node.get_object ();
+                                        if (a_obj.has_member ("family") && !a_obj.get_null_member ("family")) {
+                                            string? fam = a_obj.get_string_member ("family");
+                                            if (fam != null && fam != "") auth_list.add (fam);
+                                        } else if (a_obj.has_member ("literal") && !a_obj.get_null_member ("literal")) {
+                                            string? lit = a_obj.get_string_member ("literal");
+                                            if (lit != null && lit != "") auth_list.add (lit);
                                         }
                                     }
                                     authors = string.joinv (", ", auth_list.to_array ());
@@ -198,23 +219,28 @@ namespace Imladris.Services {
                             if (authors == "") authors = "Unknown Author";
 
                             string year = "n.d.";
-                            if (item_obj.has_member ("issued")) {
+                            if (item_obj.has_member ("issued") && !item_obj.get_null_member ("issued")) {
                                 var iss_node = item_obj.get_member ("issued");
                                 if (iss_node.get_node_type () == Json.NodeType.OBJECT) {
                                     var iss_obj = iss_node.get_object ();
-                                    if (iss_obj.has_member ("date-parts")) {
+                                    if (iss_obj.has_member ("date-parts") && !iss_obj.get_null_member ("date-parts")) {
                                         var dp = iss_obj.get_array_member ("date-parts");
                                         if (dp.get_length () > 0) {
-                                            var row0 = dp.get_array_element (0);
-                                            if (row0.get_length () > 0) {
-                                                year = row0.get_int_element (0).to_string ();
+                                            var row0_node = dp.get_element (0);
+                                            if (row0_node.get_node_type () == Json.NodeType.ARRAY) {
+                                                var row0 = row0_node.get_array ();
+                                                if (row0.get_length () > 0) {
+                                                    year = row0.get_int_element (0).to_string ();
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
 
-                            string? abs_text = item_obj.has_member ("abstract") ? item_obj.get_string_member ("abstract") : null;
+                            string? abs_text = (item_obj.has_member ("abstract") && !item_obj.get_null_member ("abstract"))
+                                ? item_obj.get_string_member ("abstract")
+                                : null;
                             if (citekey.length > 0) {
                                 results.add (new CitationItem (citekey, title, authors, year, abs_text, "better-bibtex"));
                             }
@@ -248,30 +274,44 @@ namespace Imladris.Services {
 
             var arr = root.get_array ();
             for (uint i = 0; i < arr.get_length (); i++) {
-                var el = arr.get_object_element (i);
-                if (!el.has_member ("data")) continue;
+                var el_node = arr.get_element (i);
+                if (el_node.get_node_type () != Json.NodeType.OBJECT) continue;
+                var el = el_node.get_object ();
+                if (!el.has_member ("data") || el.get_null_member ("data")) continue;
                 var data = el.get_object_member ("data");
-                string title = data.has_member ("title") ? data.get_string_member ("title") : "";
+                string title = (data.has_member ("title") && !data.get_null_member ("title"))
+                    ? (data.get_string_member ("title") ?? "")
+                    : "";
                 if (title == "") continue;
 
                 var auth_list = new Gee.ArrayList<string> ();
                 string first_author = "anon";
-                if (data.has_member ("creators")) {
-                    var creators = data.get_array_member ("creators");
-                    for (uint c = 0; c < creators.get_length (); c++) {
-                        var c_obj = creators.get_object_element (c);
-                        string name = "";
-                        if (c_obj.has_member ("lastName")) name = c_obj.get_string_member ("lastName");
-                        else if (c_obj.has_member ("name")) name = c_obj.get_string_member ("name");
-                        if (name != "") {
-                            auth_list.add (name);
-                            if (c == 0) first_author = name;
+                if (data.has_member ("creators") && !data.get_null_member ("creators")) {
+                    var creators_node = data.get_member ("creators");
+                    if (creators_node.get_node_type () == Json.NodeType.ARRAY) {
+                        var creators = creators_node.get_array ();
+                        for (uint c = 0; c < creators.get_length (); c++) {
+                            var c_node = creators.get_element (c);
+                            if (c_node.get_node_type () != Json.NodeType.OBJECT) continue;
+                            var c_obj = c_node.get_object ();
+                            string name = "";
+                            if (c_obj.has_member ("lastName") && !c_obj.get_null_member ("lastName")) {
+                                name = c_obj.get_string_member ("lastName") ?? "";
+                            } else if (c_obj.has_member ("name") && !c_obj.get_null_member ("name")) {
+                                name = c_obj.get_string_member ("name") ?? "";
+                            }
+                            if (name != "") {
+                                auth_list.add (name);
+                                if (c == 0) first_author = name;
+                            }
                         }
                     }
                 }
                 string authors = auth_list.size > 0 ? string.joinv (", ", auth_list.to_array ()) : "Unknown Author";
 
-                string date_str = data.has_member ("date") ? data.get_string_member ("date") : "";
+                string date_str = (data.has_member ("date") && !data.get_null_member ("date"))
+                    ? (data.get_string_member ("date") ?? "")
+                    : "";
                 string year = "nd";
                 try {
                     if (reg_year_cache == null) {
@@ -286,12 +326,15 @@ namespace Imladris.Services {
                 // Construct deterministic fallback citation key
                 string sanitized_author = first_author.down ().replace (" ", "");
                 var sb = new StringBuilder ();
-                for (int ci = 0; ci < sanitized_author.length; ci++) {
-                    unichar ch = sanitized_author[ci];
+                int char_idx = 0;
+                unichar ch;
+                while (sanitized_author.get_next_char (ref char_idx, out ch)) {
                     if (ch.isalnum ()) sb.append_unichar (ch);
                 }
                 string citekey = @"$(sb.str)$year";
-                string? abs_text = data.has_member ("abstractNote") ? data.get_string_member ("abstractNote") : null;
+                string? abs_text = (data.has_member ("abstractNote") && !data.get_null_member ("abstractNote"))
+                    ? data.get_string_member ("abstractNote")
+                    : null;
                 results.add (new CitationItem (citekey, title, authors, year, abs_text, "zotero-local"));
             }
             return results;
@@ -500,23 +543,55 @@ namespace Imladris.Services {
         }
 
         private string? extract_bib_field (string entry_body, string field_name) {
-            try {
-                if (reg_field_cache == null) {
-                    reg_field_cache = new GLib.HashTable<string, GLib.Regex> (str_hash, str_equal);
-                }
-                var reg = reg_field_cache.lookup (field_name);
-                if (reg == null) {
-                    reg = new Regex (@"$field_name\\s*=\\s*(?:\\{([\\s\\S]*?)\\}|\"([\\s\\S]*?)\"|(\\d+))", RegexCompileFlags.CASELESS);
-                    reg_field_cache.insert (field_name, reg);
-                }
-                MatchInfo mi;
-                if (reg.match (entry_body, 0, out mi)) {
-                    for (int g = 1; g <= 3; g++) {
-                        string val = mi.fetch (g);
-                        if (val != "") return val.strip ();
+            string lower_body = entry_body.down ();
+            string target = field_name.down ();
+            int search_pos = 0;
+
+            while (search_pos < lower_body.length) {
+                int idx = lower_body.index_of (target, search_pos);
+                if (idx < 0) return null;
+
+                // Ensure word boundary before field_name
+                if (idx > 0) {
+                    char prev = lower_body[idx - 1];
+                    if (prev.isalnum () || prev == '_') {
+                        search_pos = idx + target.length;
+                        continue;
                     }
                 }
-            } catch (RegexError e) {}
+
+                int p = idx + target.length;
+                while (p < entry_body.length && entry_body[p].isspace ()) p++;
+                if (p >= entry_body.length || entry_body[p] != '=') {
+                    search_pos = idx + target.length;
+                    continue;
+                }
+                p++;
+                while (p < entry_body.length && entry_body[p].isspace ()) p++;
+                if (p >= entry_body.length) return null;
+
+                if (entry_body[p] == '{') {
+                    int depth = 1;
+                    int start = p + 1;
+                    p++;
+                    while (p < entry_body.length && depth > 0) {
+                        if (entry_body[p] == '{') depth++;
+                        else if (entry_body[p] == '}') depth--;
+                        p++;
+                    }
+                    int end = (depth == 0) ? p - 1 : p;
+                    return entry_body.substring (start, end - start).strip ();
+                } else if (entry_body[p] == '"') {
+                    int start = p + 1;
+                    p++;
+                    while (p < entry_body.length && entry_body[p] != '"') p++;
+                    return entry_body.substring (start, p - start).strip ();
+                } else {
+                    int start = p;
+                    while (p < entry_body.length && entry_body[p] != ',' && entry_body[p] != '\n' && entry_body[p] != '}') p++;
+                    return entry_body.substring (start, p - start).strip ();
+                }
+            }
             return null;
         }
     }

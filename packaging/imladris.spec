@@ -25,6 +25,10 @@ BuildRequires:  pkgconfig(gio-2.0)
 BuildRequires:  pkgconfig(glib-2.0)
 
 Requires:       hicolor-icon-theme
+Requires:       python3
+Recommends:     pandoc
+Recommends:     libreoffice-writer
+Recommends:     texlive-scheme-basic
 Recommends:     llama-cpp
 
 %description

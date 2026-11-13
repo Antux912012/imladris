@@ -26,7 +26,8 @@ optdepends=(
     'llama-cpp: Alternative package name for local LLM inference'
     'vulkan-icd-loader: Vulkan GPU acceleration for Elrond local AI and GSK rendering'
     'quarto-cli-bin: Quarto document, slide deck, and poster rendering'
-    'pandoc: Document export to PDF, HTML, and Word'
+    'pandoc: Document export to PDF, HTML, ODT, and RTF'
+    'texlive-basic: LaTeX PDF compilation for Quarto and R Markdown'
     'libreoffice: Presentation and spreadsheet export'
 )
 makedepends=(

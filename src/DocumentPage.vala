@@ -578,7 +578,10 @@ print("Python Interpreter:", sys.version.split()[0])
         }
 
         public void refresh_live_preview (string? preloaded_text = null) {
-            if (!web_view.get_mapped ()) {
+            bool is_preview_hidden = !web_view.get_mapped () ||
+                (current_layout_mode == Services.LayoutMode.APOSTROPHE &&
+                 (!console_revealer.reveal_child || right_stack.visible_child_name != "preview"));
+            if (is_preview_hidden) {
                 pending_preview_refresh = true;
                 return;
             }
@@ -596,7 +599,7 @@ print("Python Interpreter:", sys.version.split()[0])
 
             var fmt = get_document_format ();
             if (doc_type == "html" || fmt == DocumentFormat.HTML) {
-                web_view.load_html (raw, base_uri);
+                web_view.load_html (Adapters.DocumentAdapter.render_html_with_latex (raw), base_uri);
                 return;
             }
 

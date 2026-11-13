@@ -58,16 +58,26 @@ namespace Imladris.UI {
             };
             location_row.add_prefix (new Gtk.Image.from_icon_name ("drive-harddisk-symbolic"));
 
-            int64 usage = tm.get_toolchain_disk_usage ();
-            if (usage > 0) {
-                double mb = (double) usage / (1024.0 * 1024.0);
-                var size_badge = new Gtk.Label ("%.1f MB installed".printf (mb)) {
-                    valign = Gtk.Align.CENTER
-                };
-                size_badge.add_css_class ("dim-label");
-                size_badge.add_css_class ("caption");
-                location_row.add_suffix (size_badge);
-            }
+            var size_badge = new Gtk.Label ("Calculating...") {
+                valign = Gtk.Align.CENTER,
+                visible = false
+            };
+            size_badge.add_css_class ("dim-label");
+            size_badge.add_css_class ("caption");
+            location_row.add_suffix (size_badge);
+
+            new GLib.Thread<void*> ("imladris-toolchain-size", () => {
+                int64 usage = tm.get_toolchain_disk_usage ();
+                GLib.Idle.add (() => {
+                    if (usage > 0) {
+                        double mb = (double) usage / (1024.0 * 1024.0);
+                        size_badge.label = "%.1f MB installed".printf (mb);
+                        size_badge.visible = true;
+                    }
+                    return GLib.Source.REMOVE;
+                });
+                return null;
+            });
             info_group.add (location_row);
             page.add (info_group);
 
@@ -235,6 +245,10 @@ namespace Imladris.UI {
                     status_lbl.label = "✖ Installation encountered an error. Check logs above.";
                     install_btn.label = "Retry";
                     install_btn.sensitive = true;
+                    r_switch.sensitive = true;
+                    tidy_switch.sensitive = r_switch.active;
+                    py_switch.sensitive = true;
+                    quarto_switch.sensitive = true;
                 }
             });
         }

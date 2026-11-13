@@ -49,6 +49,8 @@ namespace Imladris {
         private Adw.ButtonContent? shiny_app_content = null;
         private Gtk.Widget? btn_export_odt = null;
         private Gtk.Widget? btn_export_odp = null;
+        private Gtk.Widget? btn_export_rtf = null;
+        private Gtk.DropDown? export_format_selector = null;
         private Gtk.Widget? btn_export_mallorn = null;
         private Gtk.Widget? btn_export_rstudio = null;
         private Gtk.Widget? btn_export_jupyter = null;
@@ -138,13 +140,16 @@ namespace Imladris {
             new_submenu.append ("R Script (.R)", "app.new_r");
             new_submenu.append ("Shiny Web App (.R)", "app.new_shiny");
             new_submenu.append ("Python Script (.py)", "app.new_py");
-            new_submenu.append ("HTML5 Document (.html)", "app.new_html");
+            new_submenu.append ("HTML5 + CSS + LaTeX (.html)", "app.new_html");
+            new_submenu.append ("CSS Stylesheet (.css)", "app.new_css");
+            new_submenu.append ("BibTeX Bibliography (.bib)", "app.new_bib");
 
             var export_submenu = new GLib.Menu ();
             export_submenu.append ("Render to HTML", "app.export_html");
             export_submenu.append ("Render to PDF", "app.export_pdf");
             export_submenu.append ("OpenDocument Text (.odt)", "app.export_odt");
             export_submenu.append ("OpenDocument Presentation (.odp)", "app.export_odp");
+            export_submenu.append ("Rich Text Format (.rtf)", "app.export_rtf");
             export_submenu.append ("Portable .mallorn Archive", "app.export_mallorn");
             export_submenu.append ("Export for RStudio", "app.export_rstudio");
             export_submenu.append ("Export for Jupyter", "app.export_jupyter");
@@ -224,11 +229,12 @@ namespace Imladris {
 
             var export_formats = new Gtk.StringList ({
                 "Manuscript (HTML)",
+                "Article / Report (PDF)",
                 "Interactive Slides (RevealJS)",
                 "Conference Slides (Beamer PDF)",
                 "Symposium Poster (Typst/PDF)"
             });
-            var export_format_selector = new Gtk.DropDown (export_formats, null) {
+            export_format_selector = new Gtk.DropDown (export_formats, null) {
                 valign = Gtk.Align.CENTER,
                 tooltip_text = "Select Scientific Output Format"
             };
@@ -245,12 +251,7 @@ namespace Imladris {
             };
             btn_render_quarto.set_child (render_content);
             btn_render_quarto.clicked.connect (() => {
-                uint sel = export_format_selector.selected;
-                var sc_fmt = Core.ScientificOutputFormat.HTML_MANUSCRIPT;
-                if (sel == 1) sc_fmt = Core.ScientificOutputFormat.REVEALJS_SLIDES;
-                else if (sel == 2) sc_fmt = Core.ScientificOutputFormat.BEAMER_PDF_SLIDES;
-                else if (sel == 3) sc_fmt = Core.ScientificOutputFormat.TYPST_POSTER_PDF;
-                compile_scientific_document_async.begin (sc_fmt);
+                trigger_selected_scientific_render ();
             });
 
             btn_shiny_app = new Gtk.Button () {
@@ -300,6 +301,18 @@ namespace Imladris {
                 open_zotero_picker ();
             });
             sci_list.append (row_cite);
+
+            var row_doi_bib = new Adw.ActionRow () {
+                title = "DOI & .bib Bibliography Manager",
+                subtitle = "Ctrl+Shift+B",
+                activatable = true
+            };
+            row_doi_bib.add_prefix (new Gtk.Image.from_icon_name ("document-edit-symbolic"));
+            row_doi_bib.activated.connect (() => {
+                sci_popover.popdown ();
+                open_doi_bib_manager ();
+            });
+            sci_list.append (row_doi_bib);
 
             var row_deck = new Adw.ActionRow () {
                 title = "New Deck or Poster Template...",
@@ -1215,7 +1228,7 @@ namespace Imladris {
                 uint8[] contents;
                 string etag;
                 yield file.load_contents_async (null, out contents, out etag);
-                string raw_text = (string) contents;
+                string raw_text = Core.PlatformUtils.data_to_string (contents);
 
                 var fmt = DocumentFormat.from_filename (name);
                 string text = Adapters.DocumentAdapter.load_to_editor_buffer (raw_text, fmt);
@@ -1223,6 +1236,8 @@ namespace Imladris {
                 string lang = "markdown";
                 if (name.has_suffix (".ipynb")) lang = "markdown";
                 else if (name.has_suffix (".ts")) lang = "typescript";
+                else if (name.has_suffix (".css")) lang = "css";
+                else if (name.has_suffix (".bib")) lang = "bibtex";
                 else if (name.has_suffix (".html") || name.has_suffix (".htm")) lang = "html";
                 else if (name.has_suffix (".rmd") || name.has_suffix (".Rmd")) lang = "rmd";
                 else if (name.has_suffix (".r") || name.has_suffix (".R")) lang = "r";
@@ -1357,19 +1372,26 @@ namespace Imladris {
             try {
                 var file = yield dialog.save (this, null);
                 if (file != null) {
+                    string? dest_path = file.get_path ();
+                    if (dest_path == null) {
+                        show_toast ("Selected export destination is not a local file path");
+                        return;
+                    }
                     if (doc.file_location != null) {
                         yield save_document_async ();
                     }
                     doc.append_console_log (@"▶ Exporting $base_name to $(file.get_basename ())...");
-                    string src_path = doc.file_location != null ? doc.file_location.get_path () : @"/tmp/$base_prefix.md";
+                    string src_ext = doc.get_document_format ().get_extension ();
+                    string? doc_path = doc.file_location != null ? doc.file_location.get_path () : null;
+                    string src_path = doc_path ?? GLib.Path.build_filename (Core.PlatformUtils.get_shared_cache_dir ("tmp"), @"$base_prefix$src_ext");
                     bool ok = yield Services.ExportService.get_default ().export_document_async (
                         src_path,
-                        file.get_path (),
+                        dest_path,
                         format,
                         doc.source_buffer.text
                     );
                     if (ok) {
-                        doc.append_console_log (@"✔ Successfully exported to $(file.get_path ())");
+                        doc.append_console_log (@"✔ Successfully exported to $dest_path");
                         // Generate GxP / EU CRA Cryptographic Provenance Manifest
                         string pdir = (current_project_dir != "") ? current_project_dir : GLib.Path.get_dirname (src_path);
                         Core.ProvenanceAttestationService.generate_attestation_async.begin (
@@ -1523,6 +1545,16 @@ namespace Imladris {
             export_document_dialog_async.begin (target_format);
         }
 
+        public void trigger_selected_scientific_render () {
+            uint sel = (export_format_selector != null) ? export_format_selector.selected : 0;
+            var sc_fmt = Core.ScientificOutputFormat.HTML_MANUSCRIPT;
+            if (sel == 1) sc_fmt = Core.ScientificOutputFormat.PDF_MANUSCRIPT;
+            else if (sel == 2) sc_fmt = Core.ScientificOutputFormat.REVEALJS_SLIDES;
+            else if (sel == 3) sc_fmt = Core.ScientificOutputFormat.BEAMER_PDF_SLIDES;
+            else if (sel == 4) sc_fmt = Core.ScientificOutputFormat.TYPST_POSTER_PDF;
+            compile_scientific_document_async.begin (sc_fmt);
+        }
+
         public async void compile_scientific_document_async (Core.ScientificOutputFormat format) {
             var doc = get_active_document ();
             if (doc == null) return;
@@ -1636,6 +1668,12 @@ namespace Imladris {
                 open_zotero_picker ();
             });
             this.add_action (action_zotero);
+
+            var action_doi_bib = new GLib.SimpleAction ("doi_bib_manager", null);
+            action_doi_bib.activate.connect (() => {
+                open_doi_bib_manager ();
+            });
+            this.add_action (action_doi_bib);
 
             var action_toolchain = new GLib.SimpleAction ("toolchain_setup", null);
             action_toolchain.activate.connect (() => {
@@ -2006,8 +2044,9 @@ namespace Imladris {
             btn_render_pdf = RibbonFactory.create_tool_button ("document-send-symbolic", "PDF", "Render Document to PDF", false, false, true, null, "app.export_pdf");
             btn_export_odt = RibbonFactory.create_tool_button ("x-office-document-symbolic", "ODT", "Export to OpenDocument Text (.odt)", false, false, true, null, "app.export_odt");
             btn_export_odp = RibbonFactory.create_tool_button ("x-office-presentation-symbolic", "ODP", "Export to OpenDocument Presentation (.odp)", false, false, true, null, "app.export_odp");
+            btn_export_rtf = RibbonFactory.create_tool_button ("document-save-as-symbolic", "RTF", "Export to Rich Text Format (.rtf)", false, false, true, null, "app.export_rtf");
 
-            box.append (RibbonFactory.create_linked_group ({ btn_render_html, btn_render_pdf, btn_export_odt, btn_export_odp }));
+            box.append (RibbonFactory.create_linked_group ({ btn_render_html, btn_render_pdf, btn_export_odt, btn_export_odp, btn_export_rtf }));
             box.append (RibbonFactory.create_vseparator ());
 
             // Group 2: Interoperability & Reproducibility Exports
@@ -2167,6 +2206,10 @@ namespace Imladris {
             if (btn_export_odp != null) {
                 btn_export_odp.visible = !is_html;
                 btn_export_odp.sensitive = is_md || is_notebook;
+            }
+            if (btn_export_rtf != null) {
+                btn_export_rtf.visible = !is_html;
+                btn_export_rtf.sensitive = is_md || is_notebook;
             }
             if (btn_export_mallorn != null) {
                 btn_export_mallorn.visible = is_notebook;
@@ -2676,22 +2719,13 @@ namespace Imladris {
                         doc.source_buffer.insert_at_cursor (citation, -1);
                         doc.source_buffer.end_user_action ();
 
+                        Editor.CitationCompletionProvider.ensure_buffer_bibliography_line (doc.source_buffer, "references.bib");
                         try {
                             var reg = new Regex ("@([a-zA-Z0-9_:-]+)");
                             MatchInfo mi;
                             if (reg.match (citation, 0, out mi)) {
                                 while (mi.matches ()) {
                                     string key = mi.fetch (1);
-                                    string full_text;
-                                    Gtk.TextIter b_s, b_e;
-                                    doc.source_buffer.get_bounds (out b_s, out b_e);
-                                    full_text = doc.source_buffer.get_text (b_s, b_e, false);
-                                    string updated = zotero.ensure_yaml_bibliography (full_text, "references.bib");
-                                    if (updated != full_text) {
-                                        doc.source_buffer.begin_user_action ();
-                                        doc.source_buffer.set_text (updated);
-                                        doc.source_buffer.end_user_action ();
-                                    }
                                     zotero.sync_citation_to_project_async.begin (key, doc.current_project_dir);
                                     mi.next ();
                                 }
@@ -2700,6 +2734,37 @@ namespace Imladris {
                     }
                 }
             });
+        }
+
+        public void open_doi_bib_manager () {
+            var doc = get_active_document ();
+            string base_dir = current_project_dir;
+            if (base_dir == "" && doc != null && doc.file_location != null) {
+                var parent = doc.file_location.get_parent ();
+                if (parent != null) base_dir = parent.get_path () ?? "";
+            }
+            if (base_dir == "") {
+                base_dir = GLib.Environment.get_home_dir ();
+            }
+            string bib_path = GLib.Path.build_filename (base_dir, "references.bib");
+            string? doc_path = (doc != null && doc.file_location != null) ? doc.file_location.get_path () : null;
+            if (doc_path != null && doc_path.down ().has_suffix (".bib")) {
+                bib_path = doc_path;
+            }
+
+            var dlg = new UI.DoiBibDialog (bib_path);
+            dlg.insert_citation_requested.connect ((citekey, bib_filename) => {
+                var active = get_active_document ();
+                if (active != null) {
+                    active.source_buffer.begin_user_action ();
+                    active.source_buffer.insert_at_cursor (@"[@$citekey]", -1);
+                    active.source_buffer.end_user_action ();
+                    if (active.get_document_format () != DocumentFormat.BIB) {
+                        Editor.CitationCompletionProvider.ensure_buffer_bibliography_line (active.source_buffer, bib_filename);
+                    }
+                }
+            });
+            dlg.present (this);
         }
 
         public void source_active_file () {
