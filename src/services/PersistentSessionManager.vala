@@ -195,7 +195,10 @@ namespace Imladris.Services {
                 string? line = null;
                 while (true) {
                     line = yield r_stdout.read_line_async (GLib.Priority.DEFAULT, null);
-                    if (line == null) break;
+                    if (line == null) {
+                        r_initialized = false;
+                        break;
+                    }
                     if (line.contains (sentinel)) break;
                     output_sb.append (line + "\n");
                     session_output_received ("r", line, false);
@@ -283,7 +286,10 @@ print("%s", flush=True)
                 string? line = null;
                 while (true) {
                     line = yield py_stdout.read_line_async (GLib.Priority.DEFAULT, null);
-                    if (line == null) break;
+                    if (line == null) {
+                        py_initialized = false;
+                        break;
+                    }
                     if (line.contains (sentinel)) break;
                     output_sb.append (line + "\n");
                     session_output_received ("python", line, false);
@@ -443,6 +449,10 @@ print("%s", flush=True)
                 try {
                     if (r_stdin != null) {
                         r_stdin.put_string ("q(save = 'no')\n", null);
+                        r_stdin.close (null);
+                    }
+                    if (r_stdout != null) {
+                        r_stdout.close (null);
                     }
                     r_process.force_exit ();
                 } catch (GLib.Error e) {}
@@ -458,6 +468,10 @@ print("%s", flush=True)
                 try {
                     if (py_stdin != null) {
                         py_stdin.put_string ("exit()\n", null);
+                        py_stdin.close (null);
+                    }
+                    if (py_stdout != null) {
+                        py_stdout.close (null);
                     }
                     py_process.force_exit ();
                 } catch (GLib.Error e) {}

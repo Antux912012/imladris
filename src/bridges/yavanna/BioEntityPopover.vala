@@ -279,7 +279,7 @@ namespace Imladris.Bridges.Yavanna {
                     throw new YavannaError.ENTITY_NOT_FOUND (@"UniProt returned HTTP $(msg.status_code)");
                 }
 
-                string json_text = (string) bytes.get_data ();
+                string json_text = Core.PlatformUtils.bytes_to_string (bytes);
                 var parser = new Json.Parser ();
                 parser.load_from_data (json_text);
                 var root = parser.get_root ();
@@ -368,7 +368,7 @@ namespace Imladris.Bridges.Yavanna {
                     throw new YavannaError.ENTITY_NOT_FOUND (@"Ensembl returned HTTP $(msg.status_code)");
                 }
 
-                string json_text = (string) bytes.get_data ();
+                string json_text = Core.PlatformUtils.bytes_to_string (bytes);
                 var parser = new Json.Parser ();
                 parser.load_from_data (json_text);
                 var root = parser.get_root ();

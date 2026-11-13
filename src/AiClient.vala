@@ -327,23 +327,23 @@ namespace Imladris {
             }
 
             var content_arr = root_obj.get_array_member ("content");
-            string full_text = "";
-            string full_thinking = "";
+            var full_text_sb = new GLib.StringBuilder ();
+            var full_thinking_sb = new GLib.StringBuilder ();
 
             for (uint i = 0; i < content_arr.get_length (); i++) {
                 var block = content_arr.get_object_element (i);
                 string type_str = block.has_member ("type") ? block.get_string_member ("type") : "";
                 if (type_str == "text" && block.has_member ("text")) {
-                    full_text += block.get_string_member ("text");
+                    full_text_sb.append (block.get_string_member ("text"));
                 } else if (type_str == "thinking" && block.has_member ("thinking")) {
-                    full_thinking += block.get_string_member ("thinking");
+                    full_thinking_sb.append (block.get_string_member ("thinking"));
                 }
             }
 
-            if (full_thinking.strip ().length > 0) {
-                return @"💭 *Reasoning Process:*\n$full_thinking\n\n$full_text";
+            if (full_thinking_sb.str.strip ().length > 0) {
+                return @"💭 *Reasoning Process:*\n$(full_thinking_sb.str)\n\n$(full_text_sb.str)";
             }
-            return full_text;
+            return full_text_sb.str;
         }
 
         private string parse_error_response (string body, uint status_code, string reason, AiProvider provider) {

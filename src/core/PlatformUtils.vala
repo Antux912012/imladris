@@ -433,6 +433,61 @@ namespace Imladris.Core {
             return info;
         }
 
+        /**
+         * Safely converts GLib.Bytes (which is NOT guaranteed to be NUL-terminated)
+         * into a NUL-terminated Vala string, preventing heap buffer over-reads.
+         */
+        public static string bytes_to_string (GLib.Bytes? bytes) {
+            if (bytes == null) return "";
+            return data_to_string (bytes.get_data ());
+        }
+
+        /**
+         * Safely converts a raw uint8[] byte buffer into a NUL-terminated Vala string.
+         */
+        public static string data_to_string (uint8[]? data) {
+            if (data == null || data.length == 0) return "";
+            uint8[] buf = new uint8[data.length + 1];
+            GLib.Memory.copy (buf, data, data.length);
+            buf[data.length] = 0;
+            return (string) buf;
+        }
+
+        /**
+         * Recursively deletes a directory and its contents, closing enumerators cleanly.
+         */
+        public static void delete_directory_recursive (GLib.File dir) {
+            if (!dir.query_exists ()) {
+                return;
+            }
+            try {
+                var enumerator = dir.enumerate_children (
+                    GLib.FileAttribute.STANDARD_NAME + "," + GLib.FileAttribute.STANDARD_TYPE,
+                    GLib.FileQueryInfoFlags.NOFOLLOW_SYMLINKS
+                );
+                try {
+                    GLib.FileInfo? info = null;
+                    while ((info = enumerator.next_file ()) != null) {
+                        var child = dir.get_child (info.get_name ());
+                        if (info.get_file_type () == GLib.FileType.DIRECTORY) {
+                            delete_directory_recursive (child);
+                        } else {
+                            child.delete ();
+                        }
+                    }
+                } finally {
+                    try {
+                        enumerator.close ();
+                    } catch (GLib.Error e) {
+                        // Ignore close errors
+                    }
+                }
+                dir.delete ();
+            } catch (GLib.Error e) {
+                GLib.debug ("delete_directory_recursive (%s): %s", dir.get_path () ?? "", e.message);
+            }
+        }
+
         private static string strip_quotes (string s) {
             string res = s.strip ();
             if (res.has_prefix ("\"") && res.has_suffix ("\"") && res.length >= 2) {

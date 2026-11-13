@@ -32,6 +32,8 @@ namespace Imladris.Services {
             ensure_directory ();
         }
 
+        private GLib.Mutex snapshot_mutex = GLib.Mutex ();
+
         private void ensure_directory () {
             GLib.DirUtils.create_with_parents (cache_dir, 0700);
         }
@@ -40,45 +42,46 @@ namespace Imladris.Services {
             SourceFunc callback = snapshot_async.callback;
             
             new Thread<void*> ("imladris-recovery-worker", () => {
-                if (!is_dirty) {
-                    purge_document_cache (doc_id);
-                    Idle.add ((owned) callback);
-                    return null;
-                }
-
+                snapshot_mutex.lock ();
                 try {
-                    ensure_directory ();
-                    string doc_cache_file = GLib.Path.build_filename (cache_dir, @"$(doc_id).shadow");
-                    string doc_temp_file = @"$(doc_cache_file).tmp";
+                    if (!is_dirty) {
+                        purge_document_cache (doc_id);
+                    } else {
+                        ensure_directory ();
+                        string doc_cache_file = GLib.Path.build_filename (cache_dir, @"$(doc_id).shadow");
+                        string doc_temp_file = @"$(doc_cache_file).$(GLib.get_monotonic_time ()).tmp";
 
-                    var builder = new Json.Builder ();
-                    builder.begin_object ();
-                    builder.set_member_name ("doc_id");
-                    builder.add_string_value (doc_id);
-                    builder.set_member_name ("file_path");
-                    builder.add_string_value (file_path ?? "");
-                    builder.set_member_name ("doc_type");
-                    builder.add_string_value (doc_type);
-                    builder.set_member_name ("cursor_line");
-                    builder.add_int_value (line);
-                    builder.set_member_name ("cursor_offset");
-                    builder.add_int_value (offset);
-                    builder.set_member_name ("timestamp");
-                    builder.add_int_value (GLib.get_real_time () / 1000);
-                    builder.set_member_name ("content");
-                    builder.add_string_value (content);
-                    builder.end_object ();
+                        var builder = new Json.Builder ();
+                        builder.begin_object ();
+                        builder.set_member_name ("doc_id");
+                        builder.add_string_value (doc_id);
+                        builder.set_member_name ("file_path");
+                        builder.add_string_value (file_path ?? "");
+                        builder.set_member_name ("doc_type");
+                        builder.add_string_value (doc_type);
+                        builder.set_member_name ("cursor_line");
+                        builder.add_int_value (line);
+                        builder.set_member_name ("cursor_offset");
+                        builder.add_int_value (offset);
+                        builder.set_member_name ("timestamp");
+                        builder.add_int_value (GLib.get_real_time () / 1000);
+                        builder.set_member_name ("content");
+                        builder.add_string_value (content);
+                        builder.end_object ();
 
-                    var gen = new Json.Generator ();
-                    gen.set_root (builder.get_root ());
-                    gen.to_file (doc_temp_file);
+                        var gen = new Json.Generator ();
+                        gen.set_root (builder.get_root ());
+                        gen.to_file (doc_temp_file);
 
-                    // Atomic rename
-                    var tmp = GLib.File.new_for_path (doc_temp_file);
-                    var dest = GLib.File.new_for_path (doc_cache_file);
-                    tmp.move (dest, GLib.FileCopyFlags.OVERWRITE, null, null);
+                        // Atomic rename
+                        var tmp = GLib.File.new_for_path (doc_temp_file);
+                        var dest = GLib.File.new_for_path (doc_cache_file);
+                        tmp.move (dest, GLib.FileCopyFlags.OVERWRITE, null, null);
+                    }
                 } catch (GLib.Error e) {
                     GLib.warning ("Recovery snapshot error: %s", e.message);
+                } finally {
+                    snapshot_mutex.unlock ();
                 }
 
                 Idle.add ((owned) callback);
@@ -107,16 +110,22 @@ namespace Imladris.Services {
                 if (!dir.query_exists ()) return records;
 
                 var enumerator = dir.enumerate_children (GLib.FileAttribute.STANDARD_NAME, GLib.FileQueryInfoFlags.NONE);
-                GLib.FileInfo info;
-                while ((info = enumerator.next_file ()) != null) {
-                    string name = info.get_name ();
-                    if (name.has_suffix (".shadow")) {
-                        string path = GLib.Path.build_filename (cache_dir, name);
-                        var rec = parse_shadow_file (path);
-                        if (rec != null) {
-                            records.add (rec);
+                try {
+                    GLib.FileInfo info;
+                    while ((info = enumerator.next_file ()) != null) {
+                        string name = info.get_name ();
+                        if (name.has_suffix (".shadow")) {
+                            string path = GLib.Path.build_filename (cache_dir, name);
+                            var rec = parse_shadow_file (path);
+                            if (rec != null) {
+                                records.add (rec);
+                            }
                         }
                     }
+                } finally {
+                    try {
+                        enumerator.close ();
+                    } catch (GLib.Error e) {}
                 }
             } catch (GLib.Error e) {
                 GLib.warning ("Error checking recovery cache: %s", e.message);

@@ -77,16 +77,14 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Open Application Preferences", "Configure GPU backend, appearance, and AI credentials (Ctrl+,)", "preferences-system-symbolic", "app.preferences", "General"));
         }
 
+        private Gtk.Stack results_stack;
+
         private void setup_ui () {
-            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) {
-                margin_top = 12,
-                margin_bottom = 12,
-                margin_start = 12,
-                margin_end = 12
-            };
+            var toolbar_view = new Adw.ToolbarView ();
+            var header_bar = new Adw.HeaderBar ();
 
             search_entry = new Gtk.SearchEntry () {
-                placeholder_text = "Type a command, test, statistical tool, or shortcut...",
+                placeholder_text = "Type a command, tool, or shortcut...",
                 hexpand = true
             };
             search_entry.search_changed.connect (filter_items);
@@ -109,11 +107,11 @@ namespace Imladris.UI {
             });
             search_entry.add_controller (key_ctrl);
 
-            box.append (search_entry);
+            header_bar.title_widget = search_entry;
+            toolbar_view.add_top_bar (header_bar);
 
             list_box = new Gtk.ListBox () {
                 selection_mode = Gtk.SelectionMode.SINGLE,
-                show_separators = true,
                 hexpand = true,
                 vexpand = true
             };
@@ -124,12 +122,31 @@ namespace Imladris.UI {
                 child = list_box,
                 hexpand = true,
                 vexpand = true,
-                min_content_height = 320
+                min_content_height = 320,
+                margin_top = 8,
+                margin_bottom = 12,
+                margin_start = 12,
+                margin_end = 12
             };
-            box.append (scroller);
 
-            this.set_child (box);
+            var empty_status = new Adw.StatusPage () {
+                icon_name = "system-search-symbolic",
+                title = "No Matching Commands",
+                description = "Try a different keyword or clear the search filter."
+            };
+            empty_status.add_css_class ("compact");
+
+            results_stack = new Gtk.Stack () {
+                hexpand = true,
+                vexpand = true
+            };
+            results_stack.add_named (scroller, "list");
+            results_stack.add_named (empty_status, "empty");
+
+            toolbar_view.set_content (results_stack);
+            this.set_child (toolbar_view);
             filter_items ();
+            search_entry.grab_focus ();
         }
 
         private void filter_items () {
@@ -156,7 +173,8 @@ namespace Imladris.UI {
                 if (match) {
                     var row = new Adw.ActionRow () {
                         title = item.title,
-                        subtitle = item.subtitle
+                        subtitle = item.subtitle,
+                        activatable = true
                     };
                     row.add_prefix (new Gtk.Image.from_icon_name (item.icon_name) { pixel_size = 18 });
                     row.set_data<string> ("action_id", item.action_id);
@@ -172,6 +190,8 @@ namespace Imladris.UI {
                     if (count >= 24) break;
                 }
             }
+
+            results_stack.visible_child_name = (count == 0) ? "empty" : "list";
         }
 
         private void activate_top_row () {

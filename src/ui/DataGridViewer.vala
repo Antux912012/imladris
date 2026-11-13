@@ -93,8 +93,18 @@ namespace Imladris.UI {
             load_empty_placeholder ();
         }
 
+        private static GLib.Regex? safe_id_regex = null;
+        private uint64 request_gen = 0;
+
         private static bool is_safe_identifier (string name) {
-            return GLib.Regex.match_simple ("^[A-Za-z_][A-Za-z0-9_.$\\[\\]]*$", name.strip ());
+            try {
+                if (safe_id_regex == null) {
+                    safe_id_regex = new GLib.Regex ("^[A-Za-z_][A-Za-z0-9_.$\\[\\]]*$");
+                }
+                return safe_id_regex.match (name.strip ());
+            } catch (GLib.RegexError e) {
+                return false;
+            }
         }
 
         private void setup_toolbar () {
@@ -402,6 +412,7 @@ namespace Imladris.UI {
                 return;
             }
 
+            uint64 gen = ++request_gen;
             title_label.label = @"Loading $active_object_name...";
             loading_spinner.visible = true;
             loading_spinner.spinning = true;
@@ -412,6 +423,7 @@ namespace Imladris.UI {
                 yield fetch_python_dataframe (active_object_name);
             }
 
+            if (gen != request_gen) return;
             loading_spinner.spinning = false;
             loading_spinner.visible = false;
         }
@@ -563,11 +575,13 @@ except Exception as e:
             var header = new Adw.HeaderBar ();
             toolbar_view.add_top_bar (header);
 
-            // Re-parent this viewer inside popout window
-            var old_parent = this.get_parent () as Gtk.Box;
-            if (old_parent != null) {
-                old_parent.remove (this);
-            } else {
+            // Re-parent this viewer inside popout window safely
+            var old_parent = this.get_parent ();
+            if (old_parent is Gtk.Box) {
+                ((Gtk.Box) old_parent).remove (this);
+            } else if (old_parent is Adw.ToolbarView) {
+                ((Adw.ToolbarView) old_parent).set_content (null);
+            } else if (old_parent != null) {
                 this.unparent ();
             }
 
@@ -576,6 +590,7 @@ except Exception as e:
             popout_win.set_content (toolbar_view);
 
             popout_win.close_request.connect (() => {
+                toolbar_view.set_content (null);
                 btn_popout.visible = true;
                 popout_win = null;
                 close_requested ();

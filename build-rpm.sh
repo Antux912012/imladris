@@ -35,7 +35,16 @@ tar -czf "${RPM_ROOT}/SOURCES/imladris-${VERSION}.tar.gz" -C "${TAR_TMP}" "imlad
 rm -rf "${TAR_TMP}"
 
 echo "--> Running rpmbuild..."
-rpmbuild --define "_topdir ${RPM_ROOT}" -ba "${RPM_ROOT}/SPECS/imladris.spec"
+if command -v rpmbuild >/dev/null 2>&1; then
+    rpmbuild --define "_topdir ${RPM_ROOT}" -ba "${RPM_ROOT}/SPECS/imladris.spec"
+elif command -v podman >/dev/null 2>&1 && podman image exists localhost/dev-fedora 2>/dev/null; then
+    echo "--> Running rpmbuild inside container (localhost/dev-fedora)..."
+    podman run --rm -v "${PROJECT_DIR}:${PROJECT_DIR}:z" -w "${PROJECT_DIR}" localhost/dev-fedora \
+        rpmbuild --define "_topdir ${RPM_ROOT}" -ba "${RPM_ROOT}/SPECS/imladris.spec"
+else
+    echo "Error: rpmbuild command not found and podman localhost/dev-fedora image unavailable" >&2
+    exit 1
+fi
 
 # Copy resulting RPM packages to project root
 find "${RPM_ROOT}/RPMS" -type f -name "*.rpm" -exec cp {} "${PROJECT_DIR}/" \;

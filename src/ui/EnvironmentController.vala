@@ -242,11 +242,25 @@ for _k in list(globals().keys()):
                 try {
                     var file = file_dialog.open.end (res);
                     if (file != null) {
-                        string path = file.get_path ();
-                        string base_name = file.get_basename ();
+                        string? path = file.get_path ();
+                        if (path == null) {
+                            toast_requested ("Cannot import remote or non-local file without a filesystem path.");
+                            return;
+                        }
+                        string base_name = file.get_basename () ?? "dataset";
                         string lower_base = base_name.down ();
-                        string var_name = base_name.replace (".tabular", "").replace (".csv", "").replace (".tsv", "").replace (".txt", "").replace ("-", "_").replace (" ", "_");
-                        if (var_name.length == 0 || !var_name.get_char (0).isalpha ()) {
+                        string raw_stem = base_name.replace (".tabular", "").replace (".csv", "").replace (".tsv", "").replace (".txt", "");
+                        var sb_var = new StringBuilder ();
+                        for (int ci = 0; ci < raw_stem.length; ci++) {
+                            char ch = raw_stem[ci];
+                            if (ch.isalnum () || ch == '_') {
+                                sb_var.append_c (ch);
+                            } else {
+                                sb_var.append_c ('_');
+                            }
+                        }
+                        string var_name = sb_var.str;
+                        if (var_name.length == 0 || !var_name[0].isalpha ()) {
                             var_name = "dataset_" + var_name;
                         }
 
@@ -259,6 +273,8 @@ for _k in list(globals().keys()):
                                 : @"read.csv(\"$safe_path\")";
                             string r_code = @"$var_name <- $r_cmd\nView($var_name)\n";
                             PersistentSessionManager.get_default ().execute_r.begin (r_code, (o, r) => {
+                                string? unused_plot = null;
+                                PersistentSessionManager.get_default ().execute_r.end (r, out unused_plot);
                                 refresh_environment.begin ();
                                 view_dataframe_requested (var_name, "r");
                             });
@@ -268,6 +284,8 @@ for _k in list(globals().keys()):
                                 : @"pd.read_csv(\"$safe_path\")";
                             string py_code = @"import pandas as pd\n$var_name = $py_cmd\n";
                             PersistentSessionManager.get_default ().execute_python.begin (py_code, (o, r) => {
+                                string? unused_plot = null;
+                                PersistentSessionManager.get_default ().execute_python.end (r, out unused_plot);
                                 refresh_environment.begin ();
                                 view_dataframe_requested (var_name, "python");
                             });

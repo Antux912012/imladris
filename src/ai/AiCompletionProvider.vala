@@ -118,6 +118,45 @@ namespace Imladris.AI {
             suffix_end.forward_chars (200);
             string suffix = buffer.get_text (cursor_iter, suffix_end, false);
 
+            // Debounce 250ms so rapid typing does not flood AI completion requests
+            if (cancellable != null && cancellable.is_cancelled ()) {
+                return store;
+            }
+            uint delay_id = 0;
+            ulong cancel_hid = 0;
+            SourceFunc resume = populate_async.callback;
+            bool resumed = false;
+            delay_id = GLib.Timeout.add (250, () => {
+                delay_id = 0;
+                if (!resumed) {
+                    resumed = true;
+                    resume ();
+                }
+                return false;
+            });
+            if (cancellable != null) {
+                cancel_hid = cancellable.connect (() => {
+                    if (delay_id != 0) {
+                        GLib.Source.remove (delay_id);
+                        delay_id = 0;
+                    }
+                    if (!resumed) {
+                        resumed = true;
+                        GLib.Idle.add (() => {
+                            resume ();
+                            return false;
+                        });
+                    }
+                });
+            }
+            yield;
+            if (cancel_hid != 0 && cancellable != null) {
+                cancellable.disconnect (cancel_hid);
+            }
+            if (cancellable != null && cancellable.is_cancelled ()) {
+                return store;
+            }
+
             string completion_code = "";
             try {
                 if (elrond_ready) {

@@ -25,8 +25,12 @@ namespace Imladris.UI {
         }
 
         private void setup_ui () {
+            var toolbar_view = new Adw.ToolbarView ();
+            var header_bar = new Adw.HeaderBar ();
+            toolbar_view.add_top_bar (header_bar);
+
             var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 12) {
-                margin_top = 16,
+                margin_top = 12,
                 margin_bottom = 16,
                 margin_start = 16,
                 margin_end = 16
@@ -90,7 +94,8 @@ namespace Imladris.UI {
             list_box.append (row_poster);
 
             box.append (list_box);
-            this.set_child (box);
+            toolbar_view.set_content (box);
+            this.set_child (toolbar_view);
         }
 
         private string get_revealjs_template () {

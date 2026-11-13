@@ -58,7 +58,7 @@ namespace Imladris.UI {
             var header_bar = new Adw.HeaderBar ();
 
             detected_badge_label = new Gtk.Label ("Auto: Math") {
-                css_classes = { "caption", " pill" },
+                css_classes = { "caption", "pill" },
                 margin_start = 6,
                 margin_end = 6
             };
@@ -281,12 +281,6 @@ namespace Imladris.UI {
                 this.close ();
             });
             bottom_bar.pack_start (btn_cancel);
-
-            var btn_copy_bottom = new Gtk.Button.with_label ("Copy Code") {
-                icon_name = "edit-copy-symbolic"
-            };
-            btn_copy_bottom.clicked.connect (on_copy_clicked);
-            bottom_bar.pack_start (btn_copy_bottom);
 
             var btn_insert_save = new Gtk.Button.with_label ("Insert & Save to File") {
                 css_classes = { "suggested-action" },

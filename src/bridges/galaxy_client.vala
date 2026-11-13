@@ -342,7 +342,7 @@ namespace Imladris {
          */
         public async string verify_connection_async (GLib.Cancellable? cancellable = null) throws GLib.Error {
             var bytes = yield send_galaxy_get_async ("/api/whoami", cancellable);
-            string json_text = (string) bytes.get_data ();
+            string json_text = Core.PlatformUtils.bytes_to_string (bytes);
 
             var parser = new Json.Parser ();
             parser.load_from_data (json_text, -1);
@@ -382,7 +382,7 @@ namespace Imladris {
             }
 
             var bytes = yield send_galaxy_get_async ("/api/whoami", null);
-            string json_text = (string) bytes.get_data ();
+            string json_text = Core.PlatformUtils.bytes_to_string (bytes);
 
             var parser = new Json.Parser ();
             parser.load_from_data (json_text, -1);
@@ -418,7 +418,7 @@ namespace Imladris {
             string endpoint = "/api/histories?deleted=false&order=update_time-dsc&limit=50";
 
             var bytes = yield send_galaxy_get_async (endpoint, cancellable);
-            string json_text = (string) bytes.get_data ();
+            string json_text = Core.PlatformUtils.bytes_to_string (bytes);
 
             var parser = new Json.Parser ();
             parser.load_from_data (json_text, -1);
@@ -467,7 +467,7 @@ namespace Imladris {
             string endpoint = @"/api/histories/$(history_id)/contents?type=file&deleted=false&visible=true";
 
             var bytes = yield send_galaxy_get_async (endpoint, cancellable);
-            string json_text = (string) bytes.get_data ();
+            string json_text = Core.PlatformUtils.bytes_to_string (bytes);
 
             var parser = new Json.Parser ();
             parser.load_from_data (json_text, -1);

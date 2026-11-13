@@ -76,6 +76,15 @@ namespace Imladris.UI {
         private Gee.ArrayList<PackageItem> installed_packages;
         private Gtk.SearchEntry packages_search_entry;
 
+        // Singleton signal handler IDs for deterministic cleanup on tab close
+        private ulong hist_added_hid = 0;
+        private ulong hist_cleared_hid = 0;
+        private ulong sess_cwd_hid = 0;
+        private ulong sess_plot_hid = 0;
+        private ulong shiny_status_hid = 0;
+        private ulong shiny_url_hid = 0;
+        private uint cit_search_debounce_id = 0;
+
         public PersistentPanelRegistry (DocumentPage page, Window? win) {
             this.doc_page = page;
             this.main_window = win;
@@ -84,6 +93,108 @@ namespace Imladris.UI {
             this.installed_packages = new Gee.ArrayList<PackageItem> ();
 
             build_all_persistent_panels ();
+        }
+
+        public void cleanup () {
+            if (cit_search_debounce_id != 0) {
+                GLib.Source.remove (cit_search_debounce_id);
+                cit_search_debounce_id = 0;
+            }
+            var hist = Services.HistoryManager.get_default ();
+            if (hist_added_hid != 0) { hist.disconnect (hist_added_hid); hist_added_hid = 0; }
+            if (hist_cleared_hid != 0) { hist.disconnect (hist_cleared_hid); hist_cleared_hid = 0; }
+
+            var sess = Services.PersistentSessionManager.get_default ();
+            if (sess_cwd_hid != 0) { sess.disconnect (sess_cwd_hid); sess_cwd_hid = 0; }
+            if (sess_plot_hid != 0) { sess.disconnect (sess_plot_hid); sess_plot_hid = 0; }
+
+            var shiny = Services.ShinyService.get_default ();
+            if (shiny_status_hid != 0) { shiny.disconnect (shiny_status_hid); shiny_status_hid = 0; }
+            if (shiny_url_hid != 0) { shiny.disconnect (shiny_url_hid); shiny_url_hid = 0; }
+        }
+
+        private async void run_citation_search_async (string q, Services.ZoteroService zotero_svc) {
+            string? fallback_bib = null;
+            if (doc_page.current_project_dir != "") {
+                string bib_path = GLib.Path.build_filename (doc_page.current_project_dir, "references.bib");
+                var f = GLib.File.new_for_path (bib_path);
+                if (f.query_exists ()) {
+                    try {
+                        uint8[] data;
+                        string? etag = null;
+                        yield f.load_contents_async (null, out data, out etag);
+                        fallback_bib = Core.PlatformUtils.data_to_string (data);
+                    } catch (GLib.Error e) {
+                        GLib.debug ("Failed to load local references.bib: %s", e.message);
+                    }
+                }
+            }
+
+            var items = yield zotero_svc.search_citations_async (q, fallback_bib);
+            var child = citations_list.get_first_child ();
+            while (child != null) {
+                var next = child.get_next_sibling ();
+                citations_list.remove (child);
+                child = next;
+            }
+
+            if (items.size == 0) {
+                var empty_row = new Adw.ActionRow () {
+                    title = "No citations found",
+                    subtitle = @"No matches for '$q' in Zotero or references.bib"
+                };
+                empty_row.add_prefix (new Gtk.Image.from_icon_name ("system-search-symbolic"));
+                citations_list.append (empty_row);
+                return;
+            }
+
+            foreach (var item in items) {
+                var row = new Adw.ActionRow () {
+                    title = @"@$(item.citekey)",
+                    subtitle = @"$(item.authors) ($(item.year)) — $(item.title)"
+                };
+                row.add_prefix (new Gtk.Image.from_icon_name ("accessories-dictionary-symbolic"));
+
+                var ins_btn = new Gtk.Button.from_icon_name ("insert-text-symbolic") {
+                    valign = Gtk.Align.CENTER,
+                    tooltip_text = "Insert citation [@key]"
+                };
+                ins_btn.add_css_class ("flat");
+                string k = item.citekey;
+                ins_btn.clicked.connect (() => {
+                    doc_page.source_buffer.begin_user_action ();
+                    doc_page.source_buffer.insert_at_cursor (@"[@$k]", -1);
+                    doc_page.source_buffer.end_user_action ();
+                    Gtk.TextIter s, e;
+                    doc_page.source_buffer.get_bounds (out s, out e);
+                    string cur_text = doc_page.source_buffer.get_text (s, e, false);
+                    string updated_text = zotero_svc.ensure_yaml_bibliography (cur_text, "references.bib");
+                    if (updated_text != cur_text) {
+                        doc_page.source_buffer.begin_user_action ();
+                        doc_page.source_buffer.set_text (updated_text);
+                        doc_page.source_buffer.end_user_action ();
+                    }
+                    zotero_svc.sync_citation_to_project_async.begin (k, doc_page.current_project_dir);
+                });
+                row.add_suffix (ins_btn);
+
+                var open_btn = new Gtk.Button.from_icon_name ("system-run-symbolic") {
+                    valign = Gtk.Align.CENTER,
+                    tooltip_text = "Highlight item in Zotero desktop"
+                };
+                open_btn.add_css_class ("flat");
+                open_btn.clicked.connect (() => {
+                    try {
+                        string zot_uri = zotero_svc.get_zotero_select_uri (k);
+                        GLib.AppInfo.launch_default_for_uri (zot_uri, null);
+                    } catch (GLib.Error e) {
+                        GLib.debug ("Failed to launch Zotero URI: %s", e.message);
+                    }
+                });
+                row.add_suffix (open_btn);
+
+                citations_list.append (row);
+            }
         }
 
         public Gtk.Widget? get_panel_widget (PanelId id) {
@@ -575,83 +686,15 @@ namespace Imladris.UI {
                     return;
                 }
 
-                // Read local bib if available
-                string? fallback_bib = null;
-                if (doc_page.current_project_dir != "") {
-                    string bib_path = GLib.Path.build_filename (doc_page.current_project_dir, "references.bib");
-                    var f = GLib.File.new_for_path (bib_path);
-                    if (f.query_exists ()) {
-                        try {
-                            uint8[] data;
-                            f.load_contents (null, out data, null);
-                            fallback_bib = (string) data;
-                        } catch (GLib.Error e) {}
-                    }
+                // Read local bib asynchronously if available
+                if (cit_search_debounce_id != 0) {
+                    GLib.Source.remove (cit_search_debounce_id);
+                    cit_search_debounce_id = 0;
                 }
-
-                zotero_svc.search_citations_async.begin (q, fallback_bib, (obj, res) => {
-                    var items = zotero_svc.search_citations_async.end (res);
-                    var child = citations_list.get_first_child ();
-                    while (child != null) {
-                        var next = child.get_next_sibling ();
-                        citations_list.remove (child);
-                        child = next;
-                    }
-
-                    if (items.size == 0) {
-                        var empty_row = new Adw.ActionRow () {
-                            title = "No citations found",
-                            subtitle = @"No matches for '$q' in Zotero or references.bib"
-                        };
-                        citations_list.append (empty_row);
-                        return;
-                    }
-
-                    foreach (var item in items) {
-                        var row = new Adw.ActionRow () {
-                            title = @"@$(item.citekey)",
-                            subtitle = @"$(item.authors) ($(item.year)) — $(item.title)"
-                        };
-                        row.add_prefix (new Gtk.Image.from_icon_name ("accessories-dictionary-symbolic"));
-
-                        var ins_btn = new Gtk.Button.from_icon_name ("insert-text-symbolic") {
-                            valign = Gtk.Align.CENTER,
-                            tooltip_text = "Insert citation [@key]"
-                        };
-                        ins_btn.add_css_class ("flat");
-                        string k = item.citekey;
-                        ins_btn.clicked.connect (() => {
-                            doc_page.source_buffer.begin_user_action ();
-                            doc_page.source_buffer.insert_at_cursor (@"[@$k]", -1);
-                            doc_page.source_buffer.end_user_action ();
-                            Gtk.TextIter s, e;
-                            doc_page.source_buffer.get_bounds (out s, out e);
-                            string cur_text = doc_page.source_buffer.get_text (s, e, false);
-                            string updated_text = zotero_svc.ensure_yaml_bibliography (cur_text, "references.bib");
-                            if (updated_text != cur_text) {
-                                doc_page.source_buffer.begin_user_action ();
-                                doc_page.source_buffer.set_text (updated_text);
-                                doc_page.source_buffer.end_user_action ();
-                            }
-                            zotero_svc.sync_citation_to_project_async.begin (k, doc_page.current_project_dir);
-                        });
-                        row.add_suffix (ins_btn);
-
-                        var open_btn = new Gtk.Button.from_icon_name ("system-run-symbolic") {
-                            valign = Gtk.Align.CENTER,
-                            tooltip_text = "Highlight item in Zotero desktop"
-                        };
-                        open_btn.add_css_class ("flat");
-                        open_btn.clicked.connect (() => {
-                            try {
-                                string zot_uri = zotero_svc.get_zotero_select_uri (k);
-                                GLib.AppInfo.launch_default_for_uri (zot_uri, null);
-                            } catch (GLib.Error e) {}
-                        });
-                        row.add_suffix (open_btn);
-
-                        citations_list.append (row);
-                    }
+                cit_search_debounce_id = GLib.Timeout.add (180, () => {
+                    cit_search_debounce_id = 0;
+                    run_citation_search_async.begin (q, zotero_svc);
+                    return false;
                 });
             });
 
@@ -746,10 +789,10 @@ namespace Imladris.UI {
             foreach (var ent in initial_entries) {
                 add_history_row (ent);
             }
-            Services.HistoryManager.get_default ().entry_added.connect ((entry) => {
+            hist_added_hid = Services.HistoryManager.get_default ().entry_added.connect ((entry) => {
                 add_history_row (entry);
             });
-            Services.HistoryManager.get_default ().history_cleared.connect (() => {
+            hist_cleared_hid = Services.HistoryManager.get_default ().history_cleared.connect (() => {
                 clear_history_ui ();
             });
 
@@ -968,7 +1011,7 @@ namespace Imladris.UI {
             panels.set (PanelId.FILES, files_box);
 
             // Connect PersistentSessionManager signals for pwd & plots sync
-            Services.PersistentSessionManager.get_default ().working_directory_changed.connect ((new_dir) => {
+            sess_cwd_hid = Services.PersistentSessionManager.get_default ().working_directory_changed.connect ((new_dir) => {
                 this.current_browser_dir = new_dir;
                 this.root_project_dir = new_dir;
                 populate_files_browser ();
@@ -976,7 +1019,7 @@ namespace Imladris.UI {
                 terminal_view.buffer.get_end_iter (out end);
                 terminal_view.buffer.insert (ref end, @"\n[Working Directory changed to: $new_dir]\n$$ ", -1);
             });
-            Services.PersistentSessionManager.get_default ().plot_generated.connect ((plot_path) => {
+            sess_plot_hid = Services.PersistentSessionManager.get_default ().plot_generated.connect ((plot_path) => {
                 plot_gallery.add (plot_path);
                 active_plot_idx = plot_gallery.size - 1;
                 update_plot_view ();
@@ -1158,7 +1201,7 @@ namespace Imladris.UI {
             panels.set (PanelId.SHINY_VIEWER, shiny_box);
 
             var shiny_svc = Services.ShinyService.get_default ();
-            shiny_svc.status_changed.connect ((st) => {
+            shiny_status_hid = shiny_svc.status_changed.connect ((st) => {
                 if (shiny_status_lbl != null) {
                     shiny_status_lbl.label = st.to_badge_label ();
                     if (st == Services.ShinyAppStatus.RUNNING) {
@@ -1176,7 +1219,7 @@ namespace Imladris.UI {
                 }
             });
 
-            shiny_svc.url_ready.connect ((url) => {
+            shiny_url_hid = shiny_svc.url_ready.connect ((url) => {
                 if (shiny_svc.current_target == Services.ShinyViewerTarget.VIEWER_PANE) {
                     if (shiny_webview != null) {
                         shiny_webview.load_uri (url);
@@ -1725,7 +1768,7 @@ namespace Imladris.UI {
   </div>
 </body>
 </html>""";
-            plots_webview.load_html (svg_html, null);
+            plots_webview.load_html (svg_html, "file:///");
         }
 
         public void load_plot_image (string plot_file_path) {
@@ -1789,7 +1832,7 @@ namespace Imladris.UI {
   </div>
 </body>
 </html>""".printf (uri, fname);
-            plots_webview.load_html (html, null);
+            plots_webview.load_html (html, "file:///");
         }
 
         private void navigate_files_up () {
@@ -1979,7 +2022,7 @@ namespace Imladris.UI {
                 uri = "file://" + plot_file;
             }
             string html = """<!DOCTYPE html><html><body style="margin:0;padding:16px;background:#1e1e2e;display:flex;justify-content:center;align-items:center;min-height:90vh;"><img src="%s" style="max-width:100%%;max-height:90vh;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);" /></body></html>""".printf (uri);
-            web.load_html (html, null);
+            web.load_html (html, "file:///");
 
             toolbar_view.set_content (web);
             zoom_win.set_content (toolbar_view);
@@ -2419,16 +2462,16 @@ local({
   </ul>
 </body>
 </html>""";
-            help_view.load_html (home_html, null);
+            help_view.load_html (home_html, "file:///");
         }
 
         public async void show_help_for_topic (string topic) {
-            string sanitized = topic.replace ("\"", "").replace ("'", "").strip ();
+            string sanitized = topic.replace ("\\", "\\\\").replace ("\"", "").replace ("'", "").strip ();
             if (sanitized.length == 0) return;
 
             string r_probe = """
 local({
-  h <- help("%s")
+  h <- help("__IMLADRIS_TOPIC__")
   if (length(h) > 0) {
     txt <- utils:::.getHelpFile(h)
     f <- tempfile(fileext = ".html")
@@ -2441,7 +2484,7 @@ local({
     cat("___IMLADRIS_HELP_NOT_FOUND___\n")
   }
 })
-""".printf (sanitized);
+""".replace ("__IMLADRIS_TOPIC__", sanitized);
 
             string? plot_out = null;
             string out_str = yield Services.PersistentSessionManager.get_default ().execute_r (r_probe, out plot_out);
@@ -2452,7 +2495,7 @@ local({
                 if (e > s) {
                     string html = out_str.substring (s, e - s).strip ();
                     string styled_html = inject_help_styling (html);
-                    help_view.load_html (styled_html, null);
+                    help_view.load_html (styled_html, "file:///");
                     activate_panel_in_dock (PanelId.HELP);
                     return;
                 }
@@ -2484,7 +2527,7 @@ th { background: #f1f5f9; }
 <h3 style="color:#64748b;">No documentation found for <code>%s</code></h3>
 <p style="font-size:12px;color:#94a3b8;">Ensure R is running and package is loaded via <code>library(...)</code>.</p>
 </body></html>""".printf (topic);
-            help_view.load_html (html, null);
+            help_view.load_html (html, "file:///");
         }
 
         private void activate_panel_in_dock (PanelId pid) {
@@ -2528,7 +2571,7 @@ th { background: #f1f5f9; }
   <p>Run a Shiny application (<code>app.R</code> or <code>shinyApp()</code>) to preview interactive reactive dashboards directly in this pane.</p>
 </body>
 </html>""";
-            shiny_webview.load_html (html, null);
+            shiny_webview.load_html (html, "file:///");
         }
 
         public void open_shiny_in_dedicated_window () {

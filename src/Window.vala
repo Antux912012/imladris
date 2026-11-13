@@ -10,14 +10,14 @@ namespace Imladris {
         private Gtk.ToggleButton? btn_collapse_ribbon = null;
         private Adw.TabView tab_view;
         private Adw.TabBar tab_bar;
+        private Gtk.Box status_bar;
         private Gtk.Stack content_stack;
         private Adw.StatusPage welcome_page;
         private Gtk.Label status_badge_lbl;
         private Gtk.Label status_env_badge_lbl;
         private Gtk.Label status_words_lbl;
         private Gtk.Label status_kernel_lbl;
-        private Gtk.Scale zoom_scale;
-        private Gtk.Label zoom_lbl;
+        private Gtk.MenuButton zoom_btn;
         private int current_zoom = 100;
 
         private Adw.ToastOverlay toast_overlay;
@@ -60,6 +60,9 @@ namespace Imladris {
         private Gee.HashMap<string, Gtk.Widget> plugin_ribbon_buttons = new Gee.HashMap<string, Gtk.Widget> ();
 
         private UI.PackageIndexCache pkg_index_cache = new UI.PackageIndexCache ();
+        private ulong theme_changed_hid = 0;
+        private ulong physics_changed_hid = 0;
+        private ulong ui_settings_hid = 0;
 
         public Window (Adw.Application app) {
             Object (
@@ -77,7 +80,7 @@ namespace Imladris {
             if (settings.app_theme == Core.AppTheme.EYE_FRIENDLY) {
                 this.add_css_class ("eye-friendly");
             }
-            settings.theme_changed.connect ((theme) => {
+            theme_changed_hid = settings.theme_changed.connect ((theme) => {
                 if (theme == Core.AppTheme.EYE_FRIENDLY) {
                     this.add_css_class ("eye-friendly");
                 } else {
@@ -86,6 +89,18 @@ namespace Imladris {
             });
 
             this.close_request.connect (() => {
+                if (theme_changed_hid != 0) {
+                    Core.SettingsManager.get_default ().disconnect (theme_changed_hid);
+                    theme_changed_hid = 0;
+                }
+                if (physics_changed_hid != 0) {
+                    Core.SettingsManager.get_default ().disconnect (physics_changed_hid);
+                    physics_changed_hid = 0;
+                }
+                if (ui_settings_hid != 0) {
+                    Core.SettingsManager.get_default ().disconnect (ui_settings_hid);
+                    ui_settings_hid = 0;
+                }
                 for (int i = 0; i < tab_view.n_pages; i++) {
                     var page = tab_view.get_nth_page (i);
                     var doc = page.child as DocumentPage;
@@ -104,71 +119,77 @@ namespace Imladris {
             toolbar_view.add_top_bar (top_master_box);
 
             // =================================================================
-            // TIER 1: DARK HEADER BAR & CATEGORY SWITCHER (5 Modernized Tabs)
+            // TIER 1: ADW HEADER BAR & CATEGORY SWITCHER
             // =================================================================
-            var win_handle = new Gtk.WindowHandle ();
-            var tier1_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 2);
-            tier1_box.add_css_class ("imladris-topbar");
-            win_handle.set_child (tier1_box);
+            var header_bar = new Adw.HeaderBar () {
+                show_title = true
+            };
+            header_bar.add_css_class ("imladris-topbar");
 
-            // Native Window Controls for Pantheon (elementary OS close at start) & GNOME
-            tier1_box.append (new Gtk.WindowControls (Gtk.PackType.START));
-
-            // Branded "Imladris" Primary Menu
+            // Structured Primary Menu with submenus per GNOME HIG
             var brand_menu = new GLib.Menu ();
-            var new_sec = new GLib.Menu ();
-            new_sec.append ("New Project or Document...", "app.new_project_modal");
-            new_sec.append ("New RStudio Project (.Rproj)...", "app.new_rproj");
-            new_sec.append ("New Quarto Document (.qmd)", "app.new_qmd");
-            new_sec.append ("New R Markdown (.Rmd)", "app.new_rmd");
-            new_sec.append ("New Jupyter Notebook (.ipynb)", "app.new_ipynb");
-            new_sec.append ("New Simple Markdown (.md)", "app.new_md");
-            new_sec.append ("New R Script (.R)", "app.new_r");
-            new_sec.append ("New Shiny Web App (.R)", "app.new_shiny");
-            new_sec.append ("New Python Script (.py)", "app.new_py");
-            new_sec.append ("New HTML5 Document (.html)", "app.new_html");
-            brand_menu.append_section ("Create New", new_sec);
+            var new_submenu = new GLib.Menu ();
+            new_submenu.append ("New Project or Document...", "app.new_project_modal");
+            new_submenu.append ("New RStudio Project (.Rproj)...", "app.new_rproj");
+            new_submenu.append ("Quarto Document (.qmd)", "app.new_qmd");
+            new_submenu.append ("R Markdown (.Rmd)", "app.new_rmd");
+            new_submenu.append ("Jupyter Notebook (.ipynb)", "app.new_ipynb");
+            new_submenu.append ("Simple Markdown (.md)", "app.new_md");
+            new_submenu.append ("R Script (.R)", "app.new_r");
+            new_submenu.append ("Shiny Web App (.R)", "app.new_shiny");
+            new_submenu.append ("Python Script (.py)", "app.new_py");
+            new_submenu.append ("HTML5 Document (.html)", "app.new_html");
 
-            var io_sec = new GLib.Menu ();
-            io_sec.append ("Open Document or Project...", "app.open");
-            io_sec.append ("Save", "app.save");
-            io_sec.append ("Render to HTML", "app.export_html");
-            io_sec.append ("Render to PDF", "app.export_pdf");
-            io_sec.append ("Export OpenDocument Text (.odt)", "app.export_odt");
-            io_sec.append ("Export OpenDocument Presentation (.odp)", "app.export_odp");
-            io_sec.append ("Export Portable .mallorn Archive", "app.export_mallorn");
-            io_sec.append ("Export for RStudio", "app.export_rstudio");
-            io_sec.append ("Export for Jupyter", "app.export_jupyter");
-            io_sec.append ("Quit Imladris", "app.quit");
-            brand_menu.append_section ("File & Export", io_sec);
+            var export_submenu = new GLib.Menu ();
+            export_submenu.append ("Render to HTML", "app.export_html");
+            export_submenu.append ("Render to PDF", "app.export_pdf");
+            export_submenu.append ("OpenDocument Text (.odt)", "app.export_odt");
+            export_submenu.append ("OpenDocument Presentation (.odp)", "app.export_odp");
+            export_submenu.append ("Portable .mallorn Archive", "app.export_mallorn");
+            export_submenu.append ("Export for RStudio", "app.export_rstudio");
+            export_submenu.append ("Export for Jupyter", "app.export_jupyter");
 
-            var prefs_sec = new GLib.Menu ();
-            prefs_sec.append ("Visual Flow & Mindmap Studio...", "app.mermaid_studio");
-            prefs_sec.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
-            prefs_sec.append ("Data Science Toolchains...", "app.toolchain_setup");
-            prefs_sec.append ("Preferences", "app.preferences");
-            prefs_sec.append ("About Imladris", "app.about");
-            brand_menu.append_section (null, prefs_sec);
+            var file_sec = new GLib.Menu ();
+            file_sec.append_submenu ("New", new_submenu);
+            file_sec.append ("Open...", "app.open");
+            file_sec.append ("Save", "app.save");
+            file_sec.append_submenu ("Export", export_submenu);
+            brand_menu.append_section (null, file_sec);
+
+            var tools_sec = new GLib.Menu ();
+            tools_sec.append ("Command Palette...", "app.command_palette");
+            tools_sec.append ("Visual Flow & Mindmap Studio...", "app.mermaid_studio");
+            tools_sec.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
+            tools_sec.append ("Data Science Toolchains...", "app.toolchain_setup");
+            brand_menu.append_section (null, tools_sec);
+
+            var app_sec = new GLib.Menu ();
+            app_sec.append ("Preferences", "app.preferences");
+            app_sec.append ("About Imladris", "app.about");
+            app_sec.append ("Quit", "app.quit");
+            brand_menu.append_section (null, app_sec);
 
             var brand_btn = new Gtk.MenuButton () {
                 menu_model = brand_menu,
+                icon_name = "open-menu-symbolic",
+                tooltip_text = "Main Menu",
+                primary = true,
                 valign = Gtk.Align.CENTER
             };
-            brand_btn.add_css_class ("imladris-brand-btn");
-            var brand_content = new Adw.ButtonContent () {
-                icon_name = "document-edit-symbolic",
-                label = "Imladris"
-            };
-            brand_btn.set_child (brand_content);
-            tier1_box.append (brand_btn);
+            header_bar.pack_start (brand_btn);
 
             ribbon_stack = new Gtk.Stack () {
                 transition_type = Gtk.StackTransitionType.CROSSFADE,
                 transition_duration = Core.SettingsManager.get_default ().animation_physics.get_stack_duration_ms ()
             };
 
+            var ribbon_tabs_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 2) {
+                valign = Gtk.Align.CENTER
+            };
+            ribbon_tabs_box.add_css_class ("linked");
+
             string[] categories = {
-                "Home", "Insert", "Computation", "Publish", "View", "Packages"
+                "Home", "Insert", "Run", "Publish", "View", "Packages"
             };
 
             Gtk.ToggleButton? first_tab = null;
@@ -176,7 +197,7 @@ namespace Imladris {
                 var tab_btn = new Gtk.ToggleButton.with_label (cat);
                 tab_btn.add_css_class ("ribbon-tab-btn");
                 if (cat == "Home") tab_btn_home = tab_btn;
-                if (cat == "Computation") tab_btn.add_css_class ("ribbon-tab-scientific");
+                if (cat == "Run") tab_btn.add_css_class ("ribbon-tab-scientific");
                 if (cat == "Publish") tab_btn.add_css_class ("ribbon-tab-web");
                 if (cat == "Packages") {
                     tab_btn.add_css_class ("ribbon-tab-packages");
@@ -197,10 +218,9 @@ namespace Imladris {
                     }
                 });
 
-                tier1_box.append (tab_btn);
+                ribbon_tabs_box.append (tab_btn);
             }
-
-            tier1_box.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
+            header_bar.set_title_widget (ribbon_tabs_box);
 
             var export_formats = new Gtk.StringList ({
                 "Manuscript (HTML)",
@@ -213,13 +233,11 @@ namespace Imladris {
                 tooltip_text = "Select Scientific Output Format"
             };
             export_format_selector.add_css_class ("flat");
-            tier1_box.append (export_format_selector);
 
             var btn_render_quarto = new Gtk.Button () {
                 tooltip_text = "Compile Scientific Document / Deck / Poster (Ctrl+Shift+K)",
                 valign = Gtk.Align.CENTER
             };
-            btn_render_quarto.add_css_class ("pill-button");
             btn_render_quarto.add_css_class ("suggested-action");
             var render_content = new Adw.ButtonContent () {
                 icon_name = "media-playback-start-symbolic",
@@ -234,33 +252,11 @@ namespace Imladris {
                 else if (sel == 3) sc_fmt = Core.ScientificOutputFormat.TYPST_POSTER_PDF;
                 compile_scientific_document_async.begin (sc_fmt);
             });
-            tier1_box.append (btn_render_quarto);
-
-            var btn_deck_template = new Gtk.Button () {
-                tooltip_text = "New Scientific Deck or Poster Template...",
-                valign = Gtk.Align.CENTER
-            };
-            btn_deck_template.add_css_class ("pill-button");
-            var deck_content = new Adw.ButtonContent () {
-                icon_name = "x-office-presentation-symbolic",
-                label = "Deck / Poster"
-            };
-            btn_deck_template.set_child (deck_content);
-            btn_deck_template.clicked.connect (() => {
-                var dlg = new UI.PresentationTemplateDialog ();
-                dlg.template_selected.connect ((t_title, starter_content, suggested_fn) => {
-                    add_document_tab (suggested_fn, "markdown", starter_content);
-                    show_toast (@"Created $t_title ($suggested_fn)");
-                });
-                dlg.present (this);
-            });
-            tier1_box.append (btn_deck_template);
 
             btn_shiny_app = new Gtk.Button () {
                 tooltip_text = "Run Shiny Web Application (Ctrl+Shift+A)",
                 valign = Gtk.Align.CENTER
             };
-            btn_shiny_app.add_css_class ("pill-button");
             shiny_app_content = new Adw.ButtonContent () {
                 icon_name = "media-playback-start-symbolic",
                 label = "Run App"
@@ -269,7 +265,6 @@ namespace Imladris {
             btn_shiny_app.clicked.connect (() => {
                 toggle_shiny_app_execution ();
             });
-            tier1_box.append (btn_shiny_app);
 
             var shiny_svc = Services.ShinyService.get_default ();
             shiny_svc.status_changed.connect ((st) => {
@@ -287,80 +282,125 @@ namespace Imladris {
                 }
             });
 
-            var btn_zotero_header = new Gtk.Button () {
-                tooltip_text = "Insert Citation from Zotero (Ctrl+Shift+I)",
-                valign = Gtk.Align.CENTER
+            // Consolidated Scientific Tools Popover (Cite, Deck/Poster, Yavanna, Taniquetil, Elbereth)
+            var sci_popover = new Gtk.Popover ();
+            var sci_list = new Gtk.ListBox () {
+                selection_mode = Gtk.SelectionMode.NONE
             };
-            btn_zotero_header.add_css_class ("pill-button");
-            var zotero_content = new Adw.ButtonContent () {
-                icon_name = "accessories-dictionary-symbolic",
-                label = "Cite"
+            sci_list.add_css_class ("boxed-list");
+
+            var row_cite = new Adw.ActionRow () {
+                title = "Insert Citation (Zotero)",
+                subtitle = "Ctrl+Shift+I",
+                activatable = true
             };
-            btn_zotero_header.set_child (zotero_content);
-            btn_zotero_header.clicked.connect (() => {
+            row_cite.add_prefix (new Gtk.Image.from_icon_name ("accessories-dictionary-symbolic"));
+            row_cite.activated.connect (() => {
+                sci_popover.popdown ();
                 open_zotero_picker ();
             });
-            tier1_box.append (btn_zotero_header);
+            sci_list.append (row_cite);
 
-            // Yavanna Bio-Entity & RT-qPCR Oligo Inspector
+            var row_deck = new Adw.ActionRow () {
+                title = "New Deck or Poster Template...",
+                subtitle = "RevealJS, Beamer, or Typst",
+                activatable = true
+            };
+            row_deck.add_prefix (new Gtk.Image.from_icon_name ("x-office-presentation-symbolic"));
+            row_deck.activated.connect (() => {
+                sci_popover.popdown ();
+                var dlg = new UI.PresentationTemplateDialog ();
+                dlg.template_selected.connect ((t_title, starter_content, suggested_fn) => {
+                    add_document_tab (suggested_fn, "markdown", starter_content);
+                    show_toast (@"Created $t_title ($suggested_fn)");
+                });
+                dlg.present (this);
+            });
+            sci_list.append (row_deck);
+
             var yavanna_popover = new Imladris.Bridges.Yavanna.BioEntityPopover ();
             yavanna_popover.insert_snippet_requested.connect ((snippet) => {
                 insert_in_active_editor (snippet);
                 show_toast ("Inserted biological provenance record into document");
             });
-            var btn_yavanna_header = new Gtk.MenuButton () {
+            var btn_yavanna_inline = new Gtk.MenuButton () {
                 icon_name = "applications-science-symbolic",
-                tooltip_text = "Yavanna Bio-Entity & Oligo Inspector",
-                valign = Gtk.Align.CENTER,
-                popover = yavanna_popover
+                label = "Yavanna Bio-Entity",
+                popover = yavanna_popover,
+                hexpand = true
             };
-            btn_yavanna_header.add_css_class ("flat");
-            tier1_box.append (btn_yavanna_header);
+            btn_yavanna_inline.add_css_class ("flat");
 
-            // Taniquetil AlphaFold Structural Biology Bridge
             var taniquetil_popover = new Imladris.Bridges.Taniquetil.AlphaFoldBridgePopover ();
             taniquetil_popover.insert_snippet_requested.connect ((snippet) => {
                 insert_in_active_editor (snippet);
                 show_toast ("Inserted AlphaFold structural provenance record");
             });
-            var btn_taniquetil_header = new Gtk.MenuButton () {
+            var btn_taniquetil_inline = new Gtk.MenuButton () {
                 icon_name = "network-cellular-symbolic",
-                tooltip_text = "Taniquetil AlphaFold & Macromolecular Bridge",
-                valign = Gtk.Align.CENTER,
-                popover = taniquetil_popover
+                label = "Taniquetil AlphaFold",
+                popover = taniquetil_popover,
+                hexpand = true
             };
-            btn_taniquetil_header.add_css_class ("flat");
-            tier1_box.append (btn_taniquetil_header);
+            btn_taniquetil_inline.add_css_class ("flat");
 
-            // Elbereth Clinical Biostatistics, Power & Survival Studio
             var elbereth_popover = new Imladris.Bridges.Elbereth.ClinicalBiostatsPopover ();
             elbereth_popover.insert_snippet_requested.connect ((snippet) => {
                 insert_in_active_editor (snippet);
                 show_toast ("Inserted clinical biostatistics record into document");
             });
-            var btn_elbereth_header = new Gtk.MenuButton () {
+            var btn_elbereth_inline = new Gtk.MenuButton () {
                 icon_name = "view-statistics-symbolic",
-                tooltip_text = "Elbereth Clinical Biostatistics, Power & Survival Studio",
-                valign = Gtk.Align.CENTER,
-                popover = elbereth_popover
+                label = "Elbereth Biostats",
+                popover = elbereth_popover,
+                hexpand = true
             };
-            btn_elbereth_header.add_css_class ("flat");
-            tier1_box.append (btn_elbereth_header);
+            btn_elbereth_inline.add_css_class ("flat");
+
+            var sci_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) {
+                margin_top = 8,
+                margin_bottom = 8,
+                margin_start = 8,
+                margin_end = 8,
+                width_request = 270
+            };
+            sci_box.append (sci_list);
+            sci_box.append (new Gtk.Separator (Gtk.Orientation.HORIZONTAL));
+            sci_box.append (btn_yavanna_inline);
+            sci_box.append (btn_taniquetil_inline);
+            sci_box.append (btn_elbereth_inline);
+            sci_popover.set_child (sci_box);
+
+            var sci_tools_btn = new Gtk.MenuButton () {
+                icon_name = "applications-science-symbolic",
+                tooltip_text = "Scientific Tools, Citations & Templates",
+                valign = Gtk.Align.CENTER,
+                popover = sci_popover
+            };
+            sci_tools_btn.add_css_class ("flat");
 
             btn_collapse_ribbon = new Gtk.ToggleButton () {
                 icon_name = "ribbon-toggle-symbolic",
                 tooltip_text = "Show / Hide Ribbon Toolbar (Ctrl+F1)",
                 valign = Gtk.Align.CENTER,
-                active = true
+                active = Core.SettingsManager.get_default ().show_ribbon_toolbar
             };
             btn_collapse_ribbon.add_css_class ("flat");
             btn_collapse_ribbon.toggled.connect (() => {
-                ribbon_scroller.visible = btn_collapse_ribbon.active;
+                bool show = btn_collapse_ribbon.active;
+                if (tab_view != null && tab_view.n_pages > 0) {
+                    ribbon_scroller.visible = show;
+                }
+                Core.SettingsManager.get_default ().show_ribbon_toolbar = show;
             });
-            tier1_box.append (btn_collapse_ribbon);
 
-            tier1_box.append (new Gtk.WindowControls (Gtk.PackType.END));
-            top_master_box.append (win_handle);
+            header_bar.pack_end (btn_collapse_ribbon);
+            header_bar.pack_end (sci_tools_btn);
+            header_bar.pack_end (btn_shiny_app);
+            header_bar.pack_end (btn_render_quarto);
+            header_bar.pack_end (export_format_selector);
+
+            top_master_box.append (header_bar);
 
             // =================================================================
             // TIER 2: DYNAMIC MODERN RIBBON DECK (5 High-Density Tabs)
@@ -376,7 +416,7 @@ namespace Imladris {
             packages_ribbon_bar = new UI.PackagesRibbonBar (pkg_index_cache);
             ribbon_stack.add_named (build_home_ribbon (), "Home");
             ribbon_stack.add_named (build_insert_ribbon (), "Insert");
-            ribbon_stack.add_named (build_computation_ribbon (), "Computation");
+            ribbon_stack.add_named (build_computation_ribbon (), "Run");
             ribbon_stack.add_named (build_publish_ribbon (), "Publish");
             ribbon_stack.add_named (build_view_ribbon (), "View");
             ribbon_stack.add_named (packages_ribbon_bar, "Packages");
@@ -391,25 +431,20 @@ namespace Imladris {
             });
 
             // =================================================================
-            // TIER 3: QUICK ACCESS TOOLBAR & ADW.TABBAR
+            // TIER 3: STREAMLINED TAB BAR WITH AI & LAYOUT TOGGLES
             // =================================================================
             var tier3_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
             tier3_box.add_css_class ("imladris-subbar");
 
-            tier3_box.append (RibbonFactory.create_compact_button ("folder-open-symbolic", null, false, false, true, null, "app.open"));
-            tier3_box.append (RibbonFactory.create_compact_button ("document-save-symbolic", null, false, false, true, null, "app.save"));
-            tier3_box.append (RibbonFactory.create_compact_button ("document-send-symbolic", "PDF", false, false, true, null, "app.export_pdf"));
-            tier3_box.append (RibbonFactory.create_compact_button ("applications-internet-symbolic", "HTML", false, false, true, null, "app.export_html"));
-            tier3_box.append (RibbonFactory.create_compact_button ("edit-undo-symbolic", null, false, false, true, null, "win.undo"));
-            tier3_box.append (RibbonFactory.create_compact_button ("edit-redo-symbolic", null, false, false, true, null, "win.redo"));
-            var ai_quick_btn = RibbonFactory.create_compact_button ("system-run-symbolic", "Elrond Assistance");
-            ((Gtk.Button) ai_quick_btn).tooltip_text = "Write with Elrond Assistance (AI) — Local R, Python, SQL & Data Science Copilot (Ctrl+Shift+E)";
+            var ai_quick_btn = RibbonFactory.create_compact_button ("system-run-symbolic", "Elrond AI");
+            ((Gtk.Button) ai_quick_btn).tooltip_text = "Write with Elrond Assistance (AI) — Ctrl+Shift+E";
             ((Gtk.Button) ai_quick_btn).clicked.connect (() => {
                 trigger_elrond_assistance ();
             });
             tier3_box.append (ai_quick_btn);
 
-            var rstudio_toggle_btn = RibbonFactory.create_compact_button ("view-grid-symbolic", "RStudio / Focus");
+            var rstudio_toggle_btn = RibbonFactory.create_compact_button ("view-grid-symbolic", "4-Pane / Focus");
+            ((Gtk.Button) rstudio_toggle_btn).tooltip_text = "Switch between 4-Pane Studio and distraction-free Focus Mode";
             ((Gtk.Button) rstudio_toggle_btn).clicked.connect (() => {
                 var mgr = Services.WorkspaceStateManager.get_default ();
                 var next_mode = mgr.active_layout == Services.LayoutMode.RSTUDIO
@@ -433,11 +468,18 @@ namespace Imladris {
                 if (tab_view.n_pages == 0) {
                     content_stack.visible_child_name = "welcome";
                     tab_bar.visible = false;
+                    tier3_box.visible = false;
+                    ribbon_scroller.visible = false;
+                    status_bar.visible = false;
                 }
             });
             tab_view.page_attached.connect ((page, pos) => {
+                var sm_ui = Core.SettingsManager.get_default ();
                 content_stack.visible_child_name = "editor";
                 tab_bar.visible = true;
+                tier3_box.visible = true;
+                ribbon_scroller.visible = sm_ui.show_ribbon_toolbar && btn_collapse_ribbon.active;
+                status_bar.visible = sm_ui.show_status_bar;
             });
             tab_bar = new Adw.TabBar () {
                 view = tab_view,
@@ -461,7 +503,7 @@ namespace Imladris {
             // =================================================================
             // BOTTOM STATUS BAR (Live Metrics, Kernel Status & Zoom Slider)
             // =================================================================
-            var status_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12);
+            status_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12);
             status_bar.add_css_class ("imladris-statusbar");
 
             status_badge_lbl = new Gtk.Label ("QUARTO / MD");
@@ -475,17 +517,7 @@ namespace Imladris {
             status_bar.append (status_env_badge_lbl);
 
             var sm_hw = Core.SettingsManager.get_default ();
-            var gpu_badge_lbl = new Gtk.Label (sm_hw.gpu_backend.get_badge_label (sm_hw.hardware_acceleration_enabled)) {
-                tooltip_text = sm_hw.get_active_gpu_renderer_summary ()
-            };
-            gpu_badge_lbl.add_css_class ("status-badge");
-            gpu_badge_lbl.add_css_class ("gpu-status-badge");
-            status_bar.append (gpu_badge_lbl);
-
-            sm_hw.physics_changed.connect (() => {
-                bool hw_on = sm_hw.hardware_acceleration_enabled && (sm_hw.gpu_backend != Core.GpuRendererBackend.SOFTWARE_CAIRO);
-                gpu_badge_lbl.label = sm_hw.gpu_backend.get_badge_label (hw_on);
-                gpu_badge_lbl.tooltip_text = sm_hw.get_active_gpu_renderer_summary ();
+            physics_changed_hid = sm_hw.physics_changed.connect (() => {
                 ribbon_stack.transition_duration = sm_hw.animation_physics.get_stack_duration_ms ();
                 content_stack.transition_duration = sm_hw.animation_physics.get_stack_duration_ms ();
             });
@@ -527,21 +559,44 @@ namespace Imladris {
 
             status_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
 
-            zoom_lbl = new Gtk.Label ("100%") {
-                css_classes = { "caption", "numeric" },
-                width_chars = 4
+            var zoom_pop_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+                margin_top = 4, margin_bottom = 4, margin_start = 4, margin_end = 4
             };
-            zoom_scale = new Gtk.Scale.with_range (Gtk.Orientation.HORIZONTAL, 50, 200, 10) {
-                draw_value = false,
-                width_request = 110
+            zoom_pop_box.add_css_class ("linked");
+            var btn_z_out = new Gtk.Button.from_icon_name ("zoom-out-symbolic") { tooltip_text = "Zoom Out (Ctrl+-)" };
+            btn_z_out.clicked.connect (() => { apply_zoom (current_zoom - 10); });
+            var btn_z_reset = new Gtk.Button.with_label ("100%") { tooltip_text = "Reset Zoom (Ctrl+0)" };
+            btn_z_reset.clicked.connect (() => { apply_zoom (100); });
+            var btn_z_in = new Gtk.Button.from_icon_name ("zoom-in-symbolic") { tooltip_text = "Zoom In (Ctrl++)" };
+            btn_z_in.clicked.connect (() => { apply_zoom (current_zoom + 10); });
+            zoom_pop_box.append (btn_z_out);
+            zoom_pop_box.append (btn_z_reset);
+            zoom_pop_box.append (btn_z_in);
+            var zoom_pop = new Gtk.Popover () { child = zoom_pop_box };
+
+            current_zoom = Core.SettingsManager.get_default ().default_zoom_percent;
+            zoom_btn = new Gtk.MenuButton () {
+                label = @"$current_zoom%",
+                popover = zoom_pop,
+                tooltip_text = "Editor Zoom",
+                valign = Gtk.Align.CENTER
             };
-            zoom_scale.set_value (100);
-            zoom_scale.value_changed.connect (() => {
-                apply_zoom ((int) zoom_scale.get_value ());
+            zoom_btn.add_css_class ("flat");
+            zoom_btn.add_css_class ("caption");
+            zoom_btn.add_css_class ("numeric");
+            status_bar.append (zoom_btn);
+
+            ui_settings_hid = Core.SettingsManager.get_default ().ui_settings_changed.connect (() => {
+                var sm_ui = Core.SettingsManager.get_default ();
+                if (btn_collapse_ribbon.active != sm_ui.show_ribbon_toolbar) {
+                    btn_collapse_ribbon.active = sm_ui.show_ribbon_toolbar;
+                }
+                if (tab_view.n_pages > 0) {
+                    ribbon_scroller.visible = sm_ui.show_ribbon_toolbar;
+                    status_bar.visible = sm_ui.show_status_bar;
+                }
+                apply_zoom (sm_ui.default_zoom_percent);
             });
-            status_bar.append (new Gtk.Label ("Zoom:"));
-            status_bar.append (zoom_scale);
-            status_bar.append (zoom_lbl);
 
             toolbar_view.add_bottom_bar (status_bar);
 
@@ -559,6 +614,9 @@ namespace Imladris {
             content_stack.add_named (tab_view, "editor");
             content_stack.visible_child_name = "welcome";
             tab_bar.visible = false;
+            tier3_box.visible = false;
+            ribbon_scroller.visible = false;
+            status_bar.visible = false;
 
             toast_overlay.set_child (content_stack);
             toolbar_view.set_content (toast_overlay);
@@ -719,9 +777,16 @@ namespace Imladris {
         public void ask_elrond (string prompt) {
             var doc = get_active_document ();
             if (doc != null) {
-                doc.show_ai_assistant ();
-                if (doc.assistant_panel != null) {
-                    doc.assistant_panel.send_prompt (prompt);
+                if (Services.WorkspaceStateManager.get_default ().active_layout == Services.LayoutMode.RSTUDIO &&
+                    doc.panel_registry != null &&
+                    doc.panel_registry.elrond_chat_panel != null) {
+                    doc.dock_layout_state.activate_panel (Imladris.Core.Layout.PanelId.ELROND_AI);
+                    doc.panel_registry.elrond_chat_panel.submit_external_prompt (prompt);
+                } else {
+                    doc.show_ai_assistant ();
+                    if (doc.assistant_panel != null) {
+                        doc.assistant_panel.send_prompt (prompt);
+                    }
                 }
             } else {
                 trigger_elrond_assistance ();
@@ -945,13 +1010,15 @@ namespace Imladris {
                 tightening_threshold = 400
             };
 
-            var group = new Adw.PreferencesGroup () {
-                title = "Get Started"
+            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 18);
+
+            var quick_group = new Adw.PreferencesGroup () {
+                title = "Quick Start"
             };
 
             var qmd_row = new Adw.ActionRow () {
-                title = "New Quarto Document (.qmd)",
-                subtitle = "Literate scientific document supporting R, Python, and LaTeX",
+                title = "New Analysis Notebook (.qmd)",
+                subtitle = "Write prose, math, R, and Python in one live document",
                 activatable = true
             };
             qmd_row.add_prefix (new Gtk.Image.from_icon_name ("x-office-document-symbolic"));
@@ -959,7 +1026,43 @@ namespace Imladris {
             qmd_row.activated.connect (() => {
                 add_document_tab ("analysis.qmd", "markdown", "---\ntitle: \"Untitled Quarto Analysis\"\nauthor: \"Scientist\"\nformat: html\n---\n\n## Introduction\n\n");
             });
-            group.add (qmd_row);
+            quick_group.add (qmd_row);
+
+            var shiny_row = new Adw.ActionRow () {
+                title = "New R Script or Shiny App (.R)",
+                subtitle = "Run statistical models or build an interactive web dashboard",
+                activatable = true
+            };
+            shiny_row.add_prefix (new Gtk.Image.from_icon_name ("applications-internet-symbolic"));
+            shiny_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            shiny_row.activated.connect (() => {
+                string template = ProjectScaffolder.get_shiny_template ();
+                add_document_tab ("app.R", "r", template);
+            });
+            quick_group.add (shiny_row);
+
+            var open_row = new Adw.ActionRow () {
+                title = "Open File or Project Folder…",
+                subtitle = "Open an existing document, notebook, or RStudio workspace",
+                activatable = true
+            };
+            open_row.add_prefix (new Gtk.Image.from_icon_name ("document-open-symbolic"));
+            open_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            open_row.activated.connect (() => {
+                if (this.application != null) {
+                    this.application.activate_action ("open", null);
+                }
+            });
+            quick_group.add (open_row);
+
+            box.append (quick_group);
+
+            var more_group = new Adw.PreferencesGroup ();
+            var more_expander = new Adw.ExpanderRow () {
+                title = "More Formats &amp; Templates",
+                subtitle = "R Markdown, Jupyter notebooks, RStudio &amp; Mallorn projects"
+            };
+            more_expander.add_prefix (new Gtk.Image.from_icon_name ("view-more-symbolic"));
 
             var rmd_row = new Adw.ActionRow () {
                 title = "New R Markdown (.Rmd)",
@@ -971,20 +1074,7 @@ namespace Imladris {
             rmd_row.activated.connect (() => {
                 add_document_tab ("report.Rmd", "rmd", "---\ntitle: \"Analysis Report\"\noutput: html_document\n---\n\n```{r setup, include=FALSE}\nknitr::opts_chunk$set(echo = TRUE)\n```\n\n## Introduction\n\n");
             });
-            group.add (rmd_row);
-
-            var shiny_row = new Adw.ActionRow () {
-                title = "New Shiny Web App (.R)",
-                subtitle = "Interactive reactive web application and dashboard with R and Shiny",
-                activatable = true
-            };
-            shiny_row.add_prefix (new Gtk.Image.from_icon_name ("applications-internet-symbolic"));
-            shiny_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
-            shiny_row.activated.connect (() => {
-                string template = ProjectScaffolder.get_shiny_template ();
-                add_document_tab ("app.R", "r", template);
-            });
-            group.add (shiny_row);
+            more_expander.add_row (rmd_row);
 
             var ipynb_row = new Adw.ActionRow () {
                 title = "New Jupyter Notebook (.ipynb)",
@@ -997,10 +1087,10 @@ namespace Imladris {
                 string template = Core.NotebookSerializer.get_default_ipynb_markdown_template ();
                 add_document_tab ("notebook.ipynb", "markdown", template);
             });
-            group.add (ipynb_row);
+            more_expander.add_row (ipynb_row);
 
             var rproj_row = new Adw.ActionRow () {
-                title = "New RStudio Project (.Rproj)...",
+                title = "New RStudio Project (.Rproj)…",
                 subtitle = "Scaffold a 1:1 RStudio project directory with .Rproj, .Rprofile, and data/",
                 activatable = true
             };
@@ -1009,10 +1099,10 @@ namespace Imladris {
             rproj_row.activated.connect (() => {
                 show_new_rproj_modal ();
             });
-            group.add (rproj_row);
+            more_expander.add_row (rproj_row);
 
             var wizard_row = new Adw.ActionRow () {
-                title = "New Project Wizard...",
+                title = "New Project Wizard…",
                 subtitle = "Initialize a sandboxed reproducible environment (.mallorn)",
                 activatable = true
             };
@@ -1021,23 +1111,12 @@ namespace Imladris {
             wizard_row.activated.connect (() => {
                 show_new_project_modal ();
             });
-            group.add (wizard_row);
+            more_expander.add_row (wizard_row);
 
-            var open_row = new Adw.ActionRow () {
-                title = "Open Document or Project...",
-                subtitle = "Open an existing scientific file or project directory",
-                activatable = true
-            };
-            open_row.add_prefix (new Gtk.Image.from_icon_name ("document-open-symbolic"));
-            open_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
-            open_row.activated.connect (() => {
-                if (this.application != null) {
-                    this.application.activate_action ("open", null);
-                }
-            });
-            group.add (open_row);
+            more_group.add (more_expander);
+            box.append (more_group);
 
-            clamp.set_child (group);
+            clamp.set_child (box);
             status.set_child (clamp);
             return status;
         }
@@ -1575,10 +1654,9 @@ namespace Imladris {
 
         public void apply_zoom (int percent) {
             current_zoom = percent.clamp (50, 200);
-            if ((int) zoom_scale.get_value () != current_zoom) {
-                zoom_scale.set_value (current_zoom);
+            if (zoom_btn != null) {
+                zoom_btn.label = @"$current_zoom%";
             }
-            zoom_lbl.label = @"$current_zoom%";
             var d = get_active_document ();
             if (d != null) {
                 d.set_zoom (current_zoom);
@@ -1696,13 +1774,7 @@ namespace Imladris {
             box.append (RibbonFactory.create_linked_group ({ btn_bullet, btn_number, btn_quote }));
             box.append (RibbonFactory.create_vseparator ());
 
-            // Group 4: Assistant & Settings
-            box.append (create_elrond_assistance_button ());
-
-            box.append (RibbonFactory.create_tool_button ("emblem-system-symbolic", "Preferences", "Open Preferences (Ctrl+,)", false, false, true, null, "app.preferences"));
-            box.append (RibbonFactory.create_tool_button ("help-browser-symbolic", "About", "About Imladris & Credits", false, false, true, null, "app.about"));
-
-            // Group 5: Extensions (Obsidian-Style JSC Plugins)
+            // Group 4: Extensions (Obsidian-Style JSC Plugins)
             ext_separator = (Gtk.Separator) RibbonFactory.create_vseparator ();
             ext_separator.visible = false;
             box.append (ext_separator);
@@ -1918,7 +1990,7 @@ namespace Imladris {
 
             box.append (RibbonFactory.create_linked_group ({ btn_restart_kernel, btn_package_installer, btn_snapshot_env, btn_restore_env, btn_toolchains }));
             box.append (RibbonFactory.create_vseparator ());
-            box.append (create_elrond_assistance_button ());
+            // Group 4 removed: Elrond Assistance is in the top tab bar and Ctrl+Shift+E
 
             return box;
         }
@@ -1987,21 +2059,9 @@ namespace Imladris {
             });
             box.append (btn_preview);
             box.append (RibbonFactory.create_vseparator ());
-            box.append (create_elrond_assistance_button ());
+            // Group 4 removed: Elrond Assistance is in the top tab bar and Ctrl+Shift+E
 
             return box;
-        }
-
-        private Gtk.Widget create_elrond_assistance_button () {
-            var btn = RibbonFactory.create_tool_button (
-                "system-run-symbolic",
-                "Elrond Assistance",
-                "Write with Elrond Assistance (AI) — Local R, Python, SQL & Data Science Copilot (Ctrl+Shift+E)"
-            );
-            ((Gtk.Button) btn).clicked.connect (() => {
-                trigger_elrond_assistance ();
-            });
-            return btn;
         }
 
         /**

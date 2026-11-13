@@ -4,8 +4,9 @@
 namespace Imladris {
     public static int main (string[] args) {
         // Ensure WebKitGTK 6.0 WebProcess runs reliably without nested bwrap
-        // namespace aborts across all environments (Flatpak, Debian unprivileged userns, Wayland)
+        // namespace aborts or Wayland/Flatpak DMA-BUF/EGL buffer-sharing blanks.
         GLib.Environment.set_variable ("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1", true);
+        GLib.Environment.set_variable ("WEBKIT_DISABLE_DMABUF_RENDERER", "1", false);
 
         if ("--mcp-server" in args) {
             var loop = new GLib.MainLoop ();
@@ -41,7 +42,8 @@ namespace Imladris {
             } else if (gpu_backend == 2) {
                 GLib.Environment.set_variable ("GSK_RENDERER", "vulkan", true);
             } else {
-                string gl_renderer = (Gtk.get_minor_version () >= 14) ? "ngl" : "gl";
+                uint minor = Gtk.get_minor_version ();
+                string gl_renderer = (minor >= 14 && minor < 18) ? "ngl" : "gl";
                 GLib.Environment.set_variable ("GSK_RENDERER", gl_renderer, true);
             }
         }

@@ -69,7 +69,7 @@ shared=ipc;network;
 sockets=fallback-x11;wayland;
 devices=dri;
 filesystems=home;~/.cache/imladris:create;
-env=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1;
+env=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1;WEBKIT_DISABLE_DMABUF_RENDERER=1;
 
 [Session Bus Policy]
 org.freedesktop.Flatpak=talk

@@ -33,6 +33,21 @@ namespace Imladris.UI {
         /**
          * Undocks a persistent panel into a dedicated floating Adw.Window.
          */
+        private static void detach_widget (Gtk.Widget widget) {
+            var parent = widget.get_parent ();
+            if (parent == null) return;
+            var pbox = parent as Gtk.Box;
+            if (pbox != null) {
+                pbox.remove (widget);
+            } else if (parent is Adw.ToolbarView) {
+                ((Adw.ToolbarView) parent).set_content (null);
+            } else if (parent is Adw.Bin) {
+                ((Adw.Bin) parent).set_child (null);
+            } else {
+                widget.unparent ();
+            }
+        }
+
         public void undock_panel (PanelId pid) {
             if (undocked_windows.has_key (pid)) {
                 var existing = undocked_windows.get (pid);
@@ -43,16 +58,8 @@ namespace Imladris.UI {
             var widget = registry.get_panel_widget (pid);
             if (widget == null) return;
 
-            // Detach widget from current parent container
-            var parent = widget.get_parent ();
-            if (parent != null) {
-                var pbox = parent as Gtk.Box;
-                if (pbox != null) {
-                    pbox.remove (widget);
-                } else {
-                    widget.unparent ();
-                }
-            }
+            // Detach widget from current parent container safely
+            detach_widget (widget);
 
             var win = new Adw.Window () {
                 title = @"$(pid.to_title ()) — Imladris Workbench",
@@ -102,15 +109,7 @@ namespace Imladris.UI {
 
             var widget = registry.get_panel_widget (pid);
             if (widget != null) {
-                var parent = widget.get_parent ();
-                if (parent != null) {
-                    var pbox = parent as Gtk.Box;
-                    if (pbox != null) {
-                        pbox.remove (widget);
-                    } else {
-                        widget.unparent ();
-                    }
-                }
+                detach_widget (widget);
             }
 
             win.close ();

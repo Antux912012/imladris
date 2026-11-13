@@ -33,17 +33,37 @@ namespace Imladris {
             try {
                 var parser = new Json.Parser ();
                 parser.load_from_data (request_json, -1);
-                var req = parser.get_root ().get_object ();
+                var root = parser.get_root ();
+                if (root == null || root.get_node_type () != Json.NodeType.OBJECT) {
+                    return "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Invalid JSON-RPC request\"}}";
+                }
+                var req = root.get_object ();
 
-                int64 id = req.has_member ("id") ? req.get_int_member ("id") : 1;
-                string method = req.has_member ("method") ? req.get_string_member ("method") : "";
+                int64 id = 1;
+                string? id_str = null;
+                if (req.has_member ("id")) {
+                    var id_node = req.get_member ("id");
+                    if (id_node.get_node_type () == Json.NodeType.VALUE) {
+                        if (id_node.get_value_type () == typeof (string)) {
+                            id_str = id_node.get_string ();
+                        } else {
+                            id = id_node.get_int ();
+                        }
+                    }
+                }
+                string method = (req.has_member ("method") && req.get_member ("method").get_node_type () == Json.NodeType.VALUE)
+                    ? req.get_string_member ("method") : "";
 
                 var builder = new Json.Builder ();
                 builder.begin_object ();
                 builder.set_member_name ("jsonrpc");
                 builder.add_string_value ("2.0");
                 builder.set_member_name ("id");
-                builder.add_int_value (id);
+                if (id_str != null) {
+                    builder.add_string_value (id_str);
+                } else {
+                    builder.add_int_value (id);
+                }
 
                 if (method == "initialize") {
                     builder.set_member_name ("result");
@@ -83,24 +103,36 @@ namespace Imladris {
                     builder.end_array ();
                     builder.end_object ();
                 } else if (method == "tools/call") {
-                    var params_obj = req.get_object_member ("params");
-                    string tool_name = params_obj.get_string_member ("name");
-                    Json.Object? args = params_obj.has_member ("arguments") ? params_obj.get_object_member ("arguments") : null;
+                    if (!req.has_member ("params") || req.get_member ("params").get_node_type () != Json.NodeType.OBJECT) {
+                        builder.set_member_name ("error");
+                        builder.begin_object ();
+                        builder.set_member_name ("code");
+                        builder.add_int_value (-32602);
+                        builder.set_member_name ("message");
+                        builder.add_string_value ("Missing or invalid params object.");
+                        builder.end_object ();
+                    } else {
+                        var params_obj = req.get_object_member ("params");
+                        string tool_name = (params_obj.has_member ("name") && params_obj.get_member ("name").get_node_type () == Json.NodeType.VALUE)
+                            ? params_obj.get_string_member ("name") : "";
+                        Json.Object? args = (params_obj.has_member ("arguments") && params_obj.get_member ("arguments").get_node_type () == Json.NodeType.OBJECT)
+                            ? params_obj.get_object_member ("arguments") : null;
 
-                    string tool_result = dispatch_tool_on_main_thread (tool_name, args, window);
+                        string tool_result = dispatch_tool_on_main_thread (tool_name, args, window);
 
-                    builder.set_member_name ("result");
-                    builder.begin_object ();
-                    builder.set_member_name ("content");
-                    builder.begin_array ();
-                    builder.begin_object ();
-                    builder.set_member_name ("type");
-                    builder.add_string_value ("text");
-                    builder.set_member_name ("text");
-                    builder.add_string_value (tool_result);
-                    builder.end_object ();
-                    builder.end_array ();
-                    builder.end_object ();
+                        builder.set_member_name ("result");
+                        builder.begin_object ();
+                        builder.set_member_name ("content");
+                        builder.begin_array ();
+                        builder.begin_object ();
+                        builder.set_member_name ("type");
+                        builder.add_string_value ("text");
+                        builder.set_member_name ("text");
+                        builder.add_string_value (tool_result);
+                        builder.end_object ();
+                        builder.end_array ();
+                        builder.end_object ();
+                    }
                 } else {
                     builder.set_member_name ("error");
                     builder.begin_object ();

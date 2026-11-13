@@ -17,13 +17,13 @@ namespace Imladris.UI {
         private PackageIndexCache index_cache;
 
         private Gtk.Entry r_search_entry;
-        private Adw.Spinner r_spinner;
+        private Gtk.Spinner r_spinner;
         private Gtk.MenuButton r_more_btn;
         private Gtk.Popover r_autocomplete_popover;
         private Gtk.ListBox r_autocomplete_list;
 
         private Gtk.Entry py_search_entry;
-        private Adw.Spinner py_spinner;
+        private Gtk.Spinner py_spinner;
         private Gtk.MenuButton py_more_btn;
         private Gtk.Popover py_autocomplete_popover;
         private Gtk.ListBox py_autocomplete_list;
@@ -74,7 +74,7 @@ namespace Imladris.UI {
                 width_chars = 34
             };
 
-            r_spinner = new Adw.Spinner () {
+            r_spinner = new Gtk.Spinner () {
                 halign = Gtk.Align.END,
                 valign = Gtk.Align.CENTER,
                 margin_end = 8,
@@ -124,7 +124,7 @@ namespace Imladris.UI {
                 width_chars = 34
             };
 
-            py_spinner = new Adw.Spinner () {
+            py_spinner = new Gtk.Spinner () {
                 halign = Gtk.Align.END,
                 valign = Gtk.Align.CENTER,
                 margin_end = 8,
@@ -191,6 +191,7 @@ namespace Imladris.UI {
         }
 
         public void set_r_busy (bool busy, string? display_label = null) {
+            r_spinner.spinning = busy;
             r_spinner.visible = busy;
             if (busy) {
                 r_search_entry.secondary_icon_name = null;
@@ -204,6 +205,7 @@ namespace Imladris.UI {
         }
 
         public void set_python_busy (bool busy, string? display_label = null) {
+            py_spinner.spinning = busy;
             py_spinner.visible = busy;
             if (busy) {
                 py_search_entry.secondary_icon_name = null;

@@ -25,7 +25,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Read the Technical Wiki</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.21.0">⬇️ Download v0.21.0 (.deb / Flatpak)</a></strong>
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.23.0">⬇️ Download v0.23.0 (.deb / .rpm / Flatpak / AUR)</a></strong>
 </p>
 
 ---
@@ -42,8 +42,44 @@ The application transitions dynamically between two editing layouts:
 
 ---
 
-## 2. Key Features
+## 2. Visual Overview & Screenshots
 
+<p align="center">
+  <img src="data/screenshots/imladris-screenshot.png" alt="Imladris 4-Pane Scientific Workbench with Redesigned Elrond AI" width="100%">
+  <em>Figure 1: Four-quadrant scientific workbench featuring live Quarto preview, interactive console, environment inspector, and redesigned Elrond AI copilot with multi-context chips.</em>
+</p>
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <img src="data/screenshots/imladris-welcome.png" alt="Progressive-Disclosure Welcome Screen" width="100%"><br>
+      <em>Figure 2: Streamlined Welcome screen with Quick Start actions and expandable templates row.</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="data/screenshots/imladris-ai-copilot.png" alt="Elrond Inline Assistance Popover" width="100%"><br>
+      <em>Figure 3: Preview-first inline code assistance with instant syntax-highlighted code preview.</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="data/screenshots/imladris-preferences-workspace.png" alt="Workspace &amp; Editor Preferences" width="100%"><br>
+      <em>Figure 4: Workspace &amp; Editor preferences (4-Pane vs Focus mode, ribbon toggle, zoom).</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="data/screenshots/imladris-preferences-theming.png" alt="Appearance &amp; Theme Preferences" width="100%"><br>
+      <em>Figure 5: GNOME system themes, Eye Friendly mode, and custom accent color selection.</em>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 3. Key Features
+
+* **GNOME / Libadwaita HIG Overhaul & Zero-Chrome Empty State**: Streamlines the initial user experience with progressive disclosure. Features a clean **Quick Start** card row (*Quarto Notebook*, *R Script or Shiny App*, *Open File or Folder*) and a collapsible **More Formats & Templates** expander (*.Rmd*, *.ipynb*, *.Rproj*, *.mallorn*). When no document is open, the ribbon bar, tab bar, and status bar automatically hide for a calm distraction-free experience.
+* **Redesigned Elrond AI Copilot & Code Assistance**: Interactive scientific copilot tab with a persistent active provider pill button (*Elrond Local*, *Gemini*, *Claude*, *OpenAI*, *DeepSeek*, *Kimi*, *Qwen*, *Ollama*, *LM Studio*), context chips (*Active File*, *Selection*, *Data*, *Last Error*), Pango-formatted markdown responses, and interactive code cards (*Insert at Cursor*, *Run in Console*, *Copy*).
+* **Preview-First Inline Code Assistance (`Ctrl+Shift+E`)**: Context-aware popover floating over the editor with one-click quick prompt pills (*Fix & Clean*, *Add Comments*, *Explain*, *R Plot*) and a live monospace preview box with *Replace Selection*, *Insert at Cursor*, and *Regenerate* controls.
+* **Workspace & Editor Preferences**: New dedicated settings in Preferences for switching between **4-Pane Studio** and **Focus Mode**, toggling ribbon toolbar visibility, toggling the bottom status bar, and customizing default zoom percentage (paired with a compact status bar zoom popover).
 * **Elbereth Clinical Biostatistics, Power & Survival Studio (`Imladris.Bridges.Elbereth`)**: Native HeaderBar studio for clinical trialists, biostatisticians, and translational researchers. Computes **ICH E9 Statistical Power & Sample Size** for Two-Sample Continuous ($t$-test / Cohen's $d$), Two-Sample Proportions ($p_1$ vs. $p_2$ with Casagrande-Pike continuity correction), and Time-to-Event Survival (**Schoenfeld 1983 Log-Rank Hazard Ratio formula**) with attrition adjustment. Draws a live **Cairo Power Curve ($1-\beta$ vs. $N$)** and injects regulatory SAP justifications alongside R and Python verification chunks. Generates publication-ready code blocks for **CDISC ADSL Table 1**, **ADTTE Kaplan-Meier & Cox PH**, **Subgroup Forest Plots**, and **Differential Expression Volcano Plots**.
 * **Arekyer Galaxy-to-Quarto Provenance Bridge (`Imladris.Bridges.Arekyer`)**: Connects upstream cloud bioinformatics histories (**Galaxy Project**, such as `usegalaxy.eu`, `usegalaxy.org`, `usegalaxy.org.au`) directly to local reproducible `.qmd` and `.Rmd` manuscripts. Injects standardized R (`httr2` / `readr`) and Python (`requests` / `pandas`) data-fetching code blocks with verifiable dataset UUID/HID headers. Stores Galaxy API keys exclusively in the OS keyring (`libsecret-1` / `org.freedesktop.Secret.Service`) and injects `GALAXY_API_KEY` into isolated compilation subprocesses.
 * **Taniquetil AlphaFold Structural Biology Bridge (`Imladris.Bridges.Taniquetil`)**: Inspects 3D macromolecular structures from the DeepMind / EMBL-EBI **AlphaFold Protein Structure Database** (AFDB) and RCSB PDB directly from the header bar. Renders an interactive Cairo per-residue **pLDDT confidence distribution track** (`#0053D6` Very High, `#65CBF3` Confident, `#FFDB13` Low, `#FF7D45` Disordered) and injects reproducible **R (`bio3d`)** and **Python (PAE matrix / `biotite`)** code blocks into manuscripts.
@@ -216,7 +252,9 @@ sudo pacman -S vala meson ninja gcc \
 ### Installation via Flatpark & Flatpak:
 Imladris is officially distributed on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) (the open Flatpak application repository, [flatpark/flatpark](https://github.com/flatpark/flatpark)).
 
-To install Imladris via Flatpark:
+### Package Installation:
+
+#### Flatpark / Flatpak:
 ```bash
 # Add the Flatpark repository
 flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo
@@ -228,7 +266,25 @@ flatpak install flatpark io.github.Antux912012.Imladris
 flatpak run io.github.Antux912012.Imladris
 ```
 
-You can also download the standalone `.flatpak` bundle or `.deb` package directly from [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) or [GitHub Releases](https://github.com/Antux912012/imladris/releases/tag/v0.18.0).
+#### Arch Linux (AUR):
+```bash
+paru -S imladris
+# or using yay:
+yay -S imladris
+```
+
+#### Fedora / RHEL (.rpm):
+```bash
+sudo dnf install ./imladris-0.23.0-1.x86_64.rpm
+```
+
+#### Debian / Ubuntu (.deb):
+```bash
+sudo dpkg -i imladris_0.23.0_amd64.deb
+sudo apt-get install -f
+```
+
+Standalone packages and bundles (`.flatpak`, `.deb`, `.rpm`, and source `.tar.gz`) are available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.23.0](https://github.com/Antux912012/imladris/releases/tag/v0.23.0).
 
 ### Debug Profile Build & Verification:
 ```bash

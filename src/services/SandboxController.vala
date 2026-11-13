@@ -19,7 +19,7 @@ namespace Imladris.Services {
                 );
             }
 
-            var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_MERGE);
+            var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
             launcher.set_cwd (project_root);
 
             if (fmt == DocumentFormat.RMD || fmt == DocumentFormat.QMD) {
@@ -64,7 +64,7 @@ namespace Imladris.Services {
             bool rscript_succeeded = false;
             if (Core.PlatformUtils.is_program_available ("Rscript")) {
                 try {
-                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_MERGE);
+                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                     if (project_path != "") launcher.set_cwd (project_path);
                     string[] raw_argv = { "Rscript", "-e", "if (requireNamespace('renv', quietly=TRUE)) { renv::init(bare = TRUE); renv::snapshot(prompt = FALSE); }" };
                     string[] argv = Core.PlatformUtils.build_host_command (raw_argv, project_path);
@@ -135,7 +135,7 @@ local({
             // 1. Create .venv if not present
             if (!vdir.query_exists () && Environment.find_program_in_path ("python3") != null) {
                 try {
-                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_MERGE);
+                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                     launcher.set_cwd (project_path);
                     string[] argv = { "python3", "-m", "venv", ".venv" };
                     var proc = launcher.spawnv (argv);
@@ -194,7 +194,7 @@ numpy>=1.24.0
             string renv_dir = Path.build_filename (project_path, "renv");
             if (FileUtils.test (renv_dir, FileTest.IS_DIR) && Core.PlatformUtils.is_program_available ("Rscript")) {
                 try {
-                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_MERGE);
+                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                     if (project_path != "") launcher.set_cwd (project_path);
                     string[] raw_argv = { "Rscript", "-e", "if (requireNamespace('renv', quietly=TRUE)) renv::snapshot(prompt = FALSE)" };
                     string[] argv = Core.PlatformUtils.build_host_command (raw_argv, project_path);
@@ -233,7 +233,7 @@ numpy>=1.24.0
             string renv_dir = Path.build_filename (project_path, "renv");
             if (FileUtils.test (renv_dir, FileTest.IS_DIR) && Core.PlatformUtils.is_program_available ("Rscript")) {
                 try {
-                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_MERGE);
+                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                     if (project_path != "") launcher.set_cwd (project_path);
                     string[] raw_argv = { "Rscript", "-e", "if (requireNamespace('renv', quietly=TRUE)) renv::restore(prompt = FALSE)" };
                     string[] argv = Core.PlatformUtils.build_host_command (raw_argv, project_path);
@@ -261,7 +261,7 @@ numpy>=1.24.0
                     }
                     if (has_packages) {
                         string[] argv = { venv_python, "-m", "pip", "install", "-r", req_path };
-                        var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_MERGE);
+                        var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                         proc.wait_check ();
                     }
                 } catch (GLib.Error e) {
@@ -416,7 +416,7 @@ def ignore_patterns(folder, contents):
 shutil.copytree(src, dst, dirs_exist_ok=True, ignore=ignore_patterns)
 """;
             string[] argv = { "python3", "-c", py_script, src, dst };
-            var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_PIPE);
+            var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
             proc.wait_check ();
         }
     }

@@ -89,9 +89,10 @@ namespace Imladris.Core {
             if (!success && format == ScientificOutputFormat.BEAMER_PDF_SLIDES) {
                 bool needs_tex = exec_log.contains ("xelatex not found") ||
                                  exec_log.contains ("pdflatex not found") ||
+                                 exec_log.contains ("lualatex not found") ||
                                  exec_log.contains ("LaTeX Error") ||
                                  exec_log.contains ("beamer.cls") ||
-                                 exec_log.contains ("not found") ||
+                                 exec_log.contains ("tlmgr") ||
                                  exec_log.contains ("tinytex");
 
                 if (needs_tex) {
@@ -140,17 +141,21 @@ namespace Imladris.Core {
             try {
                 var proc = launcher.spawnv (argv);
                 var dis = new GLib.DataInputStream (proc.get_stdout_pipe ());
-                string? line = null;
-                var sb = new GLib.StringBuilder ();
+                try {
+                    string? line = null;
+                    var sb = new GLib.StringBuilder ();
 
-                while ((line = yield dis.read_line_async (GLib.Priority.DEFAULT, null)) != null) {
-                    sb.append (line).append ("\n");
-                    compilation_progress (line);
+                    while ((line = yield dis.read_line_async (GLib.Priority.DEFAULT, null)) != null) {
+                        sb.append (line).append ("\n");
+                        compilation_progress (line);
+                    }
+
+                    yield proc.wait_async (null);
+                    log_accumulator = sb.str;
+                    return proc.get_successful ();
+                } finally {
+                    try { dis.close (); } catch (GLib.Error e) {}
                 }
-
-                yield proc.wait_async (null);
-                log_accumulator = sb.str;
-                return proc.get_successful ();
             } catch (GLib.Error e) {
                 log_accumulator = e.message;
                 return false;
@@ -180,13 +185,17 @@ namespace Imladris.Core {
             try {
                 var proc = launcher.spawnv (argv);
                 var dis = new GLib.DataInputStream (proc.get_stdout_pipe ());
-                string? line = null;
+                try {
+                    string? line = null;
 
-                while ((line = yield dis.read_line_async (GLib.Priority.DEFAULT, null)) != null) {
-                    compilation_progress (@"[TinyTeX] $line");
+                    while ((line = yield dis.read_line_async (GLib.Priority.DEFAULT, null)) != null) {
+                        compilation_progress (@"[TinyTeX] $line");
+                    }
+
+                    yield proc.wait_async (null);
+                } finally {
+                    try { dis.close (); } catch (GLib.Error e) {}
                 }
-
-                yield proc.wait_async (null);
                 if (!proc.get_successful ()) {
                     throw new ExportError.TINYTEX_INSTALL_FAILED ("quarto install tinytex command failed with non-zero exit code");
                 }

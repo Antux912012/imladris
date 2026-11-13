@@ -90,47 +90,57 @@ namespace Imladris.UI {
             cache_dir = Path.build_filename (Environment.get_user_cache_dir (), "imladris", "indices");
             DirUtils.create_with_parents (cache_dir, 0755);
 
-            load_from_disk_or_defaults ();
+            // Populate lightweight defaults immediately so UI is responsive, then load full disk cache off-thread
+            populate_default_cran ();
+            populate_default_pypi ();
+            load_from_disk_async.begin ();
             check_and_refresh_indices.begin ();
         }
 
-        private void load_from_disk_or_defaults () {
+        private async void load_from_disk_async () {
             string cran_file = Path.build_filename (cache_dir, "cran_index.txt");
-            if (FileUtils.test (cran_file, FileTest.EXISTS)) {
-                try {
-                    string content;
-                    FileUtils.get_contents (cran_file, out content);
-                    string[] lines = content.split ("\n");
-                    foreach (string l in lines) {
-                        string s = l.strip ();
-                        if (s.length > 0) cran_packages.add (s);
-                    }
-                    cran_packages.sort (strcmp);
-                    cran_ready = true;
-                } catch (Error e) {
-                    populate_default_cran ();
-                }
-            } else {
-                populate_default_cran ();
-            }
-
             string pypi_file = Path.build_filename (cache_dir, "pypi_index.txt");
-            if (FileUtils.test (pypi_file, FileTest.EXISTS)) {
-                try {
-                    string content;
-                    FileUtils.get_contents (pypi_file, out content);
-                    string[] lines = content.split ("\n");
-                    foreach (string l in lines) {
-                        string s = l.strip ();
-                        if (s.length > 0) pypi_packages.add (s);
-                    }
-                    pypi_packages.sort (strcmp);
-                    pypi_ready = true;
-                } catch (Error e) {
-                    populate_default_pypi ();
+            GenericArray<string>? loaded_cran = null;
+            GenericArray<string>? loaded_pypi = null;
+
+            SourceFunc cb = load_from_disk_async.callback;
+            new Thread<void*> ("imladris-pkg-cache-load", () => {
+                if (FileUtils.test (cran_file, FileTest.EXISTS)) {
+                    try {
+                        string content;
+                        FileUtils.get_contents (cran_file, out content);
+                        var list = new GenericArray<string> (16384);
+                        foreach (unowned string l in content.split ("\n")) {
+                            string s = l.strip ();
+                            if (s.length > 0) list.add (s);
+                        }
+                        if (list.length > 0) loaded_cran = list;
+                    } catch (Error e) {}
                 }
-            } else {
-                populate_default_pypi ();
+                if (FileUtils.test (pypi_file, FileTest.EXISTS)) {
+                    try {
+                        string content;
+                        FileUtils.get_contents (pypi_file, out content);
+                        var list = new GenericArray<string> (65536);
+                        foreach (unowned string l in content.split ("\n")) {
+                            string s = l.strip ();
+                            if (s.length > 0) list.add (s);
+                        }
+                        if (list.length > 0) loaded_pypi = list;
+                    } catch (Error e) {}
+                }
+                Idle.add ((owned) cb);
+                return null;
+            });
+            yield;
+
+            if (loaded_cran != null) {
+                cran_packages = loaded_cran;
+                cran_ready = true;
+            }
+            if (loaded_pypi != null) {
+                pypi_packages = loaded_pypi;
+                pypi_ready = true;
             }
         }
 
@@ -204,33 +214,46 @@ namespace Imladris.UI {
                 throw new IOError.FAILED ("CRAN HTTP %u: %s", msg.status_code, msg.reason_phrase);
             }
 
-            unowned uint8[] raw_data = bytes.get_data ();
-            string body = (string) raw_data;
-
-            var temp_list = new GenericArray<string> ();
-            var file_buf = new StringBuilder ();
-            foreach (unowned string line in body.split ("\n")) {
-                if (line.has_prefix ("Package:")) {
-                    string pkg = line.substring (8).strip ();
-                    if (pkg.length > 0) {
-                        temp_list.add (pkg);
-                        file_buf.append (pkg);
-                        file_buf.append_c ('\n');
-                    }
-                }
-            }
-
-            temp_list.sort (strcmp);
-            cran_packages = temp_list;
-            cran_ready = true;
-
-            // Persist to disk cache
-            string cran_file = Path.build_filename (cache_dir, "cran_index.txt");
-            FileUtils.set_contents (cran_file, file_buf.str);
-
             string? new_etag = msg.response_headers.get_one ("ETag");
-            if (new_etag != null) {
-                FileUtils.set_contents (etag_file, new_etag);
+            string cran_file = Path.build_filename (cache_dir, "cran_index.txt");
+            GenericArray<string>? parsed_list = null;
+            Error? worker_err = null;
+
+            SourceFunc cb = refresh_cran_index.callback;
+            new Thread<void*> ("imladris-cran-parse", () => {
+                try {
+                    string body = Core.PlatformUtils.bytes_to_string (bytes);
+                    var temp_list = new GenericArray<string> (16384);
+                    var file_buf = new StringBuilder ();
+                    foreach (unowned string line in body.split ("\n")) {
+                        if (line.has_prefix ("Package:")) {
+                            string pkg = line.substring (8).strip ();
+                            if (pkg.length > 0) {
+                                temp_list.add (pkg);
+                                file_buf.append (pkg);
+                                file_buf.append_c ('\n');
+                            }
+                        }
+                    }
+
+                    temp_list.sort (strcmp);
+                    FileUtils.set_contents (cran_file, file_buf.str);
+                    if (new_etag != null) {
+                        FileUtils.set_contents (etag_file, new_etag);
+                    }
+                    parsed_list = temp_list;
+                } catch (Error e) {
+                    worker_err = e;
+                }
+                Idle.add ((owned) cb);
+                return null;
+            });
+            yield;
+
+            if (worker_err != null) throw worker_err;
+            if (parsed_list != null) {
+                cran_packages = parsed_list;
+                cran_ready = true;
             }
 
             return cran_packages.length;
@@ -263,37 +286,52 @@ namespace Imladris.UI {
                 throw new IOError.FAILED ("PyPI HTTP %u: %s", msg.status_code, msg.reason_phrase);
             }
 
-            var parser = new Json.Parser ();
-            var stream = new MemoryInputStream.from_bytes (bytes);
-            yield parser.load_from_stream_async (stream, null);
-
-            var root_obj = parser.get_root ().get_object ();
-            var projects_arr = root_obj.get_array_member ("projects");
-
-            var temp_list = new GenericArray<string> ();
-            var file_buf = new StringBuilder ();
-            uint len = projects_arr.get_length ();
-            for (uint i = 0; i < len; i++) {
-                var proj_obj = projects_arr.get_object_element (i);
-                if (proj_obj.has_member ("name")) {
-                    string name = proj_obj.get_string_member ("name");
-                    temp_list.add (name);
-                    file_buf.append (name);
-                    file_buf.append_c ('\n');
-                }
-            }
-
-            temp_list.sort (strcmp);
-            pypi_packages = temp_list;
-            pypi_ready = true;
-
-            // Persist to disk cache
-            string pypi_file = Path.build_filename (cache_dir, "pypi_index.txt");
-            FileUtils.set_contents (pypi_file, file_buf.str);
-
             string? new_etag = msg.response_headers.get_one ("ETag");
-            if (new_etag != null) {
-                FileUtils.set_contents (etag_file, new_etag);
+            string pypi_file = Path.build_filename (cache_dir, "pypi_index.txt");
+            GenericArray<string>? parsed_list = null;
+            Error? worker_err = null;
+
+            SourceFunc cb = refresh_pypi_index.callback;
+            new Thread<void*> ("imladris-pypi-parse", () => {
+                try {
+                    var parser = new Json.Parser ();
+                    var stream = new MemoryInputStream.from_bytes (bytes);
+                    parser.load_from_stream (stream, null);
+
+                    var root_obj = parser.get_root ().get_object ();
+                    var projects_arr = root_obj.get_array_member ("projects");
+
+                    uint len = projects_arr.get_length ();
+                    var temp_list = new GenericArray<string> ((int) len);
+                    var file_buf = new StringBuilder ();
+                    for (uint i = 0; i < len; i++) {
+                        var proj_obj = projects_arr.get_object_element (i);
+                        if (proj_obj.has_member ("name")) {
+                            string name = proj_obj.get_string_member ("name");
+                            temp_list.add (name);
+                            file_buf.append (name);
+                            file_buf.append_c ('\n');
+                        }
+                    }
+
+                    temp_list.sort (strcmp);
+                    FileUtils.set_contents (pypi_file, file_buf.str);
+                    if (new_etag != null) {
+                        FileUtils.set_contents (etag_file, new_etag);
+                    }
+                    parsed_list = temp_list;
+                } catch (Error e) {
+                    worker_err = e;
+                }
+                Idle.add ((owned) cb);
+                return null;
+            });
+            yield;
+
+            if (worker_err != null) throw worker_err;
+            if (parsed_list != null) {
+                pypi_packages = parsed_list;
+                pypi_ready = true;
             }
 
             return pypi_packages.length;

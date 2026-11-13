@@ -10,8 +10,27 @@ namespace Imladris.UI {
 
     public class PreferencesDialog : Adw.PreferencesDialog {
 
+        private ulong accent_changed_hid = 0;
+        private ulong elrond_status_hid = 0;
+        private ulong plugins_changed_hid = 0;
+
         public PreferencesDialog () {
             Object (title: "Preferences");
+
+            this.closed.connect (() => {
+                if (accent_changed_hid != 0) {
+                    Core.SettingsManager.get_default ().disconnect (accent_changed_hid);
+                    accent_changed_hid = 0;
+                }
+                if (elrond_status_hid != 0) {
+                    Imladris.AI.ElrondEngineController.get_default ().disconnect (elrond_status_hid);
+                    elrond_status_hid = 0;
+                }
+                if (plugins_changed_hid != 0) {
+                    Imladris.Plugins.PluginManager.get_default ().disconnect (plugins_changed_hid);
+                    plugins_changed_hid = 0;
+                }
+            });
 
             // Page 1: General & Rendering
             var gen_page = new Adw.PreferencesPage () {
@@ -43,13 +62,69 @@ namespace Imladris.UI {
             accent_selector.accent_selected.connect ((accent) => {
                 accent_row.subtitle = accent.get_display_name ();
             });
-            Core.SettingsManager.get_default ().accent_color_changed.connect ((accent) => {
+            accent_changed_hid = Core.SettingsManager.get_default ().accent_color_changed.connect ((accent) => {
                 accent_row.subtitle = accent.get_display_name ();
             });
             accent_row.add_suffix (accent_selector);
             appearance_group.add (accent_row);
 
             gen_page.add (appearance_group);
+
+            var workspace_group = new Adw.PreferencesGroup () {
+                title = "Workspace &amp; Editor",
+                description = "Customize toolbar visibility, layout defaults, and editor zoom"
+            };
+
+            var layout_modes = new Gtk.StringList ({
+                "4-Pane Studio (Editor, Console, Plots &amp; Files)",
+                "Focus Mode (Distraction-Free Writing)"
+            });
+            var ws_mgr = Services.WorkspaceStateManager.get_default ();
+            var layout_row = new Adw.ComboRow () {
+                title = "Workspace Layout Mode",
+                subtitle = "Switch between the 4-pane scientific workbench and distraction-free focus mode",
+                model = layout_modes,
+                selected = (ws_mgr.active_layout == Services.LayoutMode.APOSTROPHE) ? 1u : 0u
+            };
+            layout_row.notify["selected"].connect (() => {
+                var mode = (layout_row.selected == 1)
+                    ? Services.LayoutMode.APOSTROPHE
+                    : Services.LayoutMode.RSTUDIO;
+                ws_mgr.set_layout_mode (mode, true);
+            });
+            workspace_group.add (layout_row);
+
+            var ribbon_row = new Adw.SwitchRow () {
+                title = "Show Ribbon Toolbar",
+                subtitle = "Display the categorized action ribbon beneath the header bar when a document is open",
+                active = Core.SettingsManager.get_default ().show_ribbon_toolbar
+            };
+            ribbon_row.notify["active"].connect (() => {
+                Core.SettingsManager.get_default ().show_ribbon_toolbar = ribbon_row.active;
+            });
+            workspace_group.add (ribbon_row);
+
+            var statusbar_row = new Adw.SwitchRow () {
+                title = "Show Bottom Status Bar",
+                subtitle = "Display live word count, active kernel status, and zoom controls",
+                active = Core.SettingsManager.get_default ().show_status_bar
+            };
+            statusbar_row.notify["active"].connect (() => {
+                Core.SettingsManager.get_default ().show_status_bar = statusbar_row.active;
+            });
+            workspace_group.add (statusbar_row);
+
+            var zoom_row = new Adw.SpinRow.with_range (50, 200, 10) {
+                title = "Default Editor Zoom (%)",
+                subtitle = "Base zoom percentage applied to the editor and live preview",
+                value = Core.SettingsManager.get_default ().default_zoom_percent
+            };
+            zoom_row.notify["value"].connect (() => {
+                Core.SettingsManager.get_default ().default_zoom_percent = (int) zoom_row.value;
+            });
+            workspace_group.add (zoom_row);
+
+            gen_page.add (workspace_group);
 
             var hw_group = new Adw.PreferencesGroup () {
                 title = "Hardware &amp; Rendering",
@@ -359,7 +434,7 @@ namespace Imladris.UI {
                 elrond_level_row.sensitive = elrond_enable_row.active;
             });
 
-            elrond_engine.status_updated.connect ((status_text, is_busy, frac) => {
+            elrond_status_hid = elrond_engine.status_updated.connect ((status_text, is_busy, frac) => {
                 elrond_status_row.subtitle = status_text;
                 dl_progress.visible = is_busy;
                 dl_progress.fraction = frac;
@@ -704,14 +779,19 @@ namespace Imladris.UI {
                 dialog.open.begin (this.root as Gtk.Window, null, (obj, res) => {
                     try {
                         var file = dialog.open.end (res);
-                        if (file != null) {
-                            Imladris.Plugins.PluginManager.get_default ().import_plugin_archive.begin (file.get_path (), this.root as Gtk.Window, (o, r) => {
+                        string? fpath = (file != null) ? file.get_path () : null;
+                        if (fpath != null) {
+                            var parent_win = this.root as Gtk.Window;
+                            Imladris.Plugins.PluginManager.get_default ().import_plugin_archive.begin (fpath, parent_win, (o, r) => {
                                 try {
                                     Imladris.Plugins.PluginManager.get_default ().import_plugin_archive.end (r);
                                 } catch (GLib.Error err) {
-                                    var err_alert = new Adw.AlertDialog ("Import Failed", err.message);
-                                    err_alert.add_response ("ok", "OK");
-                                    err_alert.present (this.root as Gtk.Window);
+                                    var alert_parent = this.root as Gtk.Window ?? parent_win;
+                                    if (alert_parent != null) {
+                                        var err_alert = new Adw.AlertDialog ("Import Failed", err.message);
+                                        err_alert.add_response ("ok", "OK");
+                                        err_alert.present (alert_parent);
+                                    }
                                 }
                             });
                         }
@@ -749,8 +829,13 @@ namespace Imladris.UI {
 
             populate_plugins_group (plugins_group);
 
-            Imladris.Plugins.PluginManager.get_default ().plugins_changed.connect (() => {
-                populate_plugins_group (plugins_group);
+            plugins_changed_hid = Imladris.Plugins.PluginManager.get_default ().plugins_changed.connect (() => {
+                GLib.Idle.add (() => {
+                    if (plugins_changed_hid != 0) {
+                        populate_plugins_group (plugins_group);
+                    }
+                    return false;
+                });
             });
 
             this.add (ext_page);

@@ -44,19 +44,26 @@ namespace Imladris.Core {
             _state_file = GLib.Path.build_filename (_base_dir, "state.json");
         }
 
+        private static string? cached_arch = null;
+
         /**
          * Returns the platform architecture string expected by micromamba APIs.
          */
         public static string get_platform_arch () {
+            if (cached_arch != null) {
+                return cached_arch;
+            }
             try {
                 string output;
                 GLib.Process.spawn_command_line_sync ("uname -m", out output, null, null);
                 string arch = output.strip ();
                 if (arch == "aarch64" || arch == "arm64") {
-                    return "linux-aarch64";
+                    cached_arch = "linux-aarch64";
+                    return cached_arch;
                 }
             } catch (GLib.Error e) {}
-            return "linux-64";
+            cached_arch = "linux-64";
+            return cached_arch;
         }
 
         public bool is_micromamba_installed () {

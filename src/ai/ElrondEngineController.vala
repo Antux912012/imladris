@@ -245,7 +245,7 @@ namespace Imladris.AI {
         private static string extract_model_from_json (Bytes bytes) {
             try {
                 var parser = new Json.Parser ();
-                parser.load_from_data ((string) bytes.get_data (), -1);
+                parser.load_from_data (Core.PlatformUtils.bytes_to_string (bytes), -1);
                 var root = parser.get_root ();
                 if (root == null || root.get_node_type () != Json.NodeType.OBJECT) {
                     return "";

@@ -10,7 +10,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.22.0";
+        public const string APP_VERSION = "0.23.0";
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },
@@ -94,30 +94,6 @@ namespace Imladris {
             return -1;
         }
 
-        private static void recursively_delete_directory (GLib.File dir) {
-            if (!dir.query_exists ()) {
-                return;
-            }
-            try {
-                var enumerator = dir.enumerate_children (
-                    GLib.FileAttribute.STANDARD_NAME,
-                    GLib.FileQueryInfoFlags.NOFOLLOW_SYMLINKS
-                );
-                GLib.FileInfo? info = null;
-                while ((info = enumerator.next_file ()) != null) {
-                    var child = dir.get_child (info.get_name ());
-                    if (info.get_file_type () == GLib.FileType.DIRECTORY) {
-                        recursively_delete_directory (child);
-                    } else {
-                        child.delete ();
-                    }
-                }
-                dir.delete ();
-            } catch (GLib.Error e) {
-                // Best-effort removal
-            }
-        }
-
         /**
          * Right to Erasure implementation complying with GDPR Article 17.
          * Deterministically deletes all local application state, cache, and configurations.
@@ -127,9 +103,9 @@ namespace Imladris {
             string data_dir = GLib.Path.build_filename (GLib.Environment.get_user_data_dir (), "imladris");
             string cache_dir = GLib.Path.build_filename (GLib.Environment.get_user_cache_dir (), "imladris");
 
-            recursively_delete_directory (GLib.File.new_for_path (config_dir));
-            recursively_delete_directory (GLib.File.new_for_path (data_dir));
-            recursively_delete_directory (GLib.File.new_for_path (cache_dir));
+            Core.PlatformUtils.delete_directory_recursive (GLib.File.new_for_path (config_dir));
+            Core.PlatformUtils.delete_directory_recursive (GLib.File.new_for_path (data_dir));
+            Core.PlatformUtils.delete_directory_recursive (GLib.File.new_for_path (cache_dir));
 
             var schema_source = GLib.SettingsSchemaSource.get_default ();
             if (schema_source != null && schema_source.lookup ("io.github.Antux912012.Imladris", true) != null) {
@@ -152,7 +128,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.new_project_modal", { "<Control>n", "<Control><Shift>n" });
             this.set_accels_for_action ("app.open", { "<Control>o" });
             this.set_accels_for_action ("app.save", { "<Control>s" });
-            this.set_accels_for_action ("app.package_installer", { "<Control><Shift>p" });
+            this.set_accels_for_action ("app.package_installer", { "<Control><Alt>k" });
             this.set_accels_for_action ("app.export_html", { "<Control><Shift>k" });
             this.set_accels_for_action ("app.run_shiny_app", { "<Control><Shift>a" });
             this.set_accels_for_action ("app.elrond_assist", { "<Control><Shift>e" });
@@ -425,11 +401,7 @@ namespace Imladris {
         }
 
         private void setup_papirus_icon_theme () {
-            var gtk_settings = Gtk.Settings.get_default ();
-            if (gtk_settings != null) {
-                gtk_settings.gtk_icon_theme_name = "Papirus";
-            }
-
+            // Respect the user's desktop icon theme per GNOME HIG; only register bundled icons as fallback.
             var display = Gdk.Display.get_default ();
             if (display != null) {
                 var icon_theme = Gtk.IconTheme.get_for_display (display);

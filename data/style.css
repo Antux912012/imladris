@@ -398,15 +398,15 @@ menubutton.imladris-brand-btn > button:active {
 /* Eye Friendly (Sepia) Theme Overrides */
 window.eye-friendly,
 .eye-friendly {
-    --window_bg_color: #f5eee6;
-    --window_fg_color: #383431;
-    --view_bg_color: #faf5ee;
-    --view_fg_color: #2b2826;
-    --headerbar_bg_color: #ebe2d8;
-    --headerbar_fg_color: #383431;
-    --card_bg_color: #ede5da;
-    --popover_bg_color: #faf5ee;
-    --borders: #dcd0c2;
+    --window-bg-color: #f5eee6;
+    --window-fg-color: #383431;
+    --view-bg-color: #faf5ee;
+    --view-fg-color: #2b2826;
+    --headerbar-bg-color: #ebe2d8;
+    --headerbar-fg-color: #383431;
+    --card-bg-color: #ede5da;
+    --popover-bg-color: #faf5ee;
+    --border-color: #dcd0c2;
     background-color: #f5eee6;
     color: #383431;
 }

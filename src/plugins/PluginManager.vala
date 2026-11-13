@@ -435,7 +435,8 @@ namespace Imladris.Plugins {
 
         public void trigger_ribbon_button (string button_id) {
             if (context != null && is_enabled) {
-                context.evaluate (@"if (imladris._callbacks && typeof imladris._callbacks['$button_id'] === 'function') { imladris._callbacks['$button_id'](); }", -1);
+                string safe_id = button_id.replace ("\\", "\\\\").replace ("'", "\\'");
+                context.evaluate (@"if (imladris._callbacks && typeof imladris._callbacks['$safe_id'] === 'function') { imladris._callbacks['$safe_id'](); }", -1);
             }
         }
 
@@ -606,11 +607,15 @@ function onunload() {
                         // Do not reload if already loaded from earlier directory
                         string manifest_path = Path.build_filename (plugin_dir, "manifest.json");
                         if (FileUtils.test (manifest_path, FileTest.EXISTS)) {
-                            string? json = null;
-                            FileUtils.get_contents (manifest_path, out json);
-                            var m = PluginManifest.from_json (json);
-                            if (m != null && m.id != "" && !plugins.has_key (m.id)) {
-                                load_plugin_from_directory (plugin_dir, enabled_set);
+                            try {
+                                string? json = null;
+                                FileUtils.get_contents (manifest_path, out json);
+                                var m = PluginManifest.from_json (json);
+                                if (m != null && m.id != "" && !plugins.has_key (m.id)) {
+                                    load_plugin_from_directory (plugin_dir, enabled_set);
+                                }
+                            } catch (GLib.Error pe) {
+                                warning ("Skipping invalid plugin in %s: %s", plugin_dir, pe.message);
                             }
                         }
                     }
@@ -671,10 +676,11 @@ function onunload() {
                 var root = parser.get_root ();
                 if (root != null && root.get_node_type () == Json.NodeType.OBJECT) {
                     var obj = root.get_object ();
-                    if (obj.has_member ("enabled")) {
+                    if (obj.has_member ("enabled") && obj.get_member ("enabled").get_node_type () == Json.NodeType.ARRAY) {
                         var arr = obj.get_array_member ("enabled");
                         for (uint i = 0; i < arr.get_length (); i++) {
-                            list.add (arr.get_string_element (i));
+                            string? id_str = arr.get_string_element (i);
+                            if (id_str != null) list.add (id_str);
                         }
                     }
                 }
@@ -1026,37 +1032,27 @@ function onunload() {
                 FileAttribute.STANDARD_NAME + "," + FileAttribute.STANDARD_TYPE,
                 FileQueryInfoFlags.NOFOLLOW_SYMLINKS
             );
-            FileInfo? info = null;
-            while ((info = enumerator.next_file ()) != null) {
-                if (info.get_file_type () == FileType.SYMBOLIC_LINK) {
-                    continue; // Skip symlinks for package integrity and security
+            try {
+                FileInfo? info = null;
+                while ((info = enumerator.next_file ()) != null) {
+                    if (info.get_file_type () == FileType.SYMBOLIC_LINK) {
+                        continue; // Skip symlinks for package integrity and security
+                    }
+                    var child_src = source.get_child (info.get_name ());
+                    var child_dest = destination.get_child (info.get_name ());
+                    if (info.get_file_type () == FileType.DIRECTORY) {
+                        copy_directory_recursive (child_src, child_dest);
+                    } else {
+                        child_src.copy (child_dest, FileCopyFlags.OVERWRITE | FileCopyFlags.NOFOLLOW_SYMLINKS);
+                    }
                 }
-                var child_src = source.get_child (info.get_name ());
-                var child_dest = destination.get_child (info.get_name ());
-                if (info.get_file_type () == FileType.DIRECTORY) {
-                    copy_directory_recursive (child_src, child_dest);
-                } else {
-                    child_src.copy (child_dest, FileCopyFlags.OVERWRITE | FileCopyFlags.NOFOLLOW_SYMLINKS);
-                }
+            } finally {
+                try { enumerator.close (); } catch (GLib.Error e) {}
             }
         }
 
         public static void delete_directory_recursive (File dir) throws GLib.Error {
-            if (!dir.query_exists ()) return;
-            var enumerator = dir.enumerate_children (
-                FileAttribute.STANDARD_NAME + "," + FileAttribute.STANDARD_TYPE,
-                FileQueryInfoFlags.NOFOLLOW_SYMLINKS
-            );
-            FileInfo? info = null;
-            while ((info = enumerator.next_file ()) != null) {
-                var child = dir.get_child (info.get_name ());
-                if (info.get_file_type () == FileType.DIRECTORY) {
-                    delete_directory_recursive (child);
-                } else {
-                    child.delete ();
-                }
-            }
-            dir.delete ();
+            Core.PlatformUtils.delete_directory_recursive (dir);
         }
     }
 }

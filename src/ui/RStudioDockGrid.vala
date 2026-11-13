@@ -48,34 +48,11 @@ namespace Imladris.UI {
             };
             header_box.append (tab_scroller);
 
-            // QuadrantWindowControls (Minimize, Maximize/Restore, Reset)
+            // Streamlined Quadrant Controls: Maximize + Consolidated More Menu (HIG)
             var controls_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 2);
 
-            if (quad_id == QuadrantId.Q3_TOP_RIGHT) {
-                var reset_btn = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
-                    tooltip_text = "Reset 4-Quadrant RStudio Preset Layout"
-                };
-                reset_btn.add_css_class ("flat");
-                reset_btn.add_css_class ("DockControlBtn");
-                reset_btn.clicked.connect (() => {
-                    dock_state.reset_to_default ();
-                    dock_state.save_to_disk ();
-                });
-                controls_box.append (reset_btn);
-            }
-
-            var min_btn = new Gtk.Button.from_icon_name ("window-minimize-symbolic") {
-                tooltip_text = "Minimize / Collapse Quadrant"
-            };
-            min_btn.add_css_class ("flat");
-            min_btn.add_css_class ("DockControlBtn");
-            min_btn.clicked.connect (() => {
-                dock_state.toggle_minimize (quad_id);
-            });
-            controls_box.append (min_btn);
-
             var max_btn = new Gtk.Button.from_icon_name ("window-maximize-symbolic") {
-                tooltip_text = "Maximize / Restore Quadrant"
+                tooltip_text = "Maximize / Restore Pane"
             };
             max_btn.add_css_class ("flat");
             max_btn.add_css_class ("DockControlBtn");
@@ -84,22 +61,9 @@ namespace Imladris.UI {
             });
             controls_box.append (max_btn);
 
-            var popout_btn = new Gtk.Button.from_icon_name ("window-new-symbolic") {
-                tooltip_text = "Pop-out Active Tab into Floating Window"
-            };
-            popout_btn.add_css_class ("flat");
-            popout_btn.add_css_class ("DockControlBtn");
-            popout_btn.clicked.connect (() => {
-                var qc = dock_state.quadrants.get (quad_id);
-                if (qc != null && qc.active_tab != null) {
-                    popout_tab_requested (qc.active_tab);
-                }
-            });
-            controls_box.append (popout_btn);
-
             var move_btn = new Gtk.MenuButton () {
                 icon_name = "view-more-symbolic",
-                tooltip_text = "Move Active Tab to Another Quadrant..."
+                tooltip_text = "Pane Options (Minimize, Pop Out, Move)"
             };
             move_btn.add_css_class ("flat");
             move_btn.add_css_class ("DockControlBtn");
@@ -108,6 +72,38 @@ namespace Imladris.UI {
             var pop_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
                 margin_start = 6, margin_end = 6, margin_top = 6, margin_bottom = 6
             };
+
+            var min_item = new Gtk.Button.with_label ("Minimize Pane") { halign = Gtk.Align.START };
+            min_item.add_css_class ("flat");
+            min_item.clicked.connect (() => {
+                popover.popdown ();
+                dock_state.toggle_minimize (quad_id);
+            });
+            pop_box.append (min_item);
+
+            var popout_item = new Gtk.Button.with_label ("Pop Out to Window") { halign = Gtk.Align.START };
+            popout_item.add_css_class ("flat");
+            popout_item.clicked.connect (() => {
+                popover.popdown ();
+                var qc = dock_state.quadrants.get (quad_id);
+                if (qc != null && qc.active_tab != null) {
+                    popout_tab_requested (qc.active_tab);
+                }
+            });
+            pop_box.append (popout_item);
+
+            if (quad_id == QuadrantId.Q3_TOP_RIGHT) {
+                var reset_item = new Gtk.Button.with_label ("Reset 4-Pane Layout") { halign = Gtk.Align.START };
+                reset_item.add_css_class ("flat");
+                reset_item.clicked.connect (() => {
+                    popover.popdown ();
+                    dock_state.reset_to_default ();
+                    dock_state.save_to_disk ();
+                });
+                pop_box.append (reset_item);
+            }
+
+            pop_box.append (new Gtk.Separator (Gtk.Orientation.HORIZONTAL));
             pop_box.append (new Gtk.Label ("Move active tab to:") { css_classes = { "dim-label", "caption" }, xalign = 0 });
 
             QuadrantId[] dest_qids = { QuadrantId.Q1_TOP_LEFT, QuadrantId.Q2_BOTTOM_LEFT, QuadrantId.Q3_TOP_RIGHT, QuadrantId.Q4_BOTTOM_RIGHT };
@@ -115,13 +111,14 @@ namespace Imladris.UI {
 
             for (int d = 0; d < dest_qids.length; d++) {
                 var target_qid = dest_qids[d];
+                if (target_qid == quad_id) continue;
                 string tname = dest_labels[d];
                 var b = new Gtk.Button.with_label (tname) { halign = Gtk.Align.START };
                 b.add_css_class ("flat");
                 b.clicked.connect (() => {
                     popover.popdown ();
                     var qc = dock_state.quadrants.get (quad_id);
-                    if (qc != null && qc.active_tab != null && target_qid != quad_id) {
+                    if (qc != null && qc.active_tab != null) {
                         dock_state.move_tab (quad_id, target_qid, qc.active_tab);
                     }
                 });

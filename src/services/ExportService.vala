@@ -14,7 +14,7 @@ namespace Imladris.Services {
             }
 
             try {
-                var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
+                var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_SILENCE | GLib.SubprocessFlags.STDERR_SILENCE);
                 Core.PlatformUtils.inject_galaxy_credentials (launcher);
                 launcher.set_cwd (working_dir);
 
@@ -112,26 +112,7 @@ namespace Imladris.Services {
                 }
 
                 if (pptx_ready) {
-                    try {
-                        string[] raw_lo_argv = { soffice_bin, "--headless", "--convert-to", "odp", tmp_pptx, "--outdir", out_dir };
-                        string[] lo_argv = Core.PlatformUtils.build_host_command (raw_lo_argv, out_dir);
-                        var lo_proc = new GLib.Subprocess.newv (lo_argv, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
-                        if (lo_proc.wait_check ()) {
-                            string converted_name = GLib.Path.get_basename (tmp_pptx);
-                            if (converted_name.has_suffix (".pptx")) {
-                                converted_name = converted_name.substring (0, converted_name.length - 5) + ".odp";
-                            }
-                            string converted_path = GLib.Path.build_filename (out_dir, converted_name);
-                            if (GLib.FileUtils.test (converted_path, GLib.FileTest.EXISTS)) {
-                                var src_f = GLib.File.new_for_path (converted_path);
-                                var dst_f = GLib.File.new_for_path (output_path);
-                                src_f.move (dst_f, GLib.FileCopyFlags.OVERWRITE, null, null);
-                                bridge_succeeded = true;
-                            }
-                        }
-                    } catch (GLib.Error e) {
-                        bridge_succeeded = false;
-                    }
+                    bridge_succeeded = convert_with_libreoffice (soffice_bin, tmp_pptx, "odp", out_dir, output_path);
                 }
 
                 if (GLib.FileUtils.test (tmp_pptx, GLib.FileTest.EXISTS)) {
@@ -310,24 +291,7 @@ namespace Imladris.Services {
                     );
                     export_to_odt (actual_input, tmp_odt, raw_buffer_fallback);
                     if (GLib.FileUtils.test (tmp_odt, GLib.FileTest.EXISTS)) {
-                        try {
-                            string[] raw_lo_argv = { soffice_bin, "--headless", "--convert-to", "pdf", tmp_odt, "--outdir", out_dir };
-                            string[] lo_argv = Core.PlatformUtils.build_host_command (raw_lo_argv, out_dir);
-                            var lo_proc = new GLib.Subprocess.newv (lo_argv, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
-                            if (lo_proc.wait_check ()) {
-                                string converted_name = GLib.Path.get_basename (tmp_odt);
-                                if (converted_name.has_suffix (".odt")) {
-                                    converted_name = converted_name.substring (0, converted_name.length - 4) + ".pdf";
-                                }
-                                string converted_path = GLib.Path.build_filename (out_dir, converted_name);
-                                if (GLib.FileUtils.test (converted_path, GLib.FileTest.EXISTS)) {
-                                    var src_f = GLib.File.new_for_path (converted_path);
-                                    var dst_f = GLib.File.new_for_path (output_path);
-                                    src_f.move (dst_f, GLib.FileCopyFlags.OVERWRITE, null, null);
-                                    cli_succeeded = true;
-                                }
-                            }
-                        } catch (GLib.Error e) {}
+                        cli_succeeded = convert_with_libreoffice (soffice_bin, tmp_odt, "pdf", out_dir, output_path);
                         GLib.FileUtils.remove (tmp_odt);
                     }
                 }
@@ -558,6 +522,33 @@ namespace Imladris.Services {
             sb.append ("      </draw:page>\n");
         }
 
+        private static bool convert_with_libreoffice (string soffice_bin, string input_file, string target_ext, string out_dir, string output_path) {
+            try {
+                string[] raw_lo_argv = { soffice_bin, "--headless", "--convert-to", target_ext, input_file, "--outdir", out_dir };
+                string[] lo_argv = Core.PlatformUtils.build_host_command (raw_lo_argv, out_dir);
+                var lo_proc = new GLib.Subprocess.newv (lo_argv, GLib.SubprocessFlags.STDOUT_SILENCE | GLib.SubprocessFlags.STDERR_SILENCE);
+                if (lo_proc.wait_check ()) {
+                    string converted_name = GLib.Path.get_basename (input_file);
+                    int dot_idx = converted_name.last_index_of_char ('.');
+                    if (dot_idx > 0) {
+                        converted_name = converted_name.substring (0, dot_idx) + "." + target_ext;
+                    } else {
+                        converted_name = converted_name + "." + target_ext;
+                    }
+                    string converted_path = GLib.Path.build_filename (out_dir, converted_name);
+                    if (GLib.FileUtils.test (converted_path, GLib.FileTest.EXISTS)) {
+                        var src_f = GLib.File.new_for_path (converted_path);
+                        var dst_f = GLib.File.new_for_path (output_path);
+                        src_f.move (dst_f, GLib.FileCopyFlags.OVERWRITE, null, null);
+                        return true;
+                    }
+                }
+            } catch (GLib.Error e) {
+                GLib.debug ("LibreOffice conversion to %s failed: %s", target_ext, e.message);
+            }
+            return false;
+        }
+
         private static void package_oasis_zip (string mimetype, string content_xml, string output_path) throws GLib.Error {
             string styles_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -578,18 +569,33 @@ namespace Imladris.Services {
 </manifest:manifest>
 """.printf (mimetype);
 
-            string py_packer = """import sys, zipfile
-out_path, mime, content_xml, styles_xml, manifest_xml = sys.argv[1:6]
-with zipfile.ZipFile(out_path, 'w') as zf:
-    zf.writestr('mimetype', mime, compress_type=zipfile.ZIP_STORED)
-    zf.writestr('content.xml', content_xml, compress_type=zipfile.ZIP_DEFLATED)
-    zf.writestr('styles.xml', styles_xml, compress_type=zipfile.ZIP_DEFLATED)
-    zf.writestr('META-INF/manifest.xml', manifest_xml, compress_type=zipfile.ZIP_DEFLATED)
+            string py_packer = """import json, sys, zipfile
+payload = json.load(sys.stdin)
+with zipfile.ZipFile(payload['out_path'], 'w') as zf:
+    zf.writestr('mimetype', payload['mime'], compress_type=zipfile.ZIP_STORED)
+    zf.writestr('content.xml', payload['content_xml'], compress_type=zipfile.ZIP_DEFLATED)
+    zf.writestr('styles.xml', payload['styles_xml'], compress_type=zipfile.ZIP_DEFLATED)
+    zf.writestr('META-INF/manifest.xml', payload['manifest_xml'], compress_type=zipfile.ZIP_DEFLATED)
 """;
 
-            string[] argv = { "python3", "-c", py_packer, output_path, mimetype, content_xml, styles_xml, manifest_xml };
-            var proc = new GLib.Subprocess.newv (argv, GLib.SubprocessFlags.STDOUT_SILENCE | GLib.SubprocessFlags.STDERR_PIPE);
-            proc.wait_check ();
+            var jb = new Json.Builder ();
+            jb.begin_object ();
+            jb.set_member_name ("out_path"); jb.add_string_value (output_path);
+            jb.set_member_name ("mime"); jb.add_string_value (mimetype);
+            jb.set_member_name ("content_xml"); jb.add_string_value (content_xml);
+            jb.set_member_name ("styles_xml"); jb.add_string_value (styles_xml);
+            jb.set_member_name ("manifest_xml"); jb.add_string_value (manifest_xml);
+            jb.end_object ();
+            var gen = new Json.Generator ();
+            gen.set_root (jb.get_root ());
+            string stdin_json = gen.to_data (null);
+
+            string[] argv = { "python3", "-c", py_packer };
+            var proc = new GLib.Subprocess.newv (argv, GLib.SubprocessFlags.STDIN_PIPE | GLib.SubprocessFlags.STDOUT_SILENCE | GLib.SubprocessFlags.STDERR_SILENCE);
+            proc.communicate_utf8 (stdin_json, null, null, null);
+            if (!proc.get_successful ()) {
+                throw new IOError.FAILED ("Failed to package OASIS ZIP archive");
+            }
         }
     }
 }

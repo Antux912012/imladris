@@ -10,6 +10,8 @@ finish-args:
   - --socket=wayland
   - --device=dri
   - --filesystem=home
+  - --env=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
+  - --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
   - --talk-name=org.freedesktop.Flatpak
 cleanup:
   - /include
@@ -23,4 +25,4 @@ modules:
     sources:
       - type: git
         url: https://github.com/Antux912012/imladris.git
-        tag: v0.17.0
+        tag: v0.23.0

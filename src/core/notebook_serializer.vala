@@ -275,22 +275,29 @@ namespace Imladris.Core {
             string current_cell_id = "";
             var current_source = new StringBuilder ();
             bool in_yaml_frontmatter = false;
-            int yaml_marker_count = 0;
+            bool has_closed_yaml = false;
+            if (lines.length > 1 && lines[0].strip () == "---") {
+                int scan_limit = int.min (lines.length, 60);
+                for (int j = 1; j < scan_limit; j++) {
+                    if (lines[j].strip () == "---") {
+                        has_closed_yaml = true;
+                        break;
+                    }
+                }
+            }
 
             for (int i = 0; i < lines.length; i++) {
                 string line = lines[i];
                 string trimmed = line.strip ();
 
                 // Filter out Quarto / Jupyter YAML Frontmatter markers
-                if (i == 0 && trimmed == "---") {
+                if (i == 0 && trimmed == "---" && has_closed_yaml) {
                     in_yaml_frontmatter = true;
-                    yaml_marker_count++;
                     continue;
                 }
                 if (in_yaml_frontmatter) {
                     if (trimmed == "---") {
                         in_yaml_frontmatter = false;
-                        yaml_marker_count++;
                         continue;
                     }
                     if (trimmed.has_prefix ("language:")) {

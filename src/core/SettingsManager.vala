@@ -120,7 +120,8 @@ namespace Imladris.Core {
                 case OPENGL:
                 case AUTO_GPU:
                 default:
-                    return (Gtk.get_minor_version () >= 14) ? "ngl" : "gl";
+                    uint minor = Gtk.get_minor_version ();
+                    return (minor >= 14 && minor < 18) ? "ngl" : "gl";
             }
         }
 
@@ -334,6 +335,7 @@ namespace Imladris.Core {
         public signal void accent_color_changed (GnomeAccent accent);
         public signal void ai_settings_changed ();
         public signal void physics_changed ();
+        public signal void ui_settings_changed ();
 
         private bool _elrond_enabled = false;
         private AiAssistanceLevel _elrond_level = AiAssistanceLevel.MEDIUM;
@@ -350,6 +352,9 @@ namespace Imladris.Core {
         private GpuRendererBackend _gpu_backend = GpuRendererBackend.AUTO_GPU;
         private AnimationPhysicsMode _animation_physics = AnimationPhysicsMode.ALACRITTY_CRISP;
         private bool _steady_cursor = true;
+        private bool _show_ribbon_toolbar = true;
+        private bool _show_status_bar = true;
+        private int _default_zoom_percent = 100;
         private KeyFile config_keyfile = new KeyFile ();
         private string config_ini_path = "";
 
@@ -479,6 +484,40 @@ namespace Imladris.Core {
                     _custom_model_path = value;
                     save_ini ();
                     ai_settings_changed ();
+                }
+            }
+        }
+
+        public bool show_ribbon_toolbar {
+            get { return _show_ribbon_toolbar; }
+            set {
+                if (_show_ribbon_toolbar != value) {
+                    _show_ribbon_toolbar = value;
+                    save_ini ();
+                    ui_settings_changed ();
+                }
+            }
+        }
+
+        public bool show_status_bar {
+            get { return _show_status_bar; }
+            set {
+                if (_show_status_bar != value) {
+                    _show_status_bar = value;
+                    save_ini ();
+                    ui_settings_changed ();
+                }
+            }
+        }
+
+        public int default_zoom_percent {
+            get { return _default_zoom_percent; }
+            set {
+                int clamped = value.clamp (50, 200);
+                if (_default_zoom_percent != clamped) {
+                    _default_zoom_percent = clamped;
+                    save_ini ();
+                    ui_settings_changed ();
                 }
             }
         }
@@ -672,6 +711,15 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("Hardware", "animation_physics")) {
                         _animation_physics = (AnimationPhysicsMode) config_keyfile.get_integer ("Hardware", "animation_physics");
                     }
+                    if (config_keyfile.has_key ("Workspace", "show_ribbon_toolbar")) {
+                        _show_ribbon_toolbar = config_keyfile.get_boolean ("Workspace", "show_ribbon_toolbar");
+                    }
+                    if (config_keyfile.has_key ("Workspace", "show_status_bar")) {
+                        _show_status_bar = config_keyfile.get_boolean ("Workspace", "show_status_bar");
+                    }
+                    if (config_keyfile.has_key ("Workspace", "default_zoom_percent")) {
+                        _default_zoom_percent = config_keyfile.get_integer ("Workspace", "default_zoom_percent").clamp (50, 200);
+                    }
                     if (config_keyfile.has_key ("Hardware", "steady_cursor")) {
                         _steady_cursor = config_keyfile.get_boolean ("Hardware", "steady_cursor");
                     }
@@ -702,6 +750,9 @@ namespace Imladris.Core {
                 config_keyfile.set_integer ("Hardware", "gpu_backend", (int) _gpu_backend);
                 config_keyfile.set_integer ("Hardware", "animation_physics", (int) _animation_physics);
                 config_keyfile.set_boolean ("Hardware", "steady_cursor", _steady_cursor);
+                config_keyfile.set_boolean ("Workspace", "show_ribbon_toolbar", _show_ribbon_toolbar);
+                config_keyfile.set_boolean ("Workspace", "show_status_bar", _show_status_bar);
+                config_keyfile.set_integer ("Workspace", "default_zoom_percent", _default_zoom_percent);
                 FileUtils.set_contents (config_ini_path, config_keyfile.to_data ());
             } catch (Error e) {}
         }

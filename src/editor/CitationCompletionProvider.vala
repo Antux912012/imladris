@@ -140,19 +140,20 @@ namespace Imladris.Editor {
             string query = line_prefix.substring (at_idx + 1).strip ();
             bool inside_brackets = (at_idx > 0 && line_prefix[at_idx - 1] == '[');
 
-            // Read references.bib content if available
+            // Read references.bib content asynchronously if available
             string? fallback_bib = null;
             if (doc_page != null) {
                 string pdir = doc_page.current_project_dir;
                 if (pdir != "") {
                     string bib_path = GLib.Path.build_filename (pdir, "references.bib");
                     var f = GLib.File.new_for_path (bib_path);
-                    if (f.query_exists ()) {
-                        try {
-                            uint8[] data;
-                            f.load_contents (null, out data, null);
-                            fallback_bib = (string) data;
-                        } catch (GLib.Error e) {}
+                    try {
+                        uint8[] data;
+                        string? etag = null;
+                        yield f.load_contents_async (cancellable, out data, out etag);
+                        fallback_bib = Core.PlatformUtils.data_to_string (data);
+                    } catch (GLib.Error e) {
+                        // references.bib missing or cancelled
                     }
                 }
             }

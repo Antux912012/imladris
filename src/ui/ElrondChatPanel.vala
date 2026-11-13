@@ -43,8 +43,10 @@ namespace Imladris.UI {
         private Gtk.Label status_indicator;
 
         private Gtk.ToggleButton chip_active_file;
+        private Gtk.ToggleButton chip_selection;
         private Gtk.ToggleButton chip_dataframes;
         private Gtk.ToggleButton chip_last_error;
+        private Gtk.Button provider_pill_btn;
 
         private unowned DocumentPage doc_page;
         private unowned PersistentPanelRegistry panel_reg;
@@ -88,7 +90,7 @@ namespace Imladris.UI {
             };
             header.append (title);
 
-            status_indicator = new Gtk.Label ("Local Copilot") {
+            status_indicator = new Gtk.Label ("Ready") {
                 css_classes = { "dim-label", "caption" },
                 margin_start = 4
             };
@@ -102,6 +104,22 @@ namespace Imladris.UI {
             header.append (generating_spinner);
 
             header.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
+
+            provider_pill_btn = new Gtk.Button.with_label (get_active_backend_label ()) {
+                tooltip_text = "Active AI Backend — Click to configure"
+            };
+            provider_pill_btn.add_css_class ("pill");
+            provider_pill_btn.add_css_class ("caption");
+            provider_pill_btn.clicked.connect (() => {
+                if (parent_window != null) {
+                    var dlg = new AiSettingsDialog ();
+                    dlg.closed.connect (() => {
+                        provider_pill_btn.label = get_active_backend_label ();
+                    });
+                    dlg.present (parent_window);
+                }
+            });
+            header.append (provider_pill_btn);
 
             var btn_clear = new Gtk.Button.from_icon_name ("edit-clear-all-symbolic") {
                 tooltip_text = "Clear Chat History"
@@ -138,23 +156,30 @@ namespace Imladris.UI {
             };
             chips_box.append (lbl);
 
-            chip_active_file = new Gtk.ToggleButton.with_label ("+ Active File") {
+            chip_active_file = new Gtk.ToggleButton.with_label ("Active File") {
                 active = true,
-                tooltip_text = "Feed active document text into AI context"
+                tooltip_text = "Include active document text in AI context"
             };
             chip_active_file.add_css_class ("suggested-chip");
             chips_box.append (chip_active_file);
 
-            chip_dataframes = new Gtk.ToggleButton.with_label ("+ Dataframes") {
+            chip_selection = new Gtk.ToggleButton.with_label ("Selection") {
                 active = true,
-                tooltip_text = "Feed active dataframe columns & shapes into AI context"
+                tooltip_text = "Prioritize currently selected code or text"
+            };
+            chip_selection.add_css_class ("suggested-chip");
+            chips_box.append (chip_selection);
+
+            chip_dataframes = new Gtk.ToggleButton.with_label ("Data") {
+                active = true,
+                tooltip_text = "Include active environment variables & dataframes in AI context"
             };
             chip_dataframes.add_css_class ("suggested-chip");
             chips_box.append (chip_dataframes);
 
-            chip_last_error = new Gtk.ToggleButton.with_label ("+ Last Error") {
+            chip_last_error = new Gtk.ToggleButton.with_label ("Last Error") {
                 active = false,
-                tooltip_text = "Feed recent console execution errors to debug"
+                tooltip_text = "Include recent console errors to debug"
             };
             chip_last_error.add_css_class ("suggested-chip");
             chips_box.append (chip_last_error);
@@ -254,9 +279,43 @@ namespace Imladris.UI {
 
         private void add_welcome_message () {
             append_assistant_card (
-                "👋 Hello! I am **Elrond**, your local scientific AI assistant.\n\n" +
-                "I can write **R** (tidyverse, ggplot2), **Python** (pandas, scipy), and **Quarto** code, summarize dataframes, or debug errors. Ask me anything!"
+                "Hello! I'm **Elrond**, your scientific copilot.\n\n" +
+                "Ask me to write **R**, **Python**, or **Quarto** code, generate plots, or explain an error."
             );
+
+            // Starter prompt pills so newcomers can start with one click
+            var starter_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+                margin_start = 8,
+                margin_end = 8,
+                margin_top = 2,
+                margin_bottom = 4,
+                halign = Gtk.Align.START
+            };
+            string[] starters = {
+                "Summarize active file",
+                "Plot a dataset",
+                "Explain last error"
+            };
+            foreach (string s in starters) {
+                string starter_prompt = s;
+                var pill = new Gtk.Button.with_label (starter_prompt);
+                pill.add_css_class ("pill");
+                pill.add_css_class ("caption");
+                pill.clicked.connect (() => {
+                    if (starter_prompt == "Explain last error") {
+                        chip_last_error.active = true;
+                    }
+                    prompt_input.buffer.text = starter_prompt;
+                    send_prompt.begin ();
+                });
+                starter_row.append (pill);
+            }
+            var lb_row = new Gtk.ListBoxRow () {
+                selectable = false,
+                activatable = false,
+                child = starter_row
+            };
+            message_list.append (lb_row);
         }
 
         public void clear_chat_history () {
@@ -267,6 +326,20 @@ namespace Imladris.UI {
                 child = next;
             }
             add_welcome_message ();
+        }
+
+        public void submit_external_prompt (string prompt) {
+            if (is_busy || prompt.strip ().length == 0) return;
+            prompt_input.buffer.text = prompt.strip ();
+            send_prompt.begin ();
+        }
+
+        private string get_active_backend_label () {
+            if (ElrondEngineController.get_default ().is_ready) {
+                return "Elrond Local";
+            }
+            var cfg = Core.AiConfigManager.get_default ();
+            return cfg.active_provider.get_short_name ();
         }
 
         private async void send_prompt () {
@@ -288,6 +361,12 @@ namespace Imladris.UI {
 
             // Assemble context based on chips
             var context_sb = new GLib.StringBuilder ();
+            if (chip_selection.active) {
+                string sel = doc_page.get_selected_text ().strip ();
+                if (sel.length > 0) {
+                    context_sb.append_printf ("[Selected Text / Code]:\n%s\n\n", sel);
+                }
+            }
             if (chip_active_file.active) {
                 string doc_text = doc_page.source_buffer.text;
                 if (doc_text.length > 4000) {
@@ -296,14 +375,31 @@ namespace Imladris.UI {
                 context_sb.append_printf ("[Active File Content (%s)]:\n%s\n\n", doc_page.doc_type, doc_text);
             }
 
-            if (chip_dataframes.active) {
-                context_sb.append ("[Dataframe Schemas]:\nmtcars: 32 rows × 11 cols (mpg, cyl, disp, hp, drat, wt...)\n\n");
+            string env_summary = "";
+            if (chip_dataframes.active && panel_reg != null && panel_reg.environment_controller != null) {
+                var vars = panel_reg.environment_controller.get_cached_variables ();
+                if (vars.size > 0) {
+                    var sb_env = new GLib.StringBuilder ();
+                    int count = 0;
+                    foreach (var v in vars) {
+                        if (count > 0) sb_env.append (", ");
+                        sb_env.append (@"$(v.name) ($(v.var_type): $(v.dimensions))");
+                        count++;
+                        if (count >= 12) break;
+                    }
+                    env_summary = sb_env.str;
+                    context_sb.append_printf ("[Active Environment Objects]:\n%s\n\n", env_summary);
+                }
             }
 
             if (chip_last_error.active) {
                 string console_text = doc_page.console_view.buffer.text;
                 if (console_text.contains ("Error") || console_text.contains ("✖")) {
-                    context_sb.append_printf ("[Recent Console Output]:\n%s\n\n", console_text.slice (-500, console_text.length));
+                    int start_idx = int.max (0, console_text.length - 500);
+                    while (start_idx > 0 && start_idx < console_text.length && (console_text[start_idx] & 0xC0) == 0x80) {
+                        start_idx++;
+                    }
+                    context_sb.append_printf ("[Recent Console Output]:\n%s\n\n", console_text.substring (start_idx));
                 }
             }
 
@@ -311,16 +407,25 @@ namespace Imladris.UI {
 
             try {
                 var controller = ElrondEngineController.get_default ();
+                var cfg = Core.AiConfigManager.get_default ();
+                var active_settings = cfg.get_settings_for (cfg.active_provider);
+                bool has_cloud_or_local_api = !cfg.active_provider.requires_api_key () ||
+                    (active_settings.api_key != null && active_settings.api_key.strip ().length > 0);
+
                 string response;
                 if (controller.is_ready) {
                     response = yield controller.write_with_elrond (
                         doc_page.doc_type,
                         chip_active_file.active ? doc_page.source_buffer.text : "",
-                        chip_dataframes.active ? "mtcars [32x11]" : "",
-                        prompt
+                        env_summary,
+                        combined_prompt
                     );
+                } else if (has_cloud_or_local_api) {
+                    var ai_client = new AiClient ();
+                    string sys_prompt = "You are Elrond AI, an expert scientific writing and data science copilot inside Imladris (R, Python, Quarto, LaTeX, Biostats). Give concise, accurate answers with fenced ```r or ```python code blocks when helpful.";
+                    response = yield ai_client.send_chat_completion_async (sys_prompt, combined_prompt, cancellable);
                 } else {
-                    // Antigravity or demo reply
+                    // Antigravity or local fallback
                     response = yield ElrondEngineController.run_agy_prompt_async (combined_prompt, cancellable);
                 }
 
@@ -329,7 +434,7 @@ namespace Imladris.UI {
                 if (e is GLib.IOError.CANCELLED) {
                     append_assistant_card ("*Generation cancelled.*");
                 } else {
-                    append_assistant_card (@"⚠️ **Elrond Error:** $(e.message)\n\nPlease check your local server (Ollama, LM Studio, or agy) in AI Settings.");
+                    append_assistant_card (@"⚠️ **Elrond Error:** $(e.message)\n\nPlease check your active AI provider or local server in **AI Settings**.");
                 }
             } finally {
                 is_busy = false;
@@ -337,7 +442,8 @@ namespace Imladris.UI {
                 stop_btn.visible = false;
                 generating_spinner.spinning = false;
                 generating_spinner.visible = false;
-                status_indicator.label = "Local Copilot";
+                status_indicator.label = "Ready";
+                provider_pill_btn.label = get_active_backend_label ();
                 scroll_to_bottom ();
             }
         }
@@ -444,17 +550,32 @@ namespace Imladris.UI {
             }
         }
 
+        private string format_inline_markdown_to_pango (string raw) {
+            string escaped = GLib.Markup.escape_text (raw);
+            try {
+                var bold_rx = new GLib.Regex ("\\*\\*(.+?)\\*\\*");
+                escaped = bold_rx.replace (escaped, -1, 0, "<b>\\1</b>");
+                var code_rx = new GLib.Regex ("`([^`]+?)`");
+                escaped = code_rx.replace (escaped, -1, 0, "<tt>\\1</tt>");
+            } catch (GLib.Error e) {
+                return GLib.Markup.escape_text (raw);
+            }
+            return escaped;
+        }
+
         private void add_text_label (Gtk.Box container, string text) {
             if (text.length == 0) return;
-            var lbl = new Gtk.Label (text) {
+            var lbl = new Gtk.Label (null) {
                 xalign = 0,
                 wrap = true,
                 wrap_mode = Pango.WrapMode.WORD_CHAR,
                 selectable = true,
+                use_markup = true,
                 margin_start = 8,
                 margin_end = 8,
                 margin_bottom = 4
             };
+            lbl.set_markup (format_inline_markdown_to_pango (text));
             container.append (lbl);
         }
 

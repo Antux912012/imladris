@@ -33,11 +33,19 @@
   <screenshots>
     <screenshot type="default">
       <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-screenshot.png</image>
-      <caption>Imladris polyglot scientific authoring workspace and notebook studio</caption>
+      <caption>Imladris 4-pane scientific workbench with redesigned Elrond AI copilot and live data inspection</caption>
+    </screenshot>
+    <screenshot>
+      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-welcome.png</image>
+      <caption>Streamlined progressive-disclosure welcome screen with Quick Start and template expander</caption>
     </screenshot>
     <screenshot>
       <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-ai-copilot.png</image>
-      <caption>Elrond AI copilot and agent harness integration with code synthesis and live assistance</caption>
+      <caption>Elrond inline code assistance popover with instant monospace preview and replacement</caption>
+    </screenshot>
+    <screenshot>
+      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-workspace.png</image>
+      <caption>Workspace and editor preferences with layout mode switching and toolbar customization</caption>
     </screenshot>
     <screenshot>
       <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-theming.png</image>
@@ -60,6 +68,22 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.23.0" date="2026-11-13">
+      <description>
+        <p>Release v0.23.0 delivers a comprehensive GNOME/Libadwaita interface overhaul, redesigned Elrond AI copilot and code assistance, new workspace customization options in Preferences, and rock-solid WebKitGTK 6.0 preview rendering:</p>
+        <ul>
+          <li>GNOME &amp; Libadwaita HIG Redesign: Streamlines the welcome view with progressive disclosure, providing high-visibility Quick Start cards (Quarto Notebook, R Script/Shiny, Open Folder) alongside a collapsible expander for specialized templates (.Rmd, .ipynb, .Rproj, .mallorn).</li>
+          <li>Zero-Chrome Distraction-Free Empty State: Automatically conceals toolbar ribbons, document tab bar, and bottom status bar on startup or when all tabs are closed, maximizing screen estate and visual clarity.</li>
+          <li>Redesigned Elrond AI Copilot: Features a new active provider status pill in the chat header, multi-context chips (Active File, Selection, Data, Last Error), formatted inline Markdown with Pango markup, and interactive code action cards (Insert at Cursor, Run in Console, Copy).</li>
+          <li>Unified Local &amp; Cloud AI Engine: Automatically routes prompts through local ElrondEngineController when available, seamlessly falling back to configured cloud providers (Gemini, Claude, OpenAI, DeepSeek, Kimi, Qwen, Ollama, LM Studio) or Antigravity harnesses.</li>
+          <li>Preview-First Inline Assistance: Re-engineers the Ctrl+Shift+E editor prompt popover with quick-action pills (Fix &amp; Clean, Add Comments, Explain, R Plot) and a live monospace preview box with one-click Replace Selection or Insert at Cursor.</li>
+          <li>Decluttered 4-Pane Workbench Dock: Replaces crowded quadrant header buttons with clean maximize and overflow popover menus for minimizing, undocking, and quadrant rearrangement.</li>
+          <li>Preferences Workspace Controls: Adds dedicated settings for 4-Pane Studio vs. Focus Mode layout, ribbon toolbar visibility, bottom status bar visibility, and default editor zoom percentage with live-updating compact zoom controls.</li>
+          <li>WebKitGTK 6.0 Preview Stability: Eliminates blank preview panes across Wayland and GTK 4.18+ through DMABUF fallback handling, GL renderer standardization, ONDEMAND GPU policy, and base URI resolution.</li>
+          <li>Performance &amp; Memory Safety: Resolves GLib.Bytes slice boundaries, asynchronous FIFO command queue deadlocks, and GObject singleton signal handler leaks.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.22.0" date="2026-11-12">
       <description>
         <p>Release v0.22.0 introduces hardware-accelerated rendering and a comprehensive GNOME/Libadwaita interface overhaul:</p>

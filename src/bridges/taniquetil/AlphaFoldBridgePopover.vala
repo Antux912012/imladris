@@ -294,7 +294,7 @@ namespace Imladris.Bridges.Taniquetil {
                     throw new TaniquetilError.NETWORK_ERROR (@"Server error (HTTP $status).");
                 }
 
-                string json_text = (string) bytes.get_data ();
+                string json_text = Core.PlatformUtils.bytes_to_string (bytes);
                 var parser = new Json.Parser ();
                 parser.load_from_data (json_text, -1);
 

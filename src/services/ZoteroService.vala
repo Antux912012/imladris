@@ -38,6 +38,12 @@ namespace Imladris.Services {
             return instance;
         }
 
+        private static GLib.Regex? reg_year_cache = null;
+        private static GLib.Regex? reg_yaml_cache = null;
+        private static GLib.Regex? reg_bib_check_cache = null;
+        private static GLib.Regex? reg_entry_cache = null;
+        private static GLib.HashTable<string, GLib.Regex>? reg_field_cache = null;
+
         public ZoteroService () {
             session = new Soup.Session () {
                 timeout = 2
@@ -52,7 +58,7 @@ namespace Imladris.Services {
                 var msg = new Soup.Message ("GET", @"$base_url/connector/ping");
                 var bytes = yield session.send_and_read_async (msg, Priority.DEFAULT, null);
                 if (msg.status_code == 200 && bytes != null) {
-                    string txt = (string) bytes.get_data ();
+                    string txt = Core.PlatformUtils.bytes_to_string (bytes);
                     return "Zotero is running" in txt;
                 }
             } catch (GLib.Error e) {
@@ -143,7 +149,7 @@ namespace Imladris.Services {
                 throw new IOError.FAILED (@"BBT HTTP error $(msg.status_code)");
             }
 
-            string resp_str = (string) bytes.get_data ();
+            string resp_str = Core.PlatformUtils.bytes_to_string (bytes);
             var parser = new Json.Parser ();
             parser.load_from_data (resp_str, -1);
             var root = parser.get_root ();
@@ -232,7 +238,7 @@ namespace Imladris.Services {
                 throw new IOError.FAILED (@"Native Zotero API error: $(msg.status_code)");
             }
 
-            string resp_str = (string) bytes.get_data ();
+            string resp_str = Core.PlatformUtils.bytes_to_string (bytes);
             var parser = new Json.Parser ();
             parser.load_from_data (resp_str, -1);
             var root = parser.get_root ();
@@ -268,9 +274,11 @@ namespace Imladris.Services {
                 string date_str = data.has_member ("date") ? data.get_string_member ("date") : "";
                 string year = "nd";
                 try {
-                    var reg_year = new Regex ("\\b(19|20)\\d{2}\\b");
+                    if (reg_year_cache == null) {
+                        reg_year_cache = new Regex ("\\b(19|20)\\d{2}\\b");
+                    }
                     MatchInfo mi;
-                    if (reg_year.match (date_str, 0, out mi)) {
+                    if (reg_year_cache.match (date_str, 0, out mi)) {
                         year = mi.fetch (0);
                     }
                 } catch (RegexError e) {}
@@ -302,7 +310,7 @@ namespace Imladris.Services {
                 var msg = new Soup.Message ("GET", url);
                 var bytes = yield custom_session.send_and_read_async (msg, Priority.DEFAULT, null);
                 if (msg.status_code == 200 && bytes != null) {
-                    string str = ((string) bytes.get_data ()).strip ();
+                    string str = Core.PlatformUtils.bytes_to_string (bytes).strip ();
                     return str.length > 0 ? str : null;
                 }
             } catch (GLib.Error e) {
@@ -348,7 +356,7 @@ namespace Imladris.Services {
                 throw new IOError.FAILED (@"Failed to export BibTeX: $(msg.status_code)");
             }
 
-            string resp_str = (string) bytes.get_data ();
+            string resp_str = Core.PlatformUtils.bytes_to_string (bytes);
             var parser = new Json.Parser ();
             parser.load_from_data (resp_str, -1);
             var root = parser.get_root ();
@@ -391,20 +399,24 @@ namespace Imladris.Services {
          */
         public string ensure_yaml_bibliography (string document_text, string bib_filename = "references.bib") {
             try {
-                var yaml_reg = new Regex ("^---\\r?\\n([\\s\\S]*?)\\r?\\n---");
+                if (reg_yaml_cache == null) {
+                    reg_yaml_cache = new Regex ("^---\\r?\\n([\\s\\S]*?)\\r?\\n---");
+                }
                 MatchInfo mi;
-                if (!yaml_reg.match (document_text, 0, out mi)) {
+                if (!reg_yaml_cache.match (document_text, 0, out mi)) {
                     return @"---\nbibliography: $bib_filename\n---\n\n$document_text";
                 }
 
                 string yaml_content = mi.fetch (1);
-                var bib_check = new Regex ("^bibliography\\s*:", RegexCompileFlags.MULTILINE);
-                if (bib_check.match (yaml_content)) {
+                if (reg_bib_check_cache == null) {
+                    reg_bib_check_cache = new Regex ("^bibliography\\s*:", RegexCompileFlags.MULTILINE);
+                }
+                if (reg_bib_check_cache.match (yaml_content)) {
                     return document_text;
                 }
 
                 string updated_yaml = @"---\n$yaml_content\nbibliography: $bib_filename\n---";
-                return yaml_reg.replace_literal (document_text, document_text.length, 0, updated_yaml);
+                return reg_yaml_cache.replace_literal (document_text, document_text.length, 0, updated_yaml);
             } catch (RegexError e) {
                 return document_text;
             }
@@ -416,11 +428,13 @@ namespace Imladris.Services {
         public Gee.ArrayList<CitationItem> search_offline_bib (string query, string bib_content) {
             var entries = new Gee.ArrayList<CitationItem> ();
             try {
-                var entry_reg = new Regex ("@([a-zA-Z]+)\\s*\\{\\s*([^,\\s]+)\\s*,([\\s\\S]*?)(?=\\n@[a-zA-Z]+\\s*\\{|\\s*$)");
+                if (reg_entry_cache == null) {
+                    reg_entry_cache = new Regex ("@([a-zA-Z]+)\\s*\\{\\s*([^,\\s]+)\\s*,([\\s\\S]*?)(?=\\n@[a-zA-Z]+\\s*\\{|\\s*$)");
+                }
                 MatchInfo mi;
                 string lower_q = query.down ();
 
-                if (entry_reg.match (bib_content, 0, out mi)) {
+                if (reg_entry_cache.match (bib_content, 0, out mi)) {
                     while (mi.matches ()) {
                         string citekey = mi.fetch (2).strip ();
                         string body = mi.fetch (3);
@@ -462,9 +476,11 @@ namespace Imladris.Services {
             if (bib_file.query_exists ()) {
                 try {
                     uint8[] data;
-                    bib_file.load_contents (null, out data, null);
-                    existing_bib = (string) data;
-                } catch (GLib.Error e) {}
+                    yield bib_file.load_contents_async (null, out data, null);
+                    existing_bib = Core.PlatformUtils.data_to_string (data);
+                } catch (GLib.Error e) {
+                    GLib.debug ("sync_citation_to_project_async read failed: %s", e.message);
+                }
             }
 
             try {
@@ -485,7 +501,14 @@ namespace Imladris.Services {
 
         private string? extract_bib_field (string entry_body, string field_name) {
             try {
-                var reg = new Regex (@"$field_name\\s*=\\s*(?:\\{([\\s\\S]*?)\\}|\"([\\s\\S]*?)\"|(\\d+))", RegexCompileFlags.CASELESS);
+                if (reg_field_cache == null) {
+                    reg_field_cache = new GLib.HashTable<string, GLib.Regex> (str_hash, str_equal);
+                }
+                var reg = reg_field_cache.lookup (field_name);
+                if (reg == null) {
+                    reg = new Regex (@"$field_name\\s*=\\s*(?:\\{([\\s\\S]*?)\\}|\"([\\s\\S]*?)\"|(\\d+))", RegexCompileFlags.CASELESS);
+                    reg_field_cache.insert (field_name, reg);
+                }
                 MatchInfo mi;
                 if (reg.match (entry_body, 0, out mi)) {
                     for (int g = 1; g <= 3; g++) {

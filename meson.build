@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.22.0',
+  version: '0.23.0',
   default_options: ['warning_level=1']
 )
 
@@ -267,6 +267,8 @@ test('dock_environment_tests', dock_test_exe, timeout: 30)
 zotero_test_sources = files(
   'tests/test_zotero_service.vala',
   'src/services/ZoteroService.vala',
+  'src/core/PlatformUtils.vala',
+  'src/core/ToolchainManager.vala',
 )
 
 zotero_test_exe = executable('test_zotero_service',

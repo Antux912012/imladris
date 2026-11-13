@@ -777,16 +777,36 @@ namespace Imladris.Core {
             };
 
             try {
-                for (int i = 0; i < tokens.length[0]; i++) {
-                    string word = tokens[i, 0];
-                    string repl = tokens[i, 1].replace ("\\", "\\\\");
-                    var rx = new GLib.Regex (@"(?<!\\\\)\\b$word\\b");
-                    s = rx.replace (s, -1, 0, repl);
+                if (rx_math_tokens == null || map_math_tokens == null) {
+                    map_math_tokens = new GLib.HashTable<string, string> (str_hash, str_equal);
+                    var pat = new GLib.StringBuilder ("(?<!\\\\)\\b(");
+                    for (int i = 0; i < tokens.length[0]; i++) {
+                        if (i > 0) pat.append_c ('|');
+                        pat.append (GLib.Regex.escape_string (tokens[i, 0]));
+                        map_math_tokens.insert (tokens[i, 0], tokens[i, 1]);
+                    }
+                    pat.append (")\\b");
+                    rx_math_tokens = new GLib.Regex (pat.str);
                 }
+                s = rx_math_tokens.replace_eval (s, -1, 0, 0, (mi, res) => {
+                    string key = mi.fetch (1);
+                    string? val = map_math_tokens.lookup (key);
+                    res.append (val ?? key);
+                    return false;
+                });
             } catch (GLib.RegexError e) {}
 
             return s;
         }
+
+        private static GLib.Regex? rx_math_tokens = null;
+        private static GLib.HashTable<string, string>? map_math_tokens = null;
+        private static GLib.Regex? rx_greek_unicode = null;
+        private static GLib.HashTable<string, string>? map_greek_unicode = null;
+        private static GLib.Regex? rx_exp_grp = null;
+        private static GLib.Regex? rx_sub_grp = null;
+        private static GLib.Regex? rx_exp_simple = null;
+        private static GLib.Regex? rx_sub_simple = null;
 
         // =====================================================================
         // NATURAL CHEMISTRY TO LATEX & MHCHEM CONVERTER
@@ -1164,37 +1184,48 @@ namespace Imladris.Core {
             };
 
             try {
-                for (int i = 0; i < greek_unicode.length[0]; i++) {
-                    string word = greek_unicode[i, 0];
-                    string sym = greek_unicode[i, 1];
-                    var rx = new GLib.Regex (@"\\b$word\\b");
-                    s = rx.replace (s, -1, 0, sym);
+                if (rx_greek_unicode == null || map_greek_unicode == null) {
+                    map_greek_unicode = new GLib.HashTable<string, string> (str_hash, str_equal);
+                    var pat = new GLib.StringBuilder ("\\b(");
+                    for (int i = 0; i < greek_unicode.length[0]; i++) {
+                        if (i > 0) pat.append_c ('|');
+                        pat.append (GLib.Regex.escape_string (greek_unicode[i, 0]));
+                        map_greek_unicode.insert (greek_unicode[i, 0], greek_unicode[i, 1]);
+                    }
+                    pat.append (")\\b");
+                    rx_greek_unicode = new GLib.Regex (pat.str);
                 }
+                s = rx_greek_unicode.replace_eval (s, -1, 0, 0, (mi, res) => {
+                    string key = mi.fetch (1);
+                    string? val = map_greek_unicode.lookup (key);
+                    res.append (val ?? key);
+                    return false;
+                });
 
                 // Convert ^(...) and _(...)
-                var exp_grp = new GLib.Regex ("\\^\\(([^\\)]+)\\)");
-                s = exp_grp.replace_eval (s, -1, 0, 0, (mi, res) => {
+                if (rx_exp_grp == null) rx_exp_grp = new GLib.Regex ("\\^\\(([^\\)]+)\\)");
+                s = rx_exp_grp.replace_eval (s, -1, 0, 0, (mi, res) => {
                     string val = mi.fetch (1);
                     res.append (use_unicode_digits ? to_unicode_superscript (val) : @"^$val^");
                     return false;
                 });
 
-                var sub_grp = new GLib.Regex ("_\\(([^\\)]+)\\)");
-                s = sub_grp.replace_eval (s, -1, 0, 0, (mi, res) => {
+                if (rx_sub_grp == null) rx_sub_grp = new GLib.Regex ("_\\(([^\\)]+)\\)");
+                s = rx_sub_grp.replace_eval (s, -1, 0, 0, (mi, res) => {
                     string val = mi.fetch (1);
                     res.append (use_unicode_digits ? to_unicode_subscript (val) : @"~$val~");
                     return false;
                 });
 
-                var exp_simple = new GLib.Regex ("\\^([+-]?[a-zA-Z0-9]+)");
-                s = exp_simple.replace_eval (s, -1, 0, 0, (mi, res) => {
+                if (rx_exp_simple == null) rx_exp_simple = new GLib.Regex ("\\^([+-]?[a-zA-Z0-9]+)");
+                s = rx_exp_simple.replace_eval (s, -1, 0, 0, (mi, res) => {
                     string val = mi.fetch (1);
                     res.append (use_unicode_digits ? to_unicode_superscript (val) : @"^$val^");
                     return false;
                 });
 
-                var sub_simple = new GLib.Regex ("_([a-zA-Z0-9]+)");
-                s = sub_simple.replace_eval (s, -1, 0, 0, (mi, res) => {
+                if (rx_sub_simple == null) rx_sub_simple = new GLib.Regex ("_([a-zA-Z0-9]+)");
+                s = rx_sub_simple.replace_eval (s, -1, 0, 0, (mi, res) => {
                     string val = mi.fetch (1);
                     res.append (use_unicode_digits ? to_unicode_subscript (val) : @"~$val~");
                     return false;

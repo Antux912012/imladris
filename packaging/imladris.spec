@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.22.0
+Version:        0.23.0
 Release:        1%{?dist}
 Summary:        Scientific notebook studio with GPU acceleration, slide decks and posters
 
@@ -57,6 +57,25 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Fri Nov 13 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.23.0-1
+- Release 0.23.0: GNOME/Libadwaita Interface Overhaul, Elrond AI Redesign, and WebKitGTK 6.0 Preview Stability:
+  * Progressive-disclosure Welcome screen with Quick Start actions and expandable templates row.
+  * Zero-chrome empty state automatically hiding toolbar ribbons, tab bar, and status bar when idle.
+  * Redesigned Elrond AI Copilot with active provider pill, selection context chip, and rich Pango formatting.
+  * Preview-first inline assistance popover with one-click code generation, regeneration, and replacement.
+  * Decluttered 4-pane workbench headers into maximize and view-more popover controls.
+  * Consolidated preferences with new Workspace & Editor customization controls and compact zoom popover.
+  * Fixed WebKitGTK 6.0 preview rendering across Wayland, Flatpak, and GTK 4.18+ with zero-leak lifecycle.
+
+* Thu Nov 12 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.22.0-1
+- Release 0.22.0: GTK4 GSK Hardware Acceleration, Animation Physics & Command Palette:
+  * Configures GTK4 GSK hardware acceleration (OpenGL NGL and Vulkan SPIR-V pipelines) with Cairo CPU fallback.
+  * Adds configurable animation physics: Alacritty Crisp (65ms), PuTTY Instant (0ms), and Libadwaita Smooth (180ms).
+  * Introduces steady non-blinking cursor mode across code editor and REPL terminals.
+  * Implements Universal Command Palette (Ctrl+Shift+P / Ctrl+K) with fuzzy action discovery.
+  * Integrates inline code chunk execution runtime duration telemetry HUD (Out [n]: ✔ ms/s).
+  * Adds Quarto slide deck (RevealJS, Beamer) and symposium poster (Typst) scaffolding templates and export.
+
 * Thu Nov 12 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.21.0-1
 - Release 0.21.0: VS Code-grade Offline Polyglot IntelliSense & Bracket Auto-Pairing:
   * Non-AI deterministic completion engine (CodeIntelliSenseEngine) for R, Python, Quarto #| options, YAML, and LaTeX.

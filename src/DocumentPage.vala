@@ -49,6 +49,7 @@ namespace Imladris {
         private ulong ai_settings_handler_id = 0;
         private ulong theme_changed_handler_id = 0;
         private ulong dark_notify_handler_id = 0;
+        private ulong physics_changed_handler_id = 0;
 
         public DocumentFormat get_document_format () {
             if (file_location != null) {
@@ -263,7 +264,7 @@ namespace Imladris {
                 vexpand = true
             };
 
-            sm_phys.physics_changed.connect (() => {
+            physics_changed_handler_id = sm_phys.physics_changed.connect (() => {
                 console_revealer.transition_duration = sm_phys.animation_physics.get_revealer_duration_ms ();
                 right_stack.transition_duration = sm_phys.animation_physics.get_stack_duration_ms ();
             });
@@ -361,6 +362,13 @@ namespace Imladris {
             if (dark_notify_handler_id != 0) {
                 Adw.StyleManager.get_default ().disconnect (dark_notify_handler_id);
                 dark_notify_handler_id = 0;
+            }
+            if (physics_changed_handler_id != 0) {
+                Core.SettingsManager.get_default ().disconnect (physics_changed_handler_id);
+                physics_changed_handler_id = 0;
+            }
+            if (panel_registry != null) {
+                panel_registry.cleanup ();
             }
             if (update_debounce_id != 0) {
                 GLib.Source.remove (update_debounce_id);
@@ -537,7 +545,7 @@ print("Python Interpreter:", sys.version.split()[0])
                 var parent = file_location.get_parent ();
                 base_uri = parent != null ? parent.get_uri () + "/" : file_location.get_uri ();
             } else {
-                base_uri = "file://localhost/";
+                base_uri = "file:///";
             }
 
             if (doc_type == "html") {
@@ -868,41 +876,127 @@ print("Python Interpreter:", sys.version.split()[0])
             popover.autohide = true;
 
             var content_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) {
-                margin_top = 8,
-                margin_bottom = 8,
-                margin_start = 8,
-                margin_end = 8,
-                width_request = 380
+                margin_top = 10,
+                margin_bottom = 10,
+                margin_start = 10,
+                margin_end = 10,
+                width_request = 440
             };
+
+            string initial_sel = get_selected_text ().strip ();
+            bool has_sel = initial_sel.length > 0;
 
             var header_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
             var icon = new Gtk.Image.from_icon_name ("ai-elrond") { pixel_size = 20 };
-            var title_lbl = new Gtk.Label ("Write with Elrond Assistance (AI)") {
+            var title_lbl = new Gtk.Label ("Elrond Inline Assistance") {
                 css_classes = { "heading" },
                 hexpand = true,
                 xalign = 0.0f
             };
+            var ctx_badge = new Gtk.Label (has_sel ? "Replacing selection" : "At cursor") {
+                css_classes = { "dim-label", "caption" }
+            };
             header_box.append (icon);
             header_box.append (title_lbl);
+            header_box.append (ctx_badge);
             content_box.append (header_box);
 
+            var quick_pills = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
             var prompt_entry = new Gtk.Entry () {
-                placeholder_text = "Prompt Elrond (e.g. plot scatter, clean dataframe, linear model)...",
+                placeholder_text = has_sel
+                    ? "Ask Elrond how to transform this selection…"
+                    : "Ask Elrond to write code, a plot, or prose…",
                 hexpand = true
             };
-            content_box.append (prompt_entry);
 
-            var actions_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
-                halign = Gtk.Align.END
-            };
             var spinner = new Adw.Spinner () { visible = false };
-            var btn_generate = new Gtk.Button.with_label ("Generate & Insert") {
+            var btn_generate = new Gtk.Button.with_label ("Generate") {
                 css_classes = { "suggested-action" }
             };
 
-            actions_box.append (spinner);
-            actions_box.append (btn_generate);
-            content_box.append (actions_box);
+            var preview_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
+                visible = false
+            };
+            var preview_view = new Gtk.TextView () {
+                editable = true,
+                wrap_mode = Gtk.WrapMode.WORD_CHAR,
+                monospace = true,
+                top_margin = 6,
+                bottom_margin = 6,
+                left_margin = 8,
+                right_margin = 8
+            };
+            var preview_scroller = new Gtk.ScrolledWindow () {
+                child = preview_view,
+                hscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
+                vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
+                min_content_height = 90,
+                max_content_height = 220
+            };
+            preview_scroller.add_css_class ("card");
+            preview_box.append (preview_scroller);
+
+            var preview_actions = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
+            var btn_copy_inline = new Gtk.Button.from_icon_name ("edit-copy-symbolic") {
+                tooltip_text = "Copy to clipboard"
+            };
+            btn_copy_inline.add_css_class ("flat");
+            btn_copy_inline.clicked.connect (() => {
+                var disp = Gdk.Display.get_default ();
+                if (disp != null) {
+                    disp.get_clipboard ().set_text (preview_view.buffer.text);
+                }
+            });
+            var btn_regen = new Gtk.Button.with_label ("Regenerate");
+            btn_regen.add_css_class ("flat");
+            var btn_accept = new Gtk.Button.with_label (has_sel ? "Replace Selection" : "Insert at Cursor") {
+                css_classes = { "suggested-action" }
+            };
+            btn_accept.clicked.connect (() => {
+                string out_text = preview_view.buffer.text;
+                popover.popdown ();
+                insert_ai_code_at_cursor (out_text);
+            });
+            preview_actions.append (btn_copy_inline);
+            preview_actions.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
+            preview_actions.append (btn_regen);
+            preview_actions.append (btn_accept);
+            preview_box.append (preview_actions);
+
+            var err_lbl = new Gtk.Label ("") {
+                xalign = 0.0f,
+                wrap = true,
+                visible = false,
+                css_classes = { "error", "caption" }
+            };
+
+            string[] quick_labels = { "Fix & Clean", "Add Comments", "Explain", "R Plot" };
+            string[] quick_prompts = {
+                "Fix syntax or logic issues and return clean corrected code.",
+                "Add concise scientific comments explaining each step.",
+                "Explain what this code does concisely as markdown.",
+                "Generate a clean Quarto {r} ggplot2 visualization chunk."
+            };
+            for (int qi = 0; qi < quick_labels.length; qi++) {
+                string q_prompt = quick_prompts[qi];
+                var q_btn = new Gtk.Button.with_label (quick_labels[qi]);
+                q_btn.add_css_class ("pill");
+                q_btn.add_css_class ("caption");
+                q_btn.clicked.connect (() => {
+                    prompt_entry.text = q_prompt;
+                    btn_generate.activate ();
+                });
+                quick_pills.append (q_btn);
+            }
+            content_box.append (quick_pills);
+
+            var entry_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
+            entry_row.append (prompt_entry);
+            entry_row.append (spinner);
+            entry_row.append (btn_generate);
+            content_box.append (entry_row);
+            content_box.append (err_lbl);
+            content_box.append (preview_box);
 
             SourceFunc execute_generation = () => {
                 string prompt = prompt_entry.text.strip ();
@@ -911,40 +1005,51 @@ print("Python Interpreter:", sys.version.split()[0])
                 prompt_entry.sensitive = false;
                 btn_generate.sensitive = false;
                 spinner.visible = true;
+                err_lbl.visible = false;
 
                 string sel = get_selected_text ();
                 string doc_lang = this.doc_type;
                 string doc_text = source_buffer.text;
+                string full_prompt = prompt + (sel.length > 0 ? "\n[Selected Code]:\n" + sel : "");
 
                 var elrond = Imladris.AI.ElrondEngineController.get_default ();
                 if (elrond.is_ready) {
-                    elrond.write_with_elrond.begin (doc_lang, doc_text, "", prompt + (sel.length > 0 ? "\n[Selected Code]:\n" + sel : ""), (obj, res) => {
+                    elrond.write_with_elrond.begin (doc_lang, doc_text, "", full_prompt, (obj, res) => {
                         spinner.visible = false;
-                        popover.popdown ();
+                        prompt_entry.sensitive = true;
+                        btn_generate.sensitive = true;
                         try {
-                            string generated = elrond.write_with_elrond.end (res);
-                            insert_ai_code_at_cursor (generated);
+                            string generated = elrond.write_with_elrond.end (res).strip ();
+                            preview_view.buffer.text = generated;
+                            preview_box.visible = true;
                         } catch (Error e) {
-                            warning ("Elrond inline generation error: %s", e.message);
+                            err_lbl.label = @"Elrond error: $(e.message)";
+                            err_lbl.visible = true;
                         }
                     });
                 } else {
                     var ai_client = new AiClient ();
-                    string sys_prompt = "You are Elrond Assistance (AI), an expert scientific and coding assistant. Generate clean, correct code or statistical functions. Return only the code or visualization chunk.";
-                    ai_client.send_chat_completion_async.begin (sys_prompt, prompt + (sel.length > 0 ? "\n[Selected Code]:\n" + sel : ""), null, (obj, res) => {
+                    string sys_prompt = "You are Elrond Assistance (AI), an expert scientific and coding assistant. Generate clean, correct code or statistical functions. Return only the requested code or concise explanation.";
+                    ai_client.send_chat_completion_async.begin (sys_prompt, full_prompt, null, (obj, res) => {
                         spinner.visible = false;
-                        popover.popdown ();
+                        prompt_entry.sensitive = true;
+                        btn_generate.sensitive = true;
                         try {
-                            string generated = ai_client.send_chat_completion_async.end (res);
-                            insert_ai_code_at_cursor (generated);
+                            string generated = ai_client.send_chat_completion_async.end (res).strip ();
+                            preview_view.buffer.text = generated;
+                            preview_box.visible = true;
                         } catch (Error e) {
-                            warning ("AI client inline generation error: %s", e.message);
+                            err_lbl.label = @"AI error: $(e.message)";
+                            err_lbl.visible = true;
                         }
                     });
                 }
                 return Source.REMOVE;
             };
 
+            btn_regen.clicked.connect (() => {
+                execute_generation ();
+            });
             prompt_entry.activate.connect (() => {
                 execute_generation ();
             });
@@ -953,6 +1058,9 @@ print("Python Interpreter:", sys.version.split()[0])
             });
 
             popover.set_child (content_box);
+            popover.closed.connect (() => {
+                popover.unparent ();
+            });
             popover.popup ();
             prompt_entry.grab_focus ();
         }
