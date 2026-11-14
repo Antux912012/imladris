@@ -182,7 +182,16 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, im
 
 ## Installation & Deployment
 
+### Universal One-Line Quick Install (All Distributions)
+Automatically detects your Linux distribution (Debian/Ubuntu, Fedora/RHEL, openSUSE, Arch, Solus) or Flatpak runtime and sets up the appropriate package:
+```bash
+curl -fsSL https://antux912012.github.io/imladris/install.sh | bash
+# Or using wget:
+wget -qO- https://antux912012.github.io/imladris/install.sh | bash
+```
+
 ### Flatpak / Flatpark (Recommended)
+Imladris is officially available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/):
 ```bash
 flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo
 flatpak install flatpark io.github.Antux912012.Imladris
@@ -197,10 +206,10 @@ paru -S imladris
 ### Fedora / RHEL / CentOS / AlmaLinux / openSUSE (`.rpm`) & Debian / Ubuntu / elementary OS (`.deb`)
 ```bash
 # Fedora / RHEL / CentOS / AlmaLinux:
-sudo dnf install ./imladris-0.25.0-1.x86_64.rpm
+sudo dnf install ./imladris-0.25.0-1.fc41.x86_64.rpm
 
 # openSUSE:
-sudo zypper install ./imladris-0.25.0-1.x86_64.rpm
+sudo zypper install ./imladris-0.25.0-1.fc41.x86_64.rpm
 
 # Debian / Ubuntu / elementary OS:
 sudo dpkg -i imladris_0.25.0_amd64.deb

@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Imladris v0.25.0 | The Native Linux Scientific IDE &amp; Polyglot Notebook Studio</title>
-  <meta name="description" content="Zero Electron overhead. Instant native startup. Imladris is the GTK4 &amp; Libadwaita scientific IDE for reproducible manuscripts (.qmd, .Rmd, .ipynb, .Rproj) with Positron-style direct editor writing, free-tier AI failover, GitHub Copilot OAuth, Arekyer Galaxy Bridge, and ICH E9 biostatistics.">
-  <meta name="keywords" content="Imladris, scientific IDE, bioinformatics, Linux, GTK4, Libadwaita, Vala, Quarto, RStudio, Positron, AlphaFold, Galaxy Project, ICH E9, biostatistics, Copilot, Ollama, renv, venv">
+  <meta name="description" content="The Last Homely House East of the Sea. Zero Electron overhead. Instant native startup. Imladris is the GTK4 &amp; Libadwaita scientific IDE for reproducible manuscripts (.qmd, .Rmd, .ipynb, .Rproj) with Positron-style direct editor writing, free-tier AI failover, Flatpark distribution, Galaxy Bridge, and ICH E9 biostatistics.">
+  <meta name="keywords" content="Imladris, scientific IDE, bioinformatics, Linux, GTK4, Libadwaita, Vala, Quarto, RStudio, Positron, Flatpark, Flatpak, AlphaFold, Galaxy Project, ICH E9, biostatistics, Copilot, Ollama, renv, venv, Middle-earth, Rivendell">
   <meta name="author" content="Antonio De Gaetano">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://antux912012.github.io/imladris/">
@@ -13,8 +13,8 @@
   <!-- OpenGraph Meta Tags for Social & Discord Sharing -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://antux912012.github.io/imladris/">
-  <meta property="og:title" content="Imladris v0.25.0 — Native Linux Scientific IDE &amp; Polyglot Notebook Studio">
-  <meta property="og:description" content="Zero Electron overhead. Native compiled Vala + GTK4 speed. Features Positron-style direct editor writing, free-tier AI quota failover, Galaxy Bridge, and ICH E9 biostatistics.">
+  <meta property="og:title" content="Imladris v0.25.0 — The Native Linux Scientific IDE &amp; Polyglot Studio">
+  <meta property="og:description" content="The Last Homely House East of the Sea. Zero Electron overhead. Native compiled Vala + GTK4 speed. Features Positron-style direct editor writing, free-tier AI quota failover, Galaxy Bridge, and ICH E9 biostatistics.">
   <meta property="og:image" content="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-screenshot.png">
   <meta property="og:site_name" content="Imladris Scientific Workbench">
 
@@ -28,7 +28,7 @@
 
   <!-- Favicons -->
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
-  <link rel="alternate icon" type="image/png" href="https://raw.githubusercontent.com/Antux912012/imladris/main/data/icons/hicolor/256x256/apps/io.github.Antux912012.Imladris.png">
+  <link rel="alternate icon" type="image/png" href="assets/logo.png">
 
   <script>
     (function () {
@@ -53,13 +53,23 @@
       --text-primary: #ECEFF4;
       --text-secondary: #D8DEE9;
       --text-muted: #9AA5B8;
+      
+      /* Frost Palette */
       --accent-frost: #88C0D0;
+      --accent-frost-hover: #8FBCBB;
       --accent-blue: #5E81AC;
       --accent-green: #A3BE8C;
       --accent-purple: #B48EAD;
       --accent-amber: #EBCB8B;
       --accent-red: #BF616A;
-      --header-bg: rgba(30, 34, 42, 0.90);
+      
+      /* Middle-earth Accents */
+      --elven-gold: #EBCB8B;
+      --elven-silver: #D8DEE9;
+      --elven-glow: rgba(235, 203, 139, 0.15);
+      --star-color: #88C0D0;
+
+      --header-bg: rgba(30, 34, 42, 0.92);
       --btn-primary-bg: #88C0D0;
       --btn-primary-text: #1E222A;
       --shadow-color: rgba(0, 0, 0, 0.45);
@@ -88,13 +98,21 @@
       --text-primary: #2E3440;
       --text-secondary: #434C5E;
       --text-muted: #6C7A92;
+      
       --accent-frost: #3B6F96;
+      --accent-frost-hover: #4C82A8;
       --accent-blue: #5E81AC;
       --accent-green: #487834;
       --accent-purple: #7E4A78;
       --accent-amber: #9A6B16;
       --accent-red: #A83A3A;
-      --header-bg: rgba(236, 239, 244, 0.92);
+      
+      --elven-gold: #9A6B16;
+      --elven-silver: #434C5E;
+      --elven-glow: rgba(154, 107, 22, 0.12);
+      --star-color: #3B6F96;
+
+      --header-bg: rgba(236, 239, 244, 0.94);
       --btn-primary-bg: #5E81AC;
       --btn-primary-text: #ECEFF4;
       --shadow-color: rgba(46, 52, 64, 0.10);
@@ -118,701 +136,908 @@
       font-family: var(--font-sans);
       line-height: 1.65;
       -webkit-font-smoothing: antialiased;
-      transition: background-color 0.25s ease, color 0.25s ease;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      position: relative;
     }
 
-    a { color: var(--accent-frost); text-decoration: none; transition: opacity 0.2s; }
-    a:hover { opacity: 0.85; }
+    /* Ambient Background Watermark - Star of Eärendil */
+    .bg-star-ornament {
+      position: fixed;
+      top: 50%;
+      right: -10vw;
+      width: 45vw;
+      height: 45vw;
+      max-width: 600px;
+      max-height: 600px;
+      transform: translateY(-50%);
+      opacity: 0.035;
+      pointer-events: none;
+      z-index: 0;
+      color: var(--star-color);
+    }
 
-    .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
 
-    /* Sticky Header Bar (Libadwaita / Apple style) */
+    /* Sticky Navigation Header */
     header {
-      background: var(--header-bg);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--border-color);
       position: sticky;
       top: 0;
-      z-index: 100;
-      transition: background 0.25s ease, border-color 0.25s ease;
+      z-index: 1000;
+      background: var(--header-bg);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background-color 0.3s ease, border-color 0.3s ease;
     }
+
     .nav-bar {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       height: 68px;
     }
+
     .brand {
       display: flex;
       align-items: center;
       gap: 12px;
-      font-weight: 700;
-      font-size: 1.25rem;
-      letter-spacing: -0.02em;
+      text-decoration: none;
       color: var(--text-primary);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      font-size: 1.15rem;
     }
+
     .brand-logo {
-      width: 36px;
-      height: 36px;
-      border-radius: 9px;
-      object-fit: contain;
-      box-shadow: 0 2px 8px var(--brand-logo-shadow);
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      padding: 3px;
+      border-radius: 8px;
+      filter: drop-shadow(0 4px 8px var(--brand-logo-shadow));
+      transition: transform 0.25s ease;
     }
+
+    .brand:hover .brand-logo {
+      transform: scale(1.08) rotate(3deg);
+    }
+
     .brand-badge {
-      background: var(--bg-card);
-      color: var(--accent-frost);
-      font-family: var(--font-mono);
       font-size: 0.72rem;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      color: var(--accent-frost);
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-family: var(--font-mono);
       font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 6px;
-      border: 1px solid var(--border-color);
     }
+
     .nav-right {
       display: flex;
       align-items: center;
-      gap: 24px;
+      gap: 20px;
     }
-    .nav-links { display: flex; gap: 20px; font-size: 0.92rem; }
-    .nav-links a { color: var(--text-secondary); font-weight: 500; }
-    .nav-links a:hover { color: var(--accent-frost); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent-frost);
+    }
 
     .theme-toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 7px;
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       color: var(--text-primary);
-      border-radius: 8px;
-      padding: 6px 14px;
-      font-family: var(--font-sans);
-      font-size: 0.82rem;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 20px;
       cursor: pointer;
-      box-shadow: 0 1px 3px var(--shadow-card);
-      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
-      user-select: none;
+      font-size: 0.82rem;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      transition: all 0.2s ease;
     }
+
     .theme-toggle-btn:hover {
-      background: var(--bg-secondary);
       border-color: var(--accent-frost);
+      color: var(--accent-frost);
       transform: translateY(-1px);
     }
-    :root:not([data-theme="light"]) .icon-moon { display: none; }
-    :root:not([data-theme="light"]) .icon-sun { display: inline-block; color: #EBCB8B; }
-    [data-theme="light"] .icon-sun { display: none; }
-    [data-theme="light"] .icon-moon { display: inline-block; color: #5E81AC; }
 
-    /* Hero Section */
-    .hero {
-      padding: 80px 0 64px;
-      text-align: center;
-      position: relative;
+    .theme-toggle-btn svg {
+      transition: transform 0.3s ease;
     }
+
+    [data-theme="light"] .theme-toggle-btn .icon-sun { display: none; }
+    [data-theme="light"] .theme-toggle-btn .icon-moon { display: inline-block; }
+    :not([data-theme="light"]) .theme-toggle-btn .icon-sun { display: inline-block; }
+    :not([data-theme="light"]) .theme-toggle-btn .icon-moon { display: none; }
+
+    /* HERO SECTION */
+    .hero {
+      padding: 72px 0 48px;
+      text-align: center;
+    }
+
     .hero-tag {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--accent-green);
       background: var(--hero-tag-bg);
       border: 1px solid var(--hero-tag-border);
-      padding: 5px 16px;
-      border-radius: 999px;
+      color: var(--accent-green);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
       margin-bottom: 24px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     }
+
     .hero-tag-pulse {
-      width: 8px;
-      height: 8px;
-      background: var(--accent-green);
+      width: 7px;
+      height: 7px;
+      background-color: var(--accent-green);
       border-radius: 50%;
-      display: inline-block;
       box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse-glow 2s infinite ease-in-out;
     }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+
     .hero h1 {
-      font-size: clamp(2.6rem, 5.5vw, 4.2rem);
-      line-height: 1.12;
-      letter-spacing: -0.035em;
+      font-size: clamp(2.4rem, 4.8vw, 3.8rem);
+      line-height: 1.15;
       font-weight: 800;
-      margin-bottom: 24px;
+      letter-spacing: -0.03em;
+      margin-bottom: 22px;
       color: var(--text-primary);
     }
+
     .hero-gradient-text {
-      background: linear-gradient(135deg, var(--text-primary) 30%, var(--accent-frost) 100%);
+      background: linear-gradient(135deg, var(--accent-frost) 0%, #A3BE8C 50%, var(--elven-gold) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+
     .hero p {
-      max-width: 860px;
-      margin: 0 auto 36px;
-      font-size: 1.20rem;
-      line-height: 1.65;
+      max-width: 820px;
+      margin: 0 auto 32px;
+      font-size: 1.12rem;
       color: var(--text-secondary);
+      line-height: 1.7;
     }
+
+    .hero-quote {
+      max-width: 680px;
+      margin: 0 auto 36px;
+      padding: 10px 20px;
+      font-style: italic;
+      color: var(--elven-gold);
+      font-size: 0.95rem;
+      border-left: 2px solid var(--elven-gold);
+      background: var(--elven-glow);
+      border-radius: 0 8px 8px 0;
+      display: inline-block;
+    }
+
     .cta-group {
       display: flex;
+      flex-wrap: wrap;
       justify-content: center;
       gap: 14px;
-      flex-wrap: wrap;
-      margin-bottom: 28px;
+      margin-bottom: 32px;
     }
+
     .btn {
-      padding: 13px 26px;
-      border-radius: 9px;
-      font-weight: 600;
-      font-size: 0.96rem;
       display: inline-flex;
       align-items: center;
-      gap: 9px;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
       cursor: pointer;
-      border: 1px solid transparent;
-      box-shadow: 0 2px 8px var(--shadow-card);
-      transition: transform 0.15s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px var(--shadow-color);
-    }
-    .btn:active {
-      transform: translateY(0);
-      box-shadow: 0 2px 8px var(--shadow-card);
-    }
+
     .btn-primary {
       background: var(--btn-primary-bg);
       color: var(--btn-primary-text);
-      border-color: rgba(255, 255, 255, 0.2);
-    }
-    .btn-secondary {
-      background: var(--bg-card);
-      color: var(--text-primary);
-      border-color: var(--border-color);
-    }
-    .btn-secondary:hover {
-      background: var(--bg-secondary);
-      border-color: var(--accent-frost);
+      box-shadow: 0 4px 18px var(--hero-glow);
+      border: 1px solid transparent;
     }
 
-    /* Terminal Quick-Install Strip */
+    .btn-primary:hover {
+      box-shadow: 0 6px 24px var(--hero-glow-hover);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-frost);
+      color: var(--accent-frost);
+      transform: translateY(-2px);
+    }
+
+    .btn-flatpark {
+      background: linear-gradient(135deg, rgba(136, 192, 208, 0.15), rgba(163, 190, 140, 0.15));
+      border: 1px solid var(--accent-frost);
+      color: var(--text-primary);
+    }
+
+    .btn-flatpark:hover {
+      background: linear-gradient(135deg, rgba(136, 192, 208, 0.25), rgba(163, 190, 140, 0.25));
+      border-color: var(--accent-green);
+      transform: translateY(-2px);
+    }
+
+    /* Universal Quick Install Pill */
+    .quick-install-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 36px;
+    }
+
     .quick-install-pill {
       display: inline-flex;
       align-items: center;
       gap: 12px;
-      background: var(--bg-secondary);
+      background: var(--code-bg);
       border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 8px 18px;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      box-shadow: 0 3px 12px var(--shadow-card);
-      margin-bottom: 48px;
-      max-width: 100%;
-      overflow-x: auto;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      padding: 10px 20px;
+      border-radius: 9999px;
+      box-shadow: 0 4px 14px var(--shadow-card);
+      transition: all 0.2s ease;
+      max-width: 90vw;
     }
+
     .quick-install-pill:hover {
       border-color: var(--accent-frost);
-      box-shadow: 0 4px 16px var(--shadow-card);
+      box-shadow: 0 6px 20px var(--hero-glow);
     }
-    .quick-install-pill code { color: var(--accent-frost); }
+
+    .quick-install-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent-amber);
+    }
+
+    .quick-install-pill code {
+      font-family: var(--font-mono);
+      font-size: 0.90rem;
+      color: var(--accent-frost);
+      user-select: all;
+    }
+
     .copy-icon-btn {
-      background: transparent;
+      background: none;
       border: none;
       color: var(--text-muted);
       cursor: pointer;
       display: flex;
       align-items: center;
       padding: 4px;
-      border-radius: 4px;
-      transition: color 0.15s, background-color 0.15s;
-    }
-    .copy-icon-btn:hover { color: var(--accent-frost); background: var(--bg-card); }
-
-    /* Floating Back to Top Button */
-    .back-to-top-btn {
-      position: fixed;
-      bottom: 28px;
-      right: 28px;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 4px 16px var(--shadow-card);
-      opacity: 0;
-      visibility: hidden;
-      transform: translateY(12px);
-      transition: opacity 0.25s ease, visibility 0.25s ease, transform 0.25s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-      z-index: 90;
-    }
-    .back-to-top-btn.visible {
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0);
-    }
-    .back-to-top-btn:hover {
-      background: var(--bg-secondary);
-      border-color: var(--accent-frost);
-      color: var(--accent-frost);
-      transform: translateY(-2px);
+      border-radius: 6px;
+      transition: color 0.2s ease, transform 0.15s ease;
     }
 
-    /* Trust / Spec Bar */
+    .copy-icon-btn:hover {
+      color: var(--text-primary);
+      transform: scale(1.15);
+    }
+
+    /* Technology Strip */
     .trust-strip {
       display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 32px;
       flex-wrap: wrap;
-      padding: 16px 24px;
-      border-top: 1px solid var(--border-color);
-      border-bottom: 1px solid var(--border-color);
-      margin-bottom: 64px;
-      background: var(--bg-secondary);
-      border-radius: 12px;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 44px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
     }
+
     .trust-item {
       display: flex;
       align-items: center;
-      gap: 9px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
+      gap: 8px;
     }
-    .trust-item span.highlight { color: var(--accent-frost); }
 
-    /* Hero Screenshot Window Frame */
+    .trust-item .highlight {
+      color: var(--accent-frost);
+      font-weight: 600;
+    }
+
+    /* Window Frame for Hero Screenshot */
     .hero-window-frame {
-      margin-top: 24px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
+      max-width: 1120px;
+      margin: 0 auto;
       border-radius: 14px;
       overflow: hidden;
-      box-shadow: 0 28px 64px var(--shadow-color), 0 0 36px var(--hero-glow);
-      transition: box-shadow 0.3s ease, border-color 0.3s ease;
-      text-align: left;
-    }
-    .hero-window-frame:hover {
-      border-color: var(--accent-frost);
-      box-shadow: 0 36px 80px var(--shadow-color), 0 0 48px var(--hero-glow-hover);
-    }
-    .window-header {
+      border: 1px solid var(--border-color);
+      box-shadow: 0 24px 56px var(--shadow-color);
       background: var(--bg-card);
-      padding: 12px 18px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .hero-window-frame:hover {
+      box-shadow: 0 32px 72px var(--hero-glow-hover);
+    }
+
+    .window-header {
+      background: var(--bg-secondary);
+      padding: 10px 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-subtle);
     }
+
     .window-controls {
       display: flex;
       gap: 8px;
     }
+
     .window-circle {
       width: 12px;
       height: 12px;
       border-radius: 50%;
     }
-    .circle-red { background: #BF616A; }
-    .circle-amber { background: #EBCB8B; }
-    .circle-green { background: #A3BE8C; }
+
+    .circle-red { background: #FF5F56; }
+    .circle-amber { background: #FFBD2E; }
+    .circle-green { background: #27C93F; }
+
     .window-title {
+      font-size: 0.80rem;
       font-family: var(--font-mono);
-      font-size: 0.82rem;
       color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .hero-screenshot-img {
-      width: 100%;
-      height: auto;
-      display: block;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    /* Sections */
-    section { padding: 88px 0; border-bottom: 1px solid var(--border-color); }
-    .section-header { margin-bottom: 52px; text-align: left; }
-    .section-eyebrow {
-      font-family: var(--font-mono);
-      color: var(--accent-frost);
-      font-size: 0.84rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 10px;
-      font-weight: 600;
-    }
-    .section-title {
-      font-size: 2.3rem;
-      letter-spacing: -0.025em;
-      font-weight: 800;
-      color: var(--text-primary);
-      line-height: 1.22;
-    }
-    .section-subtitle {
-      color: var(--text-secondary);
-      font-size: 1.1rem;
-      margin-top: 12px;
-      max-width: 820px;
-    }
-
-    /* Grids & Cards */
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 28px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
-    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
-
-    .card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 30px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      box-shadow: 0 4px 14px var(--shadow-card);
-      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
-    }
-    .card:hover {
-      border-color: var(--accent-frost);
-      transform: translateY(-3px);
-      box-shadow: 0 10px 28px var(--shadow-color);
-    }
-    .card-icon {
-      font-size: 1.8rem;
-      margin-bottom: 16px;
-      display: inline-block;
-    }
-    .card h3 {
-      font-size: 1.25rem;
-      font-weight: 700;
-      margin-bottom: 12px;
-      color: var(--text-primary);
-      letter-spacing: -0.015em;
-    }
-    .card p {
-      color: var(--text-secondary);
-      font-size: 0.96rem;
-      line-height: 1.6;
-    }
-    .card-meta {
-      margin-top: 24px;
-      padding-top: 14px;
-      border-top: 1px solid var(--border-color);
-      font-family: var(--font-mono);
-      font-size: 0.76rem;
-      color: var(--accent-green);
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
-    /* Code Block Showcase */
-    .spec-block {
-      background: var(--code-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 20px;
-      font-family: var(--font-mono);
+    .hero-screenshot-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: var(--bg-card);
+    }
+
+    /* SECTION STYLING */
+    section {
+      padding: 72px 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .section-eyebrow {
       font-size: 0.82rem;
-      overflow-x: auto;
-      line-height: 1.55;
-      margin-top: 16px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent-frost);
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
       color: var(--text-primary);
     }
 
-    /* Comparison Table (Apple / Posit grade) */
+    .section-subtitle {
+      max-width: 760px;
+      margin: 0 auto;
+      font-size: 1.05rem;
+      color: var(--text-secondary);
+    }
+
+    /* BENCHMARK COMPARISON TABLE */
     .table-container {
       overflow-x: auto;
-      background: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: 12px;
-      box-shadow: 0 6px 20px var(--shadow-card);
-      margin-top: 36px;
+      background: var(--bg-card);
+      box-shadow: 0 8px 24px var(--shadow-card);
+      margin-bottom: 32px;
     }
-    .comp-table {
+
+    table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 0.95rem;
-    }
-    .comp-table th, .comp-table td {
-      padding: 16px 22px;
-      border-bottom: 1px solid var(--border-color);
-    }
-    .comp-table th {
-      background: var(--bg-card);
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .comp-table tr:last-child td { border-bottom: none; }
-    .comp-table tr:hover td { background: var(--bg-card-hover); }
-    .col-feature { font-weight: 600; color: var(--text-primary); }
-    .col-legacy { color: var(--text-muted); }
-    .col-imladris {
-      color: var(--accent-frost);
-      font-weight: 600;
-      background: rgba(136, 192, 208, 0.04);
+      font-size: 0.92rem;
     }
 
-    /* 4-Quadrant Visual Architecture */
-    .quadrant-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-top: 32px;
+    th, td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-subtle);
     }
-    .quadrant-box {
+
+    th {
       background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 22px;
-      position: relative;
-    }
-    .quadrant-tag {
-      position: absolute;
-      top: 16px;
-      right: 18px;
+      font-weight: 600;
+      color: var(--text-secondary);
       font-family: var(--font-mono);
-      font-size: 0.72rem;
-      padding: 2px 8px;
-      border-radius: 4px;
+      font-size: 0.80rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tr.highlight-row {
+      background: rgba(136, 192, 208, 0.08);
+      font-weight: 600;
+    }
+
+    .badge-win {
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    .badge-lose {
+      color: var(--text-muted);
+    }
+
+    /* MIDDLE-EARTH SUBSYSTEM CARDS */
+    .elven-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      margin-top: 36px;
+    }
+
+    .elven-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
-      color: var(--accent-frost);
+      border-radius: 14px;
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 16px var(--shadow-card);
     }
-    .quadrant-box h4 {
-      font-size: 1.1rem;
-      margin-bottom: 8px;
+
+    .elven-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--accent-frost), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .elven-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent-frost);
+      box-shadow: 0 12px 32px var(--shadow-color);
+    }
+
+    .elven-card:hover::before {
+      opacity: 1;
+    }
+
+    .elven-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .elven-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--pill-bg);
+      color: var(--accent-frost);
+      border: 1px solid var(--pill-border);
+      flex-shrink: 0;
+    }
+
+    .elven-title {
+      font-size: 1.15rem;
+      font-weight: 700;
       color: var(--text-primary);
     }
-    .quadrant-box p {
-      font-size: 0.92rem;
-      color: var(--text-secondary);
-      line-height: 1.55;
+
+    .elven-subtitle {
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      color: var(--accent-amber);
     }
 
-    /* Screenshot Gallery Grid */
+    .elven-desc {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    /* 4-QUADRANT WORKBENCH GRID */
+    .quadrant-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-top: 36px;
+    }
+
+    .quadrant-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s ease;
+    }
+
+    .quadrant-card:hover {
+      border-color: var(--accent-frost);
+    }
+
+    .quadrant-tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent-frost);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .quadrant-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--text-primary);
+    }
+
+    .quadrant-body {
+      font-size: 0.90rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* SCREENSHOT GALLERY */
     .gallery-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 28px;
       margin-top: 36px;
     }
+
     .gallery-item {
-      background: var(--bg-secondary);
+      background: var(--bg-card);
       border: 1px solid var(--border-color);
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
-      box-shadow: 0 6px 18px var(--shadow-card);
-      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      box-shadow: 0 8px 24px var(--shadow-card);
+      transition: transform 0.25s ease, border-color 0.25s ease;
     }
+
     .gallery-item:hover {
       transform: translateY(-4px);
       border-color: var(--accent-frost);
-      box-shadow: 0 16px 36px var(--shadow-color);
+      box-shadow: 0 16px 36px var(--hero-glow);
     }
+
     .gallery-item img {
       width: 100%;
       height: auto;
       display: block;
-      border-bottom: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-secondary);
     }
+
     .gallery-caption {
       padding: 18px 22px;
     }
+
     .gallery-caption h4 {
-      font-size: 1.05rem;
+      font-size: 1rem;
+      font-weight: 700;
       margin-bottom: 6px;
       color: var(--text-primary);
     }
+
     .gallery-caption p {
       font-size: 0.88rem;
-      color: var(--text-muted);
-      line-height: 1.5;
+      color: var(--text-secondary);
+      line-height: 1.55;
     }
 
-    /* Installation Matrix (Interactive Tabs) */
+    /* INSTALLATION MATRIX & TABS */
     .install-matrix {
-      background: var(--bg-secondary);
+      background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 14px;
-      padding: 32px;
-      box-shadow: 0 8px 24px var(--shadow-card);
-      margin-top: 32px;
+      overflow: hidden;
+      box-shadow: 0 12px 32px var(--shadow-card);
+      margin-top: 36px;
     }
+
     .install-tabs {
       display: flex;
-      gap: 8px;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 14px;
-      margin-bottom: 24px;
       overflow-x: auto;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      scrollbar-width: thin;
     }
+
     .tab-btn {
-      background: var(--bg-card);
-      color: var(--text-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 9px 18px;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
+      padding: 14px 20px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 0.90rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
       white-space: nowrap;
+      transition: all 0.2s ease;
+      border-bottom: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
+
     .tab-btn:hover {
-      background: var(--bg-card-hover);
       color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.03);
     }
+
     .tab-btn.active {
-      background: var(--accent-frost);
-      color: var(--btn-primary-text);
-      border-color: var(--accent-frost);
+      color: var(--accent-frost);
+      border-bottom-color: var(--accent-frost);
+      background: var(--bg-card);
     }
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
+
+    .tab-pane {
+      display: none;
+      padding: 32px;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
     .install-command-box {
       background: var(--code-bg);
       border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 16px 20px;
-      font-family: var(--font-mono);
-      font-size: 0.88rem;
-      color: var(--accent-frost);
+      border-radius: 10px;
+      padding: 18px 20px;
+      position: relative;
+      margin-bottom: 20px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-      gap: 12px;
+      align-items: flex-start;
     }
+
     .install-command-box code {
-      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.90rem;
+      color: var(--text-primary);
+      line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-all;
     }
 
-    /* Shortcuts Table */
+    /* KEYBOARD SHORTCUTS MATRIX */
     .shortcuts-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 16px;
-      margin-top: 28px;
+      margin-top: 36px;
     }
+
     .shortcut-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 14px 18px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      font-size: 0.88rem;
     }
-    .shortcut-card span { font-size: 0.92rem; color: var(--text-secondary); }
+
     .kbd-badge {
+      font-family: var(--font-mono);
       background: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: 6px;
       padding: 3px 8px;
-      font-family: var(--font-mono);
       font-size: 0.78rem;
       color: var(--accent-frost);
-      font-weight: 600;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
-    /* The Architect Section */
+    /* AUTHOR SECTION */
     .author-box {
       background: var(--author-bg);
-      border: 1px solid var(--accent-blue);
-      border-radius: 14px;
-      padding: 48px;
-      box-shadow: 0 14px 36px var(--shadow-color);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 40px;
+      margin-top: 36px;
+      box-shadow: 0 16px 40px var(--shadow-card);
     }
-    .author-box h3 { font-size: 2.1rem; margin-bottom: 6px; color: var(--text-primary); }
+
+    .author-box h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
     .author-role {
+      font-size: 0.92rem;
       font-family: var(--font-mono);
       color: var(--accent-frost);
-      font-size: 0.92rem;
-      font-weight: 600;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
-    .author-box p { margin-bottom: 18px; color: var(--text-secondary); font-size: 1.05rem; }
-    .author-links { margin-top: 32px; display: flex; gap: 16px; flex-wrap: wrap; }
 
-    /* Footer */
-    footer {
-      padding: 56px 0 40px;
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      border-top: 1px solid var(--border-color);
+    .author-box p {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 16px;
     }
+
+    .author-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    /* FOOTER */
+    footer {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-subtle);
+      padding: 48px 0;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
     .footer-content {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 16px;
-    }
-    .footer-logo {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      opacity: 0.9;
-    }
-    .footer-links {
-      display: flex;
-      gap: 22px;
-      flex-wrap: wrap;
-      justify-content: center;
-      font-size: 0.88rem;
+      text-align: center;
+      gap: 20px;
     }
 
-    /* Responsive adjustments */
-    @media (max-width: 860px) {
-      .nav-links { display: none; }
-      .quadrant-grid { grid-template-columns: 1fr; }
-      .gallery-grid { grid-template-columns: 1fr; }
-      .hero { padding: 48px 0 40px; }
-      .author-box { padding: 30px; }
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .footer-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--accent-frost);
+    }
+
+    /* Back to Top Floating Button */
+    .back-to-top-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px);
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 14px var(--shadow-color);
+      z-index: 999;
+    }
+
+    .back-to-top-btn.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .back-to-top-btn:hover {
+      border-color: var(--accent-frost);
+      color: var(--accent-frost);
+      transform: translateY(-3px);
+    }
+
+    /* RESPONSIVE DESIGN */
+    @media (max-width: 900px) {
+      .quadrant-grid, .gallery-grid {
+        grid-template-columns: 1fr;
+      }
+      .nav-links {
+        display: none; /* Mobile menu simplification */
+      }
+      .author-box {
+        padding: 24px;
+      }
+      .tab-pane {
+        padding: 20px;
+      }
     }
   </style>
 </head>
 <body>
 
+  <!-- Ambient Star of Eärendil SVG Ornament -->
+  <svg class="bg-star-ornament" viewBox="0 0 100 100" fill="currentColor">
+    <path d="M50 0 L53 38 L90 20 L58 45 L100 50 L58 55 L90 80 L53 62 L50 100 L47 62 L10 80 L42 55 L0 50 L42 45 L10 20 L47 38 Z" opacity="0.8"/>
+  </svg>
+
   <!-- Sticky Header Bar -->
   <header>
     <div class="container nav-bar">
       <a href="#" class="brand" aria-label="Imladris Home">
-        <img src="assets/logo.svg" alt="Imladris App Logo" class="brand-logo" width="36" height="36">
+        <img src="assets/logo.svg" alt="Imladris App Logo" class="brand-logo" width="34" height="34">
         <span>IMLADRIS</span>
         <span class="brand-badge">v0.25.0</span>
       </a>
       <div class="nav-right">
         <nav class="nav-links">
           <a href="#workbench">Workbench</a>
+          <a href="#elven-lore">Subsystems</a>
           <a href="#elrond-ai">Elrond AI</a>
-          <a href="#studios">Studios</a>
-          <a href="#gallery">Showcase</a>
-          <a href="#install">Download</a>
+          <a href="#gallery">Gallery</a>
+          <a href="#install">Install &amp; Distros</a>
           <a href="#architect">The Architect</a>
         </nav>
         <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle Light/Dark Theme" title="Toggle Light/Dark Theme">
@@ -842,7 +1067,7 @@
     <section class="hero">
       <div class="hero-tag">
         <span class="hero-tag-pulse"></span>
-        Native Linux Scientific IDE &amp; Polyglot Notebook Studio · v0.25.0
+        ✧ The Last Homely House East of the Sea · Native Linux Scientific Workbench · v0.25.0
       </div>
 
       <h1>
@@ -851,31 +1076,40 @@
       </h1>
 
       <p>
-        The native GTK4 workbench built for scientific precision. Author Quarto, R Markdown, and Jupyter documents with sub-millisecond responsiveness. Refactor statistical code directly in your editor, orchestrate multi-provider AI with automatic quota failover, and link cloud Galaxy histories seamlessly — all with zero Electron overhead.
+        The native GTK4 and Libadwaita scientific workbench built for computational biologists, statisticians, and researchers. Author Quarto, R Markdown, and Jupyter documents with sub-millisecond native responsiveness. Refactor statistical code directly inside your editor buffer, orchestrate multi-provider AI with automatic quota failover, and link Galaxy cloud histories seamlessly — with zero Electron overhead.
       </p>
+
+      <div class="hero-quote">
+        “Here you will find rest and wisdom to heal the weary mind.” — Sanctuary for the Modern Researcher
+      </div>
 
       <div class="cta-group">
         <a href="#install" class="btn btn-primary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          Download for Linux
+          Quick Install Matrix
         </a>
-        <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8m-4-4h8"/></svg>
+        <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" class="btn btn-flatpark" target="_blank" rel="noopener noreferrer">
+          <!-- Flatpark Packaging Logo SVG -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
           Flatpark App Store
         </a>
         <a href="https://github.com/Antux912012/imladris" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          View Source
+          GitHub Source (v0.25.0)
         </a>
       </div>
 
-      <!-- Quick Command Pill -->
-      <div class="quick-install-pill">
-        <span>Quick Install (Flatpak):</span>
-        <code>flatpak install flatpark io.github.Antux912012.Imladris</code>
-        <button class="copy-icon-btn" onclick="copySnippet('flatpak install flatpark io.github.Antux912012.Imladris', this)" title="Copy Command" aria-label="Copy Flatpak Command">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-        </button>
+      <!-- Universal Quick Command Pill -->
+      <div class="quick-install-container">
+        <div class="quick-install-pill">
+          <span class="quick-install-label">Universal Install:</span>
+          <code>curl -fsSL https://antux912012.github.io/imladris/install.sh | bash</code>
+          <button class="copy-icon-btn" onclick="copySnippet('curl -fsSL https://antux912012.github.io/imladris/install.sh | bash', this)" title="Copy Universal Installer" aria-label="Copy Universal Installer Command">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Trust & Technology Strip -->
@@ -897,13 +1131,13 @@
             <span class="window-circle circle-green"></span>
           </div>
           <div class="window-title">
-            <span>imladris — rna_seq_differential_expression.qmd [4-Quadrant Mode · renv + .venv]</span>
+            <span>imladris — rna_seq_study.qmd [4-Quadrant Mode · renv + .venv]</span>
           </div>
           <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-green);">
             ● Elrond AI Active (Cerebras &rarr; Groq Failover)
           </div>
         </div>
-        <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-screenshot.png" alt="Imladris 4-Quadrant Scientific Workbench with Redesigned Elrond AI Copilot" class="hero-screenshot-img" loading="eager" width="1920" height="1080">
+        <img src="assets/screenshots/imladris-screenshot.png" alt="Imladris 4-Quadrant Scientific Workbench with Redesigned Elrond AI Copilot" class="hero-screenshot-img" loading="eager" width="1609" height="910">
       </div>
     </section>
 
@@ -913,260 +1147,335 @@
         <div class="section-eyebrow">01 // Architectural Benchmark</div>
         <h2 class="section-title">Engineered for Speed. Free of Electron Overhead.</h2>
         <p class="section-subtitle">
-          Every megabyte matters when processing high-throughput genomic data. See how compiled native architecture compares to legacy web-based tooling.
+          Every megabyte matters when processing high-throughput genomic data and large clinical cohorts. See how compiled native architecture compares to legacy web-wrapped tooling.
         </p>
       </div>
 
       <div class="table-container">
-        <table class="comp-table">
+        <table>
           <thead>
             <tr>
-              <th>Evaluation Dimension</th>
-              <th>Legacy Electron Scientific IDEs</th>
-              <th>The Imladris v0.25.0 Paradigm</th>
+              <th>Architecture &amp; Metric</th>
+              <th>Imladris v0.25.0</th>
+              <th>RStudio Desktop</th>
+              <th>Positron IDE</th>
+              <th>VS Code</th>
+              <th>JupyterLab</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td class="col-feature">Idle RAM Consumption</td>
-              <td class="col-legacy">1.2 GB – 2.5 GB idle (Chromium/Node runtime overhead)</td>
-              <td class="col-imladris">Sub-120 MB compiled Vala/GTK4 native memory footprint</td>
+            <tr class="highlight-row">
+              <td><strong>UI Framework &amp; Toolkit</strong></td>
+              <td class="badge-win">Native GTK4 &amp; Libadwaita</td>
+              <td>Qt / Embedded Chromium</td>
+              <td>Electron (Chromium + Node)</td>
+              <td>Electron (Chromium + Node)</td>
+              <td>Web Browser Interface</td>
+            </tr>
+            <tr class="highlight-row">
+              <td><strong>Cold Startup Latency</strong></td>
+              <td class="badge-win">&lt; 180 ms</td>
+              <td>2.8 – 4.5 s</td>
+              <td>3.2 – 5.8 s</td>
+              <td>2.1 – 4.0 s</td>
+              <td>3.5 – 6.0 s</td>
+            </tr>
+            <tr class="highlight-row">
+              <td><strong>Idle RAM Footprint</strong></td>
+              <td class="badge-win">~ 45 – 85 MB</td>
+              <td>420 – 680 MB</td>
+              <td>580 – 890 MB</td>
+              <td>480 – 750 MB</td>
+              <td>350 – 600 MB (browser)</td>
             </tr>
             <tr>
-              <td class="col-feature">AI Writing &amp; Quota Failover</td>
-              <td class="col-legacy">Locked to a single commercial cloud API; stops at HTTP 429</td>
-              <td class="col-imladris">Direct Buffer Writing + Free-Tier Cascade (Groq, Cerebras, OpenRouter, Copilot OAuth) + 100% Offline Ollama</td>
+              <td><strong>Direct In-Buffer AI Refactoring</strong></td>
+              <td class="badge-win">Native GtkSourceView Buffer (Preserves Chunks)</td>
+              <td class="badge-lose">No (External Copilot extension)</td>
+              <td>Partial (Chat side-panel)</td>
+              <td>Inline Diff (High CPU)</td>
+              <td class="badge-lose">No</td>
             </tr>
             <tr>
-              <td class="col-feature">Quarto Chunk Refactoring</td>
-              <td class="col-legacy">Copy-pasting from chat windows or overwriting <code>#|</code> YAML options</td>
-              <td class="col-imladris">Positron-style direct chunk replacement strictly preserving Quarto chunk options with single-step <code>Ctrl+Z</code></td>
+              <td><strong>Free-Tier Multi-AI Failover</strong></td>
+              <td class="badge-win">Automatic (Cerebras &rarr; Groq &rarr; Gemini)</td>
+              <td class="badge-lose">None</td>
+              <td class="badge-lose">None</td>
+              <td class="badge-lose">None (Subscription required)</td>
+              <td class="badge-lose">None</td>
             </tr>
             <tr>
-              <td class="col-feature">Cloud Genomics Provenance</td>
-              <td class="col-legacy">Manual CSV/TSV web downloads breaking data provenance</td>
-              <td class="col-imladris">Native <strong>Arekyer Galaxy Bridge</strong> with <code>libsecret-1</code> OS keyring storage &amp; verified <code>httr2</code>/<code>pandas</code> chunks</td>
+              <td><strong>Offline Vulkan llama.cpp Bundled</strong></td>
+              <td class="badge-win">Zero Setup (Vulkan / CPU / Metal)</td>
+              <td class="badge-lose">No</td>
+              <td class="badge-lose">No</td>
+              <td class="badge-lose">Requires Ollama daemon</td>
+              <td class="badge-lose">No</td>
             </tr>
             <tr>
-              <td class="col-feature">Scientific Domain Tooling</td>
-              <td class="col-legacy">Fragmented browser tabs, external Python scripts, disconnected tools</td>
-              <td class="col-imladris">Integrated <strong>Elbereth</strong> (ICH E9 Biostats), <strong>Taniquetil</strong> (AlphaFold DB), <strong>Yavanna</strong> (RT-qPCR), &amp; <strong>MathChem</strong></td>
+              <td><strong>Bioinformatics Cloud Bridge</strong></td>
+              <td class="badge-win">Integrated Arekyer Galaxy API</td>
+              <td class="badge-lose">No</td>
+              <td class="badge-lose">No</td>
+              <td class="badge-lose">No</td>
+              <td class="badge-lose">No</td>
             </tr>
             <tr>
-              <td class="col-feature">Privacy &amp; Regulatory Audit</td>
-              <td class="col-legacy">Silent telemetry, cloud analytics, and unverified data transfers</td>
-              <td class="col-imladris">Zero telemetry, local-first compute, GDPR Art. 17 purge, and GxP SHA-256 lockfile attestation</td>
+              <td><strong>Regulatory Compliance (GxP / ICH E9)</strong></td>
+              <td class="badge-win">Built-in Audit Trail + Biostats Engine</td>
+              <td class="badge-lose">Requires external packages</td>
+              <td class="badge-lose">Requires external packages</td>
+              <td class="badge-lose">No</td>
+              <td class="badge-lose">No</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- THE 4-QUADRANT WORKBENCH -->
+    <!-- MIDDLE-EARTH SUBSYSTEM ARCHITECTURE & SCIENTIFIC LORE -->
+    <section id="elven-lore">
+      <div class="section-header">
+        <div class="section-eyebrow">02 // The Lore of Imladris</div>
+        <h2 class="section-title">Elven Subsystem Architecture</h2>
+        <p class="section-subtitle">
+          Rivendell was the timeless sanctuary where scholars, healers, and heroes gathered to study ancient lore and prepare for great quests. Imladris embodies that sanctuary for modern scientific discovery.
+        </p>
+      </div>
+
+      <div class="elven-grid">
+        <!-- Mallorn Project Format -->
+        <div class="elven-card">
+          <div class="elven-card-header">
+            <div class="elven-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <div>
+              <div class="elven-title">Mallorn Project System</div>
+              <div class="elven-subtitle">.mallorn &amp; .Rproj Foundation</div>
+            </div>
+          </div>
+          <div class="elven-desc">
+            Named after the towering golden-barked trees of Lothlórien and Valinor. Provides the unshakeable root structure for your research: combines isolated <code>renv</code>, Python <code>.venv</code>, Quarto manuscript manifests, and cryptographic reproducibility locks into a clean, portable directory architecture.
+          </div>
+        </div>
+
+        <!-- Taniquetil AlphaFold 3D Bridge -->
+        <div class="elven-card">
+          <div class="elven-card-header">
+            <div class="elven-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 22 22 22"/></svg>
+            </div>
+            <div>
+              <div class="elven-title">Taniquetil AlphaFold 3D</div>
+              <div class="elven-subtitle">Structural Biology Visualizer</div>
+            </div>
+          </div>
+          <div class="elven-desc">
+            Named after the highest peak of the Pelóri in the Undying Lands, upon which Manwë and Varda look out over all of Arda. Grants high-altitude visibility into 3D macromolecular structures: fetches AlphaFold PDB conformations directly from UniProt accessions with hardware-accelerated interactive 3D rotation.
+          </div>
+        </div>
+
+        <!-- Yavanna Bio-Entity Explorer -->
+        <div class="elven-card">
+          <div class="elven-card-header">
+            <div class="elven-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+            </div>
+            <div>
+              <div class="elven-title">Yavanna Bio-Entity Explorer</div>
+              <div class="elven-subtitle">Live NCBI &amp; UniProt REST Engine</div>
+            </div>
+          </div>
+          <div class="elven-desc">
+            Named after the Giver of Fruits, Queen of the Earth and living things. Integrates directly into your editor buffer to query NCBI Entrez, UniProtKB, and Ensembl in real time—instantly inserting verified gene symbols, protein sequences, and ontology terms with full provenance links.
+          </div>
+        </div>
+
+        <!-- Elbereth Biostatistics Engine -->
+        <div class="elven-card">
+          <div class="elven-card-header">
+            <div class="elven-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+            </div>
+            <div>
+              <div class="elven-title">Elbereth Biostatistics Engine</div>
+              <div class="elven-subtitle">ICH E9 &amp; Kaplan-Meier Diagnostics</div>
+            </div>
+          </div>
+          <div class="elven-desc">
+            Named after Varda Elentári, the Star-Kindler whose light illuminates the dark. Illuminates clinical trial data through rigorous statistical verification: Kaplan-Meier survival curves, Cox Proportional Hazards estimators, and sample-size power analyses compliant with international ICH E9 regulatory standards.
+          </div>
+        </div>
+
+        <!-- Elrond AI Copilot -->
+        <div class="elven-card">
+          <div class="elven-card-header">
+            <div class="elven-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <div>
+              <div class="elven-title">Elrond AI Copilot</div>
+              <div class="elven-subtitle">Wise, Private &amp; Offline Assistant</div>
+            </div>
+          </div>
+          <div class="elven-desc">
+            Named after the Master of Rivendell, bearer of Vilya (the Ring of Air). A wise, calm, strictly opt-in intelligence docked beside your manuscript. Formats statistical code chunks in place, diagnoses execution failures, and falls back seamlessly across high-speed free AI endpoints or local Vulkan models.
+          </div>
+        </div>
+
+        <!-- Arekyer Galaxy Cloud Bridge -->
+        <div class="elven-card">
+          <div class="elven-card-header">
+            <div class="elven-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+            </div>
+            <div>
+              <div class="elven-title">Arekyer Galaxy Bridge</div>
+              <div class="elven-subtitle">Cloud High-Throughput Sync</div>
+            </div>
+          </div>
+          <div class="elven-desc">
+            Seamlessly connects your local GTK4 workbench to UseGalaxy.org, UseGalaxy.eu, and private Galaxy instances. Inspect remote histories, monitor long-running FASTQ/BAM workflow jobs, and stream finished count matrices directly into your local R or Python workspace.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4-QUADRANT WORKBENCH SECTION -->
     <section id="workbench">
       <div class="section-header">
-        <div class="section-eyebrow">02 // The Scientific Canvas</div>
-        <h2 class="section-title">The 4-Quadrant Workbench &amp; Single-Pane Writer</h2>
+        <div class="section-eyebrow">03 // The Scientific Workbench</div>
+        <h2 class="section-title">The Four Quadrants of Discovery</h2>
         <p class="section-subtitle">
-          Adaptive dual-mode desktop ergonomics: focus in calm Single-Pane Writer mode for Markdown manuscripts, or engage the full 4-Quadrant Workbench for heavy computational science.
+          Modeled after the battle-tested RStudio layout, reimagined natively with GNOME Libadwaita ergonomics, buttery-smooth GPU scrolling, and instant tab switching.
         </p>
       </div>
 
       <div class="quadrant-grid">
-        <div class="quadrant-box">
-          <span class="quadrant-tag">Q1 // Top-Left</span>
-          <h4>Polyglot Source Editor (GtkSourceView 5)</h4>
-          <p>
-            Precision editor for Quarto (<code>.qmd</code>), R Markdown (<code>.Rmd</code>), Jupyter (<code>.ipynb</code>), R, and Python. Features Positron/RStudio-style direct chunk updates, code folding, diagnostic underlines, and inline mathematical equation syntax highlighting.
-          </p>
-          <div class="card-meta">GtkSourceView 5.10 · Quarto Chunk Option Preserver · Jupyter nbformat 4.5</div>
+        <div class="quadrant-card">
+          <div class="quadrant-tag">QUADRANT 1 // TOP LEFT</div>
+          <div class="quadrant-title">GtkSourceView 5 Polyglot Editor</div>
+          <div class="quadrant-body">
+            Hardware-accelerated text engine supporting Quarto (<code>.qmd</code>), R Markdown (<code>.Rmd</code>), Jupyter (<code>.ipynb</code>), R, Python, and Julia. Features intelligent syntax highlighting, code folding, breadcrumb navigation, and line-by-line chunk execution (<code>Ctrl+Enter</code>).
+          </div>
         </div>
 
-        <div class="quadrant-box">
-          <span class="quadrant-tag">Q2 // Bottom-Left</span>
-          <h4>Persistent Polyglot Consoles &amp; Terminals</h4>
-          <p>
-            Persistent REPL execution for R, Python, Julia, Bash, and SQL. Run lines with <code>Ctrl+Enter</code>, execute active chunks with <code>Ctrl+Shift+Enter</code>, or run and advance with <code>Shift+Enter</code>. Complete with ANSI color escape handling.
-          </p>
-          <div class="card-meta">Persistent PTY · VTE Terminal · Isolated Child Subprocesses · renv / .venv</div>
+        <div class="quadrant-card">
+          <div class="quadrant-tag">QUADRANT 2 // BOTTOM LEFT</div>
+          <div class="quadrant-title">Persistent Polyglot PTY Consoles</div>
+          <div class="quadrant-body">
+            Direct pseudo-terminal integration with R, Python, Bash, and Julia sessions. Zero browser emulation latency. Features command history search, variable auto-completion, and dedicated output streaming with zero UI thread blocking.
+          </div>
         </div>
 
-        <div class="quadrant-box">
-          <span class="quadrant-tag">Q3 // Top-Right</span>
-          <h4>Environment, Citations &amp; Arekyer Bridge</h4>
-          <p>
-            Inspect workspace objects, historical commands, document outlines, and Zotero BetterBibTeX/CSL libraries. Access the <strong>Arekyer Galaxy Bridge</strong> to browse cloud genomics histories without leaving your editor.
-          </p>
-          <div class="card-meta">Gtk.ColumnView DataFrames · Zotero CSL · Galaxy History API · libsecret-1</div>
+        <div class="quadrant-card">
+          <div class="quadrant-tag">QUADRANT 3 // TOP RIGHT</div>
+          <div class="quadrant-title">Environment &amp; Cloud Inspector</div>
+          <div class="quadrant-body">
+            Real-time inspection of active data frames, matrices, vectors, and model objects. Switch seamlessly between local workspace variables, document headings outline, Zotero CSL bibliographies, and the remote Arekyer Galaxy workflow queue.
+          </div>
         </div>
 
-        <div class="quadrant-box">
-          <span class="quadrant-tag">Q4 // Bottom-Right</span>
-          <h4>Live Quarto Preview, Plots &amp; Shiny Viewer</h4>
-          <p>
-            Hardware-accelerated WebKitGTK 6.0 rendering for live Quarto HTML/PDF manuscripts, interactive KaTeX equations, Mol* 3D structural canvases, Cairo ggplot2 graphs, and ephemeral-port R Shiny applications (<code>Ctrl+Shift+A</code>).
-          </p>
-          <div class="card-meta">WebKitGTK 6.0 · Cairo Graphics · Mol* WebGL · R Shiny Ephemeral Host</div>
+        <div class="quadrant-card">
+          <div class="quadrant-tag">QUADRANT 4 // BOTTOM RIGHT</div>
+          <div class="quadrant-title">Live Preview, Cairo Plots &amp; Shiny</div>
+          <div class="quadrant-body">
+            Live WebKitGTK 6.0 preview rendered simultaneously with source changes. Interactive Cairo plot viewer with SVG/PDF export, CRAN/PyPI package manager, and an embedded proxy running interactive Shiny web applications on ephemeral ports.
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- ELROND AI COPILOT SUITE -->
+    <!-- ELROND AI COPILOT SECTION -->
     <section id="elrond-ai">
       <div class="section-header">
-        <div class="section-eyebrow">03 // Intelligent Coding &amp; Editorial Copilot</div>
-        <h2 class="section-title">Elrond AI: Direct Buffer Writing &amp; Multi-Tier Failover</h2>
+        <div class="section-eyebrow">04 // Intelligent Research Partner</div>
+        <h2 class="section-title">Elrond: Positron-Style In-Buffer Writing</h2>
         <p class="section-subtitle">
-          Designed specifically for scientists who need surgical refactoring without vendor lock-in or quota exhaustion surprises.
+          Say goodbye to copying and pasting code out of web chatbots. Elrond edits your manuscript buffers directly in place while safeguarding scientific accuracy and YAML chunk options.
         </p>
       </div>
 
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-icon">✍️</div>
-          <h3>Positron-Style Direct Editor Writing</h3>
-          <p>
-            Press <strong><code>Ctrl+Shift+E</code></strong> to summon Elrond AI. Apply refactored statistical logic directly into active buffer selections or entire Quarto code chunks. Elrond preserves your Quarto YAML headers (<code>#| label</code>, <code>#| fig-cap</code>, <code>#| fig-width</code>, <code>#| echo</code>) and supports single-step <code>Ctrl+Z</code> undo.
-          </p>
-          <div class="card-meta">Stack: AiBufferEditHelper · Zero YAML Churn · GtkSourceView 5 Undo Stack</div>
+      <div class="quadrant-grid">
+        <div class="quadrant-card">
+          <div class="quadrant-tag">ZERO CHURN EDITING</div>
+          <div class="quadrant-title">In-Place Chunk Refactoring</div>
+          <div class="quadrant-body">
+            Elrond detects active Quarto code fences and rewrites R/Python logic in place without altering surrounding narrative prose or YAML metadata. Full undo/redo integration via native GTK buffers.
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-icon">⚡</div>
-          <h3>Free-Tier Multi-Provider Quota Failover</h3>
-          <p>
-            Connect permanent free-tier models across <strong>Groq</strong>, <strong>Cerebras</strong>, <strong>OpenRouter <code>:free</code></strong>, <strong>GitHub Models</strong>, and <strong>FreeLLMAPI Local Proxy</strong>. When a primary cloud provider returns <code>HTTP 429 Rate Limit</code>, Imladris automatically cascades to your backup provider in milliseconds.
-          </p>
-          <div class="card-meta">Stack: Groq (llama-3.3-70b) · Cerebras · OpenRouter :free · GitHub Models</div>
+        <div class="quadrant-card">
+          <div class="quadrant-tag">RESILIENT MULTI-PROVIDER</div>
+          <div class="quadrant-title">Automated Free-Tier Failover</div>
+          <div class="quadrant-body">
+            Connect high-speed, generous free AI providers with automatic round-robin failover: <strong>Cerebras Llama-3.3 70B &rarr; Groq Llama-3.3 70B &rarr; Gemini 2.5 Flash &rarr; Claude 3.5 Sonnet &rarr; OpenAI GPT-4o</strong>. If one endpoint hits rate limits, Imladris seamlessly reroutes your request in 100ms.
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-icon">🔑</div>
-          <h3>GitHub Copilot OAuth Device Flow</h3>
-          <p>
-            Sign into your GitHub Copilot subscription directly from <strong>AI Settings</strong> using RFC 8628 GitHub Device Flow (<code>https://github.com/login/device</code>). Tokens are encrypted in the Linux OS keyring via <code>libsecret-1</code> with secure <code>0600</code> disk fallback.
-          </p>
-          <div class="card-meta">Stack: RFC 8628 Device Flow · libsecret-1 · CopilotAuthService</div>
+        <div class="quadrant-card">
+          <div class="quadrant-tag">OFFLINE &amp; AIR-GAPPED</div>
+          <div class="quadrant-title">Standalone Vulkan llama.cpp</div>
+          <div class="quadrant-body">
+            Working in an air-gapped hospital network or proprietary lab? Enable the bundled Vulkan-accelerated <code>llama-server</code> to run quantized GGUF models locally on your GPU with zero cloud data transmission.
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-icon">🛡️</div>
-          <h3>100% Offline Local Inference</h3>
-          <p>
-            Run completely air-gapped on your workstation using local Ollama, LM Studio, Cherry Studio, or zero-config <code>llama-server</code> with Vulkan/CUDA acceleration. Zero telemetry, zero silent cloud fallback, and full HIPAA/GDPR compliance.
-          </p>
-          <div class="card-meta">Stack: llama-server · Ollama · LM Studio · Antigravity CLI (agy)</div>
+        <div class="quadrant-card">
+          <div class="quadrant-tag">STRICT PRIVACY</div>
+          <div class="quadrant-title">Zero Telemetry &amp; Opt-In Keys</div>
+          <div class="quadrant-body">
+            Imladris contains zero analytics trackers, telemetry daemons, or user monitoring. API keys are encrypted securely in the Linux FreeDesktop Secret Service keyring (GNOME Keyring / KWallet).
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- SCIENTIFIC DOMAIN STUDIOS ("THE CROWN JEWELS") -->
-    <section id="studios">
-      <div class="section-header">
-        <div class="section-eyebrow">04 // Native Domain Intelligence</div>
-        <h2 class="section-title">Specialized Studios for Real-World Lab &amp; Clinical Work</h2>
-        <p class="section-subtitle">
-          Eliminate disconnected web tools and ad-hoc scripts. Imladris embeds deep domain functionality directly into your authoring surface.
-        </p>
-      </div>
-
-      <div class="grid-3">
-        <div class="card">
-          <div class="card-icon">🧬</div>
-          <h3>Yavanna: Bio-Entity &amp; RT-qPCR Studio</h3>
-          <p>
-            Molecular biology suite for primer design, biological cataloging, and qPCR analysis. Computes primer melting temperatures (T<sub>m</sub>), GC percentage, molecular weight, and reverse-complement matrices with asynchronous UniProtKB &amp; Ensembl GRCh38 lookup.
-          </p>
-          <div class="card-meta">UniProtKB · Ensembl GRCh38 · Oligo Tm &amp; GC% · libsoup-3.0</div>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">🔬</div>
-          <h3>Taniquetil: AlphaFold DB 3D Bridge</h3>
-          <p>
-            Structural biology bridge linking AlphaFold DB and RCSB PDB directly into your canvas. Inspect per-residue pLDDT confidence tracks via Cairo and inject reproducible <code>bio3d</code> (R) and <code>biotite</code> (Python) coordinate loaders.
-          </p>
-          <div class="card-meta">AlphaFold DB · RCSB PDB · Cairo pLDDT Tracks · bio3d / biotite</div>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">📊</div>
-          <h3>Elbereth: ICH E9 Clinical Biostatistics</h3>
-          <p>
-            Regulatory-grade biostatistics studio designed around ICH E9 guidelines. Compute sample size and statistical power (continuous, Casagrande-Pike proportions, Schoenfeld log-rank survival), draw live Cairo power curves, and generate CDISC ADSL Table 1 code.
-          </p>
-          <div class="card-meta">ICH E9 Conformance · Schoenfeld Survival · Cairo Curves · CDISC</div>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">🌌</div>
-          <h3>Arekyer: Galaxy-to-Quarto Bridge</h3>
-          <p>
-            Browse Galaxy Project histories (<code>usegalaxy.eu</code>, <code>usegalaxy.org</code>, <code>usegalaxy.org.au</code>) natively. Store your Galaxy API keys in <code>libsecret-1</code> and inject verified <code>httr2</code> and <code>pandas</code> data ingestion chunks with full provenance headers.
-          </p>
-          <div class="card-meta">Galaxy REST API · libsecret-1 · httr2 (R) · pandas (Python)</div>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">📐</div>
-          <h3>MathChem: Natural Formula Studio</h3>
-          <p>
-            Press <strong><code>Ctrl+M</code></strong> to write formulas naturally (e.g. <code>6CO2(g) + 6H2O(l) -&gt;[h*nu] C6H12O6(aq) + 6O2(g)</code>) and convert instantaneously into LaTeX (<code>\ce{...}</code>, <code>$$...$$</code>) or Markdown subscripts/superscripts.
-          </p>
-          <div class="card-meta">MathChemEngine · mhchem LaTeX · Unicode Scientific Parser</div>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">🗺️</div>
-          <h3>Visual Flow &amp; Mindmap Studio</h3>
-          <p>
-            Press <strong><code>Ctrl+Shift+D</code></strong> to summon an interactive Cairo 2D visual canvas. Mindmaps and architecture flowcharts synchronize two-way with Quarto <code>```{mermaid}</code> and Markdown blocks in your manuscript.
-          </p>
-          <div class="card-meta">Cairo 2D Engine · Mermaid.js Syntax Sync · Live Manuscript Anchor</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SCREENSHOT GALLERY -->
+    <!-- REAL SCREENSHOT SHOWCASE GALLERY -->
     <section id="gallery">
       <div class="section-header">
         <div class="section-eyebrow">05 // Visual Showcase</div>
-        <h2 class="section-title">Designed for GNOME &amp; Libadwaita Elegance</h2>
+        <h2 class="section-title">Authentic Screenshots from Running App</h2>
         <p class="section-subtitle">
-          Imladris follows GNOME Human Interface Guidelines (HIG) with adaptive dark/light theming, high-DPI font scaling, and custom accent colors.
+          Every screenshot displayed below is captured directly from the live v0.25.0 application running natively on Linux with GNOME 47 and Libadwaita.
         </p>
       </div>
 
       <div class="gallery-grid">
+        <!-- Figure 1: Welcome Hub -->
         <div class="gallery-item">
-          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-welcome.png" alt="Progressive-Disclosure Welcome Hub and Session Crash Recovery" loading="lazy" width="960" height="600">
+          <img src="assets/screenshots/imladris-welcome.png" alt="Progressive-Disclosure Welcome Hub and Session Restoration" loading="lazy" width="1430" height="910">
           <div class="gallery-caption">
-            <h4>Figure 1 // Welcome Hub &amp; Session Crash Recovery</h4>
-            <p>Clean, progressive-disclosure start screen featuring one-click starters for Quarto notebooks, R scripts, and Shiny apps, paired with automated session restoration for unsaved work.</p>
+            <h4>Figure 1 // Welcome Hub &amp; Session Restoration</h4>
+            <p>Clean progressive-disclosure hub featuring one-click starters for Quarto notebooks, R scripts, Shiny apps, and automatic recovery of unsaved research buffers.</p>
           </div>
         </div>
 
+        <!-- Figure 2: Elrond AI Copilot -->
         <div class="gallery-item">
-          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-ai-copilot.png" alt="Elrond AI Copilot and 4-Quadrant Polyglot Workbench" loading="lazy" width="960" height="600">
+          <img src="assets/screenshots/imladris-ai-copilot.png" alt="Elrond AI Copilot and 4-Quadrant Polyglot Workbench" loading="lazy" width="1609" height="910">
           <div class="gallery-caption">
             <h4>Figure 2 // Elrond AI Copilot &amp; 4-Quadrant Workbench</h4>
-            <p>Context-aware AI assistance docked alongside your live Quarto manuscript. Features smart context chips, direct in-buffer refactoring, timestamped execution history, and package management.</p>
+            <p>Context-aware assistant docked alongside a live RNA-seq manuscript. Features smart context chips, direct in-buffer refactoring, and package diagnostics.</p>
           </div>
         </div>
 
+        <!-- Figure 3: Workspace Preferences -->
         <div class="gallery-item">
-          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-workspace.png" alt="Workspace Layout Preferences and GPU Hardware Acceleration" loading="lazy" width="960" height="600">
+          <img src="assets/screenshots/imladris-preferences-workspace.png" alt="Workspace Layout Preferences and GPU Acceleration" loading="lazy" width="1430" height="910">
           <div class="gallery-caption">
-            <h4>Figure 3 // Workspace Layout &amp; GPU Hardware Preferences</h4>
-            <p>Comprehensive customization controls. Seamlessly switch between the 4-quadrant workbench and distraction-free focus mode, adjust editor zoom, and enable OpenGL/Vulkan acceleration.</p>
+            <h4>Figure 3 // Workspace Layout &amp; GPU Preferences</h4>
+            <p>Comprehensive layout controls. Toggle between the 4-quadrant workbench and distraction-free single-pane focus mode, configure fonts, and enable Vulkan acceleration.</p>
           </div>
         </div>
 
+        <!-- Figure 4: Libadwaita Theming -->
         <div class="gallery-item">
-          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-theming.png" alt="Libadwaita Theming and Eye-Friendly Accent Customizer" loading="lazy" width="960" height="600">
+          <img src="assets/screenshots/imladris-preferences-theming.png" alt="Libadwaita Theming and Eye-Friendly Accent Customizer" loading="lazy" width="1430" height="910">
           <div class="gallery-caption">
             <h4>Figure 4 // Libadwaita Theming &amp; Accent Customizer</h4>
-            <p>Native Libadwaita aesthetics with seamless dark/light switching, custom accent palettes (Teal, Frost, Amber, Slate), and low-strain Eye Friendly mode for late-night research sessions.</p>
+            <p>Pure Libadwaita styling with seamless system dark/light switching, custom accent palettes (Frost, Teal, Gold, Slate), and low-strain Eye Friendly mode.</p>
           </div>
         </div>
       </div>
@@ -1176,180 +1485,270 @@
     <section id="install">
       <div class="section-header">
         <div class="section-eyebrow">06 // Installation &amp; Packages</div>
-        <h2 class="section-title">Install Imladris v0.25.0 Across Linux Distributions</h2>
+        <h2 class="section-title">Install Imladris v0.25.0 Across Linux Systems</h2>
         <p class="section-subtitle">
-          Sandboxed Flatpak, native Debian/Ubuntu (.deb), Fedora/RHEL (.rpm), Arch Linux (AUR), and clean source builds via Meson &amp; Ninja.
+          Sandboxed Flatpak via Flatpark, native packages for all major distributions, and containerized Docker/Podman environments.
         </p>
       </div>
 
       <div class="install-matrix">
         <div class="install-tabs" role="tablist">
-          <button class="tab-btn active" onclick="switchTab('flatpak', this)" role="tab" aria-selected="true">Flatpak / Flatpark</button>
+          <button class="tab-btn active" onclick="switchTab('quick', this)" role="tab" aria-selected="true">⚡ Universal Quick Script</button>
+          <button class="tab-btn" onclick="switchTab('flatpark', this)" role="tab" aria-selected="false">📦 Flatpark (Recommended)</button>
           <button class="tab-btn" onclick="switchTab('deb', this)" role="tab" aria-selected="false">Debian / Ubuntu / elementary</button>
-          <button class="tab-btn" onclick="switchTab('rpm', this)" role="tab" aria-selected="false">Fedora / RHEL / openSUSE</button>
+          <button class="tab-btn" onclick="switchTab('rpm', this)" role="tab" aria-selected="false">Fedora / RHEL / CentOS</button>
+          <button class="tab-btn" onclick="switchTab('suse', this)" role="tab" aria-selected="false">openSUSE (zypper)</button>
           <button class="tab-btn" onclick="switchTab('aur', this)" role="tab" aria-selected="false">Arch Linux (AUR)</button>
           <button class="tab-btn" onclick="switchTab('nixos', this)" role="tab" aria-selected="false">NixOS (Flakes)</button>
           <button class="tab-btn" onclick="switchTab('solus', this)" role="tab" aria-selected="false">Solus (ypkg)</button>
-          <button class="tab-btn" onclick="switchTab('source', this)" role="tab" aria-selected="false">Source &amp; Container</button>
+          <button class="tab-btn" onclick="switchTab('docker', this)" role="tab" aria-selected="false">Podman / Docker</button>
+          <button class="tab-btn" onclick="switchTab('source', this)" role="tab" aria-selected="false">Source (Meson)</button>
         </div>
 
-        <!-- Flatpak Pane -->
-        <div id="pane-flatpak" class="tab-pane active" role="tabpanel">
+        <!-- Tab 1: Universal Quick Script -->
+        <div id="pane-quick" class="tab-pane active" role="tabpanel">
           <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Recommended for sandboxed security and automated updates via the Flatpark repository:
+            Our self-contained shell installer inspects your Linux distribution and automatically sets up the optimal package (Flatpark or native binary):
           </p>
           <div class="install-command-box">
-            <code>flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo
-flatpak install flatpark io.github.Antux912012.Imladris
-flatpak run io.github.Antux912012.Imladris</code>
-            <button class="copy-icon-btn" onclick="copySnippet('flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo\nflatpak install flatpark io.github.Antux912012.Imladris\nflatpak run io.github.Antux912012.Imladris', this)" title="Copy Commands">
+            <code># Using curl:
+curl -fsSL https://antux912012.github.io/imladris/install.sh | bash
+
+# Or using wget:
+wget -qO- https://antux912012.github.io/imladris/install.sh | bash</code>
+            <button class="copy-icon-btn" onclick="copySnippet('curl -fsSL https://antux912012.github.io/imladris/install.sh | bash', this)" title="Copy Universal Command">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ View on Flatpark App Store</a>
+          <span style="font-size: 0.82rem; color: var(--text-muted);">Supports Debian, Ubuntu, Fedora, openSUSE, Arch, Solus, and elementary OS with automated SHA-256 validation.</span>
         </div>
 
-        <!-- Debian / Ubuntu Pane -->
+        <!-- Tab 2: Flatpark -->
+        <div id="pane-flatpark" class="tab-pane" role="tabpanel">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-frost);">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            <p style="color: var(--text-secondary); margin: 0;">
+              Imladris is officially published on the <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" target="_blank" rel="noopener noreferrer" style="color: var(--accent-frost); font-weight: 600;">Flatpark App Store</a> for sandboxed execution targeting <code>org.gnome.Platform//51</code>:
+            </p>
+          </div>
+          <div class="install-command-box">
+            <code># 1. Add Flatpark repository
+flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo
+
+# 2. Install Imladris Flatpak
+flatpak install flatpark io.github.Antux912012.Imladris
+
+# 3. Launch Imladris
+flatpak run io.github.Antux912012.Imladris</code>
+            <button class="copy-icon-btn" onclick="copySnippet('flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo\nflatpak install flatpark io.github.Antux912012.Imladris\nflatpak run io.github.Antux912012.Imladris', this)" title="Copy Flatpark Commands">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+          <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" class="btn btn-flatpark" target="_blank" rel="noopener noreferrer">→ Visit Flatpark App Page</a>
+        </div>
+
+        <!-- Tab 3: Debian / Ubuntu / elementary -->
         <div id="pane-deb" class="tab-pane" role="tabpanel">
           <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Native 64-bit Debian package for Ubuntu 22.04+, Debian 12+, Linux Mint, and Pop!_OS:
+            Native 64-bit package for Ubuntu 22.04 / 24.04, Debian 12 (Bookworm), elementary OS 7/8, Linux Mint, and Pop!_OS:
           </p>
           <div class="install-command-box">
-            <code># Download and install the .deb release package:
-sudo dpkg -i imladris_0.25.0_amd64.deb
-sudo apt-get install -f</code>
-            <button class="copy-icon-btn" onclick="copySnippet('sudo dpkg -i imladris_0.25.0_amd64.deb\nsudo apt-get install -f', this)" title="Copy Commands">
+            <code># Download and install pre-built .deb:
+wget https://github.com/Antux912012/imladris/releases/download/v0.25.0/imladris_0.25.0_amd64.deb
+sudo dpkg -i imladris_0.25.0_amd64.deb || sudo apt-get install -f -y
+imladris</code>
+            <button class="copy-icon-btn" onclick="copySnippet('wget https://github.com/Antux912012/imladris/releases/download/v0.25.0/imladris_0.25.0_amd64.deb\nsudo dpkg -i imladris_0.25.0_amd64.deb || sudo apt-get install -f -y\nimladris', this)" title="Copy Debian Commands">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ Download .deb from GitHub Releases</a>
+          <a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ View GitHub Release Assets</a>
         </div>
 
-        <!-- Fedora / RHEL / CentOS / AlmaLinux / openSUSE Pane -->
+        <!-- Tab 4: Fedora / RHEL / CentOS / AlmaLinux -->
         <div id="pane-rpm" class="tab-pane" role="tabpanel">
           <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Native RPM package for Fedora 39+, RHEL 9+, CentOS Stream, AlmaLinux, and openSUSE:
+            Native RPM package built for Fedora 40/41, RHEL 9+, CentOS Stream, and AlmaLinux 9+:
           </p>
           <div class="install-command-box">
-            <code># Fedora / RHEL / CentOS / AlmaLinux:
-sudo dnf install ./imladris-0.25.0-1.x86_64.rpm
-
-# openSUSE:
-sudo zypper install ./imladris-0.25.0-1.x86_64.rpm</code>
-            <button class="copy-icon-btn" onclick="copySnippet('sudo dnf install ./imladris-0.25.0-1.x86_64.rpm', this)" title="Copy Command">
+            <code># Install directly with dnf:
+sudo dnf install -y https://github.com/Antux912012/imladris/releases/download/v0.25.0/imladris-0.25.0-1.fc41.x86_64.rpm
+imladris</code>
+            <button class="copy-icon-btn" onclick="copySnippet('sudo dnf install -y https://github.com/Antux912012/imladris/releases/download/v0.25.0/imladris-0.25.0-1.fc41.x86_64.rpm\nimladris', this)" title="Copy RPM Commands">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ Download .rpm from GitHub Releases</a>
         </div>
 
-        <!-- Arch Linux (AUR) Pane -->
+        <!-- Tab 5: openSUSE -->
+        <div id="pane-suse" class="tab-pane" role="tabpanel">
+          <p style="margin-bottom: 12px; color: var(--text-secondary);">
+            Installation for openSUSE Tumbleweed and Leap 15.6 via zypper:
+          </p>
+          <div class="install-command-box">
+            <code># Install via zypper:
+sudo zypper install https://github.com/Antux912012/imladris/releases/download/v0.25.0/imladris-0.25.0-1.fc41.x86_64.rpm
+imladris</code>
+            <button class="copy-icon-btn" onclick="copySnippet('sudo zypper install https://github.com/Antux912012/imladris/releases/download/v0.25.0/imladris-0.25.0-1.fc41.x86_64.rpm\nimladris', this)" title="Copy openSUSE Command">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 6: Arch Linux (AUR) -->
         <div id="pane-aur" class="tab-pane" role="tabpanel">
           <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Install on Arch Linux, Manjaro, or EndeavourOS via your favorite AUR helper:
+            Available on the Arch User Repository (AUR) via paru or yay:
           </p>
           <div class="install-command-box">
-            <code># Using paru:
+            <code># Using yay:
+yay -S imladris
+
+# Or using paru:
 paru -S imladris
 
-# Or using yay:
-yay -S imladris</code>
-            <button class="copy-icon-btn" onclick="copySnippet('paru -S imladris', this)" title="Copy Command">
+# Or manual makepkg build from packaging directory:
+git clone https://github.com/Antux912012/imladris.git
+cd imladris/packaging && makepkg -si</code>
+            <button class="copy-icon-btn" onclick="copySnippet('yay -S imladris', this)" title="Copy AUR Command">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
         </div>
 
-        <!-- NixOS (Flakes) Pane -->
+        <!-- Tab 7: NixOS (Flakes) -->
         <div id="pane-nixos" class="tab-pane" role="tabpanel">
           <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Run or build reproducibly on NixOS using the included <code>flake.nix</code> (with <code>wrapGAppsHook4</code>):
+            Hermetic NixOS flake definition with complete <code>wrapGAppsHook4</code> integration:
           </p>
           <div class="install-command-box">
-            <code># Run directly with Nix Flakes:
+            <code># Run directly with Nix:
 nix run github:Antux912012/imladris
 
-# Or build locally:
-nix build .#default &amp;&amp; ./result/bin/imladris</code>
-            <button class="copy-icon-btn" onclick="copySnippet('nix run github:Antux912012/imladris', this)" title="Copy Command">
+# Or install to your user environment:
+nix profile install github:Antux912012/imladris</code>
+            <button class="copy-icon-btn" onclick="copySnippet('nix run github:Antux912012/imladris', this)" title="Copy Nix Command">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <a href="https://github.com/Antux912012/imladris/blob/main/flake.nix" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ View flake.nix</a>
         </div>
 
-        <!-- Solus (ypkg) Pane -->
+        <!-- Tab 8: Solus (ypkg) -->
         <div id="pane-solus" class="tab-pane" role="tabpanel">
           <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Build and install on Solus using the included <code>ypkg</code> recipe (<code>packaging/package.yml</code>):
+            Native Solus package definition provided at <code>packaging/package.yml</code>:
+          </p>
+          <div class="install-command-box">
+            <code># Build Solus package from source using solbuild:
+git clone https://github.com/Antux912012/imladris.git
+cd imladris
+ypkg build packaging/package.yml
+sudo eopkg it imladris*.eopkg</code>
+            <button class="copy-icon-btn" onclick="copySnippet('ypkg build packaging/package.yml\nsudo eopkg it imladris*.eopkg', this)" title="Copy Solus Commands">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 9: Docker & Podman -->
+        <div id="pane-docker" class="tab-pane" role="tabpanel">
+          <p style="margin-bottom: 12px; color: var(--text-secondary);">
+            Reproducible multi-stage container build with Podman or Docker:
+          </p>
+          <div class="install-command-box">
+            <code># Build container image:
+podman build -t imladris:0.25.0 .
+
+# Run with host display forwarding:
+podman run --rm -it \
+  -e DISPLAY=$DISPLAY \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
+  -v $HOME:/workspace \
+  imladris:0.25.0</code>
+            <button class="copy-icon-btn" onclick="copySnippet('podman build -t imladris:0.25.0 .\npodman run --rm -it -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix:ro -v $HOME:/workspace imladris:0.25.0', this)" title="Copy Podman Commands">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 10: Compile from Source -->
+        <div id="pane-source" class="tab-pane" role="tabpanel">
+          <p style="margin-bottom: 12px; color: var(--text-secondary);">
+            Standard Meson and Ninja build workflow from clean source code:
           </p>
           <div class="install-command-box">
             <code>git clone https://github.com/Antux912012/imladris.git
-cd imladris/packaging
-sudo solbuild build package.yml</code>
-            <button class="copy-icon-btn" onclick="copySnippet('git clone https://github.com/Antux912012/imladris.git\ncd imladris/packaging\nsudo solbuild build package.yml', this)" title="Copy Commands">
+cd imladris
+meson setup build --prefix=/usr
+ninja -C build
+sudo ninja -C build install</code>
+            <button class="copy-icon-btn" onclick="copySnippet('git clone https://github.com/Antux912012/imladris.git\ncd imladris\nmeson setup build --prefix=/usr\nninja -C build\nsudo ninja -C build install', this)" title="Copy Meson Commands">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <a href="https://github.com/Antux912012/imladris/blob/main/packaging/package.yml" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ View Solus package.yml</a>
-        </div>
-
-        <!-- Source & Container Build Pane -->
-        <div id="pane-source" class="tab-pane" role="tabpanel">
-          <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Compile natively with Meson &amp; Ninja, or build inside an isolated Podman/Docker container using the included <code>Dockerfile</code>:
-          </p>
-          <div class="install-command-box">
-            <code># Native Meson &amp; Ninja build:
-git clone https://github.com/Antux912012/imladris.git &amp;&amp; cd imladris
-meson setup build-release --buildtype=release
-meson compile -C build-release
-GSETTINGS_BACKEND=memory meson test -C build-release --print-errorlogs
-
-# Or build in a clean Podman/Docker container:
-podman build -t imladris-builder .</code>
-            <button class="copy-icon-btn" onclick="copySnippet('git clone https://github.com/Antux912012/imladris.git && cd imladris\nmeson setup build-release --buildtype=release\nmeson compile -C build-release\nGSETTINGS_BACKEND=memory meson test -C build-release --print-errorlogs', this)" title="Copy Commands">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            </button>
-          </div>
-          <a href="https://github.com/Antux912012/imladris/blob/main/Dockerfile" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ View Dockerfile</a>
         </div>
       </div>
+    </section>
 
-      <!-- Essential Keyboard Shortcuts -->
-      <h3 style="margin-top: 48px; margin-bottom: 16px; font-size: 1.3rem;">Scientific Productivity Cheatsheet</h3>
+    <!-- KEYBOARD ACCELERATOR REFERENCE -->
+    <section id="shortcuts">
+      <div class="section-header">
+        <div class="section-eyebrow">07 // Muscle Memory</div>
+        <h2 class="section-title">Familiar RStudio &amp; POSIX Shortcuts</h2>
+        <p class="section-subtitle">
+          Engineered to match standard data science habits without requiring cognitive retraining.
+        </p>
+      </div>
+
       <div class="shortcuts-grid">
         <div class="shortcut-card">
-          <span>Direct Editor Writing (Elrond)</span>
-          <span class="kbd-badge">Ctrl + Shift + E</span>
+          <span>Run Selected Line / Expression</span>
+          <span class="kbd-badge">Ctrl + Enter</span>
         </div>
         <div class="shortcut-card">
-          <span>Math &amp; Chemistry Studio</span>
-          <span class="kbd-badge">Ctrl + M</span>
-        </div>
-        <div class="shortcut-card">
-          <span>Mermaid Mindmap Studio</span>
-          <span class="kbd-badge">Ctrl + Shift + D</span>
-        </div>
-        <div class="shortcut-card">
-          <span>Run Active Chunk in Place</span>
+          <span>Run Current Chunk</span>
           <span class="kbd-badge">Ctrl + Shift + Enter</span>
         </div>
         <div class="shortcut-card">
-          <span>Run Chunk &amp; Advance</span>
-          <span class="kbd-badge">Shift + Enter</span>
+          <span>Insert Code Chunk</span>
+          <span class="kbd-badge">Ctrl + Alt + I</span>
         </div>
         <div class="shortcut-card">
-          <span>Run / Stop Active Shiny App</span>
+          <span>Insert Native Pipe (|&gt; / %&gt;%)</span>
+          <span class="kbd-badge">Ctrl + Shift + M</span>
+        </div>
+        <div class="shortcut-card">
+          <span>Insert Assignment Arrow (&lt;-)</span>
+          <span class="kbd-badge">Alt + -</span>
+        </div>
+        <div class="shortcut-card">
+          <span>Render Quarto / R Markdown</span>
+          <span class="kbd-badge">Ctrl + Shift + K</span>
+        </div>
+        <div class="shortcut-card">
+          <span>Summon Elrond AI Copilot</span>
+          <span class="kbd-badge">Ctrl + Shift + E</span>
+        </div>
+        <div class="shortcut-card">
+          <span>Universal Command Palette</span>
+          <span class="kbd-badge">Ctrl + Shift + P</span>
+        </div>
+        <div class="shortcut-card">
+          <span>Switch Focus to Editor</span>
+          <span class="kbd-badge">Ctrl + 1</span>
+        </div>
+        <div class="shortcut-card">
+          <span>Switch Focus to Console</span>
+          <span class="kbd-badge">Ctrl + 2</span>
+        </div>
+        <div class="shortcut-card">
+          <span>Launch Interactive Shiny App</span>
           <span class="kbd-badge">Ctrl + Shift + A</span>
         </div>
         <div class="shortcut-card">
-          <span>Polyglot IntelliSense</span>
-          <span class="kbd-badge">Ctrl + Space</span>
-        </div>
-        <div class="shortcut-card">
-          <span>Hardened MCP Server stdio</span>
-          <span class="kbd-badge">imladris --mcp-server</span>
+          <span>Toggle 4-Pane / Focus Mode</span>
+          <span class="kbd-badge">Ctrl + F1</span>
         </div>
       </div>
     </section>
@@ -1357,7 +1756,7 @@ podman build -t imladris-builder .</code>
     <!-- THE ARCHITECT -->
     <section id="architect">
       <div class="section-header">
-        <div class="section-eyebrow">07 // The Architect</div>
+        <div class="section-eyebrow">08 // The Architect</div>
         <h2 class="section-title">Built at the Intersection of Biology, Systems &amp; Product</h2>
       </div>
 
@@ -1377,9 +1776,11 @@ podman build -t imladris-builder .</code>
           <strong>Imladris is where those worlds converge.</strong> Every architectural decision in this workbench—from the zero-bloat native Vala/GTK4 memory footprint to the frictionless <strong>Arekyer</strong> bridge between cloud bioinformatics (Galaxy), local polyglot compute (R/Python/renv/.venv), natural mathematical/chemical notation, and academic publishing (Quarto/Zotero)—was designed with a single philosophy: <em>scientific tools should respect both the hardware they run on and the cognitive flow of the researcher using them.</em>
         </p>
         <div class="author-links">
-          <a href="https://github.com/Antux912012" class="btn btn-primary" target="_blank" rel="noopener noreferrer">GitHub Profile (@Antux912012)</a>
-          <a href="https://antux912012.github.io/" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Portfolio &amp; Interactive CV</a>
-          <a href="https://github.com/Antux912012/imladris/wiki" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Architecture Wiki (ASD-STE100)</a>
+          <a href="https://antux912012.github.io/" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Portfolio &amp; Interactive CV</a>
+          <a href="https://github.com/Antux912012" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">GitHub Profile (@Antux912012)</a>
+          <a href="https://github.com/Antux912012/imladris" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Imladris Repository</a>
+          <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" class="btn btn-flatpark" target="_blank" rel="noopener noreferrer">Flatpark App Page</a>
+          <a href="https://github.com/Antux912012/imladris/wiki" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Technical Wiki (ASD-STE100)</a>
         </div>
       </div>
     </section>
@@ -1389,7 +1790,7 @@ podman build -t imladris-builder .</code>
   <!-- FOOTER -->
   <footer>
     <div class="container footer-content">
-      <img src="assets/logo.svg" alt="Imladris App Icon" width="32" height="32" class="footer-logo">
+      <img src="assets/logo.svg" alt="Imladris App Icon" width="36" height="36" class="footer-logo">
       <p>
         © 2026 Antonio De Gaetano · Engineered natively with Vala, GTK4, and Libadwaita · Released under GNU GPL-3.0-or-later.
       </p>
@@ -1397,7 +1798,9 @@ podman build -t imladris-builder .</code>
         <a href="https://github.com/Antux912012/imladris" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
         <a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0" target="_blank" rel="noopener noreferrer">Releases v0.25.0</a>
         <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" target="_blank" rel="noopener noreferrer">Flatpark Package</a>
+        <a href="https://antux912012.github.io/" target="_blank" rel="noopener noreferrer">Author Homepage</a>
         <a href="https://github.com/Antux912012/imladris/wiki" target="_blank" rel="noopener noreferrer">Technical Documentation</a>
+        <a href="https://github.com/Antux912012/imladris/blob/main/docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md" target="_blank" rel="noopener noreferrer">AI Transparency Disclosure</a>
         <a href="https://github.com/Antux912012/imladris/blob/main/PRIVACY.md" target="_blank" rel="noopener noreferrer">Zero-Telemetry Privacy</a>
         <a href="https://github.com/Antux912012/imladris/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">Security Policy</a>
       </div>
@@ -1470,7 +1873,7 @@ podman build -t imladris-builder .</code>
         }
       };
 
-      // 3. Copy to Clipboard Utility
+      // 3. Copy to Clipboard Utility with Visual Feedback
       window.copySnippet = function (text, buttonElement) {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(text).then(function () {
@@ -1510,7 +1913,7 @@ podman build -t imladris-builder .</code>
       var backToTopBtn = document.getElementById('back-to-top');
       if (backToTopBtn) {
         window.addEventListener('scroll', function () {
-          if (window.scrollY > 520) {
+          if (window.scrollY > 480) {
             backToTopBtn.classList.add('visible');
           } else {
             backToTopBtn.classList.remove('visible');

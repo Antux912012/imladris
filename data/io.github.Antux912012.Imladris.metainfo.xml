@@ -44,7 +44,7 @@
     </screenshot>
     <screenshot>
       <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-ai-copilot.png</image>
-      <caption>Positron-style Elrond AI Direct Editor Writing with in-place chunk updates and Quarto option preservation</caption>
+      <caption>Positron-style Elrond AI Direct Editor Writing with in-place chunk refactoring</caption>
     </screenshot>
     <screenshot>
       <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-workspace.png</image>
