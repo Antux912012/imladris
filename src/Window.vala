@@ -1691,6 +1691,30 @@ namespace Imladris {
             });
             this.add_action (action_toggle_comment);
 
+            var action_insert_assignment = new GLib.SimpleAction ("insert_assignment", null);
+            action_insert_assignment.activate.connect (() => {
+                insert_in_active_editor (" <- ");
+            });
+            this.add_action (action_insert_assignment);
+
+            var action_focus_editor = new GLib.SimpleAction ("focus_editor", null);
+            action_focus_editor.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null && d.source_view != null) {
+                    d.source_view.grab_focus ();
+                }
+            });
+            this.add_action (action_focus_editor);
+
+            var action_focus_console = new GLib.SimpleAction ("focus_console", null);
+            action_focus_console.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null && d.panel_registry != null && d.panel_registry.repl_entry != null) {
+                    d.panel_registry.repl_entry.grab_focus ();
+                }
+            });
+            this.add_action (action_focus_console);
+
             var action_zotero = new GLib.SimpleAction ("zotero_picker", null);
             action_zotero.activate.connect (() => {
                 open_zotero_picker ();

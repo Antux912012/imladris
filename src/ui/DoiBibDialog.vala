@@ -215,17 +215,17 @@ namespace Imladris.UI {
         private async void fetch_doi_async () {
             string raw = doi_entry.text.strip ();
             if (raw.length == 0) {
-                status_lbl.label = "Enter a DOI or https://doi.org/... URL.";
+                status_lbl.label = "Enter a DOI, https://doi.org/... URL, or PubMed PMID.";
                 return;
             }
 
             fetch_btn.sensitive = false;
             fetch_spinner.visible = true;
             fetch_spinner.start ();
-            status_lbl.label = "Resolving DOI metadata...";
+            status_lbl.label = "Resolving DOI / PubMed metadata...";
 
             try {
-                string bib = yield Services.DoiBibService.get_default ().fetch_bibtex_from_doi_async (raw);
+                string bib = yield Services.DoiBibService.get_default ().fetch_bibtex_from_identifier_async (raw);
                 preview_view.buffer.text = bib;
                 status_lbl.label = "✔ BibTeX entry generated. Review and add to .bib.";
             } catch (GLib.Error e) {

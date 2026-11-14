@@ -143,6 +143,9 @@ namespace Imladris {
             this.set_accels_for_action ("win.insert_chunk", { "<Control><Alt>i" });
             this.set_accels_for_action ("win.insert_pipe", { "<Control><Shift>m" });
             this.set_accels_for_action ("win.toggle_comment", { "<Control><Shift>c" });
+            this.set_accels_for_action ("win.insert_assignment", { "<Alt>minus" });
+            this.set_accels_for_action ("win.focus_editor", { "<Control>1" });
+            this.set_accels_for_action ("win.focus_console", { "<Control>2" });
             this.set_accels_for_action ("win.zotero_picker", { "<Control><Shift>i" });
             this.set_accels_for_action ("win.doi_bib_manager", { "<Control><Shift>b" });
             this.set_accels_for_action ("app.insert_video", { "<Control><Shift>v" });

@@ -198,32 +198,52 @@ institute: "Institute for Advanced Bioinformatics"
 format:
   typst:
     papersize: a0
-    margin: 2.5cm
+    margin: 2cm
 ---
 
-# Abstract
+```{=typst}
+#set columns(3, gutter: 1.5em)
+```
 
-This symposium poster illustrates the multi-format publishing capabilities of Imladris. Scientific documents compile to high-resolution print PDF with Typst and KaTeX.
+# 1. Abstract
 
-# Methods and Data Pipeline
+This 3-column symposium poster demonstrates Imladris multi-format publishing. Scientific documents compile to high-resolution print PDF with Typst, R/Python graphics, and KaTeX.
 
-1. **Cell Culture & Perturbation**: Targeted gene knockdown assays.
+# 2. Wet-Lab & Data Pipeline
+
+1. **Cell Culture & Perturbation**: Targeted gene knockdown assays ($n = 6$ biological replicates).
 2. **Sequencing & Galaxy API**: Processed via Galaxy Cloud REST workflows using Arekyer.
 3. **Reproducibility**: Environment locked via `micromamba` and `renv`.
 
-# Results
+# 3. Differential Expression (Volcano Plot)
 
 ```{r}
 #| echo: false
-#| fig-width: 8
+#| fig-width: 7
 #| fig-height: 5
-summary(mtcars[, 1:4])
+set.seed(42)
+n_genes <- 400
+df <- data.frame(
+  log2FC = rnorm(n_genes, 0, 1.5),
+  negLog10P = rexp(n_genes, rate = 0.6)
+)
+df$sig <- abs(df$log2FC) > 1.5 & df$negLog10P > 1.3
+plot(
+  df$log2FC, df$negLog10P,
+  col = ifelse(df$sig, "#c01c28", "#77767b"),
+  pch = 19, cex = 0.8,
+  xlab = "log2 Fold Change",
+  ylab = "-log10(p-value)",
+  main = "Volcano Plot: Knockdown vs Control"
+)
+abline(h = 1.3, lty = 2, col = "#1c71d8")
+abline(v = c(-1.5, 1.5), lty = 2, col = "#1c71d8")
 ```
 
-# References and Acknowledgements
+# 4. References & Acknowledgements
 
 - Funded by European Research Council (ERC) grant.
-- Developed with Imladris Scientific Notebook Studio.
+- Authored with Imladris Scientific Notebook Studio.
 """;
         }
     }

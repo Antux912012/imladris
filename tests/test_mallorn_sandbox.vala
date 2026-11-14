@@ -1189,6 +1189,31 @@ df_omics = pd.read_csv("counts.tsv")
         } catch (GLib.Error e) {
             assert_not_reached ();
         }
+
+        // Cross-language IntelliSense symbol isolation
+        string polyglot_doc = "---\ntitle: \"Test\"\n---\n\nProse with equation x = 5.\n\n```{r}\nr_df <- read.csv(\"a.csv\")\nr_df$gene <- 1\n```\n\n```{python}\ndef py_helper():\n    pass\npy_df = pd.read_csv(\"b.csv\")\n```\n";
+        Gee.HashMap<string, Gee.ArrayList<string>> cols_r;
+        var syms_r = Editor.CodeIntelliSenseEngine.scan_buffer_symbols (polyglot_doc, Editor.IntelliSenseContext.R_CODE, out cols_r);
+        bool has_r_df = false;
+        bool leaked_py = false;
+        foreach (var item in syms_r) {
+            if (item.label == "r_df") has_r_df = true;
+            if (item.label == "py_df" || item.label == "py_helper()" || item.label == "title") leaked_py = true;
+        }
+        assert (has_r_df);
+        assert (!leaked_py);
+        assert (cols_r.has_key ("r_df") && cols_r.get ("r_df").contains ("gene"));
+
+        Gee.HashMap<string, Gee.ArrayList<string>> cols_py;
+        var syms_py = Editor.CodeIntelliSenseEngine.scan_buffer_symbols (polyglot_doc, Editor.IntelliSenseContext.PYTHON_CODE, out cols_py);
+        bool has_py_df = false;
+        bool leaked_r = false;
+        foreach (var item in syms_py) {
+            if (item.label == "py_df") has_py_df = true;
+            if (item.label == "r_df") leaked_r = true;
+        }
+        assert (has_py_df);
+        assert (!leaked_r);
     }
 
     static void test_persistent_python_and_r_repl () {

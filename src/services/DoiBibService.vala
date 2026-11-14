@@ -21,6 +21,7 @@ namespace Imladris.Services {
 
         private Soup.Session session;
         private static GLib.Regex? doi_regex = null;
+        private static GLib.Regex? pmid_regex = null;
         private static GLib.Regex? non_alnum_regex = null;
         private static GLib.Regex? doi_field_regex = null;
 
@@ -53,6 +54,124 @@ namespace Imladris.Services {
                 }
             } catch (GLib.RegexError e) {}
             return null;
+        }
+
+        /**
+         * Extracts a numeric PubMed ID (PMID) from raw text, `PMID:...`, or `pubmed.ncbi.nlm.nih.gov/<id>`.
+         */
+        public static string? extract_pmid (string raw_input) {
+            string trimmed = raw_input.strip ();
+            if (trimmed.length == 0 || extract_doi (trimmed) != null) return null;
+
+            try {
+                if (pmid_regex == null) {
+                    pmid_regex = new GLib.Regex ("(?:^|pmid\\s*:?\\s*|pubmed\\.ncbi\\.nlm\\.nih\\.gov/)(\\d{5,9})(?:[/\\s]|$)", GLib.RegexCompileFlags.CASELESS);
+                }
+                GLib.MatchInfo mi;
+                if (pmid_regex.match (trimmed, 0, out mi)) {
+                    return mi.fetch (1);
+                }
+            } catch (GLib.RegexError e) {}
+            return null;
+        }
+
+        /**
+         * Resolves either a DOI/URL or a PubMed PMID into a BibTeX entry.
+         */
+        public async string fetch_bibtex_from_identifier_async (string raw_input) throws GLib.Error {
+            if (extract_doi (raw_input) != null) {
+                return yield fetch_bibtex_from_doi_async (raw_input);
+            }
+            string? pmid = extract_pmid (raw_input);
+            if (pmid != null) {
+                return yield fetch_bibtex_from_pmid_async (pmid);
+            }
+            throw new GLib.IOError.INVALID_ARGUMENT ("Invalid identifier. Enter a DOI (10.xxxx/yyyy), doi.org URL, or PubMed PMID.");
+        }
+
+        public async string fetch_bibtex_from_pmid_async (string pmid) throws GLib.Error {
+            string url = @"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=$pmid&retmode=json";
+            var msg = new Soup.Message ("GET", url);
+            msg.request_headers.append ("Accept", "application/json");
+            var bytes = yield session.send_and_read_async (msg, Priority.DEFAULT, null);
+            if (msg.status_code == 200 && bytes != null) {
+                string body = Core.PlatformUtils.bytes_to_string (bytes);
+                string? bib = pubmed_json_to_bibtex (body, pmid);
+                if (bib != null && bib.strip ().length > 0) {
+                    return bib;
+                }
+            }
+            throw new GLib.IOError.FAILED (@"Could not resolve PubMed PMID '$pmid' (HTTP $(msg.status_code)).");
+        }
+
+        public static string? pubmed_json_to_bibtex (string json_body, string pmid) {
+            try {
+                var parser = new Json.Parser ();
+                parser.load_from_data (json_body);
+                var root = parser.get_root ();
+                if (root == null || root.get_node_type () != Json.NodeType.OBJECT) return null;
+                var root_obj = root.get_object ();
+                if (!root_obj.has_member ("result")) return null;
+                var res_obj = root_obj.get_object_member ("result");
+                if (!res_obj.has_member (pmid)) return null;
+                var art = res_obj.get_object_member (pmid);
+
+                string title = art.has_member ("title") ? (art.get_string_member ("title") ?? "").strip () : "";
+                if (title.has_suffix (".")) title = title.substring (0, title.length - 1).strip ();
+                string journal = art.has_member ("fulljournalname") ? (art.get_string_member ("fulljournalname") ?? "") :
+                                 (art.has_member ("source") ? (art.get_string_member ("source") ?? "") : "");
+                string pubdate = art.has_member ("pubdate") ? (art.get_string_member ("pubdate") ?? "") : "";
+                string year = pubdate.length >= 4 ? pubdate.substring (0, 4) : "2026";
+                string volume = art.has_member ("volume") ? (art.get_string_member ("volume") ?? "") : "";
+                string issue = art.has_member ("issue") ? (art.get_string_member ("issue") ?? "") : "";
+                string pages = art.has_member ("pages") ? (art.get_string_member ("pages") ?? "") : "";
+
+                var authors_list = new StringBuilder ();
+                string first_author = "pmid";
+                if (art.has_member ("authors") && art.get_member ("authors").get_node_type () == Json.NodeType.ARRAY) {
+                    var arr = art.get_array_member ("authors");
+                    for (uint i = 0; i < arr.get_length (); i++) {
+                        var aobj = arr.get_object_element (i);
+                        string name = aobj.has_member ("name") ? (aobj.get_string_member ("name") ?? "") : "";
+                        if (name == "") continue;
+                        if (i == 0) {
+                            string[] np = name.split (" ");
+                            first_author = np.length > 0 ? np[0].down () : "pmid";
+                        } else {
+                            authors_list.append (" and ");
+                        }
+                        authors_list.append (name);
+                    }
+                }
+
+                string doi_val = "";
+                if (art.has_member ("articleids") && art.get_member ("articleids").get_node_type () == Json.NodeType.ARRAY) {
+                    var ids = art.get_array_member ("articleids");
+                    for (uint i = 0; i < ids.get_length (); i++) {
+                        var idobj = ids.get_object_element (i);
+                        if ((idobj.get_string_member ("idtype") ?? "") == "doi") {
+                            doi_val = idobj.get_string_member ("value") ?? "";
+                            break;
+                        }
+                    }
+                }
+
+                string cite_key = @"$(first_author)$(year)_pmid$(pmid)";
+                var sb = new StringBuilder ();
+                sb.append_printf ("@article{%s,\n", cite_key);
+                if (authors_list.len > 0) sb.append_printf ("  author = {%s},\n", authors_list.str);
+                if (title.length > 0) sb.append_printf ("  title = {%s},\n", title);
+                if (journal.length > 0) sb.append_printf ("  journal = {%s},\n", journal);
+                sb.append_printf ("  year = {%s},\n", year);
+                if (volume.length > 0) sb.append_printf ("  volume = {%s},\n", volume);
+                if (issue.length > 0) sb.append_printf ("  number = {%s},\n", issue);
+                if (pages.length > 0) sb.append_printf ("  pages = {%s},\n", pages);
+                if (doi_val.length > 0) sb.append_printf ("  doi = {%s},\n", doi_val);
+                sb.append_printf ("  pmid = {%s}\n}", pmid);
+                return sb.str;
+            } catch (GLib.Error e) {
+                return null;
+            }
         }
 
         /**

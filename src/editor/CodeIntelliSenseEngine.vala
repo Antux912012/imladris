@@ -455,17 +455,47 @@ namespace Imladris.Editor {
         public static ArrayList<IntelliSenseItem> scan_buffer_symbols (string document_text, IntelliSenseContext ctx, out HashMap<string, ArrayList<string>> discovered_columns) {
             var symbols = new ArrayList<IntelliSenseItem> ();
             discovered_columns = new HashMap<string, ArrayList<string>> ();
+            if (ctx != IntelliSenseContext.R_CODE && ctx != IntelliSenseContext.PYTHON_CODE) {
+                return symbols;
+            }
+
             var seen = new HashSet<string> ();
+            bool has_fences = document_text.contains ("```");
+            string active_fence_lang = "";
+            bool in_fence = false;
 
             string[] lines = document_text.split ("\n");
             foreach (string raw_line in lines) {
                 string line = raw_line.strip ();
+                if (line.has_prefix ("```")) {
+                    if (!in_fence) {
+                        in_fence = true;
+                        string header = line.substring (3).strip ().down ();
+                        if (header.has_prefix ("{")) {
+                            int close = header.index_of ("}");
+                            if (close > 1) header = header.substring (1, close - 1).strip ();
+                        }
+                        string[] hparts = header.split_set (" ,", 2);
+                        active_fence_lang = hparts.length > 0 ? hparts[0].strip () : "";
+                    } else {
+                        in_fence = false;
+                        active_fence_lang = "";
+                    }
+                    continue;
+                }
+
+                if (has_fences) {
+                    if (!in_fence) continue;
+                    if (ctx == IntelliSenseContext.R_CODE && active_fence_lang != "r") continue;
+                    if (ctx == IntelliSenseContext.PYTHON_CODE && active_fence_lang != "python" && active_fence_lang != "py") continue;
+                }
+
                 if (line.length == 0 || line.has_prefix ("#")) {
                     continue;
                 }
 
                 // 1. Detect R assignments: var_name <- ...
-                if (line.contains ("<-")) {
+                if (ctx == IntelliSenseContext.R_CODE && line.contains ("<-")) {
                     string[] parts = line.split ("<-", 2);
                     string lhs = parts[0].strip ();
                     string rhs = parts.length > 1 ? parts[1].strip () : "";
@@ -494,28 +524,39 @@ namespace Imladris.Editor {
                 }
 
                 // 2. Detect Python def / class / assignments
-                if (line.has_prefix ("def ") && line.contains ("(")) {
-                    int open_p = line.index_of ("(");
-                    string fn_name = sanitize_identifier (line.substring (4, open_p - 4));
-                    if (fn_name.length >= 2 && !seen.contains (fn_name)) {
-                        seen.add (fn_name);
-                        symbols.add (new IntelliSenseItem (fn_name, fn_name + "()", "(...)", "Python function defined in document", IntelliSenseSymbolKind.FUNCTION, 1));
-                    }
-                } else if (line.contains ("=") && !line.contains ("==") && !line.contains ("!=") && !line.contains ("<=") && !line.contains (">=")) {
-                    string[] parts = line.split ("=", 2);
-                    string ident = sanitize_identifier (parts[0]);
-                    string rhs = parts.length > 1 ? parts[1].strip () : "";
-                    if (ident.length >= 2 && !seen.contains (ident) && !ident.contains ("(")) {
-                        seen.add (ident);
-                        bool is_df = rhs.contains ("read_csv") || rhs.contains ("read_table") || rhs.contains ("DataFrame");
-                        symbols.add (new IntelliSenseItem (
-                            ident,
-                            ident,
-                            is_df ? "DataFrame" : "variable",
-                            "Symbol defined in document",
-                            is_df ? IntelliSenseSymbolKind.DATAFRAME : IntelliSenseSymbolKind.VARIABLE,
-                            0
-                        ));
+                if (ctx == IntelliSenseContext.PYTHON_CODE) {
+                    if (line.has_prefix ("def ") && line.contains ("(")) {
+                        int open_p = line.index_of ("(");
+                        string fn_name = sanitize_identifier (line.substring (4, open_p - 4));
+                        if (fn_name.length >= 2 && !seen.contains (fn_name)) {
+                            seen.add (fn_name);
+                            symbols.add (new IntelliSenseItem (fn_name, fn_name + "()", "(...)", "Python function defined in document", IntelliSenseSymbolKind.FUNCTION, 1));
+                        }
+                    } else if (line.has_prefix ("class ") && (line.contains (":") || line.contains ("("))) {
+                        int end_idx = line.contains ("(") ? line.index_of ("(") : line.index_of (":");
+                        if (end_idx > 6) {
+                            string cls_name = sanitize_identifier (line.substring (6, end_idx - 6));
+                            if (cls_name.length >= 2 && !seen.contains (cls_name)) {
+                                seen.add (cls_name);
+                                symbols.add (new IntelliSenseItem (cls_name, cls_name, "class", "Python class defined in document", IntelliSenseSymbolKind.FUNCTION, 1));
+                            }
+                        }
+                    } else if (line.contains ("=") && !line.contains ("==") && !line.contains ("!=") && !line.contains ("<=") && !line.contains (">=")) {
+                        string[] parts = line.split ("=", 2);
+                        string ident = sanitize_identifier (parts[0]);
+                        string rhs = parts.length > 1 ? parts[1].strip () : "";
+                        if (ident.length >= 2 && !seen.contains (ident) && !ident.contains ("(")) {
+                            seen.add (ident);
+                            bool is_df = rhs.contains ("read_csv") || rhs.contains ("read_table") || rhs.contains ("DataFrame");
+                            symbols.add (new IntelliSenseItem (
+                                ident,
+                                ident,
+                                is_df ? "DataFrame" : "variable",
+                                "Symbol defined in document",
+                                is_df ? IntelliSenseSymbolKind.DATAFRAME : IntelliSenseSymbolKind.VARIABLE,
+                                0
+                            ));
+                        }
                     }
                 }
             }

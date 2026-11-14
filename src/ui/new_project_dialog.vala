@@ -63,9 +63,7 @@ namespace Imladris.UI {
             project_dir_row.add_suffix (browse_btn);
 
             title_row.changed.connect (() => {
-                if (custom_project_dir == "") {
-                    project_dir_row.subtitle = get_default_root_preview ();
-                }
+                update_project_dir_preview ();
             });
 
             meta_group.add (title_row);
@@ -260,7 +258,14 @@ namespace Imladris.UI {
 
         private string get_default_root_preview () {
             string clean_name = ProjectScaffolder.sanitize_dirname (title_row.text);
-            return GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents", clean_name);
+            string base_dir = custom_project_dir != ""
+                ? custom_project_dir
+                : GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents");
+            return GLib.Path.build_filename (base_dir, clean_name);
+        }
+
+        private void update_project_dir_preview () {
+            project_dir_row.subtitle = get_default_root_preview ();
         }
 
         private void on_browse_folder () {
@@ -273,7 +278,7 @@ namespace Imladris.UI {
                     var folder = dialog.select_folder.end (res);
                     if (folder != null && folder.get_path () != null) {
                         custom_project_dir = folder.get_path ();
-                        project_dir_row.subtitle = custom_project_dir;
+                        update_project_dir_preview ();
                     }
                 } catch (GLib.Error e) {
                     // User cancelled

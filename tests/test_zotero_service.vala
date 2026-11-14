@@ -133,6 +133,31 @@ public class TestZoteroService {
         assert (parsed.size == 1);
         assert (parsed[0].citekey == "harris2020array");
         assert ("Polymerase II" in parsed[0].title);
+
+        // 4. PubMed PMID extraction & esummary JSON -> BibTeX
+        assert (DoiBibService.extract_pmid ("PMID: 32939066") == "32939066");
+        assert (DoiBibService.extract_pmid ("https://pubmed.ncbi.nlm.nih.gov/32939066/") == "32939066");
+        assert (DoiBibService.extract_pmid ("10.1038/s41586-020-2649-2") == null);
+
+        string pm_json = """{
+            "result": {
+                "32939066": {
+                    "title": "Array programming with NumPy.",
+                    "fulljournalname": "Nature",
+                    "pubdate": "2020 Sep",
+                    "volume": "585",
+                    "issue": "7825",
+                    "pages": "357-362",
+                    "authors": [{"name": "Harris CR"}],
+                    "articleids": [{"idtype": "doi", "value": "10.1038/s41586-020-2649-2"}]
+                }
+            }
+        }""";
+        string? pm_bib = DoiBibService.pubmed_json_to_bibtex (pm_json, "32939066");
+        assert (pm_bib != null);
+        assert ("@article{harris2020_pmid32939066," in pm_bib);
+        assert ("pmid = {32939066}" in pm_bib);
+        assert ("doi = {10.1038/s41586-020-2649-2}" in pm_bib);
     }
 
     public static int main (string[] args) {

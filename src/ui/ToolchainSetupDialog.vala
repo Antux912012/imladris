@@ -26,6 +26,7 @@ namespace Imladris.UI {
 
         private ulong progress_sig_id = 0;
         private ulong log_sig_id = 0;
+        private bool is_disposed = false;
 
         public ToolchainSetupDialog () {
             Object (
@@ -33,7 +34,23 @@ namespace Imladris.UI {
                 content_width: 660,
                 content_height: 700
             );
+            this.closed.connect (() => {
+                is_disposed = true;
+                disconnect_tm_signals ();
+            });
             build_ui ();
+        }
+
+        private void disconnect_tm_signals () {
+            var tm = Core.ToolchainManager.get_default ();
+            if (progress_sig_id != 0) {
+                tm.disconnect (progress_sig_id);
+                progress_sig_id = 0;
+            }
+            if (log_sig_id != 0) {
+                tm.disconnect (log_sig_id);
+                log_sig_id = 0;
+            }
         }
 
         private void build_ui () {
@@ -224,10 +241,12 @@ namespace Imladris.UI {
 
             tm.create_or_update_base_environment_async.begin (do_r, do_py, do_quarto, do_tidy, (obj, res) => {
                 bool ok = tm.create_or_update_base_environment_async.end (res);
-                tm.disconnect (progress_sig_id);
-                tm.disconnect (log_sig_id);
-
+                disconnect_tm_signals ();
                 Core.PlatformUtils.clear_caches ();
+
+                if (is_disposed) {
+                    return;
+                }
 
                 if (ok) {
                     progress_bar.fraction = 1.0;
