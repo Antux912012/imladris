@@ -55,6 +55,21 @@ namespace Imladris.Core {
             return "%04x%04x".printf ((uint) (r1 & 0xFFFF), (uint) (r2 & 0xFFFF));
         }
 
+        private static string extract_source_node (Json.Node? node) {
+            if (node == null) return "";
+            if (node.get_node_type () == Json.NodeType.ARRAY) {
+                var sb = new StringBuilder ();
+                var arr = node.get_array ();
+                for (uint i = 0; i < arr.get_length (); i++) {
+                    sb.append (arr.get_string_element (i));
+                }
+                return sb.str;
+            } else if (node.get_node_type () == Json.NodeType.VALUE) {
+                return node.get_string () ?? "";
+            }
+            return "";
+        }
+
         /**
          * Converts a Jupyter Notebook (.ipynb) JSON string into editable Markdown text.
          *
@@ -205,11 +220,57 @@ namespace Imladris.Core {
                         builder.append ("]\n");
                     }
 
+                    string output_preview = "";
+                    if (cell.has_member ("outputs") && !cell.get_null_member ("outputs")) {
+                        var out_node = cell.get_member ("outputs");
+                        if (out_node.get_node_type () == Json.NodeType.ARRAY) {
+                            var out_arr = out_node.get_array ();
+                            if (out_arr.get_length () > 0) {
+                                string raw_outputs_json = Json.to_string (out_node, false);
+                                string b64_outputs = GLib.Base64.encode (raw_outputs_json.data);
+                                builder.append_printf ("#| outputs_b64: %s\n", b64_outputs);
+
+                                var preview_sb = new StringBuilder ();
+                                for (uint oi = 0; oi < out_arr.get_length (); oi++) {
+                                    var o_el = out_arr.get_element (oi);
+                                    if (o_el.get_node_type () != Json.NodeType.OBJECT) continue;
+                                    var o_obj = o_el.get_object ();
+                                    if (o_obj.has_member ("text") && !o_obj.get_null_member ("text")) {
+                                        string txt = extract_source_node (o_obj.get_member ("text")).strip ();
+                                        if (txt.length > 0) preview_sb.append (txt).append ("\n");
+                                    } else if (o_obj.has_member ("data") && !o_obj.get_null_member ("data")) {
+                                        var d_node = o_obj.get_member ("data");
+                                        if (d_node.get_node_type () == Json.NodeType.OBJECT) {
+                                            var d_obj = d_node.get_object ();
+                                            if (d_obj.has_member ("text/plain") && !d_obj.get_null_member ("text/plain")) {
+                                                string txt = extract_source_node (d_obj.get_member ("text/plain")).strip ();
+                                                if (txt.length > 0) preview_sb.append (txt).append ("\n");
+                                            }
+                                        }
+                                    } else if (o_obj.has_member ("ename") && !o_obj.get_null_member ("ename")) {
+                                        string ename = o_obj.get_string_member ("ename") ?? "Error";
+                                        string evalue = (o_obj.has_member ("evalue") && !o_obj.get_null_member ("evalue"))
+                                            ? (o_obj.get_string_member ("evalue") ?? "") : "";
+                                        preview_sb.append_printf ("%s: %s\n", ename, evalue);
+                                    }
+                                }
+                                output_preview = preview_sb.str.strip ();
+                            }
+                        }
+                    }
+
                     builder.append (text);
                     if (!text.has_suffix ("\n")) {
                         builder.append ("\n");
                     }
                     builder.append ("```\n\n");
+                    if (output_preview.length > 0) {
+                        builder.append ("::: {.ipynb-output}\n");
+                        foreach (string oline in output_preview.split ("\n")) {
+                            builder.append_printf ("> %s\n", oline);
+                        }
+                        builder.append (":::\n\n");
+                    }
                 } else if (cell_type == "raw") {
                     builder.append ("```{raw}\n");
                     builder.append (text);
@@ -273,6 +334,8 @@ namespace Imladris.Core {
             int current_exec_count = -1;
             var current_tags = new Gee.ArrayList<string> ();
             string current_cell_id = "";
+            string current_outputs_b64 = "";
+            bool in_ipynb_output_block = false;
             var current_source = new StringBuilder ();
             bool in_yaml_frontmatter = false;
             bool has_closed_yaml = false;
@@ -310,6 +373,19 @@ namespace Imladris.Core {
                     continue;
                 }
 
+                if (!in_code_chunk) {
+                    if (trimmed == "::: {.ipynb-output}") {
+                        in_ipynb_output_block = true;
+                        continue;
+                    }
+                    if (in_ipynb_output_block) {
+                        if (trimmed == ":::") {
+                            in_ipynb_output_block = false;
+                        }
+                        continue;
+                    }
+                }
+
                 if (!in_code_chunk && trimmed.has_prefix ("```")) {
                     if (current_source.len > 0) {
                         string md_text = current_source.str.strip ();
@@ -323,17 +399,19 @@ namespace Imladris.Core {
                     current_exec_count = -1;
                     current_tags.clear ();
                     current_cell_id = "";
+                    current_outputs_b64 = "";
 
                     string raw_tag = trimmed.substring (3).strip ();
                     current_chunk_lang = parse_chunk_language (raw_tag, default_lang);
                 } else if (in_code_chunk && trimmed == "```") {
                     in_code_chunk = false;
                     string cell_type = (current_chunk_lang == "raw") ? "raw" : "code";
-                    add_cell_to_builder (builder, cell_type, current_source.str, current_exec_count, current_tags, current_cell_id, current_chunk_lang);
+                    add_cell_to_builder (builder, cell_type, current_source.str, current_exec_count, current_tags, current_cell_id, current_chunk_lang, current_outputs_b64);
                     current_source.truncate ();
                     current_tags.clear ();
                     current_exec_count = -1;
                     current_cell_id = "";
+                    current_outputs_b64 = "";
                 } else if (in_code_chunk) {
                     // Inspect Quarto chunk comments for metadata
                     if (trimmed.has_prefix ("#| cell_id:") || trimmed.has_prefix ("#| id:")) {
@@ -342,6 +420,9 @@ namespace Imladris.Core {
                     } else if (trimmed.has_prefix ("#| execution_count:")) {
                         int colon_idx = trimmed.index_of (":");
                         current_exec_count = int.parse (trimmed.substring (colon_idx + 1).strip ());
+                    } else if (trimmed.has_prefix ("#| outputs_b64:")) {
+                        int colon_idx = trimmed.index_of (":");
+                        current_outputs_b64 = trimmed.substring (colon_idx + 1).strip ();
                     } else if (trimmed.has_prefix ("#| tags:")) {
                         parse_tags_comment (trimmed, current_tags);
                     } else {
@@ -357,7 +438,7 @@ namespace Imladris.Core {
             if (current_source.len > 0) {
                 if (in_code_chunk) {
                     string cell_type = (current_chunk_lang == "raw") ? "raw" : "code";
-                    add_cell_to_builder (builder, cell_type, current_source.str, current_exec_count, current_tags, current_cell_id, current_chunk_lang);
+                    add_cell_to_builder (builder, cell_type, current_source.str, current_exec_count, current_tags, current_cell_id, current_chunk_lang, current_outputs_b64);
                 } else {
                     string rem = current_source.str.strip ();
                     if (rem.length > 0) {
@@ -492,7 +573,8 @@ namespace Imladris.Core {
             int execution_count,
             Gee.ArrayList<string>? tags,
             string? cell_id = null,
-            string? chunk_lang = null
+            string? chunk_lang = null,
+            string? outputs_b64 = null
         ) {
             builder.begin_object ();
 
@@ -528,8 +610,24 @@ namespace Imladris.Core {
                 }
 
                 builder.set_member_name ("outputs");
-                builder.begin_array ();
-                builder.end_array ();
+                bool restored_outputs = false;
+                if (outputs_b64 != null && outputs_b64.length > 0) {
+                    try {
+                        uint8[] decoded = GLib.Base64.decode (outputs_b64);
+                        string out_json = Core.PlatformUtils.data_to_string (decoded);
+                        var p = new Json.Parser ();
+                        p.load_from_data (out_json, -1);
+                        var r = p.get_root ();
+                        if (r != null && r.get_node_type () == Json.NodeType.ARRAY) {
+                            builder.add_value (r.copy ());
+                            restored_outputs = true;
+                        }
+                    } catch (GLib.Error e) {}
+                }
+                if (!restored_outputs) {
+                    builder.begin_array ();
+                    builder.end_array ();
+                }
             }
 
             builder.set_member_name ("source");

@@ -965,11 +965,11 @@ namespace Imladris.Core {
                     continue;
                 }
 
-                // 5. Check for chemical element symbol(s) [A-Z][A-Za-z]* followed by optional subscript digits
+                // 5. Check for chemical element symbol(s) [A-Z][a-z]* followed by optional subscript digits
                 if (s[i].isupper ()) {
                     int el_start = i;
                     i++;
-                    while (i < len && s[i].isalpha ()) i++;
+                    while (i < len && s[i].islower ()) i++;
                     string el = s.substring (el_start, i - el_start);
                     out_sb.append (@"\\text{$el}");
 
@@ -1006,8 +1006,16 @@ namespace Imladris.Core {
 
         private static string format_arrow_condition_latex (string cond) {
             string c = cond.strip ();
+            if (c.has_prefix ("$") && c.has_suffix ("$") && c.length >= 2) {
+                c = c.substring (1, c.length - 2).strip ();
+            } else {
+                c = c.replace ("$", "");
+            }
             if (c == "Delta" || c == "heat") return "\\Delta";
             if (c == "h*nu" || c == "h\\nu" || c == "light") return "h\\nu";
+            if (c.contains ("_") || c.contains ("^") || c.contains ("\\")) {
+                return c;
+            }
             return @"\\text{$c}";
         }
 

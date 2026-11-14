@@ -296,6 +296,8 @@ namespace Imladris.UI {
                 this.close ();
             } catch (GLib.Error e) {
                 GLib.warning ("Failed to scaffold workspace project: %s", e.message);
+                var pw = this.get_root () as Imladris.Window;
+                if (pw != null) pw.show_toast (@"Failed to create project: $(e.message)");
             }
         }
 
@@ -335,6 +337,8 @@ namespace Imladris.UI {
                 this.close ();
             } catch (GLib.Error e) {
                 GLib.warning ("Failed to scaffold .Rproj: %s", e.message);
+                var pw = this.get_root () as Imladris.Window;
+                if (pw != null) pw.show_toast (@"Failed to create .Rproj: $(e.message)");
             }
         }
 
@@ -363,6 +367,8 @@ namespace Imladris.UI {
                 this.close ();
             } catch (GLib.Error e) {
                 GLib.warning ("Failed to create standalone file: %s", e.message);
+                var pw = this.get_root () as Imladris.Window;
+                if (pw != null) pw.show_toast (@"Failed to create file: $(e.message)");
             }
         }
     }

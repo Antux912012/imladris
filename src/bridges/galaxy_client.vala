@@ -214,7 +214,7 @@ namespace Imladris {
                             this.api_key = retrieved_key;
                         }
                     } catch (GLib.Error e) {
-                        // Secret service may be absent in non-interactive environment
+                        GLib.debug ("Secret service unavailable when loading Galaxy API key: %s", e.message);
                     }
                 });
             }

@@ -278,14 +278,56 @@ namespace Imladris.Bridges.Taniquetil {
             resolve_alphafold_model.begin (raw_query, active_cancellable);
         }
 
+        private async string resolve_uniprot_primary_accession (string raw_query, GLib.Cancellable cancellable) {
+            string q = raw_query.strip ().up ();
+            string search_url = @"https://rest.uniprot.org/uniprotkb/search?query=$(GLib.Uri.escape_string (q, null, false))&size=1&fields=accession";
+            var msg = new Soup.Message ("GET", search_url);
+            msg.request_headers.append ("Accept", "application/json");
+            try {
+                var bytes = yield http_session.send_and_read_async (msg, GLib.Priority.DEFAULT, cancellable);
+                if (msg.status_code == 200 && bytes != null) {
+                    string json_text = Core.PlatformUtils.bytes_to_string (bytes);
+                    var parser = new Json.Parser ();
+                    parser.load_from_data (json_text, -1);
+                    var root = parser.get_root ();
+                    if (root != null && root.get_node_type () == Json.NodeType.OBJECT) {
+                        var obj = root.get_object ();
+                        if (obj.has_member ("results")) {
+                            var res_arr = obj.get_array_member ("results");
+                            if (res_arr.get_length () > 0) {
+                                var first = res_arr.get_object_element (0);
+                                if (first.has_member ("primaryAccession")) {
+                                    return first.get_string_member ("primaryAccession");
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (GLib.Error e) {}
+            return q;
+        }
+
         private async void resolve_alphafold_model (string query, GLib.Cancellable cancellable) {
             try {
-                string url = @"https://alphafold.ebi.ac.uk/api/prediction/$query";
+                string clean_q = query.strip ().up ();
+                string url = @"https://alphafold.ebi.ac.uk/api/prediction/$clean_q";
                 var msg = new Soup.Message ("GET", url);
                 msg.request_headers.append ("Accept", "application/json");
 
                 var bytes = yield http_session.send_and_read_async (msg, GLib.Priority.DEFAULT, cancellable);
                 uint status = msg.status_code;
+
+                if (status == 404) {
+                    string resolved_acc = yield resolve_uniprot_primary_accession (clean_q, cancellable);
+                    if (resolved_acc != clean_q) {
+                        clean_q = resolved_acc;
+                        url = @"https://alphafold.ebi.ac.uk/api/prediction/$clean_q";
+                        msg = new Soup.Message ("GET", url);
+                        msg.request_headers.append ("Accept", "application/json");
+                        bytes = yield http_session.send_and_read_async (msg, GLib.Priority.DEFAULT, cancellable);
+                        status = msg.status_code;
+                    }
+                }
 
                 if (status == 404) {
                     throw new TaniquetilError.STRUCTURE_NOT_FOUND (@"No AlphaFold prediction found for '$query'.");
@@ -389,7 +431,8 @@ summary(plddt_scores)
 
         private void inject_python_chunk () {
             string chunk = """
-```{python taniquetil-%s}
+```{python}
+#| label: taniquetil-%s
 # TANIQUETIL ALPHAFOLD PROVENANCE: %s (%s | Mean pLDDT: %.1f)
 import requests
 af_cif_url = "%s"
@@ -399,7 +442,7 @@ pae_resp.raise_for_status()
 pae_data = pae_resp.json()
 print(f"Loaded %s: mean pLDDT = %.1f (%lld residues)")
 ```
-""".printf (entry_id.replace ("-", "_"), entry_id, gene_symbol, global_plddt, cif_url, pae_doc_url, entry_id, global_plddt, seq_length);
+""".printf (entry_id.down ().replace ("_", "-"), entry_id, gene_symbol, global_plddt, cif_url, pae_doc_url, entry_id, global_plddt, seq_length);
 
             insert_snippet_requested (chunk);
             this.popdown ();

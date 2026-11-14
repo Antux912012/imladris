@@ -179,15 +179,41 @@ namespace Imladris.Adapters {
             return result;
         }
 
+        private static GLib.Regex? plain_mermaid_regex = null;
+
+        private static string render_mermaid_svg_inline (string code) {
+            Core.MermaidDiagramKind kind;
+            Core.MermaidFlowDirection dir;
+            Gee.ArrayList<Core.MermaidNode> nodes;
+            Gee.ArrayList<Core.MermaidEdge> edges;
+            Core.MermaidFlowEngine.parse_mermaid_code (code, out kind, out dir, out nodes, out edges);
+            if (nodes.size == 0) {
+                return "<pre><code class=\"language-mermaid\">" + GLib.Markup.escape_text (code) + "</code></pre>";
+            }
+            Core.MermaidFlowEngine.auto_layout (kind, dir, nodes, edges);
+            string svg = Core.MermaidFlowEngine.export_to_svg (nodes, edges);
+            int svg_start = svg.index_of ("<svg");
+            if (svg_start > 0) {
+                svg = svg.substring (svg_start);
+            }
+            return "<div class=\"mermaid-diagram-card\" style=\"margin: 1em 0; overflow-x: auto;\">" + svg + "</div>\n";
+        }
+
         private static string transform_code_chunks (string text) {
+            string step1 = text;
             try {
                 if (chunk_regex == null) {
                     chunk_regex = new GLib.Regex ("```\\{([a-zA-Z0-9_-]+)([^\\}]*)\\}([\\s\\S]*?)```");
                 }
-                return chunk_regex.replace_eval (text, -1, 0, 0, (match_info, result) => {
+                step1 = chunk_regex.replace_eval (step1, -1, 0, 0, (match_info, result) => {
                     string lang = match_info.fetch (1);
                     string opts = match_info.fetch (2).strip ();
                     string code = match_info.fetch (3);
+
+                    if (lang.down () == "mermaid") {
+                        result.append (render_mermaid_svg_inline (code));
+                        return false;
+                    }
 
                     result.append ("<div class=\"code-chunk-card\">\n");
                     result.append_printf ("  <div class=\"code-chunk-header\"><span class=\"badge\">%s</span>", GLib.Markup.escape_text (lang.up ()));
@@ -199,9 +225,18 @@ namespace Imladris.Adapters {
                     result.append ("</div>\n");
                     return false;
                 });
+                if (plain_mermaid_regex == null) {
+                    plain_mermaid_regex = new GLib.Regex ("```mermaid\\s*\\n([\\s\\S]*?)```");
+                }
+                step1 = plain_mermaid_regex.replace_eval (step1, -1, 0, 0, (match_info, result) => {
+                    string code = match_info.fetch (1);
+                    result.append (render_mermaid_svg_inline (code));
+                    return false;
+                });
             } catch (GLib.RegexError e) {
                 return text;
             }
+            return step1;
         }
 
         private static GLib.Regex? inline_code_regex = null;

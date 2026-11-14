@@ -178,14 +178,21 @@ namespace Imladris.UI {
         }
 
         private async void choose_bib_async () {
+            var filter = new Gtk.FileFilter ();
+            filter.name = "BibTeX Files (*.bib)";
+            filter.add_pattern ("*.bib");
+            var filters = new GLib.ListStore (typeof (Gtk.FileFilter));
+            filters.append (filter);
+
             var dialog = new Gtk.FileDialog () {
-                title = "Select or Create .bib File",
+                title = "Open Existing .bib File",
                 modal = true,
-                initial_name = GLib.Path.get_basename (current_bib_path)
+                filters = filters,
+                default_filter = filter
             };
             try {
                 var parent_win = this.get_root () as Gtk.Window;
-                var file = yield dialog.save (parent_win, null);
+                var file = yield dialog.open (parent_win, null);
                 if (file != null) {
                     string? p = file.get_path ();
                     if (p == null) {

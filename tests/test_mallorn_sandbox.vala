@@ -885,7 +885,7 @@ x <- 42
         // 3. Natural Chemistry to LaTeX, mhchem (\ce{...}), Markdown Sub/Sup, and Unicode
         string photo_input = "6CO2(g) + 6H2O(l) ->[h*nu][chlorophyll] C6H12O6(aq) + 6O2(g)";
         string photo_latex = Core.MathChemEngine.natural_chem_to_latex (photo_input);
-        assert (photo_latex.contains ("\\text{CO}_{2}_{\\text{(g)}}"));
+        assert (photo_latex.contains ("\\text{C}\\text{O}_{2}_{\\text{(g)}}") || photo_latex.contains ("\\text{CO}_{2}_{\\text{(g)}}"));
         assert (photo_latex.contains ("\\xrightarrow[\\text{chlorophyll}]{h\\nu}"));
         assert (photo_latex.contains ("\\text{C}_{6}\\text{H}_{12}\\text{O}_{6}_{\\text{(aq)}}"));
 
@@ -1143,6 +1143,52 @@ df_omics = pd.read_csv("counts.tsv")
         assert ("content: \"$not_math$\"" in rendered);
         assert (".math-display-card" in rendered);
         assert (!("$$E = mc^2$$" in rendered));
+
+        // Chemistry multi-element tokenization (NaCl -> \text{Na}\text{Cl}) and arrow condition $-stripping
+        string chem_nacl = Core.MathChemEngine.natural_chem_to_latex ("NaCl");
+        assert ("\\text{Na}\\text{Cl}" in chem_nacl);
+        string chem_arrow = Core.MathChemEngine.natural_chem_to_latex ("E + S <=>[$k_1$][$k_{-1}$] ES");
+        assert (!("$" in chem_arrow));
+
+        // Mermaid inline SVG preview rendering
+        string md_mermaid = "# Flow\n\n```{mermaid}\nflowchart TD\n  A[Start] --> B[End]\n```\n";
+        string html_mermaid = Adapters.DocumentAdapter.render_html (md_mermaid, DocumentFormat.QMD);
+        assert ("mermaid-diagram-card" in html_mermaid);
+        assert ("<svg" in html_mermaid);
+
+        // .ipynb output preservation across ipynb_to_markdown -> markdown_to_ipynb
+        string sample_ipynb = """{
+  "nbformat": 4,
+  "nbformat_minor": 5,
+  "metadata": {},
+  "cells": [
+    {
+      "cell_type": "code",
+      "id": "cell-1",
+      "metadata": { "language": "python" },
+      "execution_count": 1,
+      "source": ["print(42)\n"],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": ["42\n"]
+        }
+      ]
+    }
+  ]
+}""";
+        try {
+            string md_nb = Core.NotebookSerializer.ipynb_to_markdown (sample_ipynb);
+            assert ("#| outputs_b64:" in md_nb);
+            assert ("::: {.ipynb-output}" in md_nb);
+            assert ("> 42" in md_nb);
+            string saved_ipynb = Core.NotebookSerializer.markdown_to_ipynb (md_nb, "python");
+            assert ("\"output_type\":\"stream\"" in saved_ipynb.replace (" ", "") || "\"output_type\": \"stream\"" in saved_ipynb);
+            assert (!("ipynb-output" in saved_ipynb));
+        } catch (GLib.Error e) {
+            assert_not_reached ();
+        }
     }
 
     static void test_persistent_python_and_r_repl () {

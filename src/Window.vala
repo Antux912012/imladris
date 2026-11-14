@@ -339,7 +339,7 @@ namespace Imladris {
             });
             var btn_yavanna_inline = new Gtk.MenuButton () {
                 icon_name = "applications-science-symbolic",
-                label = "Yavanna Bio-Entity",
+                label = "Gene & Primer Lookup (Yavanna)",
                 popover = yavanna_popover,
                 hexpand = true
             };
@@ -352,7 +352,7 @@ namespace Imladris {
             });
             var btn_taniquetil_inline = new Gtk.MenuButton () {
                 icon_name = "network-cellular-symbolic",
-                label = "Taniquetil AlphaFold",
+                label = "Protein 3D Structure (AlphaFold)",
                 popover = taniquetil_popover,
                 hexpand = true
             };
@@ -365,7 +365,7 @@ namespace Imladris {
             });
             var btn_elbereth_inline = new Gtk.MenuButton () {
                 icon_name = "view-statistics-symbolic",
-                label = "Elbereth Biostats",
+                label = "Biostats & Power Calc (Elbereth)",
                 popover = elbereth_popover,
                 hexpand = true
             };
@@ -1334,18 +1334,25 @@ namespace Imladris {
             }
         }
 
+        private bool standard_export_warning_dismissed = false;
+
         public async bool confirm_standard_project_export_if_needed () {
-            if (current_project_type == ProjectType.STANDARD) {
+            if (current_project_type == ProjectType.STANDARD && !standard_export_warning_dismissed) {
                 var alert = new Adw.AlertDialog (
                     "System Libraries (Non-Portable)",
                     "This project relies on system libraries and may fail to run on other machines if required packages are missing."
                 );
                 alert.add_response ("cancel", "Cancel");
+                alert.add_response ("always", "Continue & Don't Ask Again");
                 alert.add_response ("continue", "Continue Export");
                 alert.set_response_appearance ("continue", Adw.ResponseAppearance.SUGGESTED);
                 alert.set_default_response ("continue");
                 alert.set_close_response ("cancel");
                 string response = yield alert.choose (this, null);
+                if (response == "always") {
+                    standard_export_warning_dismissed = true;
+                    return true;
+                }
                 return (response == "continue");
             }
             return true;
@@ -1663,6 +1670,26 @@ namespace Imladris {
                 clear_console ();
             });
             this.add_action (action_clear_console);
+
+            var action_insert_pipe = new GLib.SimpleAction ("insert_pipe", null);
+            action_insert_pipe.activate.connect (() => {
+                insert_in_active_editor (" |> ");
+            });
+            this.add_action (action_insert_pipe);
+
+            var action_insert_chunk = new GLib.SimpleAction ("insert_chunk", null);
+            action_insert_chunk.activate.connect (() => {
+                var d = get_active_document ();
+                string def_lang = (d != null && d.get_document_format () == DocumentFormat.IPYNB) ? "python" : "r";
+                insert_in_active_editor ("\n```{" + def_lang + "}\n\n```\n");
+            });
+            this.add_action (action_insert_chunk);
+
+            var action_toggle_comment = new GLib.SimpleAction ("toggle_comment", null);
+            action_toggle_comment.activate.connect (() => {
+                toggle_active_line_comment ();
+            });
+            this.add_action (action_toggle_comment);
 
             var action_zotero = new GLib.SimpleAction ("zotero_picker", null);
             action_zotero.activate.connect (() => {
@@ -2709,6 +2736,41 @@ namespace Imladris {
             }
         }
 
+        public void toggle_active_line_comment () {
+            var doc = get_active_document ();
+            if (doc == null) return;
+            var buf = doc.source_buffer;
+            Gtk.TextIter cursor;
+            buf.get_iter_at_mark (out cursor, buf.get_insert ());
+            Gtk.TextIter line_start = cursor;
+            line_start.set_line_offset (0);
+            Gtk.TextIter line_end = line_start;
+            if (!line_end.ends_line ()) {
+                line_end.forward_to_line_end ();
+            }
+            string line_text = buf.get_text (line_start, line_end, false);
+            string trimmed = line_text.strip ();
+            buf.begin_user_action ();
+            if (trimmed.has_prefix ("# ")) {
+                int idx = line_text.index_of ("# ");
+                Gtk.TextIter del_start = line_start;
+                del_start.forward_chars (idx);
+                Gtk.TextIter del_end = del_start;
+                del_end.forward_chars (2);
+                buf.delete (ref del_start, ref del_end);
+            } else if (trimmed.has_prefix ("#")) {
+                int idx = line_text.index_of ("#");
+                Gtk.TextIter del_start = line_start;
+                del_start.forward_chars (idx);
+                Gtk.TextIter del_end = del_start;
+                del_end.forward_chars (1);
+                buf.delete (ref del_start, ref del_end);
+            } else {
+                buf.insert (ref line_start, "# ", -1);
+            }
+            buf.end_user_action ();
+        }
+
         public void open_zotero_picker () {
             var zotero = Services.ZoteroService.get_default ();
             zotero.open_native_citation_picker_async.begin ((obj, res) => {
@@ -2733,6 +2795,9 @@ namespace Imladris {
                             }
                         } catch (RegexError e) {}
                     }
+                } else {
+                    show_toast ("Zotero desktop is not running — opening DOI & .bib Manager");
+                    open_doi_bib_manager ();
                 }
             });
         }

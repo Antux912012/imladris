@@ -115,8 +115,22 @@ namespace Imladris.UI {
 
         private async void run_citation_search_async (string q, Services.ZoteroService zotero_svc) {
             string? fallback_bib = null;
-            if (doc_page.current_project_dir != "") {
-                string bib_path = GLib.Path.build_filename (doc_page.current_project_dir, "references.bib");
+            string base_dir = doc_page.current_project_dir;
+            if (base_dir == "" && doc_page.file_location != null) {
+                var parent = doc_page.file_location.get_parent ();
+                if (parent != null) base_dir = parent.get_path () ?? "";
+            }
+            string bib_rel = "references.bib";
+            Core.FrontmatterData? fm = null;
+            string fm_body = "";
+            Core.FrontmatterParser.split_frontmatter (doc_page.source_buffer.text, out fm, out fm_body);
+            if (fm != null && fm.bibliography != null && fm.bibliography.strip () != "") {
+                bib_rel = fm.bibliography.strip ();
+            }
+            if (base_dir != "" || GLib.Path.is_absolute (bib_rel)) {
+                string bib_path = GLib.Path.is_absolute (bib_rel)
+                    ? bib_rel
+                    : GLib.Path.build_filename (base_dir, bib_rel);
                 var f = GLib.File.new_for_path (bib_path);
                 if (f.query_exists ()) {
                     try {
@@ -125,7 +139,7 @@ namespace Imladris.UI {
                         yield f.load_contents_async (null, out data, out etag);
                         fallback_bib = Core.PlatformUtils.data_to_string (data);
                     } catch (GLib.Error e) {
-                        GLib.debug ("Failed to load local references.bib: %s", e.message);
+                        GLib.debug ("Failed to load local %s: %s", bib_path, e.message);
                     }
                 }
             }
@@ -165,15 +179,7 @@ namespace Imladris.UI {
                     doc_page.source_buffer.begin_user_action ();
                     doc_page.source_buffer.insert_at_cursor (@"[@$k]", -1);
                     doc_page.source_buffer.end_user_action ();
-                    Gtk.TextIter s, e;
-                    doc_page.source_buffer.get_bounds (out s, out e);
-                    string cur_text = doc_page.source_buffer.get_text (s, e, false);
-                    string updated_text = zotero_svc.ensure_yaml_bibliography (cur_text, "references.bib");
-                    if (updated_text != cur_text) {
-                        doc_page.source_buffer.begin_user_action ();
-                        doc_page.source_buffer.set_text (updated_text);
-                        doc_page.source_buffer.end_user_action ();
-                    }
+                    Editor.CitationCompletionProvider.ensure_buffer_bibliography_line (doc_page.source_buffer, "references.bib");
                     zotero_svc.sync_citation_to_project_async.begin (k, doc_page.current_project_dir);
                 });
                 row.add_suffix (ins_btn);
@@ -1001,8 +1007,19 @@ namespace Imladris.UI {
                 if (is_dir) {
                     current_browser_dir = fpath;
                     populate_files_browser ();
-                } else if (main_window != null) {
-                    main_window.open_file_from_path.begin (fpath);
+                } else {
+                    string lower_f = fpath.down ();
+                    if (lower_f.has_suffix (".csv") || lower_f.has_suffix (".tsv")) {
+                        data_grid_viewer.load_delimited_file (fpath);
+                        doc_page.dock_layout_state.activate_tab (QuadrantId.Q1_TOP_LEFT, PanelId.DATA_VIEWER);
+                        string bname = GLib.Path.get_basename (fpath);
+                        string safe_p = fpath.replace ("\\", "/").replace ("'", "\\'");
+                        string r_fn = lower_f.has_suffix (".tsv") ? "read.delim" : "read.csv";
+                        string py_sep = lower_f.has_suffix (".tsv") ? ", sep='\\t'" : "";
+                        doc_page.append_console_log (@"📊 Previewing '$bname' in Data Viewer.\n  • R:      df <- $r_fn('$safe_p')\n  • Python: df = pd.read_csv('$safe_p'$py_sep)");
+                    } else if (main_window != null) {
+                        main_window.open_file_from_path.begin (fpath);
+                    }
                 }
             });
             var files_scroll = new Gtk.ScrolledWindow () {
@@ -1593,15 +1610,7 @@ namespace Imladris.UI {
         }
 
         public void refresh_environment_and_outline () {
-            // Clear existing rows
-            Gtk.Widget? child = environment_list.get_first_child ();
-            while (child != null) {
-                var next = child.get_next_sibling ();
-                environment_list.remove (child);
-                child = next;
-            }
-
-            child = outline_list.get_first_child ();
+            Gtk.Widget? child = outline_list.get_first_child ();
             while (child != null) {
                 var next = child.get_next_sibling ();
                 outline_list.remove (child);
@@ -1618,26 +1627,15 @@ namespace Imladris.UI {
             string text = doc_page.source_buffer.text;
             string[] lines = text.split ("\n");
 
-            int var_count = 0;
             int chunk_idx = 0;
+            bool in_chunk = false;
 
             for (int i = 0; i < lines.length; i++) {
                 string line = lines[i];
                 string trimmed = line.strip ();
 
-                // 1. Outline headings & chunks
-                if (trimmed.has_prefix ("#")) {
-                    var row = new Gtk.ListBoxRow ();
-                    var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
-                        margin_top = 4, margin_bottom = 4, margin_start = 6, margin_end = 6
-                    };
-                    hbox.append (new Gtk.Image.from_icon_name ("format-text-bold-symbolic"));
-                    hbox.append (new Gtk.Label (trimmed) { xalign = 0, hexpand = true });
-                    hbox.append (new Gtk.Label (@"L$(i + 1)") { css_classes = { "dim-label", "caption" } });
-                    row.set_child (hbox);
-                    row.set_data<int> ("target-line", i);
-                    outline_list.append (row);
-                } else if (trimmed.has_prefix ("```{")) {
+                if (trimmed.has_prefix ("```{")) {
+                    in_chunk = true;
                     chunk_idx++;
                     var row = new Gtk.ListBoxRow ();
                     var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
@@ -1649,30 +1647,41 @@ namespace Imladris.UI {
                     row.set_child (hbox);
                     row.set_data<int> ("target-line", i);
                     outline_list.append (row);
+                    continue;
+                } else if (in_chunk && trimmed == "```") {
+                    in_chunk = false;
+                    continue;
                 }
 
-                // 2. Environment variable detection (Python / R / YAML assignments)
-                if (trimmed.contains ("<-") || (trimmed.contains ("=") && !trimmed.has_prefix ("#") && !trimmed.has_prefix ("<"))) {
-                    string[] parts = trimmed.contains ("<-") ? trimmed.split ("<-", 2) : trimmed.split ("=", 2);
-                    if (parts.length == 2) {
-                        string vname = parts[0].strip ();
-                        string vval = parts[1].strip ();
-                        if (vname.length > 0 && vname.length < 32 && !vname.contains (" ")) {
-                            var_count++;
-                            string vtype = "scalar";
-                            if (vval.has_prefix ("[") || vval.has_prefix ("c(")) vtype = "vector / list";
-                            else if (vval.contains ("read_") || vval.contains ("DataFrame") || vval.contains ("mtcars")) vtype = "data.frame";
-                            else if (vval.has_prefix ("\"") || vval.has_prefix ("'")) vtype = "string";
-                            add_env_row (vname, vtype, vval);
-                        }
-                    }
+                if (in_chunk) {
+                    continue;
                 }
 
-                // 3. Citations detection (@key)
+                // 1. Outline headings
+                if (trimmed.has_prefix ("#")) {
+                    var row = new Gtk.ListBoxRow ();
+                    var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
+                        margin_top = 4, margin_bottom = 4, margin_start = 6, margin_end = 6
+                    };
+                    hbox.append (new Gtk.Image.from_icon_name ("format-text-bold-symbolic"));
+                    hbox.append (new Gtk.Label (trimmed) { xalign = 0, hexpand = true });
+                    hbox.append (new Gtk.Label (@"L$(i + 1)") { css_classes = { "dim-label", "caption" } });
+                    row.set_child (hbox);
+                    row.set_data<int> ("target-line", i);
+                    outline_list.append (row);
+                }
+
+                // 2. Citations detection (@key) excluding Quarto cross-refs (@fig-, @tbl-, @sec-, @eq-, @lst-, @thm-)
                 if (trimmed.contains ("@") && !trimmed.has_prefix ("mailto:")) {
                     string[] words = trimmed.split_set (" [](),;.\t");
                     foreach (string w in words) {
                         if (w.has_prefix ("@") && w.length > 2) {
+                            string wl = w.down ();
+                            if (wl.has_prefix ("@fig-") || wl.has_prefix ("@tbl-") ||
+                                wl.has_prefix ("@sec-") || wl.has_prefix ("@eq-") ||
+                                wl.has_prefix ("@lst-") || wl.has_prefix ("@thm-")) {
+                                continue;
+                            }
                             var crow = new Adw.ActionRow () {
                                 title = w,
                                 subtitle = @"Referenced on line $(i + 1)"
@@ -1692,10 +1701,6 @@ namespace Imladris.UI {
                     }
                 }
             }
-
-            // Always show standard active session objects in Environment
-            add_env_row ("mtcars", "data.frame [32 × 11]", "mpg, cyl, disp, hp, drat, wt...");
-            add_env_row ("session_executions", "integer", @"$execution_counter cell runs");
         }
 
         private void add_env_row (string name, string type_str, string val_preview) {

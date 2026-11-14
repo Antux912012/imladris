@@ -297,6 +297,7 @@ shiny_test_sources = files(
   'src/services/ExportService.vala',
   'src/services/MediaHelper.vala',
   'src/core/MathChemEngine.vala',
+  'src/core/MermaidFlowEngine.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',

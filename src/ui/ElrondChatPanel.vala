@@ -600,7 +600,13 @@ namespace Imladris.UI {
             code_header.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
 
             string code_copy = code;
-            string code_engine = (lang.down () == "python" || lang.down () == "py") ? "python" : "r";
+            string lang_lower = lang.down ();
+            string code_engine = "r";
+            if (lang_lower == "python" || lang_lower == "py") {
+                code_engine = "python";
+            } else if (lang_lower == "bash" || lang_lower == "sh" || lang_lower == "zsh") {
+                code_engine = "bash";
+            }
 
             // Action: Insert at cursor
             var btn_insert = new Gtk.Button.from_icon_name ("insert-text-symbolic") {
@@ -608,7 +614,17 @@ namespace Imladris.UI {
             };
             btn_insert.add_css_class ("flat");
             btn_insert.clicked.connect (() => {
-                doc_page.source_buffer.insert_at_cursor (code_copy, -1);
+                string to_insert = code_copy;
+                var fmt = doc_page.get_document_format ();
+                if (fmt == DocumentFormat.QMD || fmt == DocumentFormat.RMD || fmt == DocumentFormat.IPYNB) {
+                    Gtk.TextIter cur_it;
+                    doc_page.source_buffer.get_iter_at_mark (out cur_it, doc_page.source_buffer.get_insert ());
+                    var chunk = Core.ChunkParser.find_chunk_at_line (doc_page.source_buffer.text, cur_it.get_line ());
+                    if (chunk == null && (code_engine == "r" || code_engine == "python" || code_engine == "bash")) {
+                        to_insert = "\n```{" + code_engine + "}\n" + code_copy.strip () + "\n```\n";
+                    }
+                }
+                doc_page.source_buffer.insert_at_cursor (to_insert, -1);
                 if (parent_window != null) {
                     parent_window.show_toast ("Inserted code at cursor");
                 }

@@ -561,11 +561,12 @@ plot(km_fit, col = c("#2563eb", "#dc2626"), lwd = 2,
 library(ggplot2)
 ggplot(%s, aes(x = %s, y = %s)) +
   geom_vline(xintercept = 1.0, linetype = "dashed", color = "#64748b") +
+  geom_errorbarh(aes(xmin = %s * 0.75, xmax = %s * 1.33), height = 0.2, color = "#475569") +
   geom_point(size = 3, color = "#2563eb") +
   theme_minimal() +
   labs(title = "Subgroup Forest Plot", x = "Hazard Ratio (95%% CI)", y = "Subgroup")
 ```
-""".printf (df, aval, arm);
+""".printf (df, aval, arm, aval, aval);
                 default:
                     return """```{r omics-volcano-plot, message=FALSE, warning=FALSE}
 # MULTI-OMICS DIFFERENTIAL EXPRESSION VOLCANO PLOT (FDR < 0.05, |log2FC| > 1.0)

@@ -269,12 +269,37 @@ namespace Imladris.Bridges.Yavanna {
         }
 
         private async void resolve_uniprot_async (string accession, GLib.Cancellable cancellable) {
-            string url = @"https://rest.uniprot.org/uniprotkb/$accession.json";
+            string clean_acc = accession.strip ().up ();
+            string url = @"https://rest.uniprot.org/uniprotkb/$clean_acc.json";
             var msg = new Soup.Message ("GET", url);
             msg.request_headers.append ("Accept", "application/json");
 
             try {
                 var bytes = yield http_session.send_and_read_async (msg, GLib.Priority.DEFAULT, cancellable);
+                if (msg.status_code != 200) {
+                    string search_url = @"https://rest.uniprot.org/uniprotkb/search?query=$(GLib.Uri.escape_string (clean_acc, null, false))&size=1";
+                    var smsg = new Soup.Message ("GET", search_url);
+                    smsg.request_headers.append ("Accept", "application/json");
+                    var sbytes = yield http_session.send_and_read_async (smsg, GLib.Priority.DEFAULT, cancellable);
+                    if (smsg.status_code == 200 && sbytes != null) {
+                        var sp = new Json.Parser ();
+                        sp.load_from_data (Core.PlatformUtils.bytes_to_string (sbytes), -1);
+                        var sroot = sp.get_root ();
+                        if (sroot != null && sroot.get_node_type () == Json.NodeType.OBJECT) {
+                            var sobj = sroot.get_object ();
+                            if (sobj.has_member ("results") && sobj.get_array_member ("results").get_length () > 0) {
+                                var first_hit = sobj.get_array_member ("results").get_object_element (0);
+                                if (first_hit.has_member ("primaryAccession")) {
+                                    clean_acc = first_hit.get_string_member ("primaryAccession");
+                                    url = @"https://rest.uniprot.org/uniprotkb/$clean_acc.json";
+                                    msg = new Soup.Message ("GET", url);
+                                    msg.request_headers.append ("Accept", "application/json");
+                                    bytes = yield http_session.send_and_read_async (msg, GLib.Priority.DEFAULT, cancellable);
+                                }
+                            }
+                        }
+                    }
+                }
                 if (msg.status_code != 200) {
                     throw new YavannaError.ENTITY_NOT_FOUND (@"UniProt returned HTTP $(msg.status_code)");
                 }
@@ -354,9 +379,10 @@ namespace Imladris.Bridges.Yavanna {
         }
 
         private async void resolve_ensembl_async (string query, GLib.Cancellable cancellable) {
-            string url = @"https://rest.ensembl.org/lookup/symbol/homo_sapiens/$query?content-type=application/json";
-            if (query.has_prefix ("ENSG")) {
-                url = @"https://rest.ensembl.org/lookup/id/$query?content-type=application/json";
+            string clean_q = query.strip ();
+            string url = @"https://rest.ensembl.org/lookup/symbol/homo_sapiens/$clean_q?content-type=application/json";
+            if (clean_q.up ().has_prefix ("ENSG")) {
+                url = @"https://rest.ensembl.org/lookup/id/$(clean_q.up ())?content-type=application/json";
             }
 
             var msg = new Soup.Message ("GET", url);
@@ -454,7 +480,8 @@ entity_json <- jsonlite::fromJSON(entity_url)
             if (resolved_id.length == 0) return;
             string clean_id = resolved_id.down ().replace ("_", "-");
             string snippet =
-"""```{python yavanna-%s}
+"""```{python}
+#| label: yavanna-%s
 # YAVANNA BIO-ENTITY PROVENANCE: %s:%s (%s)
 import requests
 resp = requests.get("%s", headers={"Accept": "application/json"}, timeout=10)

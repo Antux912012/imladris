@@ -403,6 +403,38 @@ namespace Imladris.UI {
             yield fetch_page_slice ();
         }
 
+        public void load_delimited_file (string file_path) {
+            try {
+                string raw;
+                GLib.FileUtils.get_contents (file_path, out raw);
+                string[] lines = raw.split ("\n");
+                char sep = file_path.down ().has_suffix (".tsv") ? '\t' : ',';
+                var sb = new GLib.StringBuilder ();
+                int row_num = 0;
+                int col_count = 0;
+                foreach (string raw_line in lines) {
+                    string line = raw_line.replace ("\r", "");
+                    if (line.strip () == "") continue;
+                    string[] fields = line.split_set (sep == '\t' ? "\t" : ",");
+                    if (row_num == 0) {
+                        col_count = fields.length;
+                        sb.append ("__COLS__\t").append (string.joinv ("\t", fields)).append ("\n");
+                    } else if (row_num <= page_size) {
+                        sb.append_printf ("__ROW__\t%d\t%s\n", row_num, string.joinv ("\t", fields));
+                    }
+                    row_num++;
+                }
+                int total_rows = int.max (0, row_num - 1);
+                sb.append_printf ("__DONE__\t%d\t%d\n", total_rows, col_count);
+                string bname = GLib.Path.get_basename (file_path);
+                this.active_object_name = bname;
+                parse_tsv_stream (bname, sb.str);
+            } catch (GLib.Error e) {
+                title_label.label = "Failed to load file";
+                dim_badge.label = e.message;
+            }
+        }
+
         private async void fetch_page_slice () {
             if (active_object_name == "") return;
 
