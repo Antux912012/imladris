@@ -28,3 +28,4 @@ modules:
       - type: git
         url: https://github.com/Antux912012/imladris.git
         tag: v0.25.0
+        commit: a3ed3021ac48a9059f7e1a07e0a7332c2b26e188
