@@ -387,6 +387,10 @@ namespace Imladris {
                     refresh_live_preview (doc_text);
                     panel_registry.refresh_environment_and_outline ();
 
+                    if (!source_buffer.get_modified ()) {
+                        return GLib.Source.REMOVE;
+                    }
+
                     // Non-blocking shadow buffer write for crash resilience
                     int line = 0;
                     int col = 0;
@@ -581,6 +585,7 @@ print("Python Interpreter:", sys.version.split()[0])
 </html>
 """;
             }
+            source_buffer.set_modified (false);
         }
 
         private void update_style_scheme () {

@@ -14,12 +14,9 @@ finish-args:
   - --device=dri
   # Network access for AI models, Shiny live server, and package installations
   - --share=network
-  # Workspace file access across user directories for data science notebooks & projects
-  - --filesystem=home
-  # Host execution portal for spawning host toolchains (R, Quarto, Python) via flatpak-spawn
-  - --talk-name=org.freedesktop.Flatpak
-  - --env=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
-  - --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
+  # Workspace file access across standard user directories for data science notebooks & projects
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
 modules:
   - name: imladris
     buildsystem: simple
@@ -37,9 +34,9 @@ modules:
         filename: imladris.deb
         only-arches:
           - x86_64
-        url: https://github.com/Antux912012/imladris/releases/download/v0.24.1/imladris_0.24.1_amd64.deb
-        sha256: f13f34f7d74cd08f15ebcb60fb73ad5ab3d4b299928327c3e51a871763145623
-        size: 1994144
+        url: https://github.com/Antux912012/imladris/releases/download/v0.25.0/imladris_0.25.0_amd64.deb
+        sha256: d3193d4a12460a81cd13672b83ca949898b08d1ef82561cac6b1503e7197c3ff
+        size: 2068144
       # END MANAGED EXTRA-DATA
       - type: file
         path: apply_extra.sh

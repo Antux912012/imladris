@@ -10,8 +10,7 @@
         "--socket=fallback-x11",
         "--socket=wayland",
         "--device=dri",
-        "--filesystem=home",
-        "--talk-name=org.freedesktop.Flatpak"
+        "--filesystem=home"
     ],
     "cleanup": [
         "/include",

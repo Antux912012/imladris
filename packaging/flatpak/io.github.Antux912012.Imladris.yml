@@ -11,8 +11,8 @@ finish-args:
   - --socket=fallback-x11
   - --socket=wayland
   - --device=dri
-  - --filesystem=home
-  - --talk-name=org.freedesktop.Flatpak
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
 cleanup:
   - /include
   - /lib/pkgconfig

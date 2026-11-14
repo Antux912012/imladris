@@ -1,21 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Antonio De Gaetano -->
 <component type="desktop-application">
   <id>io.github.Antux912012.Imladris</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>Imladris</name>
-  <summary>Scientific notebook and Quarto studio for Linux</summary>
+  <summary>Scientific notebook and Quarto IDE</summary>
   <description>
     <p>
-      Imladris is a native Linux polyglot document studio and scientific Markdown editor built with Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0. Delivering sub-second startup with zero Electron overhead, Imladris provides high-density scientific authoring for researchers, biostatisticians, and data scientists.
+      Imladris is a scientific workbench and polyglot IDE that unifies interactive R, Python, and Julia execution, Quarto publishing, biostatistics, and AI-assisted research into a single studio for researchers, biostatisticians, and data scientists.
     </p>
     <p>
       Imladris provides dual-mode operation: a distraction-free single-pane writer for Markdown and HTML, and an RStudio-style 4-quadrant workbench for computational documents (.qmd, .Rmd, .ipynb, .R, .py) with real-time KaTeX mathematics, live charts, and interactive REPL consoles.
     </p>
     <ul>
-      <li>4-Quadrant Scientific Workbench: Integrated source editor, interactive R/Python/Julia REPL consoles, variable inspector, and WebKitGTK live preview.</li>
+      <li>4-Quadrant Scientific Workbench: Integrated source editor, interactive R/Python/Julia REPL consoles, variable inspector, and live document preview.</li>
       <li>Positron/RStudio-Style Direct Editor Writing: In-place code generation and chunk replacement preserving Quarto cell options (#|) and single-step Ctrl+Z undo.</li>
-      <li>Multi-Tier AI Orchestration: Offline local LLMs via bundled llama.cpp, GitHub Copilot OAuth Device Flow, and automatic HTTP 429 quota failover across Groq, Cerebras, OpenRouter, and GitHub Models.</li>
+      <li>Multi-Tier AI Orchestration: Offline local LLMs via local llama.cpp, Ollama, or LM Studio servers, GitHub Copilot OAuth Device Flow, and automatic HTTP 429 quota failover across Groq, Cerebras, OpenRouter, and GitHub Models.</li>
       <li>Reproducible Sandboxes &amp; .mallorn Format: Isolated renv and venv project environments with 1:1 bidirectional RStudio compatibility and portable archive bundles.</li>
       <li>Full Jupyter Parity: Lossless round-trip .ipynb (nbformat 4.5) editing preserving cell IDs, execution counts, outputs, and metadata.</li>
       <li>Integrated Domain Studios: Galaxy Project workflow bridge, AlphaFold DB structure inspection, ICH E9 biostatistics calculators, and Natural Math/Chem studios.</li>
@@ -33,30 +34,33 @@
     <color type="primary" scheme_preference="light">#d8e6f8</color>
     <color type="primary" scheme_preference="dark">#1c3b64</color>
   </branding>
+  <categories>
+    <category>Development</category>
+    <category>IDE</category>
+    <category>Science</category>
+    <category>DataVisualization</category>
+    <category>NumericalAnalysis</category>
+  </categories>
   <screenshots>
     <screenshot type="default">
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-screenshot.png</image>
-      <caption>Imladris 4-pane scientific workbench with redesigned Elrond AI copilot and live data inspection</caption>
+      <caption>Four-pane scientific workbench with Quarto editor and live console</caption>
+      <image>https://raw.githubusercontent.com/Antux912012/imladris/v0.25.0/data/screenshots/imladris-screenshot.png</image>
     </screenshot>
     <screenshot>
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-welcome.png</image>
-      <caption>Streamlined progressive-disclosure welcome screen with Quick Start and template expander</caption>
+      <caption>Streamlined welcome screen with Quick Start and project templates</caption>
+      <image>https://raw.githubusercontent.com/Antux912012/imladris/v0.25.0/data/screenshots/imladris-welcome.png</image>
     </screenshot>
     <screenshot>
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-ai-copilot.png</image>
-      <caption>Positron-style Elrond AI Direct Editor Writing with in-place chunk refactoring</caption>
+      <caption>Elrond AI Direct Editor Writing with in-place chunk refactoring</caption>
+      <image>https://raw.githubusercontent.com/Antux912012/imladris/v0.25.0/data/screenshots/imladris-ai-copilot.png</image>
     </screenshot>
     <screenshot>
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-workspace.png</image>
-      <caption>Workspace and editor preferences with layout mode switching and toolbar customization</caption>
+      <caption>Workspace and editor layout preferences in Dark mode</caption>
+      <image>https://raw.githubusercontent.com/Antux912012/imladris/v0.25.0/data/screenshots/imladris-preferences-workspace.png</image>
     </screenshot>
     <screenshot>
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-theming.png</image>
-      <caption>Appearance preferences with theme selection and GNOME accent colors</caption>
-    </screenshot>
-    <screenshot>
-      <image width="1920" height="1080">https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-ai.png</image>
-      <caption>Multi-provider AI assistant configuration with direct API key portal links</caption>
+      <caption>Appearance preferences with Eye-Friendly reading theme</caption>
+      <image>https://raw.githubusercontent.com/Antux912012/imladris/v0.25.0/data/screenshots/imladris-preferences-theming.png</image>
     </screenshot>
   </screenshots>
   <launchable type="desktop-id">io.github.Antux912012.Imladris.desktop</launchable>
@@ -200,7 +204,7 @@
     </release>
     <release version="0.13.1" date="2026-10-28">
       <description>
-        <p>Release v0.13.1 brings critical security hardening, memory safety, and live preview rendering fixes: Resolves WebKitGTK 6.0 inner bwrap sandbox credential handshake collisions in Flatpak (WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1) ensuring reliable live preview; adds base URI directory resolution for relative images and stylesheets; introduces automatic WebProcess crash recovery; hardens plugin ID validation against directory traversal and blocks symlink expansion during archive extraction; secures workspace file access against path traversal; optimizes real-time word counting to zero-allocation streaming; cleans up deprecated Libadwaita expander row icons; and implements application window close resource cleanup.</p>
+        <p>Release v0.13.1 brings critical security hardening, memory safety, and live preview rendering fixes: Resolves WebKitGTK 6.0 inner sandbox credential handshake collisions in containerized environments ensuring reliable live preview; adds base URI directory resolution for relative images and stylesheets; introduces automatic WebProcess crash recovery; hardens plugin ID validation against directory traversal and blocks symlink expansion during archive extraction; secures workspace file access against path traversal; optimizes real-time word counting to zero-allocation streaming; cleans up deprecated Libadwaita expander row icons; and implements application window close resource cleanup.</p>
       </description>
     </release>
     <release version="0.13.0" date="2026-10-28">

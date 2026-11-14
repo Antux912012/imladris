@@ -984,11 +984,14 @@ namespace Imladris {
 
         public void add_document_tab (string title, string lang_id, string? initial_text = null, GLib.File? file = null) {
             var doc_page = new DocumentPage (title, lang_id, this);
-            if (initial_text != null) {
-                doc_page.source_buffer.text = initial_text;
-            }
             if (file != null) {
                 doc_page.file_location = file;
+            }
+            if (initial_text != null) {
+                doc_page.source_buffer.text = initial_text;
+                if (file != null) {
+                    doc_page.source_buffer.set_modified (false);
+                }
             }
             doc_page.project_type = current_project_type;
             doc_page.stats_changed.connect ((words, lines, badge) => {

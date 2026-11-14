@@ -198,6 +198,19 @@ flatpak install flatpark io.github.Antux912012.Imladris
 flatpak run io.github.Antux912012.Imladris
 ```
 
+#### Flatpak Sandbox Permissions & Local Linter Verification
+Imladris runs under the `org.gnome.Platform//47` runtime with minimal static sandbox privileges:
+* `--share=ipc` & `--socket=fallback-x11` / `--socket=wayland` (GTK4 & WebKitGTK rendering)
+* `--device=dri` (GPU hardware acceleration for WebKitGTK and Cairo plots)
+* `--share=network` (Quarto preview server, Micromamba environment bootstrap, and user-initiated API bridges)
+* `--filesystem=xdg-documents` & `--filesystem=xdg-download` (access to standard research workspace directories; all other paths use `Gtk.FileDialog` / `org.freedesktop.portal.FileChooser`)
+
+To build the Flatpak locally and run the official Flathub linter (`flatpak-builder-lint`):
+```bash
+flatpak run --filesystem=host --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.Antux912012.Imladris.yml
+flatpak run --filesystem=host --command=flatpak-builder-lint org.flatpak.Builder appstream data/io.github.Antux912012.Imladris.metainfo.xml
+```
+
 ### Arch Linux (AUR)
 ```bash
 paru -S imladris
@@ -301,7 +314,7 @@ imladris document.qmd        # Launch document, notebook, .Rproj, or .mallorn ar
 * **Keyring Security ([`SECURITY.md`](SECURITY.md))**: API keys and OAuth tokens are stored exclusively via system `libsecret-1` credential stores with restrictive `0600` fallbacks.
 * **Sandboxed Tooling**: Built-in MCP execution defaults to disabled (`IMLADRIS_MCP_ALLOW_EXEC=1` required) and enforces explicit interpreter binary allowlisting (`Rscript`, `python3`, `quarto`).
 * **GDPR Compliance (Art. 17)**: Execute `imladris --purge-user-data` for complete removal of application data from the local host.
-* **Generative AI & Development Disclosure ([`docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md`](docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md))**: Imladris is architected, reviewed, and tested by Antonio De Gaetano with AI pair-programming assistance (Google Gemini and Anthropic Claude used across ~60–70% of code scaffolding, refactoring, and documentation). In-app Elrond AI features are strictly opt-in with local offline (`llama.cpp`/Ollama) and consent-gated cloud options.
+* **Generative AI & Flathub Compliance Disclosure ([`docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md`](docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md))**: Imladris is architected, reviewed, and tested by Antonio De Gaetano with AI pair-programming assistance (Google Gemini and Anthropic Claude used across ~60–70% of code scaffolding, refactoring, and documentation). Flathub build manifests (`io.github.Antux912012.Imladris.yml` and `io.github.Antux912012.Imladris.json`) are human-maintained and verified via `flatpak-builder-lint`. In-app Elrond AI features are strictly opt-in with local offline (`llama.cpp`/Ollama/LM Studio) and consent-gated cloud options.
 * **License**: Published under the **[GNU General Public License v3.0 or later (`GPL-3.0-or-later`)](LICENSE)**.
 
 ```text

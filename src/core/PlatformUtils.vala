@@ -190,7 +190,7 @@ namespace Imladris.Core {
             _cache_mutex.lock ();
             if (_galaxy_secret_schema == null) {
                 _galaxy_secret_schema = new Secret.Schema (
-                    "org.ardatech.Imladris.GalaxyApiKey",
+                    "io.github.Antux912012.Imladris.GalaxyApiKey",
                     Secret.SchemaFlags.NONE,
                     "server_url", Secret.SchemaAttributeType.STRING
                 );

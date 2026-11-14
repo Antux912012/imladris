@@ -68,11 +68,7 @@ command=imladris
 shared=ipc;network;
 sockets=fallback-x11;wayland;
 devices=dri;
-filesystems=home;~/.cache/imladris:create;
-env=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1;WEBKIT_DISABLE_DMABUF_RENDERER=1;
-
-[Session Bus Policy]
-org.freedesktop.Flatpak=talk
+filesystems=xdg-documents;xdg-download;
 EOF_META
 
   run_meson_build "build-flatpak" "/app" "${PROJECT_DIR}/build-flatpak-app/files"
@@ -112,12 +108,21 @@ EOF_META
   cp "data/icons/hicolor/64x64/apps/${APP_ID}.png" "build-flatpak-app/files/share/app-info/icons/flatpak/64x64/${APP_ID}.png"
 
   python3 - "build-flatpak-app/files/share/app-info/xmls/${APP_ID}.xml.gz" "data/${APP_ID}.metainfo.xml" "${APP_ID}" << 'PYEOF'
-import gzip, sys
+import gzip, sys, re, datetime
 xml_gz, metainfo_path, app_id = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(metainfo_path, "r", encoding="utf-8") as mf:
     raw = mf.read()
+def repl_date(m):
+    dt = datetime.datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+    return f'timestamp="{int(dt.timestamp())}"'
+raw = re.sub(r'date="(\d{4}-\d{2}-\d{2})"', repl_date, raw)
+icons_xml = (
+    f'  <icon type="cached" width="128" height="128">{app_id}.png</icon>\n'
+    f'  <icon type="cached" width="64" height="64">{app_id}.png</icon>\n'
+)
+raw = raw.replace("</summary>", "</summary>\n" + icons_xml, 1)
 body = raw.split("<component", 1)[1]
-composed = f'<?xml version="1.0" encoding="UTF-8"?>\n<components version="0.8" origin="{app_id}">\n  <component{body}\n</components>\n'
+composed = f'<?xml version="1.0" encoding="UTF-8"?>\n<components version="0.8" origin="flatpak">\n  <component{body}\n</components>\n'
 with gzip.open(xml_gz, "wt", encoding="utf-8") as f:
     f.write(composed)
 PYEOF
@@ -135,12 +140,7 @@ PYEOF
     --socket=wayland \
     --device=dri \
     --filesystem=home \
-    --filesystem=~/.cache/imladris:create \
-    --env=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 \
-    --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 \
-    --talk-name=org.freedesktop.Flatpak \
-    --talk-name=org.freedesktop.secrets \
-    --metadata=X-DConf=default-settings
+    --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
 
   flatpak build-export repo build-flatpak-app master
   flatpak build-update-repo repo || true
