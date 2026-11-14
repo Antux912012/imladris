@@ -1,7 +1,7 @@
 Name:           imladris
 Version:        0.25.0
 Release:        1%{?dist}
-Summary:        Scientific notebook studio with GPU acceleration, slide decks and posters
+Summary:        Native scientific notebook studio for Quarto, R, Python, and Jupyter
 
 License:        GPL-3.0-or-later
 URL:            https://antux912012.github.io/imladris/
@@ -34,10 +34,12 @@ Recommends:     texlive-scheme-basic
 Recommends:     llama-cpp
 
 %description
-Imladris is a native Linux polyglot document studio and scientific Markdown
-editor built with Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0.
-Featuring an adaptive ribbon interface, Imladris provides a distraction-free
-writing environment for technical authors, data scientists, and researchers.
+Imladris is a native Linux polyglot document studio and scientific workbench
+built with Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0.
+Featuring an adaptive ribbon interface and 4-quadrant RStudio-style docking,
+Imladris provides a sub-second, distraction-free environment for technical authors,
+biostatisticians, and data scientists. Includes Direct Editor Writing with local
+and free-tier AI quota failover, GitHub Copilot OAuth, and reproducible sandboxes.
 
 %prep
 %autosetup -n %{name}-%{version}
@@ -65,10 +67,11 @@ export GSETTINGS_BACKEND=memory
 %changelog
 * Sat Nov 14 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.25.0-1
 - Release 0.25.0: Free-Tier AI APIs, Automatic Quota Failover, GitHub Copilot OAuth, Positron-Style Direct Editing & Security Hardening:
-  * Free-tier AI providers (Groq, Cerebras, OpenRouter Free, GitHub Models, FreeLLMAPI Local) with HTTP 429 automatic failover and privacy opt-in.
-  * GitHub Copilot OAuth Device Flow authentication with libsecret storage.
-  * Positron/RStudio-style direct editor writing (Apply to Selection, Update Chunk preserving #| options) replacing the inline editing popover.
-  * Security & data-integrity hardening: MCP execute_code opt-in & allowlist, Mallorn Zip Slip validation, direct micromamba download without shell pipes, \uFFFC anchor stripping, and dock popout/tab-close lifecycle fixes.
+  * Functions Added: Free-tier AI providers (Groq, Cerebras, OpenRouter Free, GitHub Models, FreeLLMAPI Local) with HTTP 429 automatic failover and privacy opt-in (free_api_consent_accepted).
+  * Functions Added: GitHub Copilot OAuth Device Flow authentication (CopilotAuthService) with libsecret storage and OpenAI-compatible chat completions.
+  * Functions Added: Positron/RStudio-style Direct Editor Writing (AiBufferEditHelper & ElrondChatPanel: Apply to Selection, Update Active Chunk preserving #| options, Improve Writing, Refactor Code, Fix Syntax) with single-step Ctrl+Z undo.
+  * Improvements: Replaced legacy inline editing popover with unified direct-buffer Elrond workflow; PackageIndexCache zero-phone-home on-demand loading; updated About dialog, AppStream metadata, desktop keywords, and packaging descriptions.
+  * Bugs Fixed: MCP execute_code disabled by default behind IMLADRIS_MCP_ALLOW_EXEC=1 with strict binary allowlist; GALAXY_API_KEY isolated in subprocesses; Mallorn Zip Slip path validation; shell-free micromamba download via Soup.Session + libarchive; \uFFFC anchor stripping on save; dock popout widget stealing & tab-close window leak fixes; CommandPaletteDialog action prefix fixes; DocumentAdapter static race condition fix.
 
 * Fri Nov 13 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.24.2-1
 - Release 0.24.2: Complete bundled Papirus symbolic icon pack via GResource (following 0.24.0/0.24.1 scientific bridges & toolchain setup).

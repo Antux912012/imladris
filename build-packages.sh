@@ -167,13 +167,15 @@ Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.12), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3, curl, bzip2
 Recommends: pandoc, libreoffice-writer | libreoffice, texlive-latex-base | typst, llama.cpp | llama-cpp
 Homepage: https://antux912012.github.io/imladris/
-Description: Native Polyglot Studio with AI Assistance, Auto-Completion and MCP Server
- Imladris is a native Linux Markdown and Polyglot Studio built with
- Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0.
- Features Multi-Provider AI Assistance (Google Gemini, DeepSeek, Kimi, Qwen, Ollama, and LM Studio),
- Model Context Protocol (MCP) server, and 4-Quadrant RStudio Docking.
- Supports Quarto (.qmd), R Markdown (.Rmd), Jupyter (.ipynb),
- TypeScript (.ts), HTML5 (.html), and Markdown (.md).
+Description: Native Scientific Notebook Studio for Quarto, R, Python, and Jupyter
+ Imladris is a native Linux polyglot document studio and scientific workbench
+ built with Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0.
+ Features 4-Quadrant RStudio-style docking, Positron-style Direct Editor
+ Writing, multi-tier AI quota failover (Groq, Cerebras, OpenRouter, GitHub Models),
+ GitHub Copilot OAuth, local llama.cpp inference, Model Context Protocol (MCP) server,
+ sandboxed renv/venv environments, Mallorn bundles, and bioinformatics bridges.
+ Supports Quarto (.qmd), R Markdown (.Rmd), Jupyter (.ipynb), R (.R), Python (.py),
+ and Markdown (.md).
 EOF
 
 cat <<'EOF' > deb-root/DEBIAN/postinst

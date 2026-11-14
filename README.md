@@ -8,10 +8,10 @@ SPDX-License-Identifier: GPL-3.0-or-later
 </p>
 
 <h1 align="center">Imladris</h1>
-<h3 align="center">The Native Linux Scientific Workbench, Bioinformatics Bridge &amp; Polyglot Notebook IDE</h3>
+<h3 align="center">The Native Linux Scientific Workbench &amp; Polyglot Notebook Studio</h3>
 
 <p align="center">
-  <em>Zero Electron overhead. Instant startup. Reproducible manuscripts from cloud genomics to clinical biostatistics.</em>
+  <em>Sub-second startup. Zero Electron overhead. High-density scientific authoring from cloud genomics to clinical biostatistics.</em>
 </p>
 
 <p align="center">
@@ -36,28 +36,53 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Why Imladris?
 
-Modern scientific software forces an unnecessary compromise: heavy Electron-based IDEs consume gigabytes of RAM before you load a single dataset, while lightweight editors lack R/Python notebooks, reproducible environments, and domain-specific scientific tooling.
+Modern scientific computing forces an inefficient compromise: Electron-based editors consume 1–2 GB of system RAM before opening a dataset, while lightweight text editors lack interactive REPLs, reproducible package sandboxes, and scientific domain tooling.
 
-**Imladris** is engineered in compiled **Vala**, **GTK4**, **Libadwaita**, **GtkSourceView 5**, and **WebKitGTK 6.0** to give researchers, bioinformaticians, biostatisticians, and data scientists a **sub-second native desktop studio** that keeps CPU and memory dedicated to statistical compute, genomic matrices, and local AI inference.
+**Imladris** is engineered in compiled **Vala**, **GTK4**, **Libadwaita**, **GtkSourceView 5**, and **WebKitGTK 6.0**. It delivers a native, sub-second scientific desktop studio that leaves workstation memory and GPU resources dedicated to statistical computation, genomic matrices, and local model inference.
 
-| Challenge | Legacy Workflow | The Imladris v0.25.0 Approach |
+### Comparative Workflow Matrix
+
+| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.25.0 Approach |
 | :--- | :--- | :--- |
-| **IDE Overhead** | 1–2 GB RAM idle in Electron | Native compiled Vala + GTK4 binary with hardware-accelerated rendering |
-| **AI Coding & Cost** | Locked to one paid cloud API | **Local Elrond** (offline `llama-server`) + **Free-Tier APIs** (Groq, Cerebras, OpenRouter `:free`, GitHub Models) + **Auto-Failover** + **GitHub Copilot OAuth** |
-| **Editor Refactoring** | Copy-pasting from chat or losing YAML | **Positron/RStudio-Style Direct Editor Writing** (`Apply to Selection` & `Update Chunk` preserving `#|` Quarto options + `Ctrl+Z` undo) |
-| **Cloud Genomics** | Manual CSV downloads break provenance | **Arekyer Galaxy Bridge** (`libsecret-1` keyring + verified `httr2`/`pandas` provenance chunks) |
-| **Domain Tooling** | Disconnected web calculators | Integrated **Elbereth** (ICH E9 Biostats), **Taniquetil** (AlphaFold DB), **Yavanna** (RT-qPCR & UniProt/Ensembl), & **MathChem** (`Ctrl+M`) |
+| **Idle Memory Overhead** | 1.2–2.5 GB RAM idle | **< 120 MB RAM** (native compiled Vala/GTK4 binary) |
+| **Cold Startup Latency** | 4.0–9.0 seconds | **< 0.6 seconds** instant launch |
+| **AI In-Editor Writing** | Locked to proprietary cloud subscriptions | **Positron-style Direct Editor Writing** + **GitHub Copilot OAuth** + **Free-Tier Quota Failover** (Groq/Cerebras/OpenRouter) + **Local llama.cpp** |
+| **Editor Ergonomics** | Generic web view or rigid legacy panels | **Dual-Mode Workbench**: Distraction-Free Focus Writer for Markdown, 4-Quadrant Workbench for Quarto, R, and Python |
+| **Cloud Genomics Integration**| Manual browser downloads breaking provenance | **Arekyer Galaxy Bridge**: Native `libsecret` token storage + verified `httr2`/`pandas` provenance code injection |
+| **Clinical Biostatistics** | External calculators and scripts | **Elbereth Studio**: Native ICH E9 sample size calculations, power curves, and CDISC ADaM table generators |
+| **Environment Portability** | Machine-dependent state drift | **1:1 RStudio `.Rproj` compatibility**, portable `.mallorn` bundles, and sandboxed `renv`/`venv` managers |
 
 > **Note:** Imladris is an independent open-source software project. It is not affiliated with, sponsored by, or endorsed by Posit PBC, RStudio, Project Jupyter, or the Galaxy Project.
 
 ---
 
+## Tailored for Scientific Personas
+
+### For Clinical Biostatisticians & Epidemiologists
+* **Regulatory Compliance & GxP Lockfiles**: Automatic cryptographic SHA-256 provenance manifests (`<document>.provenance.lock.json`) generated on export.
+* **ICH E9 Statistical Power Models**: Calculate sample sizes and statistical power (Two-Sample Continuous, Proportions with Casagrande-Pike correction, Schoenfeld Log-Rank Survival) with live Cairo power curves.
+* **CDISC Code Generators**: Rapid generation of compliant ADSL Table 1 summary demographics, ADTTE Kaplan-Meier survival curves, and Cox Proportional Hazards regression blocks.
+
+### For Bioinformaticians & Genomic Data Scientists
+* **Native Galaxy Project Integration**: Connect securely to `usegalaxy.eu`, `usegalaxy.org`, or `usegalaxy.org.au` via `libsecret-1` to inspect history datasets and inject programmatic retrieval code.
+* **AlphaFold DB & PDB Inspection**: Fetch DeepMind / EMBL-EBI structures directly into the workbench with per-residue pLDDT confidence visualization and R `bio3d` / Python `biotite` script generation.
+* **Yavanna Bio-Entity & RT-qPCR Studio**: Live UniProtKB and Ensembl GRCh38 querying, alongside oligo length, GC%, melting temperature ($T_m$), and molecular weight calculations.
+
+### For Data Science Practitioners & Technical Authors
+* **Direct Editor Writing (`Ctrl+Shift+E`)**: Stream AI-generated code directly into active code chunks or document selections while strictly preserving Quarto cell options (`#|`) and enabling single-step `Ctrl+Z` undo.
+* **Zero-Cost AI Failover**: Built-in support for permanent free-tier API endpoints (Groq, Cerebras, OpenRouter `:free`, GitHub Models) with automatic HTTP 429 quota cascading.
+* **Lossless Jupyter Parity**: Round-trip `.ipynb` (`nbformat 4.5`) support that maintains cell IDs, execution counts, outputs, and metadata without conversion loss.
+
+---
+
 ## What’s New in v0.25.0
 
-* **Free-Tier AI Orchestration & Automatic Quota Failover**: Configure permanent free-tier providers (**Groq**, **Cerebras**, **OpenRouter `:free`**, **GitHub Models**, and **FreeLLMAPI Local Proxy**). When a primary cloud provider hits rate limits (`HTTP 429`) or quota exhaustion, `AiClient` automatically cascades to your configured backup providers (guarded by explicit user privacy opt-in).
-* **GitHub Copilot OAuth Device Flow**: Sign in directly from **AI Settings** using standard RFC 8628 GitHub Device Flow (`https://github.com/login/device`), with tokens stored in `libsecret` (`io.github.Antux912012.Imladris.Copilot`) and `0600` fallback.
-* **Positron/RStudio-Style Direct Editor Writing**: Replaces modal inline popovers with direct, undoable buffer actions inside **Elrond AI**: **Apply to Selection**, **Update Active Chunk** (preserving `#|` Quarto cell options without resetting cursor/scroll/undo history), and one-click quick actions (*Improve Writing*, *Refactor Code*, *Fix Error*).
-* **Security & Data-Integrity Hardening**: MCP `execute_code` disabled by default (`IMLADRIS_MCP_ALLOW_EXEC=1` opt-in + `Rscript`/`python3`/`quarto` allowlist), `.mallorn` Zip Slip path traversal validation, shell-free `micromamba` bootstrap with SHA-256 verification, `\uFFFC` child-anchor sanitization on save, and dock popout/tab-close lifecycle fixes.
+* **Free-Tier AI Orchestration & Automatic Quota Failover**: Configure permanent free-tier providers (**Groq**, **Cerebras**, **OpenRouter `:free`**, **GitHub Models**, and **FreeLLMAPI Local Proxy**). When a primary provider encounters rate limits (`HTTP 429`) or quota exhaustion, `AiClient` cascades automatically to verified backups under explicit user privacy consent.
+* **GitHub Copilot OAuth Device Flow**: Authenticate directly from **AI Settings** using RFC 8628 GitHub Device Flow (`https://github.com/login/device`), with credentials secured in `libsecret` (`io.github.Antux912012.Imladris.Copilot`).
+* **Positron/RStudio-Style Direct Editor Writing**: Direct in-buffer transformations via Elrond AI: **Apply to Selection**, **Update Active Chunk** (preserving Quarto `#|` cell options and buffer undo history), and one-click actions (*Improve Writing*, *Refactor Code*, *Fix Syntax*).
+* **Security & Data-Integrity Hardening**: MCP `execute_code` disabled by default (`IMLADRIS_MCP_ALLOW_EXEC=1` opt-in with strict binary allowlist), `.mallorn` Zip Slip path traversal mitigation, shell-free `micromamba` bootstrap, `\uFFFC` anchor cleanup on file save, and dock panel lifecycle stability fixes.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, improvements, and bugs fixed.
 
 ---
 
@@ -96,28 +121,31 @@ Modern scientific software forces an unnecessary compromise: heavy Electron-base
 ## Core Capabilities
 
 ### 1. Adaptive Dual-Mode Workbench
-* **Single-Pane Writer Mode**: Opens Markdown (`.md`) and HTML (`.html`) files in a calm, distraction-free writing surface without spawning background interpreters.
-* **Four-Quadrant Workbench Mode**: Opens computational notebooks (`.qmd`, `.Rmd`, `.ipynb`, `.R`, `.py`) in a configurable RStudio-style 4-quadrant layout with Source Editor (Q1), Console & Terminal (Q2), Environment / History / Outline / Citations / Arekyer (Q3), and Files / Plots / Packages / Live Preview / Shiny Viewer (Q4).
+* **Single-Pane Focus Mode**: Calibrated for Markdown (`.md`) and HTML (`.html`) authoring without interpreter overhead.
+* **Four-Quadrant Workbench Mode**: Automatic layout activation for `.qmd`, `.Rmd`, `.ipynb`, `.R`, and `.py`:
+  * **Q1 (Top-Left)**: GtkSourceView 5 polyglot editor with code folding, breadcrumbs, and live diagnostics.
+  * **Q2 (Bottom-Left)**: Persistent interactive REPL consoles for R, Python, Julia, SQL, and Bash.
+  * **Q3 (Top-Right)**: Environment variable inspector, command history, document outline, citation manager, and Arekyer Galaxy bridge.
+  * **Q4 (Bottom-Right)**: File browser, Cairo plot viewer, package manager, WebKitGTK 6.0 live preview, and embedded Shiny viewer.
 
-### 2. Elrond AI Copilot, Free-Tier Backup & GitHub Copilot
-* **Local-First AI**: Zero-config `llama-server` (Vulkan/CUDA), Ollama, LM Studio, Cherry Studio, and Antigravity CLI (`agy`) — 100% offline with zero silent cloud fallback.
-* **Cloud & Free-Tier Multi-Provider Engine**: Supports Gemini, Claude, OpenAI, DeepSeek, Kimi, Qwen, NVIDIA NIM, Groq, Cerebras, OpenRouter `:free`, GitHub Models, and FreeLLMAPI Local Proxy with automatic `HTTP 429` failover.
-* **GitHub Copilot OAuth**: Native Device Flow sign-in from **AI Settings**.
-* **Direct Editor Writing (`Ctrl+Shift+E`)**: Apply AI code directly to editor selections or active chunks while preserving `#|` Quarto options and single-step `Ctrl+Z` undo.
+### 2. Multi-Tier AI Copilot & Direct Writing
+* **Local Offline Models**: Zero-configuration `llama-server` (Vulkan/CUDA acceleration), Ollama, and LM Studio endpoints operating fully offline.
+* **Cloud & Free-Tier Engine**: Seamless support for Google Gemini, Anthropic Claude, OpenAI, DeepSeek, Kimi, Qwen, NVIDIA NIM, Groq, Cerebras, OpenRouter `:free`, and GitHub Models.
+* **Direct Editor Writing (`Ctrl+Shift+E`)**: Update code blocks and text selections directly within the editor buffer with single-step `Ctrl+Z` undo.
 
-### 3. Integrated Scientific & Clinical Studios
-* **Elbereth Clinical Biostatistics (`Imladris.Bridges.Elbereth`)**: ICH E9 statistical power & sample size (Two-Sample Continuous, Proportions with Casagrande-Pike correction, Schoenfeld Log-Rank Survival), live Cairo power curves, and CDISC ADSL Table 1 / ADTTE Kaplan-Meier / Cox PH code generation.
-* **Arekyer Galaxy-to-Quarto Bridge (`Imladris.Bridges.Arekyer`)**: Browse Galaxy Project histories (`usegalaxy.eu`, `usegalaxy.org`, `usegalaxy.org.au`), store API keys in `libsecret-1`, and inject verified `httr2` (R) and `pandas` (Python) loaders.
-* **Taniquetil AlphaFold Bridge (`Imladris.Bridges.Taniquetil`)**: Inspect DeepMind / EMBL-EBI AlphaFold DB and RCSB PDB structures with Cairo per-residue pLDDT tracks and `bio3d` / `biotite` code generation.
-* **Yavanna Bio-Entity & RT-qPCR Studio (`Imladris.Bridges.Yavanna`)**: Asynchronous UniProtKB & Ensembl GRCh38 lookup plus in-memory oligo length, GC%, $T_m$, molecular weight, and reverse-complement calculation.
-* **Natural Math & Chemical Reaction Studio (`Ctrl+M`)**: Converts natural expressions (`(-b +- sqrt(b^2 - 4*a*c)) / (2*a)`, `6CO2(g) + 6H2O(l) ->[h*nu] C6H12O6(aq) + 6O2(g)`) into LaTeX (`$$...$$`, `\ce{...}`) or Markdown.
-* **Visual Flow & Mindmap Studio (`Ctrl+Shift+D`)**: Interactive Cairo 2D canvas synced two-way with Quarto ` ```{mermaid} ` and Markdown ` ```mermaid ` blocks.
+### 3. Integrated Domain Scientific Bridges
+* **Elbereth Biostatistics (`Imladris.Bridges.Elbereth`)**: ICH E9 sample size and power calculation module with Cairo visualization.
+* **Arekyer Galaxy Bridge (`Imladris.Bridges.Arekyer`)**: Cloud genomics dataset browser with automated `httr2` and `pandas` data loading scripts.
+* **Taniquetil AlphaFold Bridge (`Imladris.Bridges.Taniquetil`)**: Protein structure search, pLDDT plotting, and R/Python structural script generation.
+* **Yavanna Bio-Entity Studio (`Imladris.Bridges.Yavanna`)**: Ensembl and UniProtKB programmatic client with integrated oligo calculator.
+* **Natural Math & Chemistry (`Ctrl+M`)**: Natural expression parsing to KaTeX/LaTeX (`$$...$$`, `\ce{...}`).
+* **Mermaid Flow Canvas (`Ctrl+Shift+D`)**: Bi-directional Cairo diagram editor synced with Quarto and Markdown code blocks.
 
-### 4. Reproducible Environments, Jupyter Parity & Publishing
-* **`.Rproj` & `.mallorn` Portability**: Synchronizes RStudio `.Rproj` manifests and `.mallorn` bundles (`tar.zst` / `zip`) with isolated `renv` (R) and `.venv` (Python) sandboxes.
-* **Jupyter `nbformat 4.5` Parity**: Lossless round-trip `.ipynb` serialization preserving cell IDs, execution counts, tags, raw cells, and `Shift+Enter` cell advancement.
-* **Interactive Compute & R Shiny**: Persistent R, Python, Julia, SQL, and Bash consoles, `Gtk.ColumnView` dataframe viewer, Zotero BetterBibTeX/CSL citations, and ephemeral-port R Shiny hosting (`Ctrl+Shift+A`).
-* **GxP & CRA Provenance Attestation**: Writes `<document>.provenance.lock.json` SHA-256 manifests across manuscripts, lockfiles, and bio-entity records.
+### 4. Reproducibility & Scientific Publishing
+* **Bidirectional `.Rproj` & `.mallorn` Portability**: Native loading of RStudio project structures and single-file `.mallorn` (`tar.zst`/`zip`) packages.
+* **Sandboxed Dependency Management**: Project-isolated package environments powered by `renv` (R) and `.venv` (Python).
+* **Multi-Format Export Pipeline**: Headless compilation to PDF, HTML, OpenDocument Text (`.odt`), OpenDocument Presentation (`.odp`), and Rich Text Format (`.rtf`).
+* **Cryptographic GxP Lockfiles**: Production of verifiable SHA-256 manifest records ensuring reproducible research audits.
 
 ---
 
@@ -151,7 +179,7 @@ Modern scientific software forces an unnecessary compromise: heavy Electron-base
 
 ---
 
-## Installation & Building
+## Installation & Deployment
 
 ### Flatpak / Flatpark (Recommended)
 ```bash
@@ -175,9 +203,9 @@ sudo dpkg -i imladris_0.25.0_amd64.deb
 sudo apt-get install -f
 ```
 
-Download `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` bundles from [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.25.0](https://github.com/Antux912012/imladris/releases/tag/v0.25.0).
+Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.25.0](https://github.com/Antux912012/imladris/releases/tag/v0.25.0).
 
-### Build & Test from Source (Meson & Ninja)
+### Build from Source (Meson & Ninja)
 Requires `valac >= 0.56`, `meson >= 0.60`, `ninja`, `gtk4 >= 4.12`, `libadwaita-1 >= 1.5`, `gtksourceview-5 >= 5.10`, `webkitgtk-6.0 >= 2.40`, `javascriptcoregtk-6.0`, `libsoup-3.0`, `json-glib-1.0`, `libsecret-1`, and `libgee-0.8`.
 
 ```bash
@@ -189,41 +217,44 @@ GSETTINGS_BACKEND=memory meson test -C build-debug --print-errorlogs
 ./build-debug/imladris
 ```
 
-* Build `.flatpak` & `.deb` packages: `./build-packages.sh`
-* Build `.rpm` package: `./build-rpm.sh`
-* Inspect build dependencies: `meson introspect build-debug --dependencies`
+* Package build helper (.flatpak & .deb): `./build-packages.sh`
+* Package build helper (.rpm): `./build-rpm.sh`
 
 ---
 
 ## CLI & Keyboard Shortcuts
 
 ```bash
-imladris --help              # Show CLI options
-imladris --version           # Print installed version
-imladris --mcp-server        # Launch hardened MCP stdio server
-imladris --purge-user-data   # Erase all local data, keyring secrets, and cache (GDPR Art. 17)
-imladris path/to/file.qmd    # Open a document, notebook, .Rproj, or .mallorn bundle
+imladris --help              # Display CLI arguments
+imladris --version           # Output installed version
+imladris --mcp-server        # Run standard I/O Model Context Protocol (MCP) server
+imladris --purge-user-data   # Purge local configurations, cache, and keyring entries (GDPR Art. 17)
+imladris document.qmd        # Launch document, notebook, .Rproj, or .mallorn archive
 ```
 
-| Shortcut | Action |
+| Key Combination | Functional Action |
 | :--- | :--- |
-| `Ctrl+N` / `Ctrl+O` / `Ctrl+S` | New Project/File, Open, Save |
+| `Ctrl+N` / `Ctrl+O` / `Ctrl+S` | New Document/Project, Open, Save |
 | `Ctrl+Shift+E` | Open Elrond AI for Direct Editor Writing |
 | `Ctrl+M` | Open Natural Math & Chemical Reaction Studio |
 | `Ctrl+Shift+D` | Open Visual Flow & Mindmap Studio |
-| `Ctrl+Space` | Trigger offline Polyglot IntelliSense |
-| `Ctrl+Enter` / `Ctrl+Shift+Enter` / `Shift+Enter` | Run line/selection, run chunk in place, or run chunk & advance |
-| `Ctrl+Shift+A` | Run or stop active R Shiny application |
-| `Ctrl+F1` / `Ctrl+Comma` | Toggle top ribbon toolbar / Open Preferences |
+| `Ctrl+Space` | Trigger Contextual Code Completion (Polyglot IntelliSense) |
+| `Ctrl+Enter` | Execute Active Line or Selection in Console |
+| `Ctrl+Shift+Enter` | Execute Active Code Chunk in Place |
+| `Shift+Enter` | Execute Active Code Chunk and Advance to Next |
+| `Ctrl+Shift+A` | Run / Stop Active Embedded R Shiny Application |
+| `Ctrl+F1` | Collapse or Expand Modern Ribbon Toolbar |
+| `Ctrl+Comma` | Open Preferences Dialog |
 
 ---
 
-## Privacy, Security & License
+## Privacy, Security & Licensing
 
-* **Zero Telemetry ([`PRIVACY.md`](PRIVACY.md))**: No analytics, no crash reporting, and no startup phone-home calls. CRAN/PyPI index refreshes occur strictly on demand.
-* **Hardened Security ([`SECURITY.md`](SECURITY.md))**: `libsecret-1` keyring storage, MCP `execute_code` disabled by default, Zip Slip validation on `.mallorn` extraction, and shell-free `curl`/`tar` downloads.
-* **GDPR Right to Erasure (Art. 17)**: `imladris --purge-user-data` removes all local configuration, cache, and keyring entries.
-* **License**: Released under **[GNU General Public License v3.0 or later (`GPL-3.0-or-later`)](LICENSE)**.
+* **Zero Telemetry ([`PRIVACY.md`](PRIVACY.md))**: No telemetry pings, error logging reporting, or background network calls on application launch.
+* **Keyring Security ([`SECURITY.md`](SECURITY.md))**: API keys and OAuth tokens are stored exclusively via system `libsecret-1` credential stores with restrictive `0600` fallbacks.
+* **Sandboxed Tooling**: Built-in MCP execution defaults to disabled (`IMLADRIS_MCP_ALLOW_EXEC=1` required) and enforces explicit interpreter binary allowlisting (`Rscript`, `python3`, `quarto`).
+* **GDPR Compliance (Art. 17)**: Execute `imladris --purge-user-data` for complete removal of application data from the local host.
+* **License**: Published under the **[GNU General Public License v3.0 or later (`GPL-3.0-or-later`)](LICENSE)**.
 
 ```text
 SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>

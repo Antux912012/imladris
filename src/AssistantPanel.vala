@@ -204,7 +204,7 @@ namespace Imladris {
             // 7. User Prompt Entry Box + Send / Stop Buttons
             var input_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
             prompt_entry = new Gtk.Entry () {
-                placeholder_text = "Write with Elrond Assistance (AI) or ask for code/plots...",
+                placeholder_text = "Ask Elrond, generate code/plots, or direct write (Ctrl+Shift+E)...",
                 hexpand = true
             };
             prompt_entry.activate.connect (() => {

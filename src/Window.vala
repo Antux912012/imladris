@@ -2054,7 +2054,7 @@ namespace Imladris {
                 restart_active_kernel ();
             });
 
-            btn_package_installer = RibbonFactory.create_tool_button ("software-properties-symbolic", "Packages", "Open Package Installer (Ctrl+Shift+P)");
+            btn_package_installer = RibbonFactory.create_tool_button ("software-properties-symbolic", "Packages", "Package Manager (CRAN / Bioconductor / PyPI - Ctrl+Shift+P)");
             ((Gtk.Button) btn_package_installer).clicked.connect (() => {
                 show_package_installer_dialog ();
             });
@@ -2098,7 +2098,7 @@ namespace Imladris {
             box.append (RibbonFactory.create_vseparator ());
 
             // Group 2: Interoperability & Reproducibility Exports
-            btn_export_mallorn = RibbonFactory.create_tool_button ("package-x-generic-symbolic", ".mallorn", "Export Portable Reproducible Archive", false, false, true, null, "app.export_mallorn");
+            btn_export_mallorn = RibbonFactory.create_tool_button ("package-x-generic-symbolic", ".mallorn", "Export Portable .mallorn Bundle (1:1 RStudio & Sandboxed renv/venv)", false, false, true, null, "app.export_mallorn");
             btn_export_rstudio = RibbonFactory.create_tool_button ("utilities-terminal-symbolic", "RStudio", "Export Project for RStudio", false, false, true, null, "app.export_rstudio");
             btn_export_jupyter = RibbonFactory.create_tool_button ("applications-science-symbolic", "Jupyter", "Export Project for Jupyter Notebook", false, false, true, null, "app.export_jupyter");
 
@@ -2390,11 +2390,13 @@ namespace Imladris {
                 website = "https://antux912012.github.io/imladris/",
                 issue_url = "https://github.com/Antux912012/imladris/issues",
                 support_url = "https://github.com/Antux912012/imladris/discussions",
-                comments = "A GNOME-native home for scientific writing, notebooks and data work.\n\n✨ Proudly developed with Gemini Assistance."
+                comments = "Native Linux scientific notebook studio for Quarto, R, Python, and Jupyter.\n\nEngineered in compiled Vala and GTK4 with 4-quadrant workbench ergonomics, Positron-style Direct Editor Writing, multi-tier AI quota failover, and domain bridges for bioinformatics and biostatistics.\n\n✨ Proudly developed with Gemini Assistance."
             };
 
             dialog.add_link ("Architecture Blueprint", "https://github.com/Antux912012/imladris/blob/main/docs/ARCHITECTURE.md");
             dialog.add_link ("Project Documentation", "https://github.com/Antux912012/imladris#readme");
+            dialog.add_link ("Technical Wiki", "https://github.com/Antux912012/imladris/wiki");
+            dialog.add_link ("Flatpark Package", "https://flatpark.org/apps/io.github.Antux912012.Imladris/");
             dialog.add_link ("Author GitHub Profile (@Antux912012)", "https://github.com/Antux912012");
             dialog.add_link ("Imladris Repository on GitHub", "https://github.com/Antux912012/imladris");
 
@@ -2407,8 +2409,11 @@ namespace Imladris {
                 "Apostrophe (Distraction-free Markdown writing)",
                 "Python Software Foundation & Project Jupyter (Interactive computing & REPL)",
                 "The R Foundation & CRAN (Statistical computing & reproducible packages)",
+                "The Galaxy Project (Cloud genomics and scientific workflow integration)",
+                "DeepMind & EMBL-EBI (AlphaFold Protein Structure Database)",
                 "LM Studio & Ollama (Local open-weights AI inference)",
                 "llama.cpp & Georgi Gerganov (Local LLM runtime)",
+                "GitHub Copilot (AI pair programmer OAuth integration)",
                 "Quarto & Pandoc (Scientific publishing pipeline)",
                 "GNOME & Libadwaita Teams (Modern design language and components)",
                 "Papirus Development Team (Icon design)"
