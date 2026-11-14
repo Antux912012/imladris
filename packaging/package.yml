@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+name       : imladris
+version    : 0.25.0
+release    : 1
+source     :
+    - https://github.com/Antux912012/imladris/archive/refs/tags/v0.25.0.tar.gz : UPDATE_SHA256_ON_PUBLISH
+homepage   : https://antux912012.github.io/imladris/
+license    : GPL-3.0-or-later
+component  : editor
+summary    : Native scientific notebook studio for Quarto, R, Python, and Jupyter
+description: |
+    Imladris is a native Linux polyglot document studio and scientific workbench
+    built with Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0.
+    Featuring an adaptive ribbon interface and 4-quadrant RStudio-style docking,
+    Imladris provides a sub-second, distraction-free environment for technical
+    authors, biostatisticians, and data scientists. Includes Positron-style
+    Direct Editor Writing, multi-tier AI quota failover, GitHub Copilot OAuth,
+    and reproducible renv/venv sandboxes.
+builddeps  :
+    - pkgconfig(gee-0.8)
+    - pkgconfig(gio-2.0)
+    - pkgconfig(glib-2.0)
+    - pkgconfig(gtk4)
+    - pkgconfig(gtksourceview-5)
+    - pkgconfig(javascriptcoregtk-6.0)
+    - pkgconfig(json-glib-1.0)
+    - pkgconfig(libadwaita-1)
+    - pkgconfig(libsecret-1)
+    - pkgconfig(libsoup-3.0)
+    - pkgconfig(webkitgtk-6.0)
+    - desktop-file-utils
+    - vala
+rundeps    :
+    - bzip2
+    - curl
+    - hicolor-icon-theme
+    - python3
+setup      : |
+    %meson_configure
+build      : |
+    %ninja_build
+install    : |
+    %ninja_install
+check      : |
+    GSETTINGS_BACKEND=memory %ninja_test

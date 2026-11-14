@@ -2415,6 +2415,8 @@ namespace Imladris {
                 "llama.cpp & Georgi Gerganov (Local LLM runtime)",
                 "GitHub Copilot (AI pair programmer OAuth integration)",
                 "Quarto & Pandoc (Scientific publishing pipeline)",
+                "Zotero & BetterBibTeX (Reference & CSL citation management)",
+                "KaTeX & Mermaid.js (Mathematical typesetting and flow diagrams)",
                 "GNOME & Libadwaita Teams (Modern design language and components)",
                 "Papirus Development Team (Icon design)"
             });

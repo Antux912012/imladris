@@ -9,10 +9,15 @@ Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  gcc
 BuildRequires:  meson >= 0.60
+%if 0%{?suse_version}
+BuildRequires:  ninja
+BuildRequires:  appstream-glib
+%else
 BuildRequires:  ninja-build
-BuildRequires:  valac >= 0.56
-BuildRequires:  desktop-file-utils
 BuildRequires:  libappstream-glib
+%endif
+BuildRequires:  vala >= 0.56
+BuildRequires:  desktop-file-utils
 BuildRequires:  pkgconfig(gtk4) >= 4.12
 BuildRequires:  pkgconfig(libadwaita-1) >= 1.5
 BuildRequires:  pkgconfig(gtksourceview-5) >= 5.10

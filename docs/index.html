@@ -281,6 +281,10 @@
       transform: translateY(-2px);
       box-shadow: 0 6px 18px var(--shadow-color);
     }
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px var(--shadow-card);
+    }
     .btn-primary {
       background: var(--btn-primary-bg);
       color: var(--btn-primary-text);
@@ -310,6 +314,13 @@
       color: var(--text-secondary);
       box-shadow: 0 3px 12px var(--shadow-card);
       margin-bottom: 48px;
+      max-width: 100%;
+      overflow-x: auto;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .quick-install-pill:hover {
+      border-color: var(--accent-frost);
+      box-shadow: 0 4px 16px var(--shadow-card);
     }
     .quick-install-pill code { color: var(--accent-frost); }
     .copy-icon-btn {
@@ -324,6 +335,40 @@
       transition: color 0.15s, background-color 0.15s;
     }
     .copy-icon-btn:hover { color: var(--accent-frost); background: var(--bg-card); }
+
+    /* Floating Back to Top Button */
+    .back-to-top-btn {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 16px var(--shadow-card);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px);
+      transition: opacity 0.25s ease, visibility 0.25s ease, transform 0.25s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      z-index: 90;
+    }
+    .back-to-top-btn.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .back-to-top-btn:hover {
+      background: var(--bg-secondary);
+      border-color: var(--accent-frost);
+      color: var(--accent-frost);
+      transform: translateY(-2px);
+    }
 
     /* Trust / Spec Bar */
     .trust-strip {
@@ -765,7 +810,7 @@
         <nav class="nav-links">
           <a href="#workbench">Workbench</a>
           <a href="#elrond-ai">Elrond AI</a>
-          <a href="#studios">Scientific Studios</a>
+          <a href="#studios">Studios</a>
           <a href="#gallery">Showcase</a>
           <a href="#install">Download</a>
           <a href="#architect">The Architect</a>
@@ -806,13 +851,13 @@
       </h1>
 
       <p>
-        Engineered in compiled <strong>Vala</strong>, <strong>GTK4</strong>, and <strong>Libadwaita</strong> for zero-Electron sub-millisecond responsiveness. Refactor scientific code with <strong>Positron/RStudio Direct Editor Writing</strong>, orchestrate <strong>Free-Tier AI APIs</strong> with <strong>Automatic Quota Failover</strong> or <strong>GitHub Copilot OAuth</strong>, link upstream <strong>Galaxy Project</strong> histories, and unlock native clinical and structural biology studios.
+        The native GTK4 workbench built for scientific precision. Author Quarto, R Markdown, and Jupyter documents with sub-millisecond responsiveness. Refactor statistical code directly in your editor, orchestrate multi-provider AI with automatic quota failover, and link cloud Galaxy histories seamlessly — all with zero Electron overhead.
       </p>
 
       <div class="cta-group">
         <a href="#install" class="btn btn-primary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          Download v0.25.0 (.deb / Flatpak / .rpm / AUR)
+          Download for Linux
         </a>
         <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8m-4-4h8"/></svg>
@@ -820,7 +865,7 @@
         </a>
         <a href="https://github.com/Antux912012/imladris" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          GitHub Repository
+          View Source
         </a>
       </div>
 
@@ -835,12 +880,12 @@
 
       <!-- Trust & Technology Strip -->
       <div class="trust-strip">
-        <div class="trust-item"><span class="highlight">⚡ Vala 0.56+</span> &amp; GTK4</div>
-        <div class="trust-item"><span class="highlight">0 MB</span> Electron Bloat</div>
-        <div class="trust-item"><span class="highlight">100%</span> Positron Direct Writing</div>
-        <div class="trust-item"><span class="highlight">Auto-Failover</span> Free AI APIs</div>
-        <div class="trust-item"><span class="highlight">1:1</span> RStudio .Rproj &amp; .mallorn</div>
-        <div class="trust-item"><span class="highlight">GxP</span> Provenance Attestation</div>
+        <div class="trust-item"><span class="highlight">Native</span> GTK4 &amp; Vala</div>
+        <div class="trust-item"><span class="highlight">&lt; 120 MB</span> Idle Memory</div>
+        <div class="trust-item"><span class="highlight">In-Place</span> Buffer Refactoring</div>
+        <div class="trust-item"><span class="highlight">Multi-Model</span> Free AI Failover</div>
+        <div class="trust-item"><span class="highlight">1:1</span> RStudio Compatibility</div>
+        <div class="trust-item"><span class="highlight">GxP</span> Regulatory Audit Trail</div>
       </div>
 
       <!-- HERO SCREENSHOT SHOWCASE -->
@@ -866,9 +911,9 @@
     <section id="comparison">
       <div class="section-header">
         <div class="section-eyebrow">01 // Architectural Benchmark</div>
-        <h2 class="section-title">Engineered to Break the Electron Memory Tax</h2>
+        <h2 class="section-title">Engineered for Speed. Free of Electron Overhead.</h2>
         <p class="section-subtitle">
-          Scientific compute demands every byte of RAM and every CPU cycle. Here is how Imladris compares against legacy Electron IDEs and web notebooks.
+          Every megabyte matters when processing high-throughput genomic data. See how compiled native architecture compares to legacy web-based tooling.
         </p>
       </div>
 
@@ -1094,34 +1139,34 @@
 
       <div class="gallery-grid">
         <div class="gallery-item">
-          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-welcome.png" alt="Progressive-Disclosure Welcome Screen and Project Template Hub" loading="lazy" width="960" height="600">
+          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-welcome.png" alt="Progressive-Disclosure Welcome Hub and Session Crash Recovery" loading="lazy" width="960" height="600">
           <div class="gallery-caption">
-            <h4>Figure 1 // Progressive-Disclosure Welcome Hub</h4>
-            <p>Streamlined start screen featuring recent projects, reproducible template starters (.Rproj, Quarto, Jupyter), and environment indicators.</p>
+            <h4>Figure 1 // Welcome Hub &amp; Session Crash Recovery</h4>
+            <p>Clean, progressive-disclosure start screen featuring one-click starters for Quarto notebooks, R scripts, and Shiny apps, paired with automated session restoration for unsaved work.</p>
           </div>
         </div>
 
         <div class="gallery-item">
-          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-ai-copilot.png" alt="Positron-style Direct Editor Writing and Elrond AI Interface" loading="lazy" width="960" height="600">
+          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-ai-copilot.png" alt="Elrond AI Copilot and 4-Quadrant Polyglot Workbench" loading="lazy" width="960" height="600">
           <div class="gallery-caption">
-            <h4>Figure 2 // Positron-Style Direct Editor Writing</h4>
-            <p>Elrond AI sidebar with multi-context chips, direct buffer updates, and Quarto chunk option preservation with single-step undo.</p>
+            <h4>Figure 2 // Elrond AI Copilot &amp; 4-Quadrant Workbench</h4>
+            <p>Context-aware AI assistance docked alongside your live Quarto manuscript. Features smart context chips, direct in-buffer refactoring, timestamped execution history, and package management.</p>
           </div>
         </div>
 
         <div class="gallery-item">
-          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-workspace.png" alt="Adaptive Workspace and Editor Layout Preferences" loading="lazy" width="960" height="600">
+          <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-workspace.png" alt="Workspace Layout Preferences and GPU Hardware Acceleration" loading="lazy" width="960" height="600">
           <div class="gallery-caption">
-            <h4>Figure 3 // Adaptive Dual-Mode Preferences</h4>
-            <p>Easily toggle between 4-Quadrant Workbench and distraction-free Focus Writer mode, customize zoom levels, and configure ribbon toolbars.</p>
+            <h4>Figure 3 // Workspace Layout &amp; GPU Hardware Preferences</h4>
+            <p>Comprehensive customization controls. Seamlessly switch between the 4-quadrant workbench and distraction-free focus mode, adjust editor zoom, and enable OpenGL/Vulkan acceleration.</p>
           </div>
         </div>
 
         <div class="gallery-item">
           <img src="https://raw.githubusercontent.com/Antux912012/imladris/main/data/screenshots/imladris-preferences-theming.png" alt="Libadwaita Theming and Eye-Friendly Accent Customizer" loading="lazy" width="960" height="600">
           <div class="gallery-caption">
-            <h4>Figure 4 // Appearance, Accent Colors &amp; Theming</h4>
-            <p>Supports GNOME system dark/light switching, custom accent palettes (Nord Frost, Teal, Purple), and Eye Friendly low-strain mode.</p>
+            <h4>Figure 4 // Libadwaita Theming &amp; Accent Customizer</h4>
+            <p>Native Libadwaita aesthetics with seamless dark/light switching, custom accent palettes (Teal, Frost, Amber, Slate), and low-strain Eye Friendly mode for late-night research sessions.</p>
           </div>
         </div>
       </div>
@@ -1140,10 +1185,12 @@
       <div class="install-matrix">
         <div class="install-tabs" role="tablist">
           <button class="tab-btn active" onclick="switchTab('flatpak', this)" role="tab" aria-selected="true">Flatpak / Flatpark</button>
-          <button class="tab-btn" onclick="switchTab('deb', this)" role="tab" aria-selected="false">Ubuntu / Debian (.deb)</button>
-          <button class="tab-btn" onclick="switchTab('rpm', this)" role="tab" aria-selected="false">Fedora / RHEL (.rpm)</button>
+          <button class="tab-btn" onclick="switchTab('deb', this)" role="tab" aria-selected="false">Debian / Ubuntu / elementary</button>
+          <button class="tab-btn" onclick="switchTab('rpm', this)" role="tab" aria-selected="false">Fedora / RHEL / openSUSE</button>
           <button class="tab-btn" onclick="switchTab('aur', this)" role="tab" aria-selected="false">Arch Linux (AUR)</button>
-          <button class="tab-btn" onclick="switchTab('source', this)" role="tab" aria-selected="false">Build from Source</button>
+          <button class="tab-btn" onclick="switchTab('nixos', this)" role="tab" aria-selected="false">NixOS (Flakes)</button>
+          <button class="tab-btn" onclick="switchTab('solus', this)" role="tab" aria-selected="false">Solus (ypkg)</button>
+          <button class="tab-btn" onclick="switchTab('source', this)" role="tab" aria-selected="false">Source &amp; Container</button>
         </div>
 
         <!-- Flatpak Pane -->
@@ -1178,13 +1225,17 @@ sudo apt-get install -f</code>
           <a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ Download .deb from GitHub Releases</a>
         </div>
 
-        <!-- Fedora / RPM Pane -->
+        <!-- Fedora / RHEL / CentOS / AlmaLinux / openSUSE Pane -->
         <div id="pane-rpm" class="tab-pane" role="tabpanel">
           <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Native RPM package for Fedora 39+, RHEL 9+, CentOS Stream, and openSUSE:
+            Native RPM package for Fedora 39+, RHEL 9+, CentOS Stream, AlmaLinux, and openSUSE:
           </p>
           <div class="install-command-box">
-            <code>sudo dnf install ./imladris-0.25.0-1.x86_64.rpm</code>
+            <code># Fedora / RHEL / CentOS / AlmaLinux:
+sudo dnf install ./imladris-0.25.0-1.x86_64.rpm
+
+# openSUSE:
+sudo zypper install ./imladris-0.25.0-1.x86_64.rpm</code>
             <button class="copy-icon-btn" onclick="copySnippet('sudo dnf install ./imladris-0.25.0-1.x86_64.rpm', this)" title="Copy Command">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
@@ -1209,21 +1260,59 @@ yay -S imladris</code>
           </div>
         </div>
 
-        <!-- Source Build Pane -->
-        <div id="pane-source" class="tab-pane" role="tabpanel">
+        <!-- NixOS (Flakes) Pane -->
+        <div id="pane-nixos" class="tab-pane" role="tabpanel">
           <p style="margin-bottom: 12px; color: var(--text-secondary);">
-            Fast compile from source using Meson &amp; Ninja (requires <code>valac &gt;= 0.56</code>, <code>gtk4 &gt;= 4.12</code>, <code>libadwaita-1 &gt;= 1.5</code>):
+            Run or build reproducibly on NixOS using the included <code>flake.nix</code> (with <code>wrapGAppsHook4</code>):
           </p>
           <div class="install-command-box">
-            <code>git clone https://github.com/Antux912012/imladris.git
-cd imladris
-meson setup build-debug --buildtype=debug
-meson compile -C build-debug
-./build-debug/imladris</code>
-            <button class="copy-icon-btn" onclick="copySnippet('git clone https://github.com/Antux912012/imladris.git\ncd imladris\nmeson setup build-debug --buildtype=debug\nmeson compile -C build-debug\n./build-debug/imladris', this)" title="Copy Commands">
+            <code># Run directly with Nix Flakes:
+nix run github:Antux912012/imladris
+
+# Or build locally:
+nix build .#default &amp;&amp; ./result/bin/imladris</code>
+            <button class="copy-icon-btn" onclick="copySnippet('nix run github:Antux912012/imladris', this)" title="Copy Command">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
+          <a href="https://github.com/Antux912012/imladris/blob/main/flake.nix" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ View flake.nix</a>
+        </div>
+
+        <!-- Solus (ypkg) Pane -->
+        <div id="pane-solus" class="tab-pane" role="tabpanel">
+          <p style="margin-bottom: 12px; color: var(--text-secondary);">
+            Build and install on Solus using the included <code>ypkg</code> recipe (<code>packaging/package.yml</code>):
+          </p>
+          <div class="install-command-box">
+            <code>git clone https://github.com/Antux912012/imladris.git
+cd imladris/packaging
+sudo solbuild build package.yml</code>
+            <button class="copy-icon-btn" onclick="copySnippet('git clone https://github.com/Antux912012/imladris.git\ncd imladris/packaging\nsudo solbuild build package.yml', this)" title="Copy Commands">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+          <a href="https://github.com/Antux912012/imladris/blob/main/packaging/package.yml" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ View Solus package.yml</a>
+        </div>
+
+        <!-- Source & Container Build Pane -->
+        <div id="pane-source" class="tab-pane" role="tabpanel">
+          <p style="margin-bottom: 12px; color: var(--text-secondary);">
+            Compile natively with Meson &amp; Ninja, or build inside an isolated Podman/Docker container using the included <code>Dockerfile</code>:
+          </p>
+          <div class="install-command-box">
+            <code># Native Meson &amp; Ninja build:
+git clone https://github.com/Antux912012/imladris.git &amp;&amp; cd imladris
+meson setup build-release --buildtype=release
+meson compile -C build-release
+GSETTINGS_BACKEND=memory meson test -C build-release --print-errorlogs
+
+# Or build in a clean Podman/Docker container:
+podman build -t imladris-builder .</code>
+            <button class="copy-icon-btn" onclick="copySnippet('git clone https://github.com/Antux912012/imladris.git && cd imladris\nmeson setup build-release --buildtype=release\nmeson compile -C build-release\nGSETTINGS_BACKEND=memory meson test -C build-release --print-errorlogs', this)" title="Copy Commands">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+          <a href="https://github.com/Antux912012/imladris/blob/main/Dockerfile" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">→ View Dockerfile</a>
         </div>
       </div>
 
@@ -1314,6 +1403,11 @@ meson compile -C build-debug
       </div>
     </div>
   </footer>
+
+  <!-- Floating Back to Top Button -->
+  <button id="back-to-top" class="back-to-top-btn" aria-label="Back to top" title="Back to top">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+  </button>
 
   <!-- Vanilla Interaction Script (Theme Toggle, Tabs & Copy Snippets) -->
   <script>
@@ -1410,6 +1504,21 @@ meson compile -C build-debug
         setTimeout(function () {
           btn.innerHTML = originalHTML;
         }, 1800);
+      }
+
+      // 4. Floating Back to Top Button
+      var backToTopBtn = document.getElementById('back-to-top');
+      if (backToTopBtn) {
+        window.addEventListener('scroll', function () {
+          if (window.scrollY > 520) {
+            backToTopBtn.classList.add('visible');
+          } else {
+            backToTopBtn.classList.remove('visible');
+          }
+        }, { passive: true });
+        backToTopBtn.addEventListener('click', function () {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
       }
     })();
   </script>

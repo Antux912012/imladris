@@ -1,5 +1,5 @@
 pkgbase = imladris
-	pkgdesc = Polyglot Scientific & Markdown IDE with GNOME/Libadwaita UI, Elrond AI, GPU Acceleration, and R/Python
+	pkgdesc = Native scientific notebook IDE for Quarto, R, Python & Jupyter with GTK4 and AI
 	pkgver = 0.24.2
 	pkgrel = 1
 	url = https://antux912012.github.io/imladris/

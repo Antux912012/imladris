@@ -175,6 +175,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, im
 ```
 
 * 📖 **[GitHub Technical Wiki](https://github.com/Antux912012/imladris/wiki)** — [Home](docs/wiki/Home.md) · [Arekyer Bridge](docs/wiki/Galaxy-to-Quarto-Bridge.md) · [Math & Chem Studio](docs/wiki/Math-and-Chemical-Studio.md) · [Projects & Sandboxing](docs/wiki/Projects-and-Sandboxing.md) · [Elrond AI Copilot](docs/wiki/Elrond-Local-AI-Copilot.md) · [Plugin Development](docs/wiki/Plugin-Development-Guide.md)
+* 📋 **[ASD-STE100 Functional Description](docs/ASD_STE100_FUNCTIONAL_DESCRIPTION.md)** — Simplified Technical English specification of all application functions
 * 🏗️ **[Architectural Blueprint](docs/ARCHITECTURE.md)** & **[Docking Architecture](docs/DOCKING_ARCHITECTURE.md)**
 
 ---
@@ -193,14 +194,30 @@ flatpak run io.github.Antux912012.Imladris
 paru -S imladris
 ```
 
-### Fedora / RHEL (`.rpm`) & Debian / Ubuntu (`.deb`)
+### Fedora / RHEL / CentOS / AlmaLinux / openSUSE (`.rpm`) & Debian / Ubuntu / elementary OS (`.deb`)
 ```bash
-# Fedora / RHEL:
+# Fedora / RHEL / CentOS / AlmaLinux:
 sudo dnf install ./imladris-0.25.0-1.x86_64.rpm
 
-# Debian / Ubuntu:
+# openSUSE:
+sudo zypper install ./imladris-0.25.0-1.x86_64.rpm
+
+# Debian / Ubuntu / elementary OS:
 sudo dpkg -i imladris_0.25.0_amd64.deb
 sudo apt-get install -f
+```
+
+### Solus (`ypkg`)
+Build recipe provided at [`packaging/package.yml`](packaging/package.yml) (`GPL-3.0-or-later`).
+
+### NixOS (Flakes)
+```bash
+# Run directly with Nix Flakes:
+nix run github:Antux912012/imladris
+
+# Or build locally from a clone:
+nix build .#default
+./result/bin/imladris
 ```
 
 Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.25.0](https://github.com/Antux912012/imladris/releases/tag/v0.25.0).
@@ -209,12 +226,33 @@ Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are availabl
 Requires `valac >= 0.56`, `meson >= 0.60`, `ninja`, `gtk4 >= 4.12`, `libadwaita-1 >= 1.5`, `gtksourceview-5 >= 5.10`, `webkitgtk-6.0 >= 2.40`, `javascriptcoregtk-6.0`, `libsoup-3.0`, `json-glib-1.0`, `libsecret-1`, and `libgee-0.8`.
 
 ```bash
+# 1. Install build dependencies (Ubuntu / Debian):
+sudo apt-get install -y build-essential meson ninja-build valac pkg-config \
+  libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libwebkitgtk-6.0-dev \
+  libjavascriptcoregtk-6.0-dev libsoup-3.0-dev libjson-glib-1.0-dev \
+  libsecret-1-dev libgee-0.8-dev desktop-file-utils appstream-util
+
+# 2. Clone, configure, compile, and run tests:
 git clone https://github.com/Antux912012/imladris.git
 cd imladris
-meson setup build-debug --buildtype=debug
-meson compile -C build-debug
-GSETTINGS_BACKEND=memory meson test -C build-debug --print-errorlogs
-./build-debug/imladris
+meson setup build-release --buildtype=release
+meson compile -C build-release
+GSETTINGS_BACKEND=memory meson test -C build-release --print-errorlogs
+./build-release/imladris
+```
+
+### Build in a Clean Container (Podman / Docker)
+A reproducible multi-stage [`Dockerfile`](Dockerfile) is included for isolated compilation and unit testing:
+
+```bash
+# Using Podman (or replace 'podman' with 'docker'):
+podman build -t imladris-builder .
+
+# Export compiled binary and installed tree into ./dist:
+mkdir -p ./dist
+podman create --name imladris-tmp imladris-builder /bin/true
+podman cp imladris-tmp:/ ./dist/
+podman rm imladris-tmp
 ```
 
 * Package build helper (.flatpak & .deb): `./build-packages.sh`
@@ -254,6 +292,7 @@ imladris document.qmd        # Launch document, notebook, .Rproj, or .mallorn ar
 * **Keyring Security ([`SECURITY.md`](SECURITY.md))**: API keys and OAuth tokens are stored exclusively via system `libsecret-1` credential stores with restrictive `0600` fallbacks.
 * **Sandboxed Tooling**: Built-in MCP execution defaults to disabled (`IMLADRIS_MCP_ALLOW_EXEC=1` required) and enforces explicit interpreter binary allowlisting (`Rscript`, `python3`, `quarto`).
 * **GDPR Compliance (Art. 17)**: Execute `imladris --purge-user-data` for complete removal of application data from the local host.
+* **Generative AI & Development Disclosure ([`docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md`](docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md))**: Imladris is architected, reviewed, and tested by Antonio De Gaetano with AI pair-programming assistance (Google Gemini and Anthropic Claude used across ~60–70% of code scaffolding, refactoring, and documentation). In-app Elrond AI features are strictly opt-in with local offline (`llama.cpp`/Ollama) and consent-gated cloud options.
 * **License**: Published under the **[GNU General Public License v3.0 or later (`GPL-3.0-or-later`)](LICENSE)**.
 
 ```text

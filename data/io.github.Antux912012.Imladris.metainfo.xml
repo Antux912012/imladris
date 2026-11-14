@@ -23,6 +23,9 @@
       <li>Model Context Protocol (MCP): Hardened built-in stdio MCP server for agentic document analysis and data retrieval.</li>
     </ul>
     <p>
+      AI Transparency &amp; Privacy Disclosure: In-app Elrond AI features are strictly opt-in (supporting 100% offline local inference via llama.cpp/Ollama or consent-gated cloud providers). Imladris is architected and maintained by Antonio De Gaetano with AI pair-programming assistance (Google Gemini and Anthropic Claude) used in developing and auditing source code and documentation.
+    </p>
+    <p>
       Note: This application is independently developed and is not affiliated with or endorsed by Posit, RStudio, or Project Jupyter.
     </p>
   </description>

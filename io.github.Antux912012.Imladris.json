@@ -11,12 +11,7 @@
         "--socket=wayland",
         "--device=dri",
         "--filesystem=home",
-        "--filesystem=~/.cache/imladris:create",
-        "--env=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1",
-        "--env=WEBKIT_DISABLE_DMABUF_RENDERER=1",
-        "--talk-name=org.freedesktop.Flatpak",
-        "--talk-name=org.freedesktop.secrets",
-        "--metadata=X-DConf=default-settings"
+        "--talk-name=org.freedesktop.Flatpak"
     ],
     "cleanup": [
         "/include",
@@ -29,6 +24,9 @@
         {
             "name": "imladris",
             "buildsystem": "meson",
+            "config-opts": [
+                "--buildtype=release"
+            ],
             "sources": [
                 {
                     "type": "dir",
