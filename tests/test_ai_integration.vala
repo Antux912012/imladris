@@ -24,7 +24,11 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/theming/gnome_accent_metadata", test_gnome_accent_metadata);
         GLib.Test.add_func ("/core/distro_detection", test_distro_detection);
         GLib.Test.add_func ("/ai/elrond_binary_discovery", test_elrond_binary_discovery);
-        GLib.Test.add_func ("/ai/side_panel_and_inline_editing", test_side_panel_and_inline_editing);
+        GLib.Test.add_func ("/ai/side_panel_position", test_side_panel_position);
+        GLib.Test.add_func ("/ai/free_and_copilot_providers", test_free_and_copilot_providers);
+        GLib.Test.add_func ("/ai/failover_error_classification", test_failover_error_classification);
+        GLib.Test.add_func ("/ai/copilot_json_parsing", test_copilot_json_parsing);
+        GLib.Test.add_func ("/ai/chunk_edit_preserving_options", test_chunk_edit_preserving_options);
 
         return GLib.Test.run ();
     }
@@ -475,7 +479,7 @@ namespace Imladris.Tests {
         }
     }
 
-    private static void test_side_panel_and_inline_editing () {
+    private static void test_side_panel_position () {
         // 1. SidePanelPosition enum tests
         assert (SidePanelPosition.RIGHT.to_string_id () == "right");
         assert (SidePanelPosition.LEFT.to_string_id () == "left");
@@ -485,16 +489,9 @@ namespace Imladris.Tests {
         assert (SidePanelPosition.RIGHT.get_display_name () == "Right");
         assert (SidePanelPosition.LEFT.get_display_name () == "Left");
 
-        // 2. SettingsManager property defaults and mutability
+        // 2. SettingsManager chat_panel_position mutability
         var settings = SettingsManager.get_default ();
-        bool orig_inline = settings.inline_editing_enabled;
         var orig_pos = settings.chat_panel_position;
-
-        settings.inline_editing_enabled = false;
-        assert (settings.inline_editing_enabled == false);
-
-        settings.inline_editing_enabled = true;
-        assert (settings.inline_editing_enabled == true);
 
         settings.chat_panel_position = SidePanelPosition.LEFT;
         assert (settings.chat_panel_position == SidePanelPosition.LEFT);
@@ -502,8 +499,101 @@ namespace Imladris.Tests {
         settings.chat_panel_position = SidePanelPosition.RIGHT;
         assert (settings.chat_panel_position == SidePanelPosition.RIGHT);
 
-        // Restore originals
-        settings.inline_editing_enabled = orig_inline;
+        // Restore original
         settings.chat_panel_position = orig_pos;
+    }
+
+    private static void test_free_and_copilot_providers () {
+        assert (AiProvider.GROQ.to_string_id () == "groq");
+        assert (AiProvider.from_string_id ("groq") == AiProvider.GROQ);
+        assert (AiProvider.GROQ.is_free_tier () == true);
+        assert (AiProvider.GROQ.requires_api_key () == true);
+        assert (AiProvider.GROQ.get_default_endpoint ().contains ("groq.com"));
+
+        assert (AiProvider.CEREBRAS.to_string_id () == "cerebras");
+        assert (AiProvider.from_string_id ("cerebras") == AiProvider.CEREBRAS);
+        assert (AiProvider.CEREBRAS.is_free_tier () == true);
+
+        assert (AiProvider.OPENROUTER_FREE.to_string_id () == "openrouter_free");
+        assert (AiProvider.from_string_id ("openrouter_free") == AiProvider.OPENROUTER_FREE);
+        assert (AiProvider.OPENROUTER_FREE.is_free_tier () == true);
+        assert (AiProvider.OPENROUTER_FREE.get_default_model ().contains (":free"));
+
+        assert (AiProvider.GITHUB_MODELS.to_string_id () == "github_models");
+        assert (AiProvider.from_string_id ("github_models") == AiProvider.GITHUB_MODELS);
+        assert (AiProvider.GITHUB_MODELS.is_free_tier () == true);
+
+        assert (AiProvider.FREELMAPI_LOCAL.to_string_id () == "freellmapi_local");
+        assert (AiProvider.from_string_id ("freellmapi_local") == AiProvider.FREELMAPI_LOCAL);
+        assert (AiProvider.FREELMAPI_LOCAL.is_free_tier () == true);
+        assert (AiProvider.FREELMAPI_LOCAL.requires_api_key () == false);
+
+        assert (AiProvider.GITHUB_COPILOT.to_string_id () == "github_copilot");
+        assert (AiProvider.from_string_id ("github_copilot") == AiProvider.GITHUB_COPILOT);
+        assert (AiProvider.GITHUB_COPILOT.is_free_tier () == false);
+        assert (AiProvider.GITHUB_COPILOT.requires_api_key () == false);
+        assert (AiProvider.GITHUB_COPILOT.get_default_endpoint ().contains ("githubcopilot.com"));
+
+        var cfg = AiConfigManager.get_default ();
+        var groq_settings = cfg.get_settings_for (AiProvider.GROQ);
+        string orig_groq_key = groq_settings.api_key;
+        groq_settings.api_key = "gsk_test_dummy_key";
+
+        var candidates = cfg.get_free_fallback_candidates (AiProvider.CLAUDE);
+        assert (candidates.contains (AiProvider.GROQ));
+        assert (candidates.contains (AiProvider.FREELMAPI_LOCAL));
+        assert (!candidates.contains (AiProvider.CLAUDE));
+
+        var groq_excluded = cfg.get_free_fallback_candidates (AiProvider.GROQ);
+        assert (!groq_excluded.contains (AiProvider.GROQ));
+
+        groq_settings.api_key = orig_groq_key;
+    }
+
+    private static void test_failover_error_classification () {
+        assert (AiClient.is_failover_eligible_error (new GLib.IOError.FAILED ("HTTP 429 Too Many Requests")) == true);
+        assert (AiClient.is_failover_eligible_error (new GLib.IOError.FAILED ("Too Many Requests")) == true);
+        assert (AiClient.is_failover_eligible_error (new GLib.IOError.FAILED ("HTTP 402 Payment Required: quota exceeded")) == true);
+        assert (AiClient.is_failover_eligible_error (new GLib.IOError.FAILED ("rate limit reached for model")) == true);
+        assert (AiClient.is_failover_eligible_error (new GLib.IOError.FAILED ("HTTP 503 Service Unavailable")) == false);
+        assert (AiClient.is_failover_eligible_error (new GLib.IOError.FAILED ("HTTP 401 Invalid API key")) == false);
+        assert (AiClient.is_failover_eligible_error (new GLib.IOError.FAILED ("HTTP 404 Model not found")) == false);
+    }
+
+    private static void test_copilot_json_parsing () {
+        string dc_json = "{\"device_code\":\"dc_abc\",\"user_code\":\"ABCD-1234\",\"verification_uri\":\"https://github.com/login/device\",\"expires_in\":900,\"interval\":5}";
+        var dc = Imladris.AI.CopilotAuthService.parse_device_code_json (dc_json);
+        assert (dc.device_code == "dc_abc");
+        assert (dc.user_code == "ABCD-1234");
+        assert (dc.verification_uri == "https://github.com/login/device");
+        assert (dc.expires_in == 900);
+        assert (dc.interval == 5);
+
+        string tok_json = "{\"token\":\"tid=123;exp=9999\",\"expires_at\":1893456000}";
+        string? session_tok = null;
+        int64 exp_at = 0;
+        bool ok = Imladris.AI.CopilotAuthService.parse_copilot_token_json (tok_json, out session_tok, out exp_at);
+        assert (ok == true);
+        assert (session_tok == "tid=123;exp=9999");
+        assert (exp_at == 1893456000);
+    }
+
+    private static void test_chunk_edit_preserving_options () {
+        string doc = "# Title\n\n```{r}\n#| label: fig-cars\n#| echo: false\nplot(cars)\n```\n\nEnd.";
+        // Line 5 is inside the chunk ("plot(cars)")
+        string? updated = Imladris.Editor.AiBufferEditHelper.replace_active_chunk_preserving_options (
+            doc, 5, "ggplot(cars, aes(speed, dist)) + geom_point()"
+        );
+        assert (updated != null);
+        assert (updated.contains ("#| label: fig-cars"));
+        assert (updated.contains ("#| echo: false"));
+        assert (updated.contains ("ggplot(cars, aes(speed, dist)) + geom_point()"));
+        assert (!updated.contains ("plot(cars)"));
+
+        // Line 0 ("# Title") is outside any chunk
+        string? outside = Imladris.Editor.AiBufferEditHelper.replace_active_chunk_preserving_options (
+            doc, 0, "x <- 1"
+        );
+        assert (outside == null);
     }
 }

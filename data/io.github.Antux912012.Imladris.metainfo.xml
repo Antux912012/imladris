@@ -68,6 +68,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.25.0" date="2026-11-14">
+      <description>
+        <p>Release v0.25.0 introduces Free-Tier AI APIs with Automatic Quota Failover, GitHub Copilot OAuth login, Positron/RStudio-style Direct Editor Writing, and comprehensive security &amp; data-integrity hardening:</p>
+        <ul>
+          <li>Free-Tier AI APIs &amp; Quota Failover: Built-in support for Groq, Cerebras, OpenRouter Free, GitHub Models, and FreeLLMAPI Local Proxy with automatic HTTP 429 failover and explicit privacy opt-in.</li>
+          <li>GitHub Copilot Integration: OAuth Device Flow authentication with secure libsecret token storage.</li>
+          <li>Positron/RStudio-Style Direct Editor Writing: Replace selections or update Quarto code chunks directly from Elrond AI while preserving #| chunk options and single-step Ctrl+Z undo.</li>
+          <li>Security &amp; Data Integrity Hardening: MCP execute_code disabled by default with binary allowlist, Mallorn Zip Slip path validation, shell-free micromamba download, \uFFFC anchor cleanup, and dock popout fixes.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.24.2" date="2026-11-13">
       <description>
         <p>Release v0.24.2 bundles all missing Papirus symbolic icons inside the application resource archive:</p>

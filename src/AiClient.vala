@@ -14,6 +14,8 @@ namespace Imladris {
         private AiConfigManager config_mgr;
         private Cancellable? active_cancellable = null;
 
+        public signal void provider_failover_triggered (AiProvider from_provider, AiProvider to_provider);
+
         public bool is_online {
             get {
                 return config_mgr.active_provider != AiProvider.LM_STUDIO &&
@@ -76,20 +78,63 @@ namespace Imladris {
 
         public async string send_chat_completion_async (string system_prompt, string user_prompt, Cancellable? cancellable = null) throws GLib.Error {
             var provider = config_mgr.active_provider;
+            var req_cancellable = cancellable ?? new Cancellable ();
+            var attempted = new Gee.HashSet<AiProvider> ();
+            attempted.add (provider);
+
+            try {
+                return yield dispatch_provider_request_async (provider, system_prompt, user_prompt, req_cancellable);
+            } catch (GLib.Error primary_err) {
+                if (!config_mgr.auto_failover_enabled || req_cancellable.is_cancelled () || !is_failover_eligible_error (primary_err)) {
+                    throw primary_err;
+                }
+
+                var candidates = config_mgr.get_free_fallback_candidates (provider);
+                foreach (var fallback_prov in candidates) {
+                    if (req_cancellable.is_cancelled ()) {
+                        throw primary_err;
+                    }
+                    if (attempted.contains (fallback_prov)) {
+                        continue;
+                    }
+                    if (fallback_prov.is_free_tier () && fallback_prov != AiProvider.FREELMAPI_LOCAL && !config_mgr.free_api_consent_accepted) {
+                        continue;
+                    }
+                    attempted.add (fallback_prov);
+                    try {
+                        provider_failover_triggered (provider, fallback_prov);
+                        return yield dispatch_provider_request_async (fallback_prov, system_prompt, user_prompt, req_cancellable);
+                    } catch (GLib.Error fb_err) {
+                        GLib.debug ("Failover provider %s failed: %s", fallback_prov.to_string_id (), fb_err.message);
+                    }
+                }
+                throw primary_err;
+            }
+        }
+
+        public static bool is_failover_eligible_error (GLib.Error err) {
+            string msg = err.message.down ();
+            return msg.contains ("http 429") || msg.contains ("rate limit") || msg.contains ("quota") || msg.contains ("too many requests");
+        }
+
+        private async string dispatch_provider_request_async (AiProvider provider, string system_prompt, string user_prompt, Cancellable req_cancellable) throws GLib.Error {
             string key = config_mgr.get_api_key_for (provider);
             string model = config_mgr.get_model_for (provider);
+            if (model.strip ().length == 0) {
+                model = provider.get_default_model ();
+            }
             string base_endpoint = config_mgr.get_endpoint_for (provider);
 
             // 1. Validation
-            if (provider.requires_api_key () && key.length == 0) {
+            if (provider == AiProvider.GITHUB_COPILOT) {
+                key = yield Imladris.AI.CopilotAuthService.get_default ().get_copilot_session_token_async (false, req_cancellable);
+            } else if (provider.requires_api_key () && key.length == 0) {
                 string help_url = provider.get_api_key_help_url () ?? "";
                 string url_hint = help_url.length > 0 ? @"\nGet your key at: $help_url" : "";
                 throw new GLib.IOError.NOT_INITIALIZED (
                     @"No API key found for $(provider.get_display_name ()). Please configure your key in AI Settings or set the $(provider.get_env_var_name () ?? "appropriate") environment variable.$url_hint"
                 );
             }
-
-            var req_cancellable = cancellable ?? new Cancellable ();
 
             // Antigravity (agy Agent Harness)
             if (provider == AiProvider.ANTIGRAVITY) {
@@ -156,6 +201,10 @@ namespace Imladris {
                 msg.request_headers.append ("User-Agent", "Imladris-IDE/1.0");
             } else if (provider == AiProvider.QWEN) {
                 msg.request_headers.append ("X-DashScope-Client", "Imladris-IDE");
+            } else if (provider == AiProvider.GITHUB_COPILOT) {
+                msg.request_headers.append ("Editor-Version", Imladris.AI.CopilotAuthService.EDITOR_VERSION);
+                msg.request_headers.append ("Editor-Plugin-Version", Imladris.AI.CopilotAuthService.EDITOR_PLUGIN_VERSION);
+                msg.request_headers.append ("Openai-Organization", "github-copilot");
             }
 
             // Manage Cancellable

@@ -90,11 +90,11 @@ namespace Imladris.UI {
             cache_dir = Path.build_filename (Environment.get_user_cache_dir (), "imladris", "indices");
             DirUtils.create_with_parents (cache_dir, 0755);
 
-            // Populate lightweight defaults immediately so UI is responsive, then load full disk cache off-thread
+            // Populate lightweight defaults immediately so UI is responsive, then load full disk cache off-thread.
+            // Remote CRAN/PyPI refresh is deferred until explicitly requested in the Package Manager to respect zero-phone-home privacy.
             populate_default_cran ();
             populate_default_pypi ();
             load_from_disk_async.begin ();
-            check_and_refresh_indices.begin ();
         }
 
         private async void load_from_disk_async () {

@@ -373,10 +373,45 @@ author = "%s"
             bool is_zstd = (bytes_read >= 4 && header[0] == 0x28 && header[1] == 0xb5 && header[2] == 0x2f && header[3] == 0xfd);
 
             if (is_zstd) {
+                // Validate archive member paths against traversal / absolute paths before extraction
+                string[] list_argv = { "tar", "--zstd", "-tf", mallorn_path };
+                var list_proc = new Subprocess.newv (list_argv, SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE);
+                string list_out, list_err;
+                list_proc.communicate_utf8 (null, null, out list_out, out list_err);
+                if (!list_proc.get_successful ()) {
+                    throw new GLib.IOError.FAILED (@"Failed to inspect .mallorn archive: $list_err");
+                }
+                foreach (string entry in (list_out ?? "").split ("\n")) {
+                    string norm = entry.strip ().replace ("\\", "/");
+                    if (norm.length == 0) continue;
+                    if (norm.has_prefix ("/") || norm.has_prefix ("~")) {
+                        throw new GLib.IOError.PERMISSION_DENIED (@"Rejected unsafe absolute archive path: $entry");
+                    }
+                    foreach (string seg in norm.split ("/")) {
+                        if (seg == "..") {
+                            throw new GLib.IOError.PERMISSION_DENIED (@"Rejected archive path traversal entry: $entry");
+                        }
+                    }
+                }
                 string[] argv = { "tar", "-C", target_dir, "--zstd", "-xf", mallorn_path };
                 var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_PIPE);
                 proc.wait_check ();
             } else if (is_zip) {
+                // Validate zip member paths against traversal / absolute paths before extraction
+                string[] check_argv = {
+                    "python3", "-c",
+                    "import sys, zipfile, os\n" +
+                    "with zipfile.ZipFile(sys.argv[1]) as z:\n" +
+                    "    for n in z.namelist():\n" +
+                    "        p = n.replace('\\\\', '/')\n" +
+                    "        if os.path.isabs(p) or p.startswith('~') or '..' in p.split('/'):\n" +
+                    "            sys.exit(1)\n",
+                    mallorn_path
+                };
+                var check_proc = new Subprocess.newv (check_argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_PIPE);
+                if (!check_proc.wait_check ()) {
+                    throw new GLib.IOError.PERMISSION_DENIED ("Rejected unsafe zip archive entry containing path traversal or absolute path.");
+                }
                 string[] argv = { "python3", "-m", "zipfile", "-e", mallorn_path, target_dir };
                 var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_PIPE);
                 proc.wait_check ();

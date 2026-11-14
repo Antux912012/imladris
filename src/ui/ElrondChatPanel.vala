@@ -185,6 +185,57 @@ namespace Imladris.UI {
             chips_box.append (chip_last_error);
 
             this.append (chips_box);
+
+            // Quick-action improvement chips (Positron/RStudio style)
+            var actions_box = new Gtk.FlowBox () {
+                selection_mode = Gtk.SelectionMode.NONE,
+                row_spacing = 4,
+                column_spacing = 4,
+                margin_start = 8,
+                margin_end = 8,
+                margin_bottom = 2,
+                max_children_per_line = 3
+            };
+
+            var btn_improve = new Gtk.Button.with_label ("Improve Writing") {
+                tooltip_text = "Improve clarity, academic tone, and grammar of selected text"
+            };
+            btn_improve.add_css_class ("flat");
+            btn_improve.add_css_class ("caption");
+            btn_improve.clicked.connect (() => {
+                trigger_quick_action ("Improve clarity, academic tone, and grammar of the selected text. Return the revised text.", true, false);
+            });
+            actions_box.append (btn_improve);
+
+            var btn_refactor = new Gtk.Button.with_label ("Refactor Code") {
+                tooltip_text = "Refactor selected code or active chunk for readability and best practices"
+            };
+            btn_refactor.add_css_class ("flat");
+            btn_refactor.add_css_class ("caption");
+            btn_refactor.clicked.connect (() => {
+                trigger_quick_action ("Refactor this code for readability, performance, and best practices. Return the updated code in a single fenced block.", true, false);
+            });
+            actions_box.append (btn_refactor);
+
+            var btn_fix = new Gtk.Button.with_label ("Fix Error") {
+                tooltip_text = "Diagnose the last console error and provide corrected code"
+            };
+            btn_fix.add_css_class ("flat");
+            btn_fix.add_css_class ("caption");
+            btn_fix.clicked.connect (() => {
+                trigger_quick_action ("Diagnose the last console error and provide the corrected code.", true, true);
+            });
+            actions_box.append (btn_fix);
+
+            this.append (actions_box);
+        }
+
+        private void trigger_quick_action (string prompt_template, bool include_selection, bool include_error) {
+            if (is_busy) return;
+            if (include_selection) chip_selection.active = true;
+            if (include_error) chip_last_error.active = true;
+            prompt_input.buffer.text = prompt_template;
+            send_prompt.begin ();
         }
 
         private void setup_message_stream () {
@@ -328,6 +379,10 @@ namespace Imladris.UI {
             add_welcome_message ();
         }
 
+        public void focus_input () {
+            prompt_input.grab_focus ();
+        }
+
         public void submit_external_prompt (string prompt) {
             if (is_busy || prompt.strip ().length == 0) return;
             prompt_input.buffer.text = prompt.strip ();
@@ -411,6 +466,16 @@ namespace Imladris.UI {
                 var active_settings = cfg.get_settings_for (cfg.active_provider);
                 bool has_cloud_or_local_api = !cfg.active_provider.requires_api_key () ||
                     (active_settings.api_key != null && active_settings.api_key.strip ().length > 0);
+                bool has_failover_backup = cfg.auto_failover_enabled &&
+                    cfg.get_free_fallback_candidates (cfg.active_provider).size > 0;
+
+                if (!controller.is_ready && cfg.active_provider.is_free_tier () && !cfg.free_api_consent_accepted) {
+                    bool accepted = yield ensure_free_api_consent_async ();
+                    if (!accepted) {
+                        append_assistant_card ("*Cancelled: Free-tier cloud AI consent was declined. You can select a local provider (Ollama / LM Studio) or configure your own API key in **AI Settings**.*");
+                        return;
+                    }
+                }
 
                 string response;
                 if (controller.is_ready) {
@@ -420,8 +485,11 @@ namespace Imladris.UI {
                         env_summary,
                         combined_prompt
                     );
-                } else if (has_cloud_or_local_api) {
+                } else if (has_cloud_or_local_api || has_failover_backup) {
                     var ai_client = new AiClient ();
+                    ai_client.provider_failover_triggered.connect ((from_p, to_p) => {
+                        status_indicator.label = @"Failover → $(to_p.get_short_name ())";
+                    });
                     string sys_prompt = "You are Elrond AI, an expert scientific writing and data science copilot inside Imladris (R, Python, Quarto, LaTeX, Biostats). Give concise, accurate answers with fenced ```r or ```python code blocks when helpful.";
                     response = yield ai_client.send_chat_completion_async (sys_prompt, combined_prompt, cancellable);
                 } else {
@@ -446,6 +514,29 @@ namespace Imladris.UI {
                 provider_pill_btn.label = get_active_backend_label ();
                 scroll_to_bottom ();
             }
+        }
+
+        private async bool ensure_free_api_consent_async () {
+            var cfg = Core.AiConfigManager.get_default ();
+            if (cfg.free_api_consent_accepted) return true;
+
+            var dlg = new Adw.AlertDialog (
+                "Free Cloud AI Privacy Notice",
+                "You are about to send your prompt and selected document context to a free-tier cloud AI provider (such as Groq, Cerebras, OpenRouter Free, or GitHub Models). Free-tier APIs may have rate limits or provider-specific data retention terms. Do you want to continue?"
+            );
+            dlg.add_response ("cancel", "Cancel");
+            dlg.add_response ("accept", "Use Free API");
+            dlg.set_response_appearance ("accept", Adw.ResponseAppearance.SUGGESTED);
+            dlg.default_response = "accept";
+            dlg.close_response = "cancel";
+
+            string choice = yield dlg.choose (parent_window, null);
+            if (choice == "accept") {
+                cfg.free_api_consent_accepted = true;
+                cfg.save ();
+                return true;
+            }
+            return false;
         }
 
         private void append_user_card (string text) {
@@ -624,12 +715,82 @@ namespace Imladris.UI {
                         to_insert = "\n```{" + code_engine + "}\n" + code_copy.strip () + "\n```\n";
                     }
                 }
-                doc_page.source_buffer.insert_at_cursor (to_insert, -1);
+                doc_page.source_buffer.begin_user_action ();
+                try {
+                    doc_page.source_buffer.insert_at_cursor (to_insert, -1);
+                } finally {
+                    doc_page.source_buffer.end_user_action ();
+                }
                 if (parent_window != null) {
-                    parent_window.show_toast ("Inserted code at cursor");
+                    parent_window.show_toast_with_action ("Inserted code at cursor", "Undo", "win.undo");
                 }
             });
             code_header.append (btn_insert);
+
+            // Action: Apply to Selection (Positron/RStudio direct editor write)
+            var btn_apply_sel = new Gtk.Button.from_icon_name ("edit-find-replace-symbolic") {
+                tooltip_text = "Replace selected editor text with this snippet (Ctrl+Z to undo)"
+            };
+            btn_apply_sel.add_css_class ("flat");
+            btn_apply_sel.clicked.connect (() => {
+                if (!doc_page.source_buffer.has_selection) {
+                    if (parent_window != null) {
+                        parent_window.show_toast ("Select text or code in the editor first");
+                    }
+                    return;
+                }
+                Gtk.TextIter sel_start, sel_end;
+                doc_page.source_buffer.get_selection_bounds (out sel_start, out sel_end);
+                doc_page.source_buffer.begin_user_action ();
+                try {
+                    doc_page.source_buffer.delete (ref sel_start, ref sel_end);
+                    doc_page.source_buffer.insert (ref sel_start, code_copy.strip (), -1);
+                } finally {
+                    doc_page.source_buffer.end_user_action ();
+                }
+                if (parent_window != null) {
+                    parent_window.show_toast_with_action ("Applied AI edit to selection", "Undo", "win.undo");
+                }
+            });
+            code_header.append (btn_apply_sel);
+
+            // Action: Update Active Chunk (preserving #| Quarto options)
+            var btn_update_chunk = new Gtk.Button.from_icon_name ("document-edit-symbolic") {
+                tooltip_text = "Replace active code chunk body while preserving #| options"
+            };
+            btn_update_chunk.add_css_class ("flat");
+            btn_update_chunk.clicked.connect (() => {
+                Gtk.TextIter cur_it;
+                doc_page.source_buffer.get_iter_at_mark (out cur_it, doc_page.source_buffer.get_insert ());
+                int body_start_line = -1;
+                int end_fence_line = -1;
+                if (!Editor.AiBufferEditHelper.get_active_chunk_body_range (
+                        doc_page.source_buffer.text, cur_it.get_line (), out body_start_line, out end_fence_line)) {
+                    if (parent_window != null) {
+                        parent_window.show_toast ("Place cursor inside a code chunk to update it");
+                    }
+                    return;
+                }
+                string clean_code = code_copy;
+                while (clean_code.has_suffix ("\n")) {
+                    clean_code = clean_code.substring (0, clean_code.length - 1);
+                }
+                Gtk.TextIter start_it, end_it;
+                doc_page.source_buffer.get_iter_at_line (out start_it, body_start_line);
+                doc_page.source_buffer.get_iter_at_line (out end_it, end_fence_line);
+
+                doc_page.source_buffer.begin_user_action ();
+                try {
+                    doc_page.source_buffer.delete (ref start_it, ref end_it);
+                    doc_page.source_buffer.insert (ref start_it, clean_code + "\n", -1);
+                } finally {
+                    doc_page.source_buffer.end_user_action ();
+                }
+                if (parent_window != null) {
+                    parent_window.show_toast_with_action ("Updated active chunk (preserved #| options)", "Undo", "win.undo");
+                }
+            });
+            code_header.append (btn_update_chunk);
 
             // Action: Run in Console
             var btn_run = new Gtk.Button.from_icon_name ("media-playback-start-symbolic") {

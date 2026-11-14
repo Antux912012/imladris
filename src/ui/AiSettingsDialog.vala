@@ -252,6 +252,54 @@ namespace Imladris.UI {
 
             frontier_page.add (cursor_group);
 
+            // --- GitHub Copilot (OAuth Device Flow) Group ---
+            var copilot_group = new Adw.PreferencesGroup () {
+                title = "GitHub Copilot",
+                description = "Sign in with your GitHub Copilot subscription via OAuth Device Flow",
+                header_suffix = new Gtk.Image.from_icon_name (AiProvider.GITHUB_COPILOT.get_icon_name ()) { pixel_size = 28, valign = Gtk.Align.CENTER }
+            };
+
+            var copilot_auth = Imladris.AI.CopilotAuthService.get_default ();
+            var copilot_settings = config_mgr.get_settings_for (AiProvider.GITHUB_COPILOT);
+
+            var copilot_status_row = new Adw.ActionRow () {
+                title = "GitHub Account"
+            };
+            var copilot_auth_btn = new Gtk.Button () { valign = Gtk.Align.CENTER };
+
+            update_copilot_ui (copilot_auth, copilot_status_row, copilot_auth_btn);
+
+            copilot_auth.auth_state_changed.connect ((signed_in, uname) => {
+                update_copilot_ui (copilot_auth, copilot_status_row, copilot_auth_btn);
+            });
+
+            copilot_auth_btn.clicked.connect (() => {
+                if (copilot_auth.is_signed_in ()) {
+                    copilot_auth.sign_out_async.begin ((obj, res) => {
+                        copilot_auth.sign_out_async.end (res);
+                        update_copilot_ui (copilot_auth, copilot_status_row, copilot_auth_btn);
+                        this.add_toast (new Adw.Toast ("Signed out of GitHub Copilot"));
+                    });
+                } else {
+                    start_copilot_device_flow_async.begin ();
+                }
+            });
+
+            copilot_status_row.add_suffix (copilot_auth_btn);
+            copilot_group.add (copilot_status_row);
+
+            var copilot_model_row = new Adw.EntryRow () {
+                title = "Model Name",
+                text = copilot_settings.model
+            };
+            copilot_model_row.notify["text"].connect (() => {
+                copilot_settings.model = copilot_model_row.text;
+                config_mgr.save ();
+            });
+            copilot_group.add (copilot_model_row);
+
+            frontier_page.add (copilot_group);
+
             this.add (frontier_page);
 
             // ==========================================
@@ -666,6 +714,218 @@ namespace Imladris.UI {
             local_page.add (custom_group);
 
             this.add (local_page);
+
+            // ==========================================
+            // Page 4: Free-Tier APIs & Automatic Failover
+            // ==========================================
+            var free_page = new Adw.PreferencesPage () {
+                title = "Free & Backup",
+                icon_name = "network-transmit-receive-symbolic"
+            };
+
+            var failover_group = new Adw.PreferencesGroup () {
+                title = "Automatic Quota Failover",
+                description = "Automatically fall back to configured free-tier AI providers when your primary provider hits rate limits (HTTP 429) or quota exhaustion"
+            };
+
+            var auto_failover_row = new Adw.SwitchRow () {
+                title = "Enable Automatic Free-Tier Failover",
+                subtitle = "Tries Groq, Cerebras, OpenRouter Free, GitHub Models, and FreeLLMAPI Local Proxy in order",
+                active = config_mgr.auto_failover_enabled
+            };
+            auto_failover_row.notify["active"].connect (() => {
+                config_mgr.auto_failover_enabled = auto_failover_row.active;
+                config_mgr.save ();
+            });
+            failover_group.add (auto_failover_row);
+
+            var consent_row = new Adw.SwitchRow () {
+                title = "Free Cloud AI Privacy Consent",
+                subtitle = "Allow sending prompts to free-tier cloud APIs when selected or during failover",
+                active = config_mgr.free_api_consent_accepted
+            };
+            consent_row.notify["active"].connect (() => {
+                config_mgr.free_api_consent_accepted = consent_row.active;
+                config_mgr.save ();
+            });
+            failover_group.add (consent_row);
+
+            free_page.add (failover_group);
+
+            add_provider_config_group (free_page, AiProvider.GROQ, "Groq (Free Tier)", "Ultra-fast Llama 3.3 70B & Mixtral inference with permanent free tier", true, false);
+            add_provider_config_group (free_page, AiProvider.CEREBRAS, "Cerebras (Free Tier)", "High-speed wafer-scale inference with generous daily free tokens", true, false);
+            add_provider_config_group (free_page, AiProvider.OPENROUTER_FREE, "OpenRouter (:free Models)", "Access community :free models via OpenRouter", true, false);
+            add_provider_config_group (free_page, AiProvider.GITHUB_MODELS, "GitHub Models (Free Tier)", "Use your GitHub Personal Access Token (models:read) for free inference", true, false);
+            add_provider_config_group (free_page, AiProvider.FREELMAPI_LOCAL, "FreeLLMAPI Local Proxy", "Local OpenAI-compatible free proxy (localhost:8000) — no API key required", false, true);
+
+            this.add (free_page);
+        }
+
+        private void add_provider_config_group (
+            Adw.PreferencesPage page,
+            AiProvider provider,
+            string title,
+            string description,
+            bool include_key,
+            bool include_endpoint
+        ) {
+            var group = new Adw.PreferencesGroup () {
+                title = title,
+                description = description,
+                header_suffix = new Gtk.Image.from_icon_name (provider.get_icon_name ()) { pixel_size = 28, valign = Gtk.Align.CENTER }
+            };
+            var settings = config_mgr.get_settings_for (provider);
+
+            if (include_key) {
+                var key_row = new Adw.PasswordEntryRow () {
+                    title = @"$(provider.get_short_name ()) API Key",
+                    text = settings.api_key
+                };
+                key_row.notify["text"].connect (() => {
+                    settings.api_key = key_row.text;
+                    config_mgr.save ();
+                });
+                group.add (key_row);
+            }
+
+            if (include_endpoint) {
+                var ep_row = new Adw.EntryRow () {
+                    title = "Base Endpoint",
+                    text = settings.endpoint
+                };
+                ep_row.notify["text"].connect (() => {
+                    settings.endpoint = ep_row.text;
+                    config_mgr.save ();
+                });
+                group.add (ep_row);
+            }
+
+            var model_row = new Adw.EntryRow () {
+                title = "Model Name",
+                text = settings.model
+            };
+            model_row.notify["text"].connect (() => {
+                settings.model = model_row.text;
+                config_mgr.save ();
+            });
+            group.add (model_row);
+
+            string help_url = provider.get_api_key_help_url ();
+            if (help_url.length > 0) {
+                var action_row = new Adw.ActionRow () {
+                    title = include_key ? @"Get $(provider.get_short_name ()) API Key" : @"$(provider.get_short_name ()) Documentation",
+                    subtitle = help_url
+                };
+                var btn = new Gtk.Button.with_label ("Open ↗") { valign = Gtk.Align.CENTER };
+                btn.clicked.connect (() => {
+                    AiConfigManager.open_url (help_url);
+                });
+                action_row.add_suffix (btn);
+                group.add (action_row);
+            }
+
+            page.add (group);
+        }
+
+        private static void update_copilot_ui (
+            Imladris.AI.CopilotAuthService copilot_auth,
+            Adw.ActionRow copilot_status_row,
+            Gtk.Button copilot_auth_btn
+        ) {
+            if (copilot_auth.is_signed_in ()) {
+                string uname = copilot_auth.get_username ();
+                copilot_status_row.subtitle = uname.length > 0 ? @"Signed in as @$uname" : "Signed in to GitHub Copilot";
+                copilot_auth_btn.label = "Sign Out";
+                copilot_auth_btn.remove_css_class ("suggested-action");
+                copilot_auth_btn.add_css_class ("destructive-action");
+            } else {
+                copilot_status_row.subtitle = "Not signed in — Click to authorize via GitHub";
+                copilot_auth_btn.label = "Sign in with GitHub";
+                copilot_auth_btn.remove_css_class ("destructive-action");
+                copilot_auth_btn.add_css_class ("suggested-action");
+            }
+        }
+
+        private async void start_copilot_device_flow_async () {
+            var auth = Imladris.AI.CopilotAuthService.get_default ();
+            var poll_cancellable = new Cancellable ();
+
+            try {
+                var info = yield auth.request_device_code_async (poll_cancellable);
+
+                var dlg = new Adw.Dialog () {
+                    title = "GitHub Copilot Login",
+                    content_width = 400,
+                    content_height = 290
+                };
+                var toolbar = new Adw.ToolbarView ();
+                toolbar.add_top_bar (new Adw.HeaderBar ());
+
+                var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 12) {
+                    margin_top = 16,
+                    margin_bottom = 20,
+                    margin_start = 20,
+                    margin_end = 20,
+                    halign = Gtk.Align.CENTER
+                };
+                box.append (new Gtk.Label ("Enter this one-time code on GitHub to authorize Imladris:") {
+                    wrap = true,
+                    justify = Gtk.Justification.CENTER
+                });
+
+                var code_lbl = new Gtk.Label (info.user_code) {
+                    selectable = true
+                };
+                code_lbl.add_css_class ("title-1");
+                code_lbl.add_css_class ("monospace");
+                box.append (code_lbl);
+
+                var status_lbl = new Gtk.Label ("Waiting for authorization in browser...") {
+                    css_classes = { "dim-label", "caption" }
+                };
+                box.append (status_lbl);
+
+                var btn_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
+                    halign = Gtk.Align.CENTER,
+                    margin_top = 8
+                };
+                var copy_open_btn = new Gtk.Button.with_label ("Copy Code & Open GitHub ↗");
+                copy_open_btn.add_css_class ("suggested-action");
+                copy_open_btn.clicked.connect (() => {
+                    var display = Gdk.Display.get_default ();
+                    if (display != null) {
+                        display.get_clipboard ().set_text (info.user_code);
+                    }
+                    AiConfigManager.open_url (info.verification_uri);
+                    status_lbl.label = "Code copied! Complete login in browser...";
+                });
+                btn_row.append (copy_open_btn);
+
+                var cancel_btn = new Gtk.Button.with_label ("Cancel");
+                cancel_btn.clicked.connect (() => {
+                    poll_cancellable.cancel ();
+                    dlg.close ();
+                });
+                btn_row.append (cancel_btn);
+
+                box.append (btn_row);
+                toolbar.set_content (box);
+                dlg.set_child (toolbar);
+
+                dlg.closed.connect (() => {
+                    poll_cancellable.cancel ();
+                });
+                dlg.present (this);
+
+                yield auth.poll_device_token_async (info, poll_cancellable);
+                string uname = auth.get_username ();
+                dlg.close ();
+                this.add_toast (new Adw.Toast (uname.length > 0 ? @"Signed in to GitHub Copilot as @$uname" : "Signed in to GitHub Copilot"));
+            } catch (GLib.Error e) {
+                if (!(e is GLib.IOError.CANCELLED)) {
+                    this.add_toast (new Adw.Toast (@"Copilot login failed: $(e.message)"));
+                }
+            }
         }
     }
 }

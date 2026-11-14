@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.24.2
+Version:        0.25.0
 Release:        1%{?dist}
 Summary:        Scientific notebook studio with GPU acceleration, slide decks and posters
 
@@ -63,6 +63,16 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Sat Nov 14 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.25.0-1
+- Release 0.25.0: Free-Tier AI APIs, Automatic Quota Failover, GitHub Copilot OAuth, Positron-Style Direct Editing & Security Hardening:
+  * Free-tier AI providers (Groq, Cerebras, OpenRouter Free, GitHub Models, FreeLLMAPI Local) with HTTP 429 automatic failover and privacy opt-in.
+  * GitHub Copilot OAuth Device Flow authentication with libsecret storage.
+  * Positron/RStudio-style direct editor writing (Apply to Selection, Update Chunk preserving #| options) replacing the inline editing popover.
+  * Security & data-integrity hardening: MCP execute_code opt-in & allowlist, Mallorn Zip Slip validation, direct micromamba download without shell pipes, \uFFFC anchor stripping, and dock popout/tab-close lifecycle fixes.
+
+* Fri Nov 13 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.24.2-1
+- Release 0.24.2: Complete bundled Papirus symbolic icon pack via GResource (following 0.24.0/0.24.1 scientific bridges & toolchain setup).
+
 * Fri Nov 13 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.23.0-1
 - Release 0.23.0: GNOME/Libadwaita Interface Overhaul, Elrond AI Redesign, and WebKitGTK 6.0 Preview Stability:
   * Progressive-disclosure Welcome screen with Quick Start actions and expandable templates row.

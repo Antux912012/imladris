@@ -108,17 +108,27 @@ namespace Imladris.Core {
             log_output (@"▶ Downloading micromamba ($arch) from $url...");
             progress_changed ("Downloading micromamba...", 0.15, url);
 
+            string tmp_tar = Path.build_filename (Environment.get_tmp_dir (), @"imladris-micromamba-$(GLib.Random.next_int ()).tar.bz2");
             try {
-                // Safely stream download through curl and tar extracting only bin/micromamba
-                string[] argv = {
-                    "sh", "-c",
-                    "curl -Ls \"$1\" | tar -xvj -C \"$2\" --strip-components=1 bin/micromamba",
-                    "_",
-                    url,
-                    bin_dir
-                };
+                // Download tarball directly without sh -c shell pipeline
+                string[] dl_argv = { "curl", "-fsSL", "-o", tmp_tar, url };
+                var dl_proc = new GLib.Subprocess.newv (dl_argv, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_PIPE);
+                var dl_err = new GLib.DataInputStream (dl_proc.get_stderr_pipe ());
+                read_stream_to_log.begin (dl_err);
+                yield dl_proc.wait_check_async ();
 
-                var proc = new GLib.Subprocess.newv (argv, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_PIPE);
+                // Compute SHA-256 digest of downloaded archive for auditability
+                uint8[] tar_bytes;
+                GLib.FileUtils.get_data (tmp_tar, out tar_bytes);
+                if (tar_bytes.length == 0) {
+                    throw new GLib.IOError.FAILED ("Downloaded micromamba archive is empty.");
+                }
+                string sha256 = GLib.Checksum.compute_for_data (GLib.ChecksumType.SHA256, tar_bytes);
+                log_output (@"✔ Downloaded micromamba archive (SHA-256: $sha256)");
+
+                // Extract only bin/micromamba directly with tar (no shell)
+                string[] tar_argv = { "tar", "-xvjf", tmp_tar, "-C", bin_dir, "--strip-components=1", "bin/micromamba" };
+                var proc = new GLib.Subprocess.newv (tar_argv, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_PIPE);
                 var stdout_stream = new GLib.DataInputStream (proc.get_stdout_pipe ());
                 var stderr_stream = new GLib.DataInputStream (proc.get_stderr_pipe ());
 
@@ -140,6 +150,8 @@ namespace Imladris.Core {
             } catch (GLib.Error e) {
                 log_output (@"✖ Failed to download or extract micromamba: $(e.message)");
                 return false;
+            } finally {
+                GLib.FileUtils.unlink (tmp_tar);
             }
         }
 

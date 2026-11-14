@@ -22,6 +22,7 @@ Imladris is designed from first principles as a **local-first, private scientifi
   * Configuration: `~/.config/imladris/`
   * Cache & Indices: `~/.cache/imladris/`
   * Downloaded Local Models: `~/.local/share/imladris/models/`
+* **Package Index Caching**: Built-in default CRAN and PyPI package lists are bundled locally for offline autocomplete. Remote index caches (`~/.cache/imladris/indices/`) are refreshed from CRAN (`PACKAGES`) and PyPI (PEP 691 JSON) strictly on demand when explicitly requested by the user in the Packages Ribbon Manager. No network checks or updates are run during application startup.
 * You retain complete ownership and control over all files created or cached by the application.
 
 ---
@@ -29,13 +30,17 @@ Imladris is designed from first principles as a **local-first, private scientifi
 ## 3. Artificial Intelligence: Local vs. Cloud Providers
 
 ### A. Elrond Assistance (Local AI Copilot)
-* **100% Local Inference**: When using Elrond Assistance, inference runs on your machine via a local `llama-server` subprocess communicating solely over the local loopback interface (`127.0.0.1:8088`).
+* **100% Local Inference & No Cloud Fallback**: When using Elrond Assistance, inference runs on your machine via a local `llama-server` subprocess or local server (Ollama, LM Studio, Cherry Studio) over loopback (`localhost` / `127.0.0.1`). There is no silent fallback to cloud AI providers. If local inference is unavailable or fails, requests are never routed externally without explicit configuration.
 * **Air-Gapped & Offline**: No document context, dataframes, prompts, or generated code are sent over the Internet. The model runs fully offline.
 
-### B. Optional Frontier Cloud AI (Gemini, Claude, OpenAI, DeepSeek, etc.)
-* **Strictly Opt-In**: Cloud AI features are disabled by default and require you to explicitly provide your own developer API key.
-* **Direct Encrypted Connections**: When you configure a third-party AI provider, requests are transmitted directly from your client to the provider’s official API endpoint over encrypted TLS (HTTPS). There are no intermediary proxy servers operated by Imladris.
-* **Local Credential Storage**: API keys are stored only in your local configuration directory (`~/.config/imladris/ai_settings.json`) with file access restricted to your local Linux user account.
+### B. Frontier Cloud AI & Free-Tier Providers
+* **Strictly Opt-In**: Cloud AI features are disabled by default and require you to explicitly configure a provider or enter an API key.
+* **Direct Encrypted Connections**: Requests are transmitted directly from your client to the provider’s official API endpoint over encrypted TLS (HTTPS). There are no intermediary proxy servers operated by Imladris.
+* **Local Credential Storage**: API keys are stored only in your local configuration directory (`~/.config/imladris/ai_config.json`) with file access restricted to your local Linux user account (POSIX permissions `0600`).
+* **Free-Tier Cloud AI APIs & Automatic Quota Failover**:
+  When cloud providers return HTTP 429 (quota exhaustion or rate limiting), automatic failover across free-tier candidates (Groq, Cerebras, OpenRouter `:free`, GitHub Models) is strictly guarded. It requires explicit user privacy opt-in via `free_api_consent_accepted` (in `ai_config.json` or Preferences) before any prompt is transmitted to an alternate free cloud endpoint. Local FreeLLMAPI proxy failover (`localhost:8000`) remains internal and does not transmit data over the public internet.
+* **GitHub Copilot OAuth Device Flow**:
+  When authenticating with GitHub Copilot via OAuth Device Code Flow (`https://github.com/login/device`), the resulting token is stored in the Linux OS keyring (`org.freedesktop.Secret.Service` via `libsecret`) under the schema `io.github.Antux912012.Imladris.Copilot`. If Secret Service is unavailable, the token is written to `~/.config/imladris/copilot_token` with POSIX permissions `0600`.
 
 ---
 
@@ -45,13 +50,13 @@ Under the European Union General Data Protection Regulation (GDPR) and equivalen
 
 * **Data Minimization (Art. 5(1)(c))**: The application does not collect, retain, or process personal data on external servers.
 * **Integrity and Confidentiality (Art. 5(1)(f))**: All data is managed locally under user permissions; external API requests use TLS encryption.
-* **Right of Access & Data Portability (Art. 15 & 20)**: All your files and project bundles are stored in open, human-readable formats (standard Markdown, YAML frontmatter, JSON, and standard `.tar.gz` for `.mallorn` archives).
-* **Right to Erasure ("Right to be Forgotten", Art. 17)**: You can permanently erase all application data, caches, and state at any time by executing the deterministic command `imladris --purge-user-data` or by manually deleting the `~/.config/imladris`, `~/.cache/imladris`, and `~/.local/share/imladris` directories.
+* **Right of Access & Data Portability (Art. 15 & 20)**: All your files and project bundles are stored in open, human-readable formats (standard Markdown, YAML frontmatter, JSON, and standard `.tar.zst` or `.zip` for `.mallorn` archives).
+* **Right to Erasure ("Right to be Forgotten", Art. 17)**: You can permanently erase all application data, caches, and state at any time by executing the deterministic command `imladris --purge-user-data` or by deleting the `~/.config/imladris`, `~/.cache/imladris`, and `~/.local/share/imladris` directories.
 
 ---
 
 ## 5. Open Source Licensing & Code Provenance
 * **Core License**: Imladris is released under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**.
-* **Permissive (MIT) Compatibility**: Any integrated or referenced permissive libraries (such as MIT-licensed components) are fully compatible with and subsumed under the GPLv3 license terms in compliance with the Free Software Foundation standards.
+* **Permissive (MIT) Compatibility**: Any integrated or referenced permissive libraries are fully compatible with and subsumed under GPLv3 terms.
 * **Bundled Assets**: Bundled Papirus symbolic icons are distributed under the GNU GPLv3 license.
 * **Flathub AI Disclosure**: In compliance with Flathub Generative AI policies, development transparency and code provenance details are explicitly documented in the project repository and release documentation.

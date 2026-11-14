@@ -266,6 +266,9 @@ namespace Imladris {
                 return @"✔ Code chunk {$engine} inserted successfully.";
             } else if (name == "execute_code") {
                 if (doc == null) return "No active document open.";
+                if (Environment.get_variable ("IMLADRIS_MCP_ALLOW_EXEC") != "1") {
+                    return "Security Error: MCP execute_code is disabled by default. Set IMLADRIS_MCP_ALLOW_EXEC=1 to opt in.";
+                }
                 string cmd = (args != null && args.has_member ("command") && !args.get_null_member ("command")) ? (args.get_string_member ("command") ?? "") : "";
                 if (cmd.length == 0) return "Error: No command provided.";
                 string[] parts;
@@ -273,6 +276,11 @@ namespace Imladris {
                     GLib.Shell.parse_argv (cmd, out parts);
                 } catch (GLib.ShellError e) {
                     return @"Error: Invalid command syntax: $(e.message)";
+                }
+                if (parts.length == 0) return "Error: Empty command.";
+                string bin = GLib.Path.get_basename (parts[0]);
+                if (bin != "Rscript" && bin != "python3" && bin != "quarto") {
+                    return @"Security Error: MCP execute_code only permits Rscript, python3, or quarto (got '$bin').";
                 }
                 ExecutionEngine.run_command_async.begin (parts, doc);
                 return @"▶ Executing command asynchronously: $cmd";

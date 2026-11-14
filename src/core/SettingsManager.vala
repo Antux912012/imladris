@@ -346,7 +346,6 @@ namespace Imladris.Core {
         private bool _inline_completion_enabled = true;
         private bool _code_intellisense_enabled = true;
         private bool _auto_close_brackets = true;
-        private bool _inline_editing_enabled = true;
         private SidePanelPosition _chat_panel_position = SidePanelPosition.RIGHT;
         private string _custom_model_path = "";
         private GpuRendererBackend _gpu_backend = GpuRendererBackend.AUTO_GPU;
@@ -451,17 +450,6 @@ namespace Imladris.Core {
                 if (_auto_close_brackets != value) {
                     _auto_close_brackets = value;
                     save_ini ();
-                }
-            }
-        }
-
-        public bool inline_editing_enabled {
-            get { return _inline_editing_enabled; }
-            set {
-                if (_inline_editing_enabled != value) {
-                    _inline_editing_enabled = value;
-                    save_ini ();
-                    ai_settings_changed ();
                 }
             }
         }
@@ -698,9 +686,6 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("Editor", "auto_close_brackets")) {
                         _auto_close_brackets = config_keyfile.get_boolean ("Editor", "auto_close_brackets");
                     }
-                    if (config_keyfile.has_key ("ElrondAI", "inline_editing")) {
-                        _inline_editing_enabled = config_keyfile.get_boolean ("ElrondAI", "inline_editing");
-                    }
                     if (config_keyfile.has_key ("ElrondAI", "chat_panel_position")) {
                         string pos_str = config_keyfile.get_string ("ElrondAI", "chat_panel_position");
                         _chat_panel_position = SidePanelPosition.from_string_id (pos_str);
@@ -749,7 +734,6 @@ namespace Imladris.Core {
                 config_keyfile.set_boolean ("ElrondAI", "inline_completion", _inline_completion_enabled);
                 config_keyfile.set_boolean ("Editor", "code_intellisense", _code_intellisense_enabled);
                 config_keyfile.set_boolean ("Editor", "auto_close_brackets", _auto_close_brackets);
-                config_keyfile.set_boolean ("ElrondAI", "inline_editing", _inline_editing_enabled);
                 config_keyfile.set_string ("ElrondAI", "chat_panel_position", _chat_panel_position.to_string_id ());
                 config_keyfile.set_string ("ElrondAI", "custom_model_path", _custom_model_path);
                 config_keyfile.set_boolean ("Hardware", "hw_acceleration", hardware_acceleration_enabled);

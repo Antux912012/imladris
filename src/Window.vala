@@ -746,11 +746,7 @@ namespace Imladris {
         public void trigger_elrond_assistance () {
             var doc = get_active_document ();
             if (doc != null) {
-                if (Core.SettingsManager.get_default ().inline_editing_enabled) {
-                    doc.show_inline_prompt_popover ();
-                } else {
-                    doc.show_ai_assistant ();
-                }
+                doc.show_ai_assistant ();
             } else {
                 trigger_ai_assistant ();
             }
@@ -2303,6 +2299,16 @@ namespace Imladris {
         public void show_toast (string message) {
             if (toast_overlay != null) {
                 toast_overlay.add_toast (new Adw.Toast (message));
+            }
+        }
+
+        public void show_toast_with_action (string message, string button_label, string action_name) {
+            if (toast_overlay != null) {
+                var toast = new Adw.Toast (message) {
+                    button_label = button_label,
+                    action_name = action_name
+                };
+                toast_overlay.add_toast (toast);
             }
         }
 

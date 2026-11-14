@@ -27,15 +27,17 @@ namespace Imladris.Adapters {
         }
 
         public static string save_from_editor_buffer (string editor_text, Imladris.DocumentFormat format, string? existing_raw_file = null) {
+            // Strip any Gtk.TextChildAnchor Unicode Object Replacement Characters (\uFFFC)
+            string clean_text = editor_text.replace ("\uFFFC", "");
             if (format == Imladris.DocumentFormat.IPYNB) {
                 try {
-                    return Core.NotebookSerializer.markdown_to_ipynb (editor_text, existing_raw_file ?? "python");
+                    return Core.NotebookSerializer.markdown_to_ipynb (clean_text, existing_raw_file ?? "python");
                 } catch (GLib.Error e) {
                     GLib.warning ("Failed to serialize editor buffer to .ipynb JSON: %s", e.message);
-                    return editor_text;
+                    return clean_text;
                 }
             }
-            return editor_text;
+            return clean_text;
         }
 
         public static string render_html (string editor_text, Imladris.DocumentFormat format) {
@@ -444,26 +446,29 @@ namespace Imladris.Adapters {
                         in_ul = true;
                     }
                     res.append_printf ("  <li>%s</li>\n", format_inline_markdown (line.substring (2)));
-                } else if (is_ordered_list_item (trimmed_line, out ordered_item_text)) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (!in_ol) {
-                        res.append ("<ol>\n");
-                        in_ol = true;
-                    }
-                    res.append_printf ("  <li>%s</li>\n", format_inline_markdown (ordered_item_text));
                 } else {
-                    if (in_ul) {
-                        res.append ("</ul>\n");
-                        in_ul = false;
-                    }
-                    if (in_ol) {
-                        res.append ("</ol>\n");
-                        in_ol = false;
-                    }
-                    if (trimmed_line == "") {
-                        res.append ("\n");
+                    string ordered_item_text = "";
+                    if (is_ordered_list_item (trimmed_line, out ordered_item_text)) {
+                        if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
+                        if (!in_ol) {
+                            res.append ("<ol>\n");
+                            in_ol = true;
+                        }
+                        res.append_printf ("  <li>%s</li>\n", format_inline_markdown (ordered_item_text));
                     } else {
-                        res.append_printf ("<p>%s</p>\n", format_inline_markdown (line));
+                        if (in_ul) {
+                            res.append ("</ul>\n");
+                            in_ul = false;
+                        }
+                        if (in_ol) {
+                            res.append ("</ol>\n");
+                            in_ol = false;
+                        }
+                        if (trimmed_line == "") {
+                            res.append ("\n");
+                        } else {
+                            res.append_printf ("<p>%s</p>\n", format_inline_markdown (line));
+                        }
                     }
                 }
             }
@@ -476,8 +481,6 @@ namespace Imladris.Adapters {
 
             return res.str;
         }
-
-        private static string ordered_item_text = "";
 
         private static bool is_ordered_list_item (string trimmed_line, out string item_content) {
             item_content = "";

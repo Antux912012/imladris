@@ -56,15 +56,33 @@ Positioned directly next to the word and line counter in the bottom status bar, 
 
 ## 4. Triggering Elrond in the Editor
 
-1. **Inline Prompt Popover (`Ctrl+Shift+E`)**: Press `Ctrl+Shift+E` or right-click in the editor and choose **"Write with Elrond Assistance (AI)"**. Type an instruction (e.g., *"Filter rows where p_value < 0.05 and plot volcano curve"*), and Elrond writes the code directly into the buffer.
-2. **Inline Autocompletion**: As you type code chunks, Elrond suggests completions in ghost text or popup completion lists via `GtkSourceView`. Press `Tab` or `Enter` to accept.
-3. **Dedicated Side Panel**: Open the **Assistant** side panel (`Ctrl+Alt+A`) for conversational querying, hypothesis validation, or debugging statistical models.
+### A. Positron/RStudio-Style Direct Editor Writing (`Ctrl+Shift+E`)
+Press `Ctrl+Shift+E` or right-click in the editor and choose **"Write with Elrond Assistance"**. Direct Editor Writing operates directly on the active document buffer without modal popovers:
+1. **Apply to Selection**: When text is selected, the generated code or revision replaces the highlighted range.
+2. **Update Active Chunk**: When the cursor is positioned inside a fenced code chunk (` ```{r} `, ` ```{python} `), the chunk body is updated in place. The opening fence and all leading Quarto options (`#| label: ...`, `#| fig-cap: ...`) are strictly preserved.
+3. **Single-Step `Ctrl+Z` Undo**: All edits made during a Direct Editor Writing operation are recorded as a single buffer edit action. Pressing `Ctrl+Z` immediately reverts the buffer to its previous state.
+
+### B. Inline Autocompletion
+As you type code chunks, Elrond suggests completions in ghost text or popup completion lists via `GtkSourceView`. Press `Tab` or `Enter` to accept.
+
+### C. Dedicated Side Panel (`Ctrl+Alt+A`)
+Open the **Assistant** side panel for multi-turn conversational querying, hypothesis validation, and statistical debugging.
 
 ---
 
 ## 5. Connecting External Local & Cloud Providers
 
 In addition to the zero-config internal engine, **Preferences → AI & Elrond** allows routing queries to:
-- **Local Servers**: Ollama (`http://localhost:11434`), LM Studio (`http://localhost:1234`), Cherry Studio, or LocalAI.
+- **Local Servers**: Ollama (`http://localhost:11434`), LM Studio (`http://localhost:1234`), Cherry Studio, or LocalAI on loopback.
 - **Local CLI Harness**: Automatic discovery and integration with host Antigravity CLI (`agy`), OpenCode, or OpenClaude.
 - **Frontier Cloud APIs**: Direct API key connections for Google Gemini (`gemini-2.0-flash`, `gemini-1.5-pro`), Anthropic Claude (`claude-3-5-sonnet`), DeepSeek (`deepseek-reasoner` / R1), Qwen, OpenAI, Kimi, and NVIDIA NIM.
+- **Free-Tier Cloud AI APIs**:
+  - **Groq Free Tier** (`api.groq.com`, e.g., `llama-3.3-70b-versatile`)
+  - **Cerebras Free Tier** (`api.cerebras.ai`, e.g., `llama-3.3-70b`)
+  - **OpenRouter Free Models** (`openrouter.ai`, models ending with `:free`, e.g., `meta-llama/llama-3.3-70b-instruct:free`)
+  - **GitHub Models Free Tier** (`models.inference.ai.azure.com`, e.g., `gpt-4o`)
+  - **FreeLLMAPI Local Proxy** (`http://localhost:8000`)
+- **Automatic Quota Failover**:
+  When a cloud provider returns HTTP 429 (quota exceeded or rate limit), Imladris automatically cascades across candidate free-tier providers. To preserve data privacy, remote failover requires explicit user opt-in (`free_api_consent_accepted` in `ai_config.json`).
+- **GitHub Copilot OAuth Device Flow**:
+  Authenticate with GitHub Copilot via standard OAuth Device Code Flow (`https://github.com/login/device`). Credentials are encrypted in `libsecret` under schema `io.github.Antux912012.Imladris.Copilot` with `0600` POSIX file permissions on fallback.

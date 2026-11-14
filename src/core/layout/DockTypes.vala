@@ -266,6 +266,18 @@ namespace Imladris.Core.Layout {
 
         public void undock_panel (PanelId pid) {
             popped_out_panels.add (pid);
+            foreach (var qc in quadrants.values) {
+                if (qc.active_tab == pid) {
+                    PanelId? next_tab = null;
+                    foreach (var t in qc.tabs) {
+                        if (!popped_out_panels.contains (t)) {
+                            next_tab = t;
+                            break;
+                        }
+                    }
+                    qc.active_tab = next_tab;
+                }
+            }
             panel_undocked (pid);
             state_updated ();
         }

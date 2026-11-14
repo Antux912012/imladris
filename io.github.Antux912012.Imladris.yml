@@ -26,4 +26,4 @@ modules:
     sources:
       - type: git
         url: https://github.com/Antux912012/imladris.git
-        tag: v0.24.2
+        tag: v0.25.0

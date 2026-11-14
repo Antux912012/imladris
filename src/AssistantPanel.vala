@@ -47,21 +47,11 @@ namespace Imladris {
             // 1. Header controls: Engine Selector + Model Selector + Settings
             var header_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
 
-            engine_dropdown = new Gtk.DropDown.from_strings ({
-                "Google Gemini",
-                "Claude (Anthropic)",
-                "OpenAI (GPT-4o / o1)",
-                "DeepSeek (Chat & R1)",
-                "Kimi (Moonshot)",
-                "Qwen (DashScope)",
-                "Cursor API Compatibility",
-                "NVIDIA NIM",
-                "Ollama (Local)",
-                "LM Studio (Local)",
-                "Cherry Studio / LocalAI",
-                "Antigravity (agy Agent)",
-                "Custom Provider"
-            });
+            var provider_names = new string[(int) AiProvider.CUSTOM + 1];
+            for (int i = 0; i <= (int) AiProvider.CUSTOM; i++) {
+                provider_names[i] = ((AiProvider) i).get_display_name ();
+            }
+            engine_dropdown = new Gtk.DropDown.from_strings (provider_names);
             engine_dropdown.hexpand = true;
             engine_dropdown.tooltip_text = "Select active AI provider";
 

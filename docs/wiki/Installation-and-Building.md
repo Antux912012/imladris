@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Installation and Building Guide
 
-Imladris (`v0.18.0`) can be installed either as an isolated **Flatpak bundle**, pre-built **native system packages** (`.deb`, `.rpm`), or compiled directly from source using **Meson and Ninja**.
+Imladris (`v0.25.0`) can be installed either as an isolated **Flatpak bundle**, pre-built **native system packages** (`.deb`, `.rpm`), or compiled directly from source using **Meson and Ninja**.
 
 ---
 
@@ -50,23 +50,23 @@ The repository includes a rootless build script `build-packages.sh`:
 ```bash
 ./build-packages.sh
 ```
-This script runs the Flatpak build finish lifecycle, compiles AppStream metadata into `repo/`, and outputs `io.github.Antux912012.Imladris.flatpak` and `imladris_0.18.0_amd64.deb`.
+This script runs the Flatpak build finish lifecycle, compiles AppStream metadata into `repo/`, and outputs `io.github.Antux912012.Imladris.flatpak` and `imladris_0.25.0_amd64.deb`.
 
 ---
 
 ## 2. Pre-Built Native Packages (.deb & .rpm)
 
-On every release ([v0.18.0 Releases](https://github.com/Antux912012/imladris/releases/tag/v0.18.0)), pre-built binary packages are available:
+On every release ([v0.25.0 Releases](https://github.com/Antux912012/imladris/releases/tag/v0.25.0)), pre-built binary packages are available:
 
 ### Debian / Ubuntu (`.deb`)
 ```bash
-sudo dpkg -i imladris_0.18.0_amd64.deb
+sudo dpkg -i imladris_0.25.0_amd64.deb
 sudo apt-get install -f  # Resolves any missing runtime dependencies
 ```
 
 ### Fedora / RHEL (`.rpm`)
 ```bash
-sudo dnf install ./imladris-0.18.0-1.fc44.x86_64.rpm
+sudo dnf install ./imladris-0.25.0-1.fc44.x86_64.rpm
 ```
 
 ---

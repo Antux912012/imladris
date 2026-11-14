@@ -1,6 +1,6 @@
 # Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 pkgname=imladris
-pkgver=0.24.2
+pkgver=0.25.0
 pkgrel=1
 pkgdesc="Polyglot Scientific & Markdown IDE with GNOME/Libadwaita UI, Elrond AI, GPU Acceleration, and R/Python"
 arch=('x86_64')
@@ -40,7 +40,8 @@ makedepends=(
     'gcc'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('e31bf0ebf27305ce9475b9ef67ef33a5b6bcbf098831a275fa28f1f9fc20de0c')
+# Maintainer note: run `updpkgsums` after tagging v$pkgver
+sha256sums=('SKIP')
 
 build() {
     cd "$srcdir/imladris-$pkgver"

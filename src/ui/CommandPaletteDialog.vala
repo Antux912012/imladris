@@ -238,7 +238,8 @@ namespace Imladris.UI {
                     else if (act == "restart_kernel") parent_window.restart_active_kernel ();
                     else if (act == "interrupt_execution") parent_window.interrupt_active_execution ();
                     else if (act == "clear_console") parent_window.clear_console ();
-                    else if (act == "open_zotero") parent_window.open_zotero_picker ();
+                    else if (act == "open_zotero" || act == "zotero_picker") parent_window.open_zotero_picker ();
+                    else if (act == "doi_bib_manager") parent_window.open_doi_bib_manager ();
                 }
             } else if (action_id.has_prefix ("bridge.")) {
                 if (parent_window != null) {
@@ -246,14 +247,17 @@ namespace Imladris.UI {
                     if (b == "elbereth") {
                         var p = new Bridges.Elbereth.ClinicalBiostatsPopover ();
                         p.set_parent (parent_window);
+                        p.closed.connect (() => { p.unparent (); });
                         p.popup ();
                     } else if (b == "yavanna") {
                         var p = new Bridges.Yavanna.BioEntityPopover ();
                         p.set_parent (parent_window);
+                        p.closed.connect (() => { p.unparent (); });
                         p.popup ();
                     } else if (b == "taniquetil") {
                         var p = new Bridges.Taniquetil.AlphaFoldBridgePopover ();
                         p.set_parent (parent_window);
+                        p.closed.connect (() => { p.unparent (); });
                         p.popup ();
                     }
                 }

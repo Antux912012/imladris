@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Imladris v0.24.2 | Native Linux Scientific Workbench, Bioinformatics Bridge & Polyglot IDE</title>
-  <meta name="description" content="Native Linux scientific workbench for reproducible research built in Vala, GTK4, and Libadwaita. Features the Arekyer Galaxy-to-Quarto Provenance Bridge, Natural Math & Chemical Reaction Studio, Rproj scaffolding, and Jupyter nbformat 4.5 parity.">
+  <title>Imladris v0.25.0 | Native Linux Scientific Workbench, Bioinformatics Bridge & Polyglot IDE</title>
+  <meta name="description" content="Native Linux scientific workbench for reproducible research built in Vala, GTK4, and Libadwaita. Features Positron-style direct editor writing, Free-Tier AI APIs with automatic quota failover, GitHub Copilot OAuth, Arekyer Galaxy Bridge, and integrated scientific domain studios: Yavanna (RT-qPCR), Taniquetil (AlphaFold), and Elbereth (ICH E9 Biostatistics).">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
   <link rel="alternate icon" type="image/png" href="assets/logo.png">
   <script>
@@ -420,7 +420,7 @@
       <div class="brand">
         <img src="assets/logo.svg" alt="Imladris App Logo" class="brand-logo" width="32" height="32">
         <span>IMLADRIS</span>
-        <span class="brand-badge">GTK4 · Vala · v0.24.2</span>
+        <span class="brand-badge">GTK4 · Vala · v0.25.0</span>
       </div>
       <div class="nav-right">
         <nav class="nav-links">
@@ -457,14 +457,14 @@
         <img src="assets/logo.svg" alt="Imladris App Icon" class="hero-logo" width="112" height="112">
       </div>
       <div>
-        <span class="hero-tag">Native Linux Scientific Computing, Bioinformatics &amp; Polyglot IDE · v0.24.2</span>
+        <span class="hero-tag">Native Linux Scientific Computing, Bioinformatics &amp; Polyglot IDE · v0.25.0</span>
       </div>
       <h1>Bridge Cloud Bioinformatics to Reproducible Manuscripts.</h1>
       <p>
-        Imladris is a zero-bloat native polyglot IDE (<code>.qmd</code>, <code>.Rmd</code>, <code>.ipynb</code>, <code>.Rproj</code>) engineered in Vala, GTK4, and Libadwaita. Connect upstream <strong>Galaxy Project</strong> histories via the <strong>Arekyer Provenance Bridge</strong>, author equations in the <strong>Natural Math &amp; Chemical Reaction Studio</strong>, and compile reproducibly across R, Python, Zotero, and Quarto.
+        Imladris is a zero-bloat native polyglot IDE (<code>.qmd</code>, <code>.Rmd</code>, <code>.ipynb</code>, <code>.Rproj</code>) engineered in compiled Vala, GTK4, and Libadwaita for instantaneous sub-millisecond responsiveness. Refactor code seamlessly with <strong>Positron/RStudio Direct Editor Writing</strong> (preserving Quarto <code>#|</code> YAML chunk options), orchestrate <strong>Free-Tier AI APIs</strong> (Groq, Cerebras, OpenRouter <code>:free</code>, GitHub Models) with <strong>Automatic Quota Failover</strong> or <strong>GitHub Copilot OAuth Device Flow</strong> alongside 100% offline Local Elrond, link upstream <strong>Galaxy Project</strong> histories via the <strong>Arekyer Provenance Bridge</strong>, and unlock three native scientific domain studios: <strong>Yavanna</strong>, <strong>Taniquetil</strong>, and <strong>Elbereth</strong>.
       </p>
       <div class="cta-group">
-        <a href="https://github.com/Antux912012/imladris/releases/tag/v0.24.2" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Download v0.24.2 (.deb / Flatpak)</a>
+        <a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Download v0.25.0 (.deb / .rpm / Flatpak / AUR)</a>
         <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Install from Flatpark</a>
         <a href="https://github.com/Antux912012/imladris" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
         <a href="https://github.com/Antux912012/imladris/wiki" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Technical Wiki &rarr;</a>
@@ -474,48 +474,55 @@
       <div class="ide-preview">
         <div class="ide-header">
           <span>imladris — rna_seq_differential_expression.qmd [Sandboxed · .Rproj Synced]</span>
-          <span>env: renv + .venv · Arekyer Vault: libsecret-1 (Connected)</span>
+          <span>env: renv + .venv · AI: Cerebras &rarr; Groq Failover Active · Keyring: libsecret-1</span>
         </div>
         <div class="ide-grid">
           <div class="quadrant">
-            <div class="quadrant-title">Q1 // Polyglot Source (GtkSourceView 5)</div>
-            <div class="code-snippet"><span class="code-comment">```{r arekyer-galaxy-43, message=FALSE}
-# AREKYER PROVENANCE RECORD
-# Server: https://usegalaxy.eu | HID: 43 (tabular)</span>
-req &lt;- httr2::<span class="code-fn">request</span>(galaxy_url) |&gt;
-  httr2::<span class="code-fn">req_headers</span>(<span class="code-keyword">"x-api-key"</span> = Sys.getenv(<span class="code-keyword">"GALAXY_API_KEY"</span>))
-galaxy_df_43 &lt;- readr::<span class="code-fn">read_tsv</span>(httr2::<span class="code-fn">resp_body_raw</span>(httr2::<span class="code-fn">req_perform</span>(req)))
+            <div class="quadrant-title">Q1 // Polyglot Source &amp; Positron Chunk Writing (GtkSourceView 5)</div>
+            <div class="code-snippet"><span class="code-comment">```{r deseq2-volcano, message=FALSE}
+#| label: fig-volcano
+#| fig-cap: "Differential expression across treated vs control."
+#| fig-width: 7
+# [Imladris Direct AI Rewrite: #| YAML options preserved]</span>
+dds &lt;- DESeq2::<span class="code-fn">DESeq</span>(dds_raw)
+res &lt;- DESeq2::<span class="code-fn">results</span>(dds, alpha = <span class="code-keyword">0.05</span>)
+EnhancedVolcano::<span class="code-fn">EnhancedVolcano</span>(res, lab = rownames(res),
+  x = <span class="code-keyword">'log2FoldChange'</span>, y = <span class="code-keyword">'pvalue'</span>, pCutoff = <span class="code-keyword">1e-05</span>)
 <span class="code-comment">```</span>
 $$\ce{6CO2(g) + 6H2O(l) -&gt;[h\nu] C6H12O6(aq) + 6O2(g)}$$</div>
           </div>
 
           <div class="quadrant">
-            <div class="quadrant-title">Q2 // Arekyer Bridge &amp; Zotero Inspector</div>
-            <div class="code-snippet"><span class="code-keyword">[Arekyer Bridge · usegalaxy.eu]</span>
-<span class="status-ok">●</span> #42: HISAT2 Aligned Reads [BAM · 100 MB]      [ + R ] [ + Py ]
-<span class="status-ok">●</span> #43: DESeq2_Normalized_Counts.tsv [1.0 MB]    [ + R ] [ + Py ]
+            <div class="quadrant-title">Q2 // Scientific Studios &amp; Galaxy Bridge</div>
+            <div class="code-snippet"><span class="code-keyword">[Yavanna RT-qPCR Studio]</span>
+<span class="status-ok">●</span> GAPDH Primer Pair: Tm 60.1°C · ΔG -1.4 kcal/mol (Valid)
+<span class="status-ok">●</span> Relative Expression: 2^(-ΔΔCt) fold-change computed
 
-<span class="code-keyword">[Zotero BetterBibTeX]</span>
-<span class="status-ok">✓</span> @smith2025_genomics — Nature Biotechnology (2025)
-<span class="status-ok">✓</span> @love2014_deseq2 — Genome Biology (2014)</div>
+<span class="code-keyword">[Taniquetil 3D Structural Bridge]</span>
+<span class="status-ok">●</span> AlphaFold AF-P04637-F1 (p53) · Mol* WebGL Active (pLDDT: 88.4)
+
+<span class="code-keyword">[Arekyer Bridge · usegalaxy.eu]</span>
+<span class="status-ok">●</span> #43: DESeq2_Normalized_Counts.tsv [1.0 MB]    [ + R ] [ + Py ]</div>
           </div>
 
           <div class="quadrant">
-            <div class="quadrant-title">Q3 // Hermetic Subprocess Console &amp; Keyring Injection</div>
-            <div class="code-snippet">$ quarto render rna_seq_differential_expression.qmd --to pdf
-<span class="status-ok">[✓]</span> Keyring lookup: org.ardatech.Imladris.GalaxyApiKey (libsecret-1)
-<span class="status-ok">[✓]</span> Injecting GALAXY_API_KEY into isolated SubprocessLauncher
-<span class="status-ok">[✓]</span> Executing R &amp; Python chunks (galaxy_df_43 verified)
-<span class="status-ok">[✓]</span> Output generated: build/manuscript_v1.pdf</div>
+            <div class="quadrant-title">Q3 // AI Failover Console &amp; Hermetic Subprocess</div>
+            <div class="code-snippet">$ imladris ai --refactor-selection --preserve-yaml-options
+<span class="status-ok">[✓]</span> Router: Cerebras llama-3.3-70b (Free Tier) &rarr; HTTP 429 Quota Exceeded
+<span class="status-ok">[⚡]</span> Auto-Failover: Engaged Groq llama-3.3-70b-versatile (Latency: 138ms)
+<span class="status-ok">[✓]</span> Copilot OAuth Device Flow: Authenticated (@github-user)
+<span class="status-ok">[✓]</span> Direct Editor Write: Updated Quarto chunk in Q1 with zero YAML churn
+<span class="status-ok">[✓]</span> Hermetic Subprocess: quarto render build/manuscript_v1.pdf</div>
           </div>
 
           <div class="quadrant">
-            <div class="quadrant-title">Q4 // Live Manuscript, MathChem &amp; Shiny Preview (WebKitGTK 6.0)</div>
-            <div class="code-snippet"><span class="code-comment">[Live WebKitGTK 6.0 / mhchem / KaTeX Render]</span>
+            <div class="quadrant-title">Q4 // Live Preview &amp; WebKitGTK 6.0 Interactive View</div>
+            <div class="code-snippet"><span class="code-comment">[WebKitGTK 6.0 / Mol* WebGL / KaTeX / Elbereth Render]</span>
 --------------------------------------------------
-<span class="code-keyword">Eq 1.1:</span> 6 CO₂(g) + 6 H₂O(l) →[hν] C₆H₁₂O₆(aq) + 6 O₂(g)
-<span class="code-keyword">Fig 1.2:</span> Volcano Plot of Log2 Fold Change vs FDR (&lt; 0.05)
-Dataset UUID: <span class="code-comment">f2db41e1fa331b3e (HID: 43 · Verified)</span>
+<span class="code-keyword">Taniquetil:</span> Interactive PDB P04637 (Mol* 3D Canvas)
+<span class="code-keyword">Elbereth ICH E9:</span> Kaplan-Meier Hazard Ratio: 0.62 (95% CI: 0.44-0.87)
+<span class="code-keyword">MathChem:</span> 6 CO₂(g) + 6 H₂O(l) →[hν] C₆H₁₂O₆(aq) + 6 O₂(g)
+Dataset HID 43: <span class="code-comment">DESeq2 Normalized · SHA-256 Verified</span>
 --------------------------------------------------</div>
           </div>
         </div>
@@ -530,8 +537,33 @@ Dataset UUID: <span class="code-comment">f2db41e1fa331b3e (HID: 43 · Verified)<
       </div>
       <div class="grid-2">
         <div class="card">
+          <h3>Positron-Style Direct Editor Writing</h3>
+          <p>Execute surgical AI refactoring directly against active editor selections or entire Quarto and R Markdown code chunks. Injects updated compute logic while strictly preserving manuscript syntax and Quarto chunk options (<code>#| label</code>, <code>#| fig-cap</code>, <code>#| fig-width</code>, <code>#| echo</code>) with single-step <code>Ctrl+Z</code> undo.</p>
+          <div class="card-meta">Stack: GtkSourceView 5 · AiBufferEditHelper · Chunk Option Preserver</div>
+        </div>
+        <div class="card">
+          <h3>Free-Tier AI Orchestration &amp; Automatic Failover</h3>
+          <p>Connect to Groq, Cerebras, OpenRouter <code>:free</code>, and GitHub Models. If a provider hits rate limits or returns HTTP 429, Imladris instantly fails over to the next tier in milliseconds (with explicit privacy opt-in). Supports GitHub Copilot OAuth Device Flow alongside offline Local Elrond (Ollama, llama-server).</p>
+          <div class="card-meta">Stack: Groq · Cerebras · OpenRouter :free · GitHub Models · Copilot OAuth · Ollama</div>
+        </div>
+        <div class="card">
+          <h3>Yavanna: Bio-Entity &amp; RT-qPCR Oligo Studio</h3>
+          <p>Molecular biology studio for primer design, UniProt/Ensembl biological entity cataloging, and quantitative PCR analysis. Compute melting temperatures (T<sub>m</sub>), GC content, molecular weight, and reverse-complement tables in memory.</p>
+          <div class="card-meta">Stack: UniProtKB · Ensembl GRCh38 · Oligo Tm &amp; GC% · libsoup-3.0</div>
+        </div>
+        <div class="card">
+          <h3>Taniquetil: AlphaFold 3D Structural Bridge</h3>
+          <p>Integrated structural biology bridge linking AlphaFold DB and RCSB PDB directly into your writing canvas. Query UniProt accessions, inspect per-residue pLDDT confidence tracks via Cairo, and inject reproducible <code>bio3d</code> (R) and <code>biotite</code> (Python) code chunks.</p>
+          <div class="card-meta">Stack: AlphaFold DB · RCSB PDB · Cairo pLDDT Track · bio3d / biotite</div>
+        </div>
+        <div class="card">
+          <h3>Elbereth: ICH E9 Clinical Biostatistics Studio</h3>
+          <p>Regulatory-grade biostatistics studio designed around ICH E9 (Statistical Principles for Clinical Trials). Compute sample size and power (continuous, proportions, Schoenfeld log-rank survival), draw live Cairo power curves, and generate CDISC ADSL Table 1 and Cox PH code chunks.</p>
+          <div class="card-meta">Stack: ICH E9 Conformance · Schoenfeld Survival · Cairo Power Curves · CDISC</div>
+        </div>
+        <div class="card">
           <h3>Arekyer: Galaxy-to-Quarto Bridge (<code>WIKI 02</code>)</h3>
-          <p>Stop breaking data provenance by manually downloading TSVs from cloud bioinformatics pipelines. Browse Galaxy Histories natively, store API keys securely in the Linux OS keyring (<code>libsecret-1</code>), and inject verified <code>httr2</code> (R) or <code>pandas</code> (Python) loaders into your manuscript.</p>
+          <p>Eliminate broken data provenance caused by manual CSV/TSV downloads. Browse Galaxy Histories natively, store API keys securely in the Linux OS keyring (<code>libsecret-1</code>), and inject verified <code>httr2</code> (R) or <code>pandas</code> (Python) loaders directly into your manuscript.</p>
           <div class="card-meta">Stack: libsoup-3.0 · json-glib-1.0 · libsecret-1 · GtkSourceView 5</div>
         </div>
         <div class="card">
@@ -540,24 +572,14 @@ Dataset UUID: <span class="code-comment">f2db41e1fa331b3e (HID: 43 · Verified)<
           <div class="card-meta">Stack: MathChemEngine · mhchem · Unicode Scientific Parser</div>
         </div>
         <div class="card">
-          <h3>Native <code>.Rproj</code> Scaffolding &amp; Jupyter Parity</h3>
-          <p>Create and synchronize RStudio <code>.Rproj</code> manifests alongside portable <code>.mallorn</code> bundles (<code>tar.zst</code>). Edit Jupyter Notebooks (<code>.ipynb</code> <code>nbformat 4.5</code>) with lossless preservation of cell IDs, execution counts, cell tags, raw cells, and <code>Shift+Enter</code> cell execution.</p>
-          <div class="card-meta">Stack: DCF .Rproj Sync · nbformat 4.5 Serializer · Shift+Enter</div>
-        </div>
-        <div class="card">
           <h3>Native GTK4 &amp; Libadwaita Performance</h3>
           <p>Built in compiled Vala with GtkSourceView 5 and WebKitGTK 6.0. Zero Electron overhead means your workstation's RAM and CPU remain dedicated to statistical compute, genomic matrices, and local AI inference.</p>
           <div class="card-meta">Stack: Vala 0.56+ · GTK4 · Libadwaita · Nord Dark/Light UI</div>
         </div>
         <div class="card">
-          <h3>Hermetic Sandboxes &amp; Reactive R Shiny</h3>
-          <p>Isolate projects inside project-local <code>renv</code> (R) and <code>.venv</code> (Python) environments with strict <code>pwd</code> root locking. Launch interactive R Shiny web applications (<code>Ctrl+Shift+A</code>) directly inside Quadrant 4 or a standalone window.</p>
-          <div class="card-meta">Stack: renv · uv / .venv · Micromamba · Shiny Ephemeral Server</div>
-        </div>
-        <div class="card">
-          <h3>Zotero Citations, Elrond Local AI &amp; MCP</h3>
-          <p>Query your local Zotero library via BetterBibTeX/CSL-JSON with live <code>@citekey</code> completion, paired with local LLM inference (<code>llama-server</code>, Ollama, LM Studio) and a built-in Model Context Protocol (<code>--mcp-server</code>) stdio server.</p>
-          <div class="card-meta">Stack: Zotero BibTeX/CSL · Elrond Copilot · JSON-RPC 2.0 MCP</div>
+          <h3>Hermetic Sandboxes, Zotero Citations &amp; MCP</h3>
+          <p>Isolate projects inside project-local <code>renv</code> (R) and <code>.venv</code> (Python) environments with strict <code>pwd</code> root locking. Query Zotero BetterBibTeX/CSL, launch R Shiny apps, and expose workspace context via hardened Model Context Protocol (<code>--mcp-server</code>).</p>
+          <div class="card-meta">Stack: renv · uv / .venv · Zotero CSL · Hardened JSON-RPC 2.0 MCP</div>
         </div>
       </div>
     </section>

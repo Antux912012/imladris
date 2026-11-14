@@ -292,8 +292,8 @@ namespace Imladris.UI {
                 tab_list_box.append (tab_btn);
             }
 
-            // Check minimized or empty state
-            if (qconfig.size_state == QuadrantSizeState.MINIMIZED || qconfig.tabs.size == 0 || qconfig.active_tab == null) {
+            // Check minimized, empty, or popped-out state
+            if (qconfig.size_state == QuadrantSizeState.MINIMIZED || qconfig.tabs.size == 0 || qconfig.active_tab == null || dock_state.popped_out_panels.contains (qconfig.active_tab)) {
                 Gtk.Widget? vp_child = viewport_box.get_first_child ();
                 while (vp_child != null) {
                     var next = vp_child.get_next_sibling ();

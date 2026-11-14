@@ -16,6 +16,12 @@ namespace Imladris.Core {
         QWEN,
         CURSOR,
         NVIDIA_NIM,
+        GROQ,
+        CEREBRAS,
+        OPENROUTER_FREE,
+        GITHUB_MODELS,
+        GITHUB_COPILOT,
+        FREELMAPI_LOCAL,
         OLLAMA,
         LM_STUDIO,
         CHERRY_STUDIO,
@@ -32,6 +38,12 @@ namespace Imladris.Core {
                 case QWEN: return "qwen";
                 case CURSOR: return "cursor";
                 case NVIDIA_NIM: return "nvidia_nim";
+                case GROQ: return "groq";
+                case CEREBRAS: return "cerebras";
+                case OPENROUTER_FREE: return "openrouter_free";
+                case GITHUB_MODELS: return "github_models";
+                case GITHUB_COPILOT: return "github_copilot";
+                case FREELMAPI_LOCAL: return "freellmapi_local";
                 case OLLAMA: return "ollama";
                 case LM_STUDIO: return "lm_studio";
                 case CHERRY_STUDIO: return "cherry_studio";
@@ -55,6 +67,15 @@ namespace Imladris.Core {
                 case "nvidia":
                 case "nvidia_nim":
                 case "nim": return NVIDIA_NIM;
+                case "groq": return GROQ;
+                case "cerebras": return CEREBRAS;
+                case "openrouter":
+                case "openrouter_free": return OPENROUTER_FREE;
+                case "github_models": return GITHUB_MODELS;
+                case "copilot":
+                case "github_copilot": return GITHUB_COPILOT;
+                case "freellmapi":
+                case "freellmapi_local": return FREELMAPI_LOCAL;
                 case "ollama": return OLLAMA;
                 case "lm_studio":
                 case "local_llama": return LM_STUDIO;
@@ -77,6 +98,12 @@ namespace Imladris.Core {
                 case QWEN: return "Qwen (Alibaba DashScope)";
                 case CURSOR: return "Cursor API (Cursor Compatibility)";
                 case NVIDIA_NIM: return "NVIDIA NIM (integrate.api.nvidia.com)";
+                case GROQ: return "Groq Free Tier (api.groq.com)";
+                case CEREBRAS: return "Cerebras Free Tier (api.cerebras.ai)";
+                case OPENROUTER_FREE: return "OpenRouter Free Models (openrouter.ai)";
+                case GITHUB_MODELS: return "GitHub Models Free Tier (models.inference.ai.azure.com)";
+                case GITHUB_COPILOT: return "GitHub Copilot (OAuth Login)";
+                case FREELMAPI_LOCAL: return "FreeLLMAPI Local Proxy (localhost:8080)";
                 case OLLAMA: return "Ollama (localhost:11434)";
                 case LM_STUDIO: return "LM Studio (localhost:1234)";
                 case CHERRY_STUDIO: return "Cherry Studio / LocalAI (localhost:23333 / 8080)";
@@ -96,6 +123,12 @@ namespace Imladris.Core {
                 case QWEN: return "Qwen";
                 case CURSOR: return "Cursor";
                 case NVIDIA_NIM: return "NVIDIA NIM";
+                case GROQ: return "Groq (Free)";
+                case CEREBRAS: return "Cerebras (Free)";
+                case OPENROUTER_FREE: return "OpenRouter (Free)";
+                case GITHUB_MODELS: return "GitHub Models";
+                case GITHUB_COPILOT: return "GitHub Copilot";
+                case FREELMAPI_LOCAL: return "FreeLLMAPI Proxy";
                 case OLLAMA: return "Ollama";
                 case LM_STUDIO: return "LM Studio";
                 case CHERRY_STUDIO: return "Cherry Studio";
@@ -115,6 +148,12 @@ namespace Imladris.Core {
                 case QWEN: return "ai-qwen";
                 case CURSOR: return "ai-cursor";
                 case NVIDIA_NIM: return "ai-nvidia";
+                case GROQ:
+                case CEREBRAS:
+                case OPENROUTER_FREE: return "ai-openai";
+                case GITHUB_MODELS:
+                case GITHUB_COPILOT: return "accessories-text-editor-symbolic";
+                case FREELMAPI_LOCAL: return "network-server-symbolic";
                 case OLLAMA: return "ai-ollama";
                 case LM_STUDIO: return "ai-lmstudio";
                 case CHERRY_STUDIO: return "ai-custom";
@@ -134,6 +173,12 @@ namespace Imladris.Core {
                 case QWEN: return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
                 case CURSOR: return "https://api.cursor.sh/v1";
                 case NVIDIA_NIM: return "https://integrate.api.nvidia.com/v1";
+                case GROQ: return "https://api.groq.com/openai/v1";
+                case CEREBRAS: return "https://api.cerebras.ai/v1";
+                case OPENROUTER_FREE: return "https://openrouter.ai/api/v1";
+                case GITHUB_MODELS: return "https://models.inference.ai.azure.com";
+                case GITHUB_COPILOT: return "https://api.githubcopilot.com";
+                case FREELMAPI_LOCAL: return "http://localhost:8080/v1";
                 case OLLAMA: return "http://localhost:11434/v1";
                 case LM_STUDIO: return "http://localhost:1234/v1";
                 case CHERRY_STUDIO: return "http://localhost:23333/v1";
@@ -153,6 +198,12 @@ namespace Imladris.Core {
                 case QWEN: return "qwen2.5-coder-32b-instruct";
                 case CURSOR: return "cursor-small";
                 case NVIDIA_NIM: return "meta/llama-3.3-70b-instruct";
+                case GROQ: return "llama-3.3-70b-versatile";
+                case CEREBRAS: return "llama-3.3-70b";
+                case OPENROUTER_FREE: return "meta-llama/llama-3.3-70b-instruct:free";
+                case GITHUB_MODELS: return "gpt-4o-mini";
+                case GITHUB_COPILOT: return "gpt-4o";
+                case FREELMAPI_LOCAL: return "auto";
                 case OLLAMA: return "qwen2.5-coder:latest";
                 case LM_STUDIO: return "default";
                 case CHERRY_STUDIO: return "default";
@@ -180,6 +231,18 @@ namespace Imladris.Core {
                     return { "cursor-small", "claude-3-5-sonnet", "gpt-4o", "cursor-fast" };
                 case NVIDIA_NIM:
                     return { "meta/llama-3.3-70b-instruct", "deepseek-ai/deepseek-r1", "nvidia/llama-3.1-nemotron-70b-instruct", "qwen/qwen2.5-coder-32b-instruct" };
+                case GROQ:
+                    return { "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen-2.5-coder-32b" };
+                case CEREBRAS:
+                    return { "llama-3.3-70b", "llama3.1-8b" };
+                case OPENROUTER_FREE:
+                    return { "meta-llama/llama-3.3-70b-instruct:free", "google/gemini-2.0-flash-exp:free", "qwen/qwen-2.5-coder-32b-instruct:free" };
+                case GITHUB_MODELS:
+                    return { "gpt-4o-mini", "gpt-4o", "Meta-Llama-3.1-70B-Instruct" };
+                case GITHUB_COPILOT:
+                    return { "gpt-4o", "claude-3.5-sonnet", "o3-mini" };
+                case FREELMAPI_LOCAL:
+                    return { "auto", "gpt-4o-mini", "llama-3.3-70b-versatile" };
                 case OLLAMA:
                     return { "qwen2.5-coder:latest", "deepseek-r1:latest", "llama3.2:latest", "codellama:latest" };
                 case LM_STUDIO:
@@ -205,6 +268,12 @@ namespace Imladris.Core {
                 case QWEN: return "https://dashscope.console.aliyun.com/apiKey";
                 case CURSOR: return "https://cursor.com";
                 case NVIDIA_NIM: return "https://build.nvidia.com";
+                case GROQ: return "https://console.groq.com/keys";
+                case CEREBRAS: return "https://cloud.cerebras.ai";
+                case OPENROUTER_FREE: return "https://openrouter.ai/keys";
+                case GITHUB_MODELS: return "https://github.com/marketplace/models";
+                case GITHUB_COPILOT: return "https://github.com/settings/copilot";
+                case FREELMAPI_LOCAL: return "https://github.com/tashfeenahmed/freellmapi";
                 case LM_STUDIO: return "https://lmstudio.ai";
                 case CHERRY_STUDIO: return "https://cherry-ai.com";
                 case CUSTOM: return "https://platform.openai.com/api-keys";
@@ -222,6 +291,11 @@ namespace Imladris.Core {
                 case QWEN: return "DASHSCOPE_API_KEY";
                 case CURSOR: return "CURSOR_API_KEY";
                 case NVIDIA_NIM: return "NVIDIA_API_KEY";
+                case GROQ: return "GROQ_API_KEY";
+                case CEREBRAS: return "CEREBRAS_API_KEY";
+                case OPENROUTER_FREE: return "OPENROUTER_API_KEY";
+                case GITHUB_MODELS:
+                case GITHUB_COPILOT: return "GITHUB_TOKEN";
                 case CUSTOM: return "OPENAI_API_KEY";
                 default: return null;
             }
@@ -233,9 +307,26 @@ namespace Imladris.Core {
                 case LM_STUDIO:
                 case CHERRY_STUDIO:
                 case ANTIGRAVITY:
+                case GITHUB_COPILOT:
+                case FREELMAPI_LOCAL:
                     return false;
                 default:
                     return true;
+            }
+        }
+
+        public bool is_free_tier () {
+            switch (this) {
+                case GEMINI:
+                case NVIDIA_NIM:
+                case GROQ:
+                case CEREBRAS:
+                case OPENROUTER_FREE:
+                case GITHUB_MODELS:
+                case FREELMAPI_LOCAL:
+                    return true;
+                default:
+                    return false;
             }
         }
     }
@@ -284,6 +375,9 @@ namespace Imladris.Core {
             }
         }
 
+        public bool auto_failover_enabled { get; set; default = true; }
+        public bool free_api_consent_accepted { get; set; default = false; }
+
         private Gee.HashMap<string, ProviderSettings> providers;
 
         public signal void config_changed ();
@@ -313,6 +407,12 @@ namespace Imladris.Core {
                 AiProvider.QWEN,
                 AiProvider.CURSOR,
                 AiProvider.NVIDIA_NIM,
+                AiProvider.GROQ,
+                AiProvider.CEREBRAS,
+                AiProvider.OPENROUTER_FREE,
+                AiProvider.GITHUB_MODELS,
+                AiProvider.GITHUB_COPILOT,
+                AiProvider.FREELMAPI_LOCAL,
                 AiProvider.OLLAMA,
                 AiProvider.LM_STUDIO,
                 AiProvider.CHERRY_STUDIO,
@@ -344,6 +444,10 @@ namespace Imladris.Core {
                 AiProvider.QWEN,
                 AiProvider.CURSOR,
                 AiProvider.NVIDIA_NIM,
+                AiProvider.GROQ,
+                AiProvider.CEREBRAS,
+                AiProvider.OPENROUTER_FREE,
+                AiProvider.GITHUB_MODELS,
                 AiProvider.CUSTOM
             };
 
@@ -475,6 +579,26 @@ namespace Imladris.Core {
             save ();
         }
 
+        public Gee.ArrayList<AiProvider> get_free_fallback_candidates (AiProvider primary) {
+            var list = new Gee.ArrayList<AiProvider> ();
+            AiProvider[] order = {
+                AiProvider.GROQ,
+                AiProvider.CEREBRAS,
+                AiProvider.GEMINI,
+                AiProvider.OPENROUTER_FREE,
+                AiProvider.GITHUB_MODELS,
+                AiProvider.NVIDIA_NIM,
+                AiProvider.FREELMAPI_LOCAL
+            };
+            foreach (var prov in order) {
+                if (prov == primary) continue;
+                if (prov == AiProvider.FREELMAPI_LOCAL || get_api_key_for (prov).length > 0) {
+                    list.add (prov);
+                }
+            }
+            return list;
+        }
+
         public static string normalize_endpoint (string base_url, string path = "/chat/completions") {
             string clean = base_url.strip ();
             while (clean.has_suffix ("/")) {
@@ -532,6 +656,12 @@ namespace Imladris.Core {
                 if (root_obj.has_member ("temperature")) {
                     _temperature = root_obj.get_double_member ("temperature");
                 }
+                if (root_obj.has_member ("auto_failover_enabled")) {
+                    auto_failover_enabled = root_obj.get_boolean_member ("auto_failover_enabled");
+                }
+                if (root_obj.has_member ("free_api_consent_accepted")) {
+                    free_api_consent_accepted = root_obj.get_boolean_member ("free_api_consent_accepted");
+                }
 
                 if (root_obj.has_member ("providers")) {
                     var provs_obj = root_obj.get_object_member ("providers");
@@ -561,6 +691,12 @@ namespace Imladris.Core {
 
                 builder.set_member_name ("temperature");
                 builder.add_double_value (temperature);
+
+                builder.set_member_name ("auto_failover_enabled");
+                builder.add_boolean_value (auto_failover_enabled);
+
+                builder.set_member_name ("free_api_consent_accepted");
+                builder.add_boolean_value (free_api_consent_accepted);
 
                 builder.set_member_name ("providers");
                 builder.begin_object ();

@@ -117,6 +117,27 @@ namespace Imladris.UI {
             panel_dock_changed ();
         }
 
+        /**
+         * Closes and destroys all floating undocked windows when the owning document tab closes.
+         */
+        public void close_all_undocked () {
+            var keys = new Gee.ArrayList<PanelId> ();
+            foreach (var k in undocked_windows.keys) {
+                keys.add (k);
+            }
+            foreach (var pid in keys) {
+                var win = undocked_windows.get (pid);
+                undocked_windows.unset (pid);
+                var widget = registry.get_panel_widget (pid);
+                if (widget != null) {
+                    detach_widget (widget);
+                }
+                if (win != null) {
+                    win.destroy ();
+                }
+            }
+        }
+
         public bool is_panel_undocked (PanelId pid) {
             return undocked_windows.has_key (pid);
         }

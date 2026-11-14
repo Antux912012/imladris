@@ -25,7 +25,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Read the Technical Wiki</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.23.0">⬇️ Download v0.23.0 (.deb / .rpm / Flatpak / AUR)</a></strong>
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0">⬇️ Download v0.25.0 (.deb / .rpm / Flatpak / AUR)</a></strong>
 </p>
 
 ---
@@ -56,8 +56,8 @@ The application transitions dynamically between two editing layouts:
       <em>Figure 2: Streamlined Welcome screen with Quick Start actions and expandable templates row.</em>
     </td>
     <td width="50%" align="center">
-      <img src="data/screenshots/imladris-ai-copilot.png" alt="Elrond Inline Assistance Popover" width="100%"><br>
-      <em>Figure 3: Preview-first inline code assistance with instant syntax-highlighted code preview.</em>
+      <img src="data/screenshots/imladris-ai-copilot.png" alt="Elrond Direct Editor Writing Assistance" width="100%"><br>
+      <em>Figure 3: Positron/RStudio-style Direct Editor Writing with in-place chunk updates and Quarto option preservation.</em>
     </td>
   </tr>
   <tr>
@@ -77,8 +77,8 @@ The application transitions dynamically between two editing layouts:
 ## 3. Key Features
 
 * **GNOME / Libadwaita HIG Overhaul & Zero-Chrome Empty State**: Streamlines the initial user experience with progressive disclosure. Features a clean **Quick Start** card row (*Quarto Notebook*, *R Script or Shiny App*, *Open File or Folder*) and a collapsible **More Formats & Templates** expander (*.Rmd*, *.ipynb*, *.Rproj*, *.mallorn*). When no document is open, the ribbon bar, tab bar, and status bar automatically hide for a calm distraction-free experience.
-* **Redesigned Elrond AI Copilot & Code Assistance**: Interactive scientific copilot tab with a persistent active provider pill button (*Elrond Local*, *Gemini*, *Claude*, *OpenAI*, *DeepSeek*, *Kimi*, *Qwen*, *Ollama*, *LM Studio*), context chips (*Active File*, *Selection*, *Data*, *Last Error*), Pango-formatted markdown responses, and interactive code cards (*Insert at Cursor*, *Run in Console*, *Copy*).
-* **Preview-First Inline Code Assistance (`Ctrl+Shift+E`)**: Context-aware popover floating over the editor with one-click quick prompt pills (*Fix & Clean*, *Add Comments*, *Explain*, *R Plot*) and a live monospace preview box with *Replace Selection*, *Insert at Cursor*, and *Regenerate* controls.
+* **Redesigned Elrond AI Copilot & Multi-Provider Engine**: Scientific AI copilot supporting local inference (*Elrond Local / llama-server*, *Ollama*, *LM Studio*, *Cherry Studio*, *Antigravity agy*), frontier cloud APIs (*Gemini*, *Claude*, *OpenAI*, *DeepSeek*, *Kimi*, *Qwen*, *NVIDIA NIM*), and free-tier APIs (*Groq*, *Cerebras*, *OpenRouter :free*, *GitHub Models*, *FreeLLMAPI Local Proxy*). Features automatic quota failover on HTTP 429 errors (with opt-in privacy consent) and GitHub Copilot OAuth Device Flow authentication.
+* **Positron/RStudio-Style Direct Editor Writing (`Ctrl+Shift+E`)**: Context-aware code synthesis writing directly into the active editor buffer. Supports **Apply to Selection**, **Update Active Chunk** (automatically preserving `#|` Quarto cell options), and single-step `Ctrl+Z` undo without modal popover disruption.
 * **Workspace & Editor Preferences**: New dedicated settings in Preferences for switching between **4-Pane Studio** and **Focus Mode**, toggling ribbon toolbar visibility, toggling the bottom status bar, and customizing default zoom percentage (paired with a compact status bar zoom popover).
 * **Elbereth Clinical Biostatistics, Power & Survival Studio (`Imladris.Bridges.Elbereth`)**: Native HeaderBar studio for clinical trialists, biostatisticians, and translational researchers. Computes **ICH E9 Statistical Power & Sample Size** for Two-Sample Continuous ($t$-test / Cohen's $d$), Two-Sample Proportions ($p_1$ vs. $p_2$ with Casagrande-Pike continuity correction), and Time-to-Event Survival (**Schoenfeld 1983 Log-Rank Hazard Ratio formula**) with attrition adjustment. Draws a live **Cairo Power Curve ($1-\beta$ vs. $N$)** and injects regulatory SAP justifications alongside R and Python verification chunks. Generates publication-ready code blocks for **CDISC ADSL Table 1**, **ADTTE Kaplan-Meier & Cox PH**, **Subgroup Forest Plots**, and **Differential Expression Volcano Plots**.
 * **Arekyer Galaxy-to-Quarto Provenance Bridge (`Imladris.Bridges.Arekyer`)**: Connects upstream cloud bioinformatics histories (**Galaxy Project**, such as `usegalaxy.eu`, `usegalaxy.org`, `usegalaxy.org.au`) directly to local reproducible `.qmd` and `.Rmd` manuscripts. Injects standardized R (`httr2` / `readr`) and Python (`requests` / `pandas`) data-fetching code blocks with verifiable dataset UUID/HID headers. Stores Galaxy API keys exclusively in the OS keyring (`libsecret-1` / `org.freedesktop.Secret.Service`) and injects `GALAXY_API_KEY` into isolated compilation subprocesses.
@@ -275,22 +275,16 @@ yay -S imladris
 
 #### Fedora / RHEL (.rpm):
 ```bash
-sudo dnf install ./imladris-0.24.2-1.x86_64.rpm
+sudo dnf install ./imladris-0.25.0-1.x86_64.rpm
 ```
 
 #### Debian / Ubuntu (.deb):
 ```bash
-sudo dpkg -i imladris_0.24.2_amd64.deb
+sudo dpkg -i imladris_0.25.0_amd64.deb
 sudo apt-get install -f
 ```
 
-#### AppImage (`.AppImage`):
-```bash
-chmod +x ./Imladris-0.24.2-x86_64.AppImage
-./Imladris-0.24.2-x86_64.AppImage
-```
-
-Standalone packages and bundles (`.flatpak`, `.deb`, `.rpm`, `.AppImage`, and source `.tar.gz`) are available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.24.2](https://github.com/Antux912012/imladris/releases/tag/v0.24.2).
+Standalone packages and bundles (`.flatpak`, `.deb`, `.rpm`, and source `.tar.gz`) are available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.25.0](https://github.com/Antux912012/imladris/releases/tag/v0.25.0).
 
 ### Debug Profile Build & Verification:
 ```bash
@@ -312,7 +306,7 @@ sudo meson install -C build-release
 ### Automated Packaging Scripts:
 * Generate Flatpak bundle and Debian `.deb` package: `./build-packages.sh`
 * Generate Fedora `.rpm` package: `./build-rpm.sh`
-* Generate SPDX Software Bill of Materials (SBOM): `./scripts/generate-sbom.sh`
+* Inspect build dependencies and metadata: `meson introspect build-release --dependencies`
 
 ---
 

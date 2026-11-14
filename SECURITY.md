@@ -15,8 +15,8 @@ We provide security updates for the current minor release branch:
 
 | Version Branch | Supported | Security Patch Delivery Channel |
 | :--- | :--- | :--- |
-| `0.18.x` | **Yes** | GitHub Releases, Flatpak, Debian, Fedora RPM, AUR |
-| `< 0.18.0` | No | Upgrade to the latest stable release |
+| `0.25.x` | **Yes** | GitHub Releases, Flatpak, Debian, Fedora RPM, AUR |
+| `< 0.25.0` | No | Upgrade to the latest stable release |
 
 ---
 
@@ -58,6 +58,8 @@ Imladris enforces security boundaries through these controls:
 
 * **Strict Sandboxing**: The Flatpak deployment operates under `org.gnome.Platform//51` with least-privilege permissions.
 * **No Unsanitized Shell Invocations**: Process execution uses `GLib.SubprocessLauncher` with explicit argument vectors. The application does not pass unsanitized input to shell interpreters (`sh -c`).
-* **Path Traversal Protection**: Workspace file operations validate relative paths and reject `..` path segments.
-* **Local-First AI Execution**: Elrond Assistance runs offline on loopback (`127.0.0.1:8088`). The engine transmits no prompt text, document content, or telemetry to external servers.
-* **Secret Storage**: Cloud AI API keys reside in local user configuration files restricted to POSIX permissions `0600`.
+* **Direct Binary Downloads Without Shell Pipelines**: External toolchain bootstrapping (such as micromamba) downloads archives directly via `curl` and unpacks via `tar` using explicit argument vectors in `GLib.Subprocess`. Piping untrusted remote scripts directly into shell interpreters (`curl | sh` or `sh -c`) is prohibited. All downloaded archives undergo SHA-256 verification.
+* **.mallorn Path Traversal (Zip Slip) Protection**: `MallornManager` validates archive member paths prior to extraction. For both `.tar.zst` and `.zip` archives, entries containing absolute paths (`/`, `~`) or directory traversal segments (`..`) are rejected before any files are written to disk.
+* **Model Context Protocol (MCP) Tool Hardening**: The MCP stdio server (`--mcp-server`) disables the `execute_code` tool by default. Execution requires explicit opt-in via environment variable `IMLADRIS_MCP_ALLOW_EXEC=1`. When enabled, code execution is restricted strictly to an allowlist consisting of `Rscript`, `python3`, and `quarto`. Unlisted executables and arbitrary shell commands are rejected.
+* **Local-First AI Execution**: Elrond Assistance runs offline on loopback (`127.0.0.1:8088` or local socket). The engine transmits no prompt text, document content, or telemetry to external servers.
+* **Secret Storage**: Cloud AI API keys reside in local user configuration files restricted to POSIX permissions `0600`. GitHub Copilot OAuth tokens are stored in the OS keyring via `libsecret` under schema `io.github.Antux912012.Imladris.Copilot` with `0600` file fallback.

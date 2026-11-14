@@ -162,6 +162,10 @@ namespace Imladris.AI {
                 if (elrond_ready) {
                     completion_code = yield elrond.complete_code_async (prefix, suffix, "", cancellable);
                 } else if (cloud_ready) {
+                    var cfg = Core.AiConfigManager.get_default ();
+                    if (cfg.active_provider.is_free_tier () && cfg.active_provider != Core.AiProvider.FREELMAPI_LOCAL && !cfg.free_api_consent_accepted) {
+                        return store;
+                    }
                     var client = new AiClient ();
                     completion_code = yield client.complete_code_async (prefix, suffix, cancellable);
                 }

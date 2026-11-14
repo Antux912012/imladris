@@ -453,16 +453,6 @@ namespace Imladris.UI {
             });
             elrond_group.add (inline_autocomplete_row);
 
-            var inline_edit_row = new Adw.SwitchRow () {
-                title = "Inline AI Editing Popover",
-                subtitle = "Show inline prompt popover at cursor on 'Write with Elrond Assistance' (Ctrl+Shift+E)",
-                active = settings.inline_editing_enabled
-            };
-            inline_edit_row.notify["active"].connect (() => {
-                settings.inline_editing_enabled = inline_edit_row.active;
-            });
-            elrond_group.add (inline_edit_row);
-
             var panel_pos_row = new Adw.ActionRow () {
                 title = "AI Chat and Side Panel Position",
                 subtitle = "Keep the LLM chat and preview panel docked on the left or right side of the editor"

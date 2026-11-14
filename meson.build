@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.24.2',
+  version: '0.25.0',
   default_options: ['warning_level=1']
 )
 
@@ -43,11 +43,13 @@ sources = files(
   'src/AiClient.vala',
   'src/ai/ElrondEngineController.vala',
   'src/ai/AiCompletionProvider.vala',
+  'src/ai/CopilotAuthService.vala',
   'src/McpServer.vala',
   'src/AssistantPanel.vala',
   'src/Window.vala',
   'src/console/ReplBridge.vala',
   'src/editor/ChunkExecutionEngine.vala',
+  'src/editor/AiBufferEditHelper.vala',
   'src/editor/CodeIntelliSenseEngine.vala',
   'src/editor/CodeIntelliSenseProvider.vala',
   'src/core/frontmatter_parser.vala',
@@ -186,7 +188,11 @@ ai_test_sources = files(
   'src/core/SettingsManager.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/ChunkParser.vala',
+  'src/AiClient.vala',
+  'src/ai/CopilotAuthService.vala',
   'src/ai/ElrondEngineController.vala',
+  'src/editor/AiBufferEditHelper.vala',
 )
 
 ai_test_exe = executable('test_ai_integration',
