@@ -36,5 +36,5 @@ modules:
     sources:
       - type: git
         url: https://github.com/Antux912012/imladris.git
-        tag: v0.25.0
-        commit: c626b91ff93a4be9edb3af1743d985ba0770a363
+        tag: v0.26.0
+        commit: 32b9eddd14686dd6edeedf7565f8ee94457c1b6d

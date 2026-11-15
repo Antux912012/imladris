@@ -18,15 +18,16 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
   <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
-  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0"><img src="https://img.shields.io/badge/Release-v0.25.0-blue?style=flat-square" alt="Release v0.25.0"></a>
+  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.26.0"><img src="https://img.shields.io/badge/Release-v0.26.0-blue?style=flat-square" alt="Release v0.26.0"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-0.56%2B-green?style=flat-square" alt="Vala">
+  <img src="https://img.shields.io/badge/Rust-1.75%2B-orange?style=flat-square" alt="Rust">
   <img src="https://img.shields.io/badge/License-GPL--3.0--or--later-brightgreen?style=flat-square" alt="License">
 </p>
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Official Landing Page</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.25.0">⬇️ Download v0.25.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.26.0">⬇️ Download v0.26.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Technical Wiki</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong>
@@ -219,13 +220,13 @@ paru -S imladris
 ### Fedora / RHEL / CentOS / AlmaLinux / openSUSE (`.rpm`) & Debian / Ubuntu / elementary OS (`.deb`)
 ```bash
 # Fedora / RHEL / CentOS / AlmaLinux:
-sudo dnf install ./imladris-0.25.0-1.fc41.x86_64.rpm
+sudo dnf install ./imladris-0.26.0-1.fc45.x86_64.rpm
 
 # openSUSE:
-sudo zypper install ./imladris-0.25.0-1.fc41.x86_64.rpm
+sudo zypper install ./imladris-0.26.0-1.fc45.x86_64.rpm
 
 # Debian / Ubuntu / elementary OS:
-sudo dpkg -i imladris_0.25.0_amd64.deb
+sudo dpkg -i imladris_0.26.0_amd64.deb
 sudo apt-get install -f
 ```
 
@@ -242,7 +243,7 @@ nix build .#default
 ./result/bin/imladris
 ```
 
-Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.25.0](https://github.com/Antux912012/imladris/releases/tag/v0.25.0).
+Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.26.0](https://github.com/Antux912012/imladris/releases/tag/v0.26.0).
 
 ### Build from Source (Meson & Ninja)
 Requires `valac >= 0.56`, `meson >= 0.60`, `ninja`, `gtk4 >= 4.12`, `libadwaita-1 >= 1.5`, `gtksourceview-5 >= 5.10`, `webkitgtk-6.0 >= 2.40`, `javascriptcoregtk-6.0`, `libsoup-3.0`, `json-glib-1.0`, `libsecret-1`, and `libgee-0.8`.
