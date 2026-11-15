@@ -31,7 +31,7 @@ namespace Imladris.Adapters {
             string clean_text = editor_text.replace ("\uFFFC", "");
             if (format == Imladris.DocumentFormat.IPYNB) {
                 try {
-                    return Core.NotebookSerializer.markdown_to_ipynb (clean_text, existing_raw_file ?? "python");
+                    return Core.NotebookSerializer.markdown_to_ipynb (clean_text, existing_raw_file ?? "");
                 } catch (GLib.Error e) {
                     GLib.warning ("Failed to serialize editor buffer to .ipynb JSON: %s", e.message);
                     return clean_text;
@@ -41,34 +41,279 @@ namespace Imladris.Adapters {
         }
 
         public static string render_html (string editor_text, Imladris.DocumentFormat format) {
+            string clean_text = editor_text.replace ("\uFFFC", "");
+            if (format == Imladris.DocumentFormat.HTML) {
+                return render_html_with_latex (clean_text);
+            }
+            if (format == Imladris.DocumentFormat.TEX) {
+                return render_latex_document_html (clean_text);
+            }
+            if (format == Imladris.DocumentFormat.TS) {
+                return render_typescript_document_html (clean_text);
+            }
+
             Core.FrontmatterData? meta;
             string body;
-            Core.FrontmatterParser.split_frontmatter (editor_text, out meta, out body);
+            Core.FrontmatterParser.split_frontmatter (clean_text, out meta, out body);
 
             var builder = new StringBuilder ();
             if (meta != null && !meta.is_empty ()) {
                 builder.append (meta.to_html ());
             }
 
-            // Convert Code chunk annotations ```{r} or ```{python} to styled blocks
-            string processed_body = transform_code_chunks (body);
-            processed_body = transform_display_math (processed_body);
-            processed_body = transform_media_tags (processed_body);
-            builder.append (basic_markdown_to_html (processed_body));
+            string rust_json = Core.NativeCore.render_markdown_html (body, "{}");
+            string rust_html = "";
+            try {
+                var parser = new Json.Parser ();
+                parser.load_from_data (rust_json, -1);
+                var root = parser.get_root ();
+                if (root != null && root.get_node_type () == Json.NodeType.OBJECT) {
+                    var obj = root.get_object ();
+                    if (obj.has_member ("html")) {
+                        rust_html = obj.get_string_member ("html");
+                    }
+                }
+            } catch (GLib.Error e) {
+                GLib.warning ("Failed to decode Rust markdown HTML JSON: %s", e.message);
+            }
+            string hydrated = hydrate_rust_placeholders (rust_html);
+            builder.append (hydrated);
 
+            return builder.str;
+        }
+
+        private static string unescape_html_attr (string attr) {
+            return attr
+                .replace ("&quot;", "\"")
+                .replace ("&#39;", "'")
+                .replace ("&lt;", "<")
+                .replace ("&gt;", ">")
+                .replace ("&amp;", "&");
+        }
+
+        private static GLib.Regex? rust_math_display_regex = null;
+        private static GLib.Regex? rust_math_inline_regex = null;
+        private static GLib.Regex? rust_mermaid_regex = null;
+
+        private static string hydrate_rust_placeholders (string html) {
+            string working = html;
+            try {
+                if (rust_math_display_regex == null) {
+                    rust_math_display_regex = new GLib.Regex ("<div class=\"imladris-math-display\" data-tex=\"([^\"]*)\"></div>");
+                }
+                working = rust_math_display_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
+                    string tex = unescape_html_attr (match_info.fetch (1));
+                    res.append (Core.MathChemEngine.render_latex_to_html (tex, true));
+                    return false;
+                });
+
+                if (rust_math_inline_regex == null) {
+                    rust_math_inline_regex = new GLib.Regex ("<span class=\"imladris-math-inline\" data-tex=\"([^\"]*)\"></span>");
+                }
+                working = rust_math_inline_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
+                    string tex = unescape_html_attr (match_info.fetch (1));
+                    res.append (Core.MathChemEngine.render_latex_to_html (tex, false));
+                    return false;
+                });
+
+                if (rust_mermaid_regex == null) {
+                    rust_mermaid_regex = new GLib.Regex ("<div class=\"imladris-mermaid-block\" data-mermaid=\"([^\"]*)\"></div>");
+                }
+                working = rust_mermaid_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
+                    string code = unescape_html_attr (match_info.fetch (1));
+                    res.append (render_mermaid_svg_inline (code));
+                    return false;
+                });
+            } catch (GLib.RegexError e) {
+                GLib.warning ("Failed to hydrate placeholders: %s", e.message);
+            }
+            return working;
+        }
+
+        private static string render_latex_document_html (string source) {
+            var builder = new StringBuilder ();
+            string body = source;
+            int doc_start = source.index_of ("\\begin{document}");
+            if (doc_start >= 0) {
+                string preamble = source.substring (0, doc_start);
+                body = source.substring (doc_start + "\\begin{document}".length);
+                int doc_end = body.last_index_of ("\\end{document}");
+                if (doc_end >= 0) {
+                    body = body.substring (0, doc_end);
+                }
+
+                string title = "";
+                string author = "";
+                string date = "";
+                try {
+                    var title_re = new GLib.Regex ("\\\\title\\{([^\\}]*)\\}");
+                    var author_re = new GLib.Regex ("\\\\author\\{([^\\}]*)\\}");
+                    var date_re = new GLib.Regex ("\\\\date\\{([^\\}]*)\\}");
+                    GLib.MatchInfo mi;
+                    if (title_re.match (preamble, 0, out mi) || title_re.match (body, 0, out mi)) {
+                        title = mi.fetch (1).strip ();
+                    }
+                    if (author_re.match (preamble, 0, out mi) || author_re.match (body, 0, out mi)) {
+                        author = mi.fetch (1).strip ();
+                    }
+                    if (date_re.match (preamble, 0, out mi) || date_re.match (body, 0, out mi)) {
+                        date = mi.fetch (1).strip ();
+                    }
+                } catch (GLib.RegexError e) {}
+
+                if (title != "" || author != "" || date != "") {
+                    builder.append ("<div class=\"document-frontmatter-card\">");
+                    if (title != "") {
+                        builder.append_printf ("<h1 class=\"frontmatter-title\">%s</h1>", GLib.Markup.escape_text (title));
+                    }
+                    builder.append ("<div class=\"frontmatter-meta-grid\">");
+                    if (author != "") {
+                        builder.append_printf ("<div><span class=\"frontmatter-label\">Author</span>%s</div>", GLib.Markup.escape_text (author));
+                    }
+                    if (date != "") {
+                        builder.append_printf ("<div><span class=\"frontmatter-label\">Date</span>%s</div>", GLib.Markup.escape_text (date));
+                    }
+                    builder.append ("</div></div>\n");
+                }
+            }
+
+            var prot = new Gee.ArrayList<string> ();
+            string working = body;
+            try {
+                var verb_re = new GLib.Regex ("\\\\begin\\{(verbatim|lstlisting)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
+                working = verb_re.replace_eval (working, -1, 0, 0, (mi, res) => {
+                    int idx = prot.size;
+                    prot.add ("<pre><code>" + GLib.Markup.escape_text (mi.fetch (2)) + "</code></pre>");
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    return false;
+                });
+
+                var bracket_math = new GLib.Regex ("\\\\\\[([\\s\\S]*?)\\\\\\]");
+                working = bracket_math.replace_eval (working, -1, 0, 0, (mi, res) => {
+                    int idx = prot.size;
+                    prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), true));
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    return false;
+                });
+                var env_math = new GLib.Regex ("\\\\begin\\{(equation|equation\\*|align|align\\*|gather|gather\\*)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
+                working = env_math.replace_eval (working, -1, 0, 0, (mi, res) => {
+                    int idx = prot.size;
+                    prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (2).strip (), true));
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    return false;
+                });
+                var dd_math = new GLib.Regex ("\\$\\$([\\s\\S]*?)\\$\\$");
+                working = dd_math.replace_eval (working, -1, 0, 0, (mi, res) => {
+                    int idx = prot.size;
+                    prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), true));
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    return false;
+                });
+
+                var paren_math = new GLib.Regex ("\\\\\\(([\\s\\S]*?)\\\\\\)");
+                working = paren_math.replace_eval (working, -1, 0, 0, (mi, res) => {
+                    int idx = prot.size;
+                    prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), false));
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    return false;
+                });
+                var ce_re = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
+                working = ce_re.replace_eval (working, -1, 0, 0, (mi, res) => {
+                    int idx = prot.size;
+                    prot.add (Core.MathChemEngine.render_latex_to_html ("\\ce{" + mi.fetch (1) + "}", false));
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    return false;
+                });
+                var inline_dollar = new GLib.Regex ("(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)");
+                working = inline_dollar.replace_eval (working, -1, 0, 0, (mi, res) => {
+                    int idx = prot.size;
+                    prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), false));
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    return false;
+                });
+            } catch (GLib.RegexError e) {}
+
+            working = GLib.Markup.escape_text (working);
+            try {
+                working = new GLib.Regex ("\\\\maketitle").replace (working, -1, 0, "");
+                working = new GLib.Regex ("\\\\section\\*?\\{([^\\}]*)\\}").replace (working, -1, 0, "<h2>\\1</h2>");
+                working = new GLib.Regex ("\\\\subsection\\*?\\{([^\\}]*)\\}").replace (working, -1, 0, "<h3>\\1</h3>");
+                working = new GLib.Regex ("\\\\subsubsection\\*?\\{([^\\}]*)\\}").replace (working, -1, 0, "<h4>\\1</h4>");
+                working = new GLib.Regex ("\\\\textbf\\{([^\\}]*)\\}").replace (working, -1, 0, "<strong>\\1</strong>");
+                working = new GLib.Regex ("\\\\(?:textit|emph)\\{([^\\}]*)\\}").replace (working, -1, 0, "<em>\\1</em>");
+                working = new GLib.Regex ("\\\\texttt\\{([^\\}]*)\\}").replace (working, -1, 0, "<code>\\1</code>");
+                working = new GLib.Regex ("\\\\cite\\{([^\\}]*)\\}").replace (working, -1, 0, "<span class=\"frontmatter-badge\">[\\1]</span>");
+            } catch (GLib.RegexError e) {}
+
+            var lines = working.split ("\n");
+            var body_out = new StringBuilder ();
+            foreach (var ln in lines) {
+                string t = ln.strip ();
+                if (t == "") {
+                    body_out.append ("<br/>\n");
+                } else if (t.has_prefix ("<h") || t.has_prefix ("__IMLADRIS_TEX_PROT_")) {
+                    body_out.append (t);
+                    body_out.append ("\n");
+                } else {
+                    body_out.append ("<p>");
+                    body_out.append (t);
+                    body_out.append ("</p>\n");
+                }
+            }
+
+            string final_body = body_out.str;
+            for (int i = 0; i < prot.size; i++) {
+                final_body = final_body.replace (@"__IMLADRIS_TEX_PROT_$(i)__", prot[i]);
+            }
+            builder.append (final_body);
+            return builder.str;
+        }
+
+        private static string render_typescript_document_html (string source) {
+            var builder = new StringBuilder ();
+            string symbols_json = Core.NativeCore.analyze_typescript_symbols_json (source);
+            try {
+                var parser = new Json.Parser ();
+                parser.load_from_data (symbols_json, -1);
+                var arr = parser.get_root ().get_array ();
+                if (arr != null && arr.get_length () > 0) {
+                    builder.append ("<div class=\"document-frontmatter-card\">");
+                    builder.append ("<h2 class=\"frontmatter-title\">TypeScript Module Symbols</h2>");
+                    builder.append ("<div class=\"frontmatter-meta-grid\">");
+                    for (uint i = 0; i < arr.get_length (); i++) {
+                        var obj = arr.get_object_element (i);
+                        string kind = obj.has_member ("kind") ? obj.get_string_member ("kind") : "symbol";
+                        string name = obj.has_member ("name") ? obj.get_string_member ("name") : "";
+                        int64 line = obj.has_member ("line") ? obj.get_int_member ("line") : 1;
+                        builder.append_printf (
+                            "<div><span class=\"frontmatter-badge\">%s</span> <code>%s</code> <span style=\"opacity:0.7;\">:%lld</span></div>",
+                            GLib.Markup.escape_text (kind),
+                            GLib.Markup.escape_text (name),
+                            line
+                        );
+                    }
+                    builder.append ("</div></div>\n");
+                }
+            } catch (GLib.Error e) {}
+
+            builder.append ("<div class=\"code-chunk-card\">\n");
+            builder.append ("  <div class=\"code-chunk-header\"><span class=\"badge\">TYPESCRIPT</span></div>\n");
+            builder.append_printf ("  <pre><code class=\"language-typescript\">%s</code></pre>\n", GLib.Markup.escape_text (source));
+            builder.append ("</div>\n");
             return builder.str;
         }
 
         private static GLib.Regex? html_protected_tag_regex = null;
         private static GLib.Regex? html_inline_math_regex = null;
+        private static GLib.Regex? html_ce_regex = null;
 
         /**
-         * Renders LaTeX math ($...$, $$...$$, \begin{equation}...\end{equation}) inside
+         * Renders LaTeX math ($...$, $$...$$, \begin{equation}...\end{equation}, \ce{...}) inside
          * raw HTML documents while preserving <style>, <script>, <pre>, and <code> blocks,
          * and injects MathChemEngine CSS when needed.
          */
         public static string render_html_with_latex (string raw_html) {
-            if (!raw_html.contains ("$") && !raw_html.contains ("\\begin{equation}")) {
+            if (!raw_html.contains ("$") && !raw_html.contains ("\\begin{equation}") && !raw_html.contains ("\\ce{")) {
                 return raw_html;
             }
 
@@ -90,8 +335,17 @@ namespace Imladris.Adapters {
             working = transform_display_math (working);
 
             try {
+                if (html_ce_regex == null) {
+                    html_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
+                }
+                working = html_ce_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
+                    res.append (Core.MathChemEngine.render_latex_to_html ("\\ce{" + match_info.fetch (1) + "}", false));
+                    return false;
+                });
+
                 if (html_inline_math_regex == null) {
-                    html_inline_math_regex = new GLib.Regex ("(?<!\\\\)\\$([^\\$\\n]+?)\\$");
+                    // Pandoc currency guard: no space after opening $, no space before closing $, no digit after closing $
+                    html_inline_math_regex = new GLib.Regex ("(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)");
                 }
                 working = html_inline_math_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
                     string expr = match_info.fetch (1).strip ();
@@ -193,7 +447,7 @@ namespace Imladris.Adapters {
                 return "<pre><code class=\"language-mermaid\">" + GLib.Markup.escape_text (code) + "</code></pre>";
             }
             Core.MermaidFlowEngine.auto_layout (kind, dir, nodes, edges);
-            string svg = Core.MermaidFlowEngine.export_to_svg (nodes, edges);
+            string svg = Core.MermaidFlowEngine.export_to_svg (nodes, edges, kind);
             int svg_start = svg.index_of ("<svg");
             if (svg_start > 0) {
                 svg = svg.substring (svg_start);

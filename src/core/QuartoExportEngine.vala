@@ -83,7 +83,7 @@ namespace Imladris.Core {
             string base_name = GLib.Path.get_basename (qmd_path);
             int dot_idx = base_name.last_index_of (".");
             string root_name = (dot_idx > 0) ? base_name.substring (0, dot_idx) : base_name;
-            string expected_output = GLib.Path.build_filename (working_dir, root_name + format.get_extension ());
+            string expected_output = resolve_expected_output_path (working_dir, root_name, format.get_extension ());
 
             compilation_progress (@"▶ Starting $(format.to_display_label ()) compilation for $base_name...");
 
@@ -121,6 +121,10 @@ namespace Imladris.Core {
             }
 
             if (!GLib.FileUtils.test (expected_output, GLib.FileTest.EXISTS)) {
+                expected_output = resolve_expected_output_path (working_dir, root_name, format.get_extension ());
+            }
+
+            if (!GLib.FileUtils.test (expected_output, GLib.FileTest.EXISTS)) {
                 string missing_msg = @"Quarto exited without creating $(GLib.Path.get_basename (expected_output))";
                 compilation_progress (@"✖ Render failed: $missing_msg");
                 throw new ExportError.RENDER_FAILED (missing_msg);
@@ -129,6 +133,44 @@ namespace Imladris.Core {
             compilation_progress (@"✔ Successfully generated: $(GLib.Path.get_basename (expected_output))");
             export_succeeded (expected_output, format);
             return expected_output;
+        }
+
+        private string resolve_expected_output_path (string working_dir, string root_name, string ext) {
+            string direct = GLib.Path.build_filename (working_dir, root_name + ext);
+            if (GLib.FileUtils.test (direct, GLib.FileTest.EXISTS)) {
+                return direct;
+            }
+            string? dir = working_dir;
+            for (int depth = 0; depth < 3 && dir != null && dir != "" && dir != "/"; depth++) {
+                string yml_path = GLib.Path.build_filename (dir, "_quarto.yml");
+                if (!GLib.FileUtils.test (yml_path, GLib.FileTest.EXISTS)) {
+                    yml_path = GLib.Path.build_filename (dir, "_quarto.yaml");
+                }
+                if (GLib.FileUtils.test (yml_path, GLib.FileTest.EXISTS)) {
+                    try {
+                        string yml;
+                        GLib.FileUtils.get_contents (yml_path, out yml);
+                        foreach (string raw_line in yml.split ("\n")) {
+                            string line = raw_line.strip ();
+                            if (line.has_prefix ("output-dir:")) {
+                                string out_dir = line.substring ("output-dir:".length).strip ().replace ("\"", "").replace ("'", "");
+                                if (out_dir.length > 0) {
+                                    string candidate = GLib.Path.is_absolute (out_dir)
+                                        ? GLib.Path.build_filename (out_dir, root_name + ext)
+                                        : GLib.Path.build_filename (dir, out_dir, root_name + ext);
+                                    if (GLib.FileUtils.test (candidate, GLib.FileTest.EXISTS)) {
+                                        return candidate;
+                                    }
+                                    return candidate;
+                                }
+                            }
+                        }
+                    } catch (GLib.FileError e) {}
+                    break;
+                }
+                dir = GLib.Path.get_dirname (dir);
+            }
+            return direct;
         }
 
         private async bool execute_quarto_render_pass (string qmd_path, ScientificOutputFormat format, string working_dir, out string log_accumulator) {
@@ -150,6 +192,13 @@ namespace Imladris.Core {
                 argv = Core.PlatformUtils.build_host_command (host_cmd, working_dir);
             } else {
                 Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
+                string venv_py = GLib.Path.build_filename (working_dir, ".venv", "bin", "python3");
+                string iml_py = GLib.Path.build_filename (working_dir, ".imladris-env", "bin", "python3");
+                if (GLib.FileUtils.test (venv_py, GLib.FileTest.IS_EXECUTABLE)) {
+                    launcher.setenv ("QUARTO_PYTHON", venv_py, true);
+                } else if (GLib.FileUtils.test (iml_py, GLib.FileTest.IS_EXECUTABLE)) {
+                    launcher.setenv ("QUARTO_PYTHON", iml_py, true);
+                }
                 argv = raw_args;
             }
 

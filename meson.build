@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.25.0',
+  version: '0.26.0',
   default_options: ['warning_level=1']
 )
 
@@ -25,6 +25,35 @@ deps = [
   m_dep,
 ]
 
+rust_core_inc = include_directories('rust/imladris_core/include')
+rust_core_lib = custom_target('imladris_core_lib',
+  output: 'libimladris_core.a',
+  command: [
+    meson.current_source_dir() / 'scripts' / 'build-rust-core.sh',
+    meson.current_source_dir(),
+    '@OUTPUT@',
+  ],
+  build_by_default: true,
+  build_always_stale: true,
+  console: true,
+)
+
+rust_vala_args = [
+  '--target-glib=2.76',
+  '--vapidir=' + meson.current_source_dir() / 'src' / 'core',
+  '--pkg=imladris_core',
+]
+
+rust_test_exe = find_program('/usr/lib/sdk/rust-stable/bin/cargo', 'cargo', required: false)
+if rust_test_exe.found()
+  test('rust_core_tests', rust_test_exe,
+    args: ['test', '--offline', '--manifest-path', meson.current_source_dir() / 'rust/imladris_core/Cargo.toml'],
+    workdir: meson.current_source_dir() / 'rust/imladris_core',
+    env: ['PATH=/usr/lib/sdk/rust-stable/bin:/app/bin:/usr/bin:/bin'],
+    timeout: 60,
+  )
+endif
+
 resources = gnome.compile_resources(
   'imladris-resources',
   'data/imladris.gresource.xml',
@@ -40,6 +69,8 @@ sources = files(
   'src/SmartRibbonHelpers.vala',
   'src/DocumentPage.vala',
   'src/ExecutionEngine.vala',
+  'src/runners/LatexBuildRunner.vala',
+  'src/runners/TypeScriptRunner.vala',
   'src/AiClient.vala',
   'src/ai/ElrondEngineController.vala',
   'src/ai/AiCompletionProvider.vala',
@@ -55,6 +86,8 @@ sources = files(
   'src/core/frontmatter_parser.vala',
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
+  'src/core/FormatProfile.vala',
+  'src/core/NativeCore.vala',
   'src/core/MallornManager.vala',
   'src/core/ChunkParser.vala',
   'src/core/MathChemEngine.vala',
@@ -118,7 +151,9 @@ executable('imladris',
   sources,
   resources,
   dependencies: deps,
-  vala_args: ['--target-glib=2.76'],
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
   install: true
 )
 
@@ -149,11 +184,18 @@ install_subdir(
   install_dir: get_option('datadir') / 'icons'
 )
 
+install_subdir(
+  'data/language-specs',
+  install_dir: get_option('datadir') / 'imladris'
+)
+
 test_sources = files(
   'tests/test_mallorn_sandbox.vala',
   'src/core/frontmatter_parser.vala',
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
+  'src/core/FormatProfile.vala',
+  'src/core/NativeCore.vala',
   'src/core/MallornManager.vala',
   'src/core/MathChemEngine.vala',
   'src/core/MermaidFlowEngine.vala',
@@ -177,7 +219,9 @@ test_sources = files(
 test_exe = executable('test_mallorn_sandbox',
   test_sources,
   dependencies: deps,
-  vala_args: ['--target-glib=2.76'],
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
 )
 
 test('mallorn_sandbox_tests', test_exe, timeout: 120)
@@ -188,6 +232,7 @@ ai_test_sources = files(
   'src/core/SettingsManager.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/NativeCore.vala',
   'src/core/ChunkParser.vala',
   'src/AiClient.vala',
   'src/ai/CopilotAuthService.vala',
@@ -198,7 +243,9 @@ ai_test_sources = files(
 ai_test_exe = executable('test_ai_integration',
   ai_test_sources,
   dependencies: deps,
-  vala_args: ['--target-glib=2.76'],
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
 )
 
 test('ai_integration_tests', ai_test_exe, timeout: 30)
@@ -209,6 +256,8 @@ plugin_test_sources = files(
   'src/core/frontmatter_parser.vala',
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
+  'src/core/FormatProfile.vala',
+  'src/core/NativeCore.vala',
   'src/core/MallornManager.vala',
   'src/core/MathChemEngine.vala',
   'src/core/MermaidFlowEngine.vala',
@@ -231,7 +280,9 @@ plugin_test_sources = files(
 plugin_test_exe = executable('test_plugin_engine',
   plugin_test_sources,
   dependencies: deps,
-  vala_args: ['--target-glib=2.76'],
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
 )
 
 test('plugin_engine_tests', plugin_test_exe, timeout: 30)
@@ -241,6 +292,8 @@ dock_test_sources = files(
   'src/core/frontmatter_parser.vala',
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
+  'src/core/FormatProfile.vala',
+  'src/core/NativeCore.vala',
   'src/core/MallornManager.vala',
   'src/core/MathChemEngine.vala',
   'src/core/MermaidFlowEngine.vala',
@@ -267,7 +320,9 @@ dock_test_sources = files(
 dock_test_exe = executable('test_dock_environment',
   dock_test_sources,
   dependencies: deps,
-  vala_args: ['--target-glib=2.76'],
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
 )
 
 test('dock_environment_tests', dock_test_exe, timeout: 30)
@@ -294,6 +349,8 @@ shiny_test_sources = files(
   'src/core/frontmatter_parser.vala',
   'src/core/notebook_serializer.vala',
   'src/core/project_scaffolder.vala',
+  'src/core/FormatProfile.vala',
+  'src/core/NativeCore.vala',
   'src/core/MallornManager.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
@@ -313,7 +370,9 @@ shiny_test_sources = files(
 shiny_test_exe = executable('test_shiny_service',
   shiny_test_sources,
   dependencies: deps,
-  vala_args: ['--target-glib=2.76'],
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
 )
 
 test('shiny_service_tests', shiny_test_exe, timeout: 30)
@@ -336,6 +395,90 @@ galaxy_test_exe = executable('test_galaxy_bridge',
 )
 
 test('galaxy_bridge_tests', galaxy_test_exe, timeout: 30)
+
+format_test_exe = executable('test_format_profile',
+  files(
+    'tests/test_format_profile.vala',
+    'src/core/frontmatter_parser.vala',
+    'src/core/notebook_serializer.vala',
+    'src/core/project_scaffolder.vala',
+    'src/core/FormatProfile.vala',
+    'src/core/NativeCore.vala',
+    'src/core/MallornManager.vala',
+    'src/core/MathChemEngine.vala',
+    'src/core/MermaidFlowEngine.vala',
+    'src/core/PlatformUtils.vala',
+    'src/core/ToolchainManager.vala',
+    'src/adapters/DocumentAdapter.vala',
+    'src/services/SandboxController.vala',
+    'src/services/WorkspaceStateManager.vala',
+    'src/core/ChunkParser.vala',
+  ),
+  dependencies: deps,
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
+)
+
+test('format_profile_tests', format_test_exe, timeout: 30)
+
+rust_rendering_test_exe = executable('test_rust_rendering',
+  files(
+    'tests/test_rust_rendering.vala',
+    'src/core/frontmatter_parser.vala',
+    'src/core/notebook_serializer.vala',
+    'src/core/project_scaffolder.vala',
+    'src/core/FormatProfile.vala',
+    'src/core/NativeCore.vala',
+    'src/core/MallornManager.vala',
+    'src/core/MathChemEngine.vala',
+    'src/core/MermaidFlowEngine.vala',
+    'src/core/PlatformUtils.vala',
+    'src/core/ToolchainManager.vala',
+    'src/services/SandboxController.vala',
+    'src/core/ChunkParser.vala',
+    'src/adapters/DocumentAdapter.vala',
+  ),
+  dependencies: deps,
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
+)
+
+test('rust_rendering_tests', rust_rendering_test_exe, timeout: 30)
+
+exec_sec_test_exe = executable('test_execution_and_security',
+  files(
+    'tests/test_execution_and_security.vala',
+    'src/core/PlatformUtils.vala',
+    'src/core/ToolchainManager.vala',
+    'src/core/NativeCore.vala',
+    'src/core/FormatProfile.vala',
+    'src/core/ChunkParser.vala',
+    'src/core/frontmatter_parser.vala',
+    'src/core/notebook_serializer.vala',
+    'src/core/project_scaffolder.vala',
+    'src/core/MallornManager.vala',
+    'src/core/MathChemEngine.vala',
+    'src/core/MermaidFlowEngine.vala',
+    'src/adapters/DocumentAdapter.vala',
+    'src/services/SandboxController.vala',
+    'src/services/RecoveryService.vala',
+    'src/services/ExportService.vala',
+    'src/services/PersistentSessionManager.vala',
+    'src/runners/LatexBuildRunner.vala',
+    'src/runners/TypeScriptRunner.vala',
+    'src/editor/CodeIntelliSenseEngine.vala',
+    'src/services/PackageIndexCache.vala',
+    'src/ui/PackagesRibbonBar.vala',
+  ),
+  dependencies: deps,
+  include_directories: [rust_core_inc],
+  link_with: [rust_core_lib],
+  vala_args: rust_vala_args,
+)
+
+test('execution_and_security_tests', exec_sec_test_exe, timeout: 30)
 
 
 

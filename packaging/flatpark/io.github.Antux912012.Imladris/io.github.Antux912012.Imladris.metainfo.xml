@@ -75,6 +75,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.26.0" date="2026-11-15">
+      <description>
+        <p>Release v0.26.0 introduces the hybrid Rust core (imladris_core) + Vala/GTK4 architecture, format-adaptive UI across all 7 scientific formats (.qmd, .Rmd, .ipynb, .md, .tex, .ts, .html), sequential chunk execution, LaTeX/TypeScript runners, and Flatpak/security hardening:</p>
+        <ul>
+          <li>Hybrid Rust Core (imladris_core): CommonMark + GFM + math/mermaid rendering, lossless Jupyter (.ipynb) round-trip serialization, YAML frontmatter, LaTeX, and TypeScript symbol analyzers over C-ABI.</li>
+          <li>Format-Adaptive UI &amp; Syntax Highlighting: FormatProfile-driven ribbon, headerbar, comments, citations, and embedded GtkSourceView 5 language specs for Quarto, R Markdown, LaTeX, and TypeScript.</li>
+          <li>Polyglot Execution &amp; Compilers: Per-project/tab PersistentSessionManager pool, sequential Gtk.TextMark chunk execution, LatexBuildRunner (.log diagnostics), TypeScriptRunner (tsc/tsx/node/deno/bun), and polyglot R + Python EnvironmentController.</li>
+          <li>Flatpak &amp; Security Hardening: Unified Flatpak permissions (--talk-name=org.freedesktop.Flatpak), hardened Mallorn/plugin archive validation, sanitized CRAN/GitHub package installation, and atomic RecoveryService.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.25.0" date="2026-11-14">
       <description>
         <p>Release v0.25.0 introduces Free-Tier AI APIs with Automatic Quota Failover, GitHub Copilot OAuth login, Positron/RStudio-style Direct Editor Writing, and comprehensive security, stability, and documentation improvements:</p>

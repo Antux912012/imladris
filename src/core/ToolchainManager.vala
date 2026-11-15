@@ -162,7 +162,9 @@ namespace Imladris.Core {
             bool install_r = true,
             bool install_python = true,
             bool install_quarto = true,
-            bool install_tidyverse = true
+            bool install_tidyverse = true,
+            bool install_node_ts = false,
+            bool install_tex = false
         ) {
             bool mamba_ok = yield ensure_micromamba_async ();
             if (!mamba_ok) {
@@ -207,6 +209,15 @@ namespace Imladris.Core {
                 pkgs.add ("pandoc");
             }
 
+            if (install_node_ts) {
+                pkgs.add ("nodejs");
+                pkgs.add ("typescript");
+            }
+
+            if (install_tex) {
+                pkgs.add ("tectonic");
+            }
+
             if (pkgs.length == 0) {
                 log_output ("ℹ No components selected for installation.");
                 return true;
@@ -215,9 +226,10 @@ namespace Imladris.Core {
             progress_changed ("Resolving conda-forge packages...", 0.35, "Connecting to conda-forge");
             log_output (@"▶ Provisioning base-ds environment with $(pkgs.length) packages from conda-forge...");
 
+            bool env_exists = GLib.FileUtils.test (default_env, GLib.FileTest.IS_DIR);
             var cmd = new GLib.GenericArray<string> ();
             cmd.add (mamba_bin);
-            cmd.add ("create");
+            cmd.add (env_exists ? "install" : "create");
             cmd.add ("-y");
             cmd.add ("-r");
             cmd.add (mamba_root);
@@ -342,9 +354,10 @@ local({
             string sandbox_prefix = GLib.Path.build_filename (project_path, ".imladris-env");
             log_output (@"▶ Initializing project sandbox in $sandbox_prefix...");
 
+            bool env_exists = GLib.FileUtils.test (sandbox_prefix, GLib.FileTest.IS_DIR);
             var cmd = new GLib.GenericArray<string> ();
             cmd.add (mamba_bin);
-            cmd.add ("create");
+            cmd.add (env_exists ? "install" : "create");
             cmd.add ("-y");
             cmd.add ("-r");
             cmd.add (mamba_root);

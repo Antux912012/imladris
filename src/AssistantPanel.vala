@@ -336,7 +336,7 @@ namespace Imladris {
             if (doc.source_buffer.get_selection_bounds (out start, out end)) {
                 return doc.source_buffer.get_text (start, end, false);
             }
-            return doc.source_buffer.text;
+            return doc.get_clean_source_text ();
         }
 
         public void send_prompt (string user_prompt) {
@@ -355,7 +355,7 @@ namespace Imladris {
 
                 var doc = parent_window != null ? parent_window.get_active_document () : null;
                 string doc_lang = doc != null ? doc.doc_type : "markdown";
-                string doc_text = doc != null ? doc.source_buffer.text : "";
+                string doc_text = doc != null ? doc.get_clean_source_text () : "";
 
                 elrond_engine.write_with_elrond.begin (doc_lang, doc_text, "", user_prompt, (obj, res) => {
                     set_generating_state (false);

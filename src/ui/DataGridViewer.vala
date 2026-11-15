@@ -49,6 +49,7 @@ namespace Imladris.UI {
 
         public string active_object_name { get; private set; default = ""; }
         public string active_engine { get; private set; default = "r"; }
+        public string session_key { get; set; default = "default"; }
 
         private Gtk.Label title_label;
         private Gtk.Label dim_badge;
@@ -463,57 +464,99 @@ namespace Imladris.UI {
         private async void fetch_r_dataframe (string obj_name) {
             int start_row = current_offset + 1;
             int end_row = current_offset + page_size;
+            string b64_name = GLib.Base64.encode (obj_name.data);
 
             string r_code = """
 local({
-  if (!exists('%s', envir = .GlobalEnv)) {
+  .raw_hex <- '%s'
+  .obj_name <- rawToChar(jsonlite::base64_dec(.raw_hex))
+  if (FALSE) {}
+})
+""";
+            // Decode Base64 safely in base R without requiring jsonlite
+            r_code = """
+local({
+  .b64 <- '%s'
+  .b64_alpha <- 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  .b64_dec_str <- function(s) {
+    s <- gsub('=+$', '', s)
+    chars <- strsplit(s, '')[[1L]]
+    if (length(chars) == 0L) return('')
+    vals <- match(chars, strsplit(.b64_alpha, '')[[1L]]) - 1L
+    bits <- integer(0)
+    for (v in vals) {
+      for (b in 5:0) bits <- c(bits, bitwAnd(bitwShiftR(v, b), 1L))
+    }
+    nbytes <- length(bits) %/% 8L
+    if (nbytes == 0L) return('')
+    bytes <- vapply(seq_len(nbytes), function(i) {
+      sl <- bits[((i - 1L) * 8L + 1L):(i * 8L)]
+      sum(sl * c(128L, 64L, 32L, 16L, 8L, 4L, 2L, 1L))
+    }, integer(1))
+    out <- rawToChar(as.raw(bytes))
+    Encoding(out) <- 'UTF-8'
+    out
+  }
+  .obj_name <- .b64_dec_str(.b64)
+  if (!exists(.obj_name, envir = .GlobalEnv)) {
     cat('__ERROR__\tObject not found in R GlobalEnv\n')
   } else {
-    d <- get('%s', envir = .GlobalEnv)
+    d <- get(.obj_name, envir = .GlobalEnv)
     if (is.matrix(d)) d <- as.data.frame(d)
     nr <- nrow(d); nc <- ncol(d)
-    cols <- colnames(d)
-    if (is.null(cols)) cols <- paste0('V', seq_len(nc))
-    types <- vapply(d, function(x) class(x)[1], character(1))
-    headers <- paste0(cols, ' [', types, ']')
-    cat('__COLS__\t', paste(headers, collapse = '\t'), '\n', sep='')
-    if (nr > 0) {
-      idx <- seq.int(min(%dL, nr), min(%dL, nr))
-      sub_d <- d[idx, , drop = FALSE]
-      sub_chr <- lapply(sub_d, function(col) {
-        v <- as.character(col)
-        v[is.na(v)] <- 'NA'
-        gsub('[\t\r\n]', ' ', v)
-      })
-      lines <- do.call(paste, c(sub_chr, sep = '\t'))
-      cat(paste0('__ROW__\t', idx, '\t', lines, collapse = '\n'), '\n', sep='')
+    if (is.null(nr)) nr <- 0L
+    if (is.null(nc)) nc <- 0L
+    if (nc == 0L) {
+      cat('__COLS__\t(no columns)\n')
+      cat('__DONE__\t', nr, '\t', 0L, '\n', sep='')
+    } else {
+      cols <- colnames(d)
+      if (is.null(cols)) cols <- paste0('V', seq_len(nc))
+      types <- vapply(d, function(x) class(x)[1], character(1))
+      headers <- paste0(cols, ' [', types, ']')
+      cat('__COLS__\t', paste(headers, collapse = '\t'), '\n', sep='')
+      if (nr > 0L) {
+        idx <- seq.int(min(%dL, nr), min(%dL, nr))
+        sub_d <- d[idx, , drop = FALSE]
+        sub_chr <- lapply(sub_d, function(col) {
+          v <- as.character(col)
+          v[is.na(v)] <- 'NA'
+          gsub('[\t\r\n]', ' ', v)
+        })
+        lines <- do.call(paste, c(sub_chr, sep = '\t'))
+        cat(paste0('__ROW__\t', idx, '\t', lines, collapse = '\n'), '\n', sep='')
+      }
+      cat('__DONE__\t', nr, '\t', nc, '\n', sep='')
     }
-    cat('__DONE__\t', nr, '\t', nc, '\n', sep='')
   }
 })
-""".printf (obj_name, obj_name, start_row, end_row);
+""".printf (b64_name, start_row, end_row);
 
             string? plot_out = null;
-            string out_str = yield Services.PersistentSessionManager.get_default ().execute_r (r_code, out plot_out);
+            string out_str = yield Services.PersistentSessionManager.for_key (session_key).execute_r_with_options (r_code, null, null, 15000, false, out plot_out);
             parse_tsv_stream (obj_name, out_str);
         }
 
         private async void fetch_python_dataframe (string obj_name) {
             int start_idx = current_offset;
             int end_idx = current_offset + page_size;
+            string b64_name = GLib.Base64.encode (obj_name.data);
 
             string py_code = """
+import base64 as _b64
 try:
-    _d = eval('%s')
+    _obj_name = _b64.b64decode('%s').decode('utf-8')
+    _d = globals()[_obj_name] if _obj_name in globals() else eval(_obj_name, globals())
     if hasattr(_d, 'to_dict') and hasattr(_d, 'columns'):
         cols = [f"{c} [{_d[c].dtype}]" for c in _d.columns]
         print('__COLS__\t' + '\t'.join(cols))
         nr = len(_d)
         nc = len(_d.columns)
         sub = _d.iloc[%d:%d]
-        for idx, (_, r) in enumerate(sub.iterrows(), start=%d):
-            row_vals = [str(v).replace('\t', ' ').replace('\n', ' ') for v in r.values]
-            print(f'__ROW__\t{idx}\t' + '\t'.join(row_vals))
+        if nc > 0 and len(sub) > 0:
+            _rows = sub.astype(str).apply(lambda col: col.str.replace('\t', ' ', regex=False).str.replace('\r', ' ', regex=False).str.replace('\n', ' ', regex=False))
+            for idx, row in enumerate(_rows.itertuples(index=False, name=None), start=%d):
+                print(f'__ROW__\t{idx}\t' + '\t'.join(row))
         print(f'__DONE__\t{nr}\t{nc}')
     elif hasattr(_d, 'shape') and len(_d.shape) == 2:
         cols = [f'col_{i}' for i in range(_d.shape[1])]
@@ -522,17 +565,17 @@ try:
         nc = _d.shape[1]
         sub = _d[%d:%d]
         for idx, r in enumerate(sub, start=%d):
-            row_vals = [str(v).replace('\t', ' ').replace('\n', ' ') for v in r]
+            row_vals = [str(v).replace('\t', ' ').replace('\r', ' ').replace('\n', ' ') for v in r]
             print(f'__ROW__\t{idx}\t' + '\t'.join(row_vals))
         print(f'__DONE__\t{nr}\t{nc}')
     else:
         print('__ERROR__\tTarget is not a 2D dataframe or matrix')
 except Exception as e:
     print('__ERROR__\t' + str(e))
-""".printf (obj_name, start_idx, end_idx, start_idx + 1, start_idx, end_idx, start_idx + 1);
+""".printf (b64_name, start_idx, end_idx, start_idx + 1, start_idx, end_idx, start_idx + 1);
 
             string? plot_out = null;
-            string out_str = yield Services.PersistentSessionManager.get_default ().execute_python (py_code, out plot_out);
+            string out_str = yield Services.PersistentSessionManager.for_key (session_key).execute_python_with_options (py_code, null, null, 15000, false, out plot_out);
             parse_tsv_stream (obj_name, out_str);
         }
 

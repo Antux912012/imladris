@@ -105,11 +105,15 @@ namespace Imladris.Editor {
             buffer.begin_user_action ();
 
             if (line_prefix.strip ().has_prefix ("#|") && p.item.kind == IntelliSenseSymbolKind.OPTION) {
-                int pipe_idx = line_prefix.index_of ("#|");
+                int pipe_byte_idx = line_prefix.index_of ("#|");
+                int pipe_char_idx = line_prefix.substring (0, pipe_byte_idx).char_count ();
                 Gtk.TextIter replace_start = line_start;
-                replace_start.forward_chars (pipe_idx);
+                replace_start.forward_chars (pipe_char_idx);
                 buffer.delete (ref replace_start, ref cursor_iter);
-                string replacement = "#| " + p.item.insert_text;
+                string opt_body = p.item.insert_text.has_prefix ("#|")
+                    ? p.item.insert_text.substring (2).strip ()
+                    : p.item.insert_text;
+                string replacement = "#| " + opt_body;
                 buffer.insert (ref replace_start, replacement, -1);
                 if (p.item.cursor_backtrack > 0) {
                     replace_start.backward_chars (p.item.cursor_backtrack);
@@ -188,11 +192,18 @@ namespace Imladris.Editor {
                                 kind,
                                 0
                             ) { score = sc + 100 };
-                            store.append (new IntelliSenseProposal (env_item));
+                            items.add (env_item);
                         }
                     }
                 }
             }
+
+            items.sort ((a, b) => {
+                if (a.score != b.score) {
+                    return b.score - a.score;
+                }
+                return strcmp (a.label, b.label);
+            });
 
             int max_items = 25;
             int added = 0;

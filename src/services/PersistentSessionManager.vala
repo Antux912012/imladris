@@ -19,15 +19,52 @@ using GLib;
 
 namespace Imladris.Services {
 
+    public delegate void OutputLineFunc (string engine, string line, bool is_error);
+
     public class PersistentSessionManager : GLib.Object {
 
         private static PersistentSessionManager? _instance = null;
+        private static Gee.HashMap<string, PersistentSessionManager>? _pool = null;
+        private static Gee.HashMap<string, int>? _pool_refs = null;
 
         public static PersistentSessionManager get_default () {
             if (_instance == null) {
                 _instance = new PersistentSessionManager ();
             }
             return _instance;
+        }
+
+        public static PersistentSessionManager for_key (string session_key) {
+            string norm = session_key.strip ();
+            if (norm == "") return get_default ();
+            if (_pool == null) {
+                _pool = new Gee.HashMap<string, PersistentSessionManager> ();
+                _pool_refs = new Gee.HashMap<string, int> ();
+            }
+            if (!_pool.has_key (norm)) {
+                var mgr = new PersistentSessionManager ();
+                if (GLib.FileUtils.test (norm, GLib.FileTest.IS_DIR)) {
+                    mgr._current_working_dir = norm;
+                }
+                _pool.set (norm, mgr);
+                _pool_refs.set (norm, 1);
+            } else {
+                _pool_refs.set (norm, _pool_refs.get (norm) + 1);
+            }
+            return _pool.get (norm);
+        }
+
+        public static void release_session (string session_key) {
+            string norm = session_key.strip ();
+            if (_pool == null || !_pool.has_key (norm)) return;
+            int cnt = _pool_refs.get (norm) - 1;
+            if (cnt <= 0) {
+                _pool.get (norm).shutdown_all ();
+                _pool.unset (norm);
+                _pool_refs.unset (norm);
+            } else {
+                _pool_refs.set (norm, cnt);
+            }
         }
 
         private string _current_working_dir = "";
@@ -118,26 +155,21 @@ namespace Imladris.Services {
                 GLib.warning ("Failed to change process current dir to %s", dir_path);
             }
 
-            // Sync R session
-            if (r_initialized && r_stdin != null) {
-                try {
-                    string escaped = dir_path.replace ("\\", "/").replace ("\"", "\\\"");
-                    r_stdin.put_string (@"setwd(\"$escaped\"); invisible()\n", null);
-                    r_stdin.flush ();
-                } catch (GLib.Error e) {
-                    // Session may have terminated
-                }
+            string escaped = dir_path.replace ("\\", "/").replace ("\"", "\\\"");
+
+            // Route working directory updates through locked 4-field protocol calls
+            if (r_initialized && r_process != null) {
+                execute_r_with_options.begin (@"setwd(\"$escaped\")", null, null, 10000, false, (obj, res) => {
+                    string? p;
+                    execute_r_with_options.end (res, out p);
+                });
             }
 
-            // Sync Python session
-            if (py_initialized && py_stdin != null) {
-                try {
-                    string escaped = dir_path.replace ("\\", "/").replace ("\"", "\\\"");
-                    py_stdin.put_string (@"import os; os.chdir(\"$escaped\")\n", null);
-                    py_stdin.flush ();
-                } catch (GLib.Error e) {
-                    // Session may have terminated
-                }
+            if (py_initialized && py_process != null) {
+                execute_python_with_options.begin (@"import os; os.chdir(\"$escaped\")", null, null, 10000, false, (obj, res) => {
+                    string? p;
+                    execute_python_with_options.end (res, out p);
+                });
             }
 
             working_directory_changed (dir_path);
@@ -149,9 +181,20 @@ namespace Imladris.Services {
          * remain alive across calls.
          */
         public async string execute_r (string code, out string? generated_plot) {
+            return yield execute_r_with_options (code, null, null, 60000, true, out generated_plot);
+        }
+
+        public async string execute_r_with_options (
+            string code,
+            OutputLineFunc? on_output,
+            GLib.Cancellable? cancellable,
+            int timeout_ms,
+            bool emit_global_signals,
+            out string? generated_plot
+        ) {
             yield lock_r ();
             try {
-                return yield execute_r_internal (code, out generated_plot);
+                return yield execute_r_internal (code, on_output, cancellable, timeout_ms, emit_global_signals, out generated_plot);
             } finally {
                 unlock_r ();
             }
@@ -165,7 +208,14 @@ namespace Imladris.Services {
             return sb.str;
         }
 
-        private async string execute_r_internal (string code, out string? generated_plot) {
+        private async string execute_r_internal (
+            string code,
+            OutputLineFunc? on_output,
+            GLib.Cancellable? cancellable,
+            int timeout_ms,
+            bool emit_global_signals,
+            out string? generated_plot
+        ) {
             generated_plot = null;
             ensure_r_session ();
 
@@ -177,53 +227,73 @@ namespace Imladris.Services {
             string plot_id = GLib.Uuid.string_random ().replace ("-", "");
             string plot_file = GLib.Path.build_filename (plot_dir, @"plot_$(plot_id).png");
 
-            bool has_plot = code.contains ("plot(") || code.contains ("plot (") ||
-                            code.contains ("ggplot") || code.contains ("qplot") ||
-                            code.contains ("hist(") || code.contains ("barplot(") ||
-                            code.contains ("boxplot(") || code.contains ("pairs(") ||
-                            code.contains ("heatmap(") || code.contains ("pheatmap(") ||
-                            code.contains ("image(") || code.contains ("matplot(") ||
-                            code.contains ("qqnorm(") || code.contains ("curve(") ||
-                            code.contains ("xyplot(") || code.contains ("bwplot(") ||
-                            code.contains ("dotchart(") || code.contains ("pie(") ||
-                            code.contains ("print(");
-
             string sentinel = @"__IMLADRIS_R_DONE_$(plot_id)__";
             string hex_code = encode_hex (code.data);
-            string payload = @"$(sentinel)|$(has_plot ? "1" : "0")|$(hex_code)|$(plot_file.replace ("\\", "/"))\n";
+            string payload = @"$(sentinel)|1|$(hex_code)|$(plot_file.replace ("\\", "/"))\n";
+
+            var exec_cancel = new GLib.Cancellable ();
+            ulong fwd_hid = 0;
+            if (cancellable != null) {
+                fwd_hid = cancellable.connect (() => {
+                    exec_cancel.cancel ();
+                    if (r_process != null) r_process.send_signal (2);
+                });
+            }
+            bool timed_out = false;
+            uint timeout_id = 0;
+            if (timeout_ms > 0) {
+                timeout_id = GLib.Timeout.add ((uint) timeout_ms, () => {
+                    timed_out = true;
+                    exec_cancel.cancel ();
+                    if (r_process != null) r_process.send_signal (2);
+                    timeout_id = 0;
+                    return GLib.Source.REMOVE;
+                });
+            }
 
             try {
-                r_stdin.put_string (payload, null);
-                r_stdin.flush ();
+                size_t written;
+                yield r_stdin.write_all_async (payload.data, GLib.Priority.DEFAULT, exec_cancel, out written);
+                yield r_stdin.flush_async (GLib.Priority.DEFAULT, exec_cancel);
 
                 var output_sb = new GLib.StringBuilder ();
                 string? line = null;
                 while (true) {
-                    line = yield r_stdout.read_line_async (GLib.Priority.DEFAULT, null);
+                    line = yield r_stdout.read_line_async (GLib.Priority.DEFAULT, exec_cancel);
                     if (line == null) {
                         r_initialized = false;
                         break;
                     }
                     if (line.contains (sentinel)) break;
                     output_sb.append (line + "\n");
-                    session_output_received ("r", line, false);
+                    if (on_output != null) on_output ("r", line, false);
+                    if (emit_global_signals) session_output_received ("r", line, false);
                 }
 
-                if (has_plot && GLib.FileUtils.test (plot_file, GLib.FileTest.EXISTS)) {
+                if (GLib.FileUtils.test (plot_file, GLib.FileTest.EXISTS)) {
                     var f = GLib.File.new_for_path (plot_file);
                     try {
                         var info = f.query_info (GLib.FileAttribute.STANDARD_SIZE, GLib.FileQueryInfoFlags.NONE);
                         if (info.get_size () > 100) {
                             generated_plot = plot_file;
-                            plot_generated (plot_file);
+                            if (emit_global_signals) plot_generated (plot_file);
                         }
                     } catch (GLib.Error e) {}
                 }
 
                 return output_sb.str.strip ();
             } catch (GLib.Error e) {
+                if (timed_out) {
+                    return @"✖ R execution timed out after $(timeout_ms / 1000)s (sent SIGINT).";
+                }
+                if (e is GLib.IOError.CANCELLED) {
+                    return "✖ R execution interrupted.";
+                }
                 r_initialized = false;
                 return @"✖ R evaluation error: $(e.message)";
+            } finally {
+                if (timeout_id != 0) GLib.Source.remove (timeout_id);
+                if (cancellable != null && fwd_hid != 0) cancellable.disconnect (fwd_hid);
             }
         }
 
@@ -233,15 +303,33 @@ namespace Imladris.Services {
          * remain alive in the workspace.
          */
         public async string execute_python (string code, out string? generated_plot) {
+            return yield execute_python_with_options (code, null, null, 60000, true, out generated_plot);
+        }
+
+        public async string execute_python_with_options (
+            string code,
+            OutputLineFunc? on_output,
+            GLib.Cancellable? cancellable,
+            int timeout_ms,
+            bool emit_global_signals,
+            out string? generated_plot
+        ) {
             yield lock_py ();
             try {
-                return yield execute_python_internal (code, out generated_plot);
+                return yield execute_python_internal (code, on_output, cancellable, timeout_ms, emit_global_signals, out generated_plot);
             } finally {
                 unlock_py ();
             }
         }
 
-        private async string execute_python_internal (string code, out string? generated_plot) {
+        private async string execute_python_internal (
+            string code,
+            OutputLineFunc? on_output,
+            GLib.Cancellable? cancellable,
+            int timeout_ms,
+            bool emit_global_signals,
+            out string? generated_plot
+        ) {
             generated_plot = null;
             ensure_python_session ();
 
@@ -253,46 +341,73 @@ namespace Imladris.Services {
             string plot_id = GLib.Uuid.string_random ().replace ("-", "");
             string plot_file = GLib.Path.build_filename (plot_dir, @"plot_$(plot_id).png");
 
-            bool has_plot = code.contains ("plt.") || code.contains ("matplotlib") ||
-                            code.contains (".plot(") || code.contains ("sns.") ||
-                            code.contains ("seaborn");
-
             string b64_code = GLib.Base64.encode (code.data);
             string sentinel = @"__IMLADRIS_PY_DONE_$(plot_id)__";
-            string payload = @"$(sentinel)|$(has_plot ? "1" : "0")|$(b64_code)|$(plot_file)\n";
+            string payload = @"$(sentinel)|1|$(b64_code)|$(plot_file)\n";
+
+            var exec_cancel = new GLib.Cancellable ();
+            ulong fwd_hid = 0;
+            if (cancellable != null) {
+                fwd_hid = cancellable.connect (() => {
+                    exec_cancel.cancel ();
+                    if (py_process != null) py_process.send_signal (2);
+                });
+            }
+            bool timed_out = false;
+            uint timeout_id = 0;
+            if (timeout_ms > 0) {
+                timeout_id = GLib.Timeout.add ((uint) timeout_ms, () => {
+                    timed_out = true;
+                    exec_cancel.cancel ();
+                    if (py_process != null) py_process.send_signal (2);
+                    timeout_id = 0;
+                    return GLib.Source.REMOVE;
+                });
+            }
 
             try {
-                py_stdin.put_string (payload, null);
-                py_stdin.flush ();
+                size_t written;
+                yield py_stdin.write_all_async (payload.data, GLib.Priority.DEFAULT, exec_cancel, out written);
+                yield py_stdin.flush_async (GLib.Priority.DEFAULT, exec_cancel);
 
                 var output_sb = new GLib.StringBuilder ();
                 string? line = null;
                 while (true) {
-                    line = yield py_stdout.read_line_async (GLib.Priority.DEFAULT, null);
+                    line = yield py_stdout.read_line_async (GLib.Priority.DEFAULT, exec_cancel);
                     if (line == null) {
                         py_initialized = false;
                         break;
                     }
                     if (line.contains (sentinel)) break;
                     output_sb.append (line + "\n");
-                    session_output_received ("python", line, false);
+                    if (on_output != null) on_output ("python", line, false);
+                    if (emit_global_signals) session_output_received ("python", line, false);
                 }
 
-                if (has_plot && GLib.FileUtils.test (plot_file, GLib.FileTest.EXISTS)) {
+                if (GLib.FileUtils.test (plot_file, GLib.FileTest.EXISTS)) {
                     var f = GLib.File.new_for_path (plot_file);
                     try {
                         var info = f.query_info (GLib.FileAttribute.STANDARD_SIZE, GLib.FileQueryInfoFlags.NONE);
                         if (info.get_size () > 100) {
                             generated_plot = plot_file;
-                            plot_generated (plot_file);
+                            if (emit_global_signals) plot_generated (plot_file);
                         }
                     } catch (GLib.Error e) {}
                 }
 
                 return output_sb.str.strip ();
             } catch (GLib.Error e) {
+                if (timed_out) {
+                    return @"✖ Python execution timed out after $(timeout_ms / 1000)s (sent SIGINT).";
+                }
+                if (e is GLib.IOError.CANCELLED) {
+                    return "✖ Python execution interrupted.";
+                }
                 py_initialized = false;
                 return @"✖ Python evaluation error: $(e.message)";
+            } finally {
+                if (timeout_id != 0) GLib.Source.remove (timeout_id);
+                if (cancellable != null && fwd_hid != 0) cancellable.disconnect (fwd_hid);
             }
         }
 
@@ -307,16 +422,17 @@ namespace Imladris.Services {
         }
 
         public void interrupt_active_execution () {
-            if (r_process != null) {
+            if (r_process != null && r_initialized) {
                 r_process.send_signal (2); // SIGINT
             }
-            if (py_process != null) {
+            if (py_process != null && py_initialized) {
                 py_process.send_signal (2); // SIGINT
             }
         }
 
         private void ensure_r_session () {
             if (r_initialized && r_process != null) return;
+            r_initialized = false;
 
             string? cwd = (current_working_dir != "" && GLib.FileUtils.test (current_working_dir, GLib.FileTest.IS_DIR))
                 ? current_working_dir : null;
@@ -341,7 +457,7 @@ namespace Imladris.Services {
                     launcher.set_cwd (cwd);
                 }
 
-                string r_driver = "options(width = 120, warn = 1); .imladris_env <- globalenv(); .imladris_con <- file('stdin', open = 'r'); while (length(.line <- readLines(.imladris_con, n = 1L, warn = FALSE)) > 0L) { if (!nzchar(.line)) next; .parts <- strsplit(.line, '|', fixed = TRUE)[[1L]]; if (length(.parts) < 4L) next; .sentinel <- .parts[1L]; .has_plot <- (.parts[2L] == '1'); .hex <- .parts[3L]; .plot_file <- paste(.parts[4L:length(.parts)], collapse = '|'); .code <- if (nzchar(.hex)) { .idx <- seq.int(1L, nchar(.hex), by = 2L); .s <- rawToChar(as.raw(strtoi(substring(.hex, .idx, .idx + 1L), 16L))); Encoding(.s) <- 'UTF-8'; .s } else ''; tryCatch({ .exprs <- parse(text = .code); if (.has_plot) grDevices::png(.plot_file, width = 800, height = 500, res = 120); tryCatch({ for (.e in .exprs) { .res <- withVisible(eval(.e, envir = .imladris_env)); if (.res$visible) print(.res$value) } }, finally = { if (.has_plot && grDevices::dev.cur() > 1L) grDevices::dev.off() }) }, error = function(e) { cat(sprintf('Error: %s\\n', conditionMessage(e))) }); flush.console(); cat(sprintf('\\n%s\\n', .sentinel)); flush.console() }";
+                string r_driver = "options(width = 120, warn = 1); .imladris_env <- globalenv(); .imladris_con <- file('stdin', open = 'r'); while (length(.line <- readLines(.imladris_con, n = 1L, warn = FALSE)) > 0L) { if (!nzchar(.line)) next; .parts <- strsplit(.line, '|', fixed = TRUE)[[1L]]; if (length(.parts) < 4L) next; .sentinel <- .parts[1L]; .has_plot <- (.parts[2L] == '1'); .hex <- .parts[3L]; .plot_file <- paste(.parts[4L:length(.parts)], collapse = '|'); .code <- if (nzchar(.hex)) { .idx <- seq.int(1L, nchar(.hex), by = 2L); .s <- rawToChar(as.raw(strtoi(substring(.hex, .idx, .idx + 1L), 16L))); Encoding(.s) <- 'UTF-8'; .s } else ''; .drew_plot <- FALSE; tryCatch({ .exprs <- parse(text = .code); if (.has_plot) { grDevices::png(.plot_file, width = 800, height = 500, res = 120); grDevices::dev.control(displaylist = 'enable') }; tryCatch({ for (.e in .exprs) { .res <- withVisible(eval(.e, envir = .imladris_env)); if (.res$visible) print(.res$value) }; if (.has_plot && grDevices::dev.cur() > 1L) { .rec <- tryCatch(grDevices::recordPlot(), error = function(e) NULL); .drew_plot <- (!is.null(.rec) && length(.rec[[1L]]) > 0L) } }, finally = { if (.has_plot && grDevices::dev.cur() > 1L) grDevices::dev.off(); if (.has_plot && !.drew_plot && file.exists(.plot_file)) unlink(.plot_file) }) }, interrupt = function(e) { cat('Execution interrupted.\\n') }, error = function(e) { cat(sprintf('Error: %s\\n', conditionMessage(e))) }); flush.console(); cat(sprintf('\\n%s\\n', .sentinel)); flush.console() }";
 
                 string[] raw_argv = {
                     (resolved_path != null) ? resolved_path : "R",
@@ -364,6 +480,14 @@ namespace Imladris.Services {
                 r_stdin = new GLib.DataOutputStream (r_process.get_stdin_pipe ());
                 r_stdout = new GLib.DataInputStream (r_process.get_stdout_pipe ());
                 r_initialized = true;
+                var spawned_r = r_process;
+                spawned_r.wait_async.begin (null, (obj, res) => {
+                    try { spawned_r.wait_async.end (res); } catch (GLib.Error e) {}
+                    if (r_process == spawned_r) {
+                        r_initialized = false;
+                        r_process = null;
+                    }
+                });
             } catch (GLib.Error e) {
                 r_initialized = false;
                 GLib.warning ("Failed to launch persistent R session: %s", e.message);
@@ -372,6 +496,7 @@ namespace Imladris.Services {
 
         private void ensure_python_session () {
             if (py_initialized && py_process != null) return;
+            py_initialized = false;
 
             string? cwd = (current_working_dir != "" && GLib.FileUtils.test (current_working_dir, GLib.FileTest.IS_DIR))
                 ? current_working_dir : null;
@@ -397,7 +522,13 @@ namespace Imladris.Services {
                 }
 
                 string py_driver = """
-import sys, base64, traceback
+import os, sys, base64, traceback
+os.environ.setdefault('MPLBACKEND', 'Agg')
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+except Exception:
+    pass
 _imladris_ns = {'__name__': '__main__'}
 for _raw in sys.stdin:
     _raw = _raw.strip()
@@ -408,23 +539,25 @@ for _raw in sys.stdin:
         continue
     _sentinel, _has_plot, _b64, _plot_path = _parts
     try:
+        if 'matplotlib.pyplot' in sys.modules:
+            sys.modules['matplotlib.pyplot'].close('all')
         _src = base64.b64decode(_b64).decode('utf-8')
         _code = compile(_src, '<imladris-cell>', 'exec')
-        _has_mpl = False
-        if _has_plot == '1':
-            try:
-                import matplotlib
-                matplotlib.use('Agg')
-                import matplotlib.pyplot as plt
-                _has_mpl = True
-            except Exception:
-                _has_mpl = False
         exec(_code, _imladris_ns)
-        if _has_mpl and plt.get_fignums():
-            plt.savefig(_plot_path, dpi=120, bbox_inches='tight')
-            plt.close('all')
+        if _has_plot == '1' and 'matplotlib.pyplot' in sys.modules:
+            _plt = sys.modules['matplotlib.pyplot']
+            if _plt.get_fignums():
+                _plt.savefig(_plot_path, dpi=120, bbox_inches='tight')
+    except KeyboardInterrupt:
+        print('Execution interrupted.')
     except Exception:
         traceback.print_exc(file=sys.stdout)
+    finally:
+        if 'matplotlib.pyplot' in sys.modules:
+            try:
+                sys.modules['matplotlib.pyplot'].close('all')
+            except Exception:
+                pass
     sys.stdout.flush()
     sys.stderr.flush()
     print(_sentinel, flush=True)
@@ -449,6 +582,14 @@ for _raw in sys.stdin:
                 py_stdin = new GLib.DataOutputStream (py_process.get_stdin_pipe ());
                 py_stdout = new GLib.DataInputStream (py_process.get_stdout_pipe ());
                 py_initialized = true;
+                var spawned_py = py_process;
+                spawned_py.wait_async.begin (null, (obj, res) => {
+                    try { spawned_py.wait_async.end (res); } catch (GLib.Error e) {}
+                    if (py_process == spawned_py) {
+                        py_initialized = false;
+                        py_process = null;
+                    }
+                });
             } catch (GLib.Error e) {
                 py_initialized = false;
                 GLib.warning ("Failed to launch persistent Python session: %s", e.message);

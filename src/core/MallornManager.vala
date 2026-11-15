@@ -156,10 +156,18 @@ message("✔ RStudio project environment initialized for: %s")
             // Sync with .mallorn manifests
             write_project_manifests (project_dir, cfg);
 
-            // If sandboxed, initialize renv
+            // If sandboxed, initialize renv and ensure .Rprofile activates it
             if (sandboxed) {
                 try {
                     Services.SandboxController.init_r_sandbox (project_dir);
+                    string rprof_curr = "";
+                    if (FileUtils.test (rprofile_path, FileTest.EXISTS)) {
+                        FileUtils.get_contents (rprofile_path, out rprof_curr);
+                    }
+                    if (!rprof_curr.contains ("renv/activate.R")) {
+                        rprof_curr += "\nif (file.exists(\"renv/activate.R\")) source(\"renv/activate.R\")\n";
+                        FileUtils.set_contents (rprofile_path, rprof_curr);
+                    }
                 } catch (GLib.Error e) {
                     // Non-fatal if host Rscript unavailable
                 }
@@ -321,22 +329,36 @@ author = "%s"
                 if (!op.query_exists ()) op.make_directory_with_parents (null);
             }
 
-            // Attempt tar --zstd first
+            // Attempt tar --zstd first (excluding heavy/ephemeral runtime environments)
             bool success = false;
-            try {
-                string[] argv = { "tar", "-C", project_dir, "--zstd", "-cf", output_path, "." };
-                var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_PIPE);
-                success = proc.wait_check ();
-            } catch (GLib.Error e) {
-                success = false;
-            }
-
-            if (!success) {
-                // Fallback to python3 zipfile
+            bool want_zip = output_path.down ().has_suffix (".zip");
+            if (!want_zip) {
+                try {
+                    string[] argv = {
+                        "tar", "-C", project_dir,
+                        "--exclude=.imladris-env", "--exclude=.venv",
+                        "--exclude=renv/library", "--exclude=.git",
+                        "--exclude=node_modules",
+                        "--zstd", "-cf", output_path, "."
+                    };
+                    var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_PIPE);
+                    success = proc.wait_check ();
+                } catch (GLib.Error e) {
+                    success = false;
+                }
+                if (!success) {
+                    throw new IOError.FAILED (@"Failed to pack .mallorn tar.zst archive: $output_path");
+                }
+            } else {
+                // Explicit .zip variant via python3 zipfile
                 string py_code = "import zipfile, os, sys\n"
                     + "src, dst = sys.argv[1], sys.argv[2]\n"
+                    + "skip = {'.imladris-env', '.venv', '.git', 'node_modules'}\n"
                     + "with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as zf:\n"
                     + "    for root, dirs, files in os.walk(src):\n"
+                    + "        dirs[:] = [d for d in dirs if d not in skip]\n"
+                    + "        if os.path.basename(root) == 'renv' and 'library' in dirs:\n"
+                    + "            dirs.remove('library')\n"
                     + "        for f in files:\n"
                     + "            p = os.path.join(root, f)\n"
                     + "            rel = os.path.relpath(p, src)\n"
@@ -373,17 +395,25 @@ author = "%s"
             bool is_zstd = (bytes_read >= 4 && header[0] == 0x28 && header[1] == 0xb5 && header[2] == 0x2f && header[3] == 0xfd);
 
             if (is_zstd) {
-                // Validate archive member paths against traversal / absolute paths before extraction
-                string[] list_argv = { "tar", "--zstd", "-tf", mallorn_path };
+                // Validate archive member types (reject symlinks/hardlinks/devices) and paths before extraction
+                string[] list_argv = { "tar", "--zstd", "-tvf", mallorn_path };
                 var list_proc = new Subprocess.newv (list_argv, SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE);
                 string list_out, list_err;
                 list_proc.communicate_utf8 (null, null, out list_out, out list_err);
                 if (!list_proc.get_successful ()) {
                     throw new GLib.IOError.FAILED (@"Failed to inspect .mallorn archive: $list_err");
                 }
-                foreach (string entry in (list_out ?? "").split ("\n")) {
+                foreach (string raw_line in (list_out ?? "").split ("\n")) {
+                    string line = raw_line.strip ();
+                    if (line.length == 0) continue;
+                    char ftype = line[0];
+                    if (ftype == 'l' || ftype == 'h' || ftype == 'b' || ftype == 'c' || ftype == 'p') {
+                        throw new GLib.IOError.PERMISSION_DENIED (@"Rejected unsafe link/device archive entry: $line");
+                    }
+                    // Last space-separated field in `tar -tvf` is the member path
+                    int last_sp = line.last_index_of_char (' ');
+                    string entry = (last_sp >= 0 && last_sp + 1 < line.length) ? line.substring (last_sp + 1) : line;
                     string norm = entry.strip ().replace ("\\", "/");
-                    if (norm.length == 0) continue;
                     if (norm.has_prefix ("/") || norm.has_prefix ("~")) {
                         throw new GLib.IOError.PERMISSION_DENIED (@"Rejected unsafe absolute archive path: $entry");
                     }

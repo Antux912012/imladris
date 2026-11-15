@@ -28,7 +28,10 @@ namespace Imladris.UI {
                     return;
                 }
                 apply_policy (view.get_settings (), enabled);
-                view.reload ();
+                string? uri = view.uri;
+                if (uri != null && (uri.has_prefix ("http://") || uri.has_prefix ("https://"))) {
+                    view.reload ();
+                }
             });
 
             return web_view;
@@ -44,7 +47,9 @@ namespace Imladris.UI {
                 : WebKit.HardwareAccelerationPolicy.NEVER;
             settings.enable_webgl = enable_hw;
             settings.allow_file_access_from_file_urls = true;
-            settings.allow_universal_access_from_file_urls = true;
+            settings.allow_universal_access_from_file_urls = false;
+            settings.enable_write_console_messages_to_stdout = false;
+            settings.enable_developer_extras = false;
         }
     }
 }

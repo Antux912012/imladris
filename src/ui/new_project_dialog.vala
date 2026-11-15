@@ -213,6 +213,34 @@ namespace Imladris.UI {
                 "utilities-terminal-symbolic",
                 DocumentFormat.PYSCRIPT
             );
+            add_standalone_target_row (
+                standalone_group,
+                "Create a LaTeX document (.tex)",
+                "Standard LaTeX article template with amsmath, mhchem, and PDF compilation.",
+                "x-office-document-symbolic",
+                DocumentFormat.TEX
+            );
+            add_standalone_target_row (
+                standalone_group,
+                "Create a TypeScript file (.ts)",
+                "Typed TypeScript module with Node/tsc execution and typechecking.",
+                "utilities-terminal-symbolic",
+                DocumentFormat.TS
+            );
+            add_standalone_target_row (
+                standalone_group,
+                "Create a CSS stylesheet (.css)",
+                "Stylesheet for HTML reports and Quarto themes.",
+                "text-x-generic-symbolic",
+                DocumentFormat.CSS
+            );
+            add_standalone_target_row (
+                standalone_group,
+                "Create a BibTeX bibliography (.bib)",
+                "Reference library for Quarto, R Markdown, and LaTeX citations.",
+                "book-open-symbolic",
+                DocumentFormat.BIB
+            );
 
             page.add (standalone_group);
 
@@ -260,7 +288,8 @@ namespace Imladris.UI {
             string clean_name = ProjectScaffolder.sanitize_dirname (title_row.text);
             string base_dir = custom_project_dir != ""
                 ? custom_project_dir
-                : GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents");
+                : (GLib.Environment.get_user_special_dir (GLib.UserDirectory.DOCUMENTS)
+                    ?? GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents"));
             return GLib.Path.build_filename (base_dir, clean_name);
         }
 
@@ -311,7 +340,8 @@ namespace Imladris.UI {
             if (raw_name.length == 0) raw_name = "Untitled_R_Project";
             string base_dir = this.custom_project_dir != ""
                 ? this.custom_project_dir
-                : GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents");
+                : (GLib.Environment.get_user_special_dir (GLib.UserDirectory.DOCUMENTS)
+                    ?? GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents"));
 
             DocumentFormat fmt = get_selected_project_format ();
             if (fmt != DocumentFormat.RMD && fmt != DocumentFormat.QMD) {
@@ -350,7 +380,8 @@ namespace Imladris.UI {
         private void create_standalone_document (DocumentFormat fmt) {
             string base_docs = this.custom_project_dir != ""
                 ? this.custom_project_dir
-                : GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents");
+                : (GLib.Environment.get_user_special_dir (GLib.UserDirectory.DOCUMENTS)
+                    ?? GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents"));
             string name = title_row.text.strip () != "" ? title_row.text.strip () : "Untitled";
 
             var cfg = new ProjectConfig () {

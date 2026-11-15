@@ -12,6 +12,7 @@ namespace Imladris.Core {
     public enum RuntimeSource {
         PROJECT_SANDBOX,
         MANAGED_GLOBAL,
+        FLATPAK_EXTENSION,
         HOST_FLATPAK_SPAWN,
         HOST_NATIVE,
         MISSING;
@@ -22,6 +23,8 @@ namespace Imladris.Core {
                     return "Project Sandbox (.imladris-env)";
                 case MANAGED_GLOBAL:
                     return "Managed Global Toolchain (base-ds)";
+                case FLATPAK_EXTENSION:
+                    return "Flatpak SDK Extension";
                 case HOST_FLATPAK_SPAWN:
                     return "Host System (via Flatpak Portal)";
                 case HOST_NATIVE:
@@ -83,14 +86,20 @@ namespace Imladris.Core {
                     return RuntimeSource.PROJECT_SANDBOX;
                 }
 
-                // Check Python virtual environment (.venv)
-                if (binary_name == "python" || binary_name == "python3") {
-                    string venv_py = GLib.Path.build_filename (project_dir, ".venv", "bin", "python");
-                    if (GLib.FileUtils.test (venv_py, GLib.FileTest.IS_EXECUTABLE)) {
-                        resolved_path = venv_py;
-                        env_prefix = GLib.Path.build_filename (project_dir, ".venv");
-                        return RuntimeSource.PROJECT_SANDBOX;
-                    }
+                // Check Python virtual environment (.venv) for all binaries (python, pip, uv, pytest, ipython, jupyter, etc.)
+                string venv_bin = GLib.Path.build_filename (project_dir, ".venv", "bin", binary_name);
+                if (GLib.FileUtils.test (venv_bin, GLib.FileTest.IS_EXECUTABLE)) {
+                    resolved_path = venv_bin;
+                    env_prefix = GLib.Path.build_filename (project_dir, ".venv");
+                    return RuntimeSource.PROJECT_SANDBOX;
+                }
+
+                // Check Node.js local binaries
+                string node_bin = GLib.Path.build_filename (project_dir, "node_modules", ".bin", binary_name);
+                if (GLib.FileUtils.test (node_bin, GLib.FileTest.IS_EXECUTABLE)) {
+                    resolved_path = node_bin;
+                    env_prefix = project_dir;
+                    return RuntimeSource.PROJECT_SANDBOX;
                 }
             }
 
@@ -103,14 +112,36 @@ namespace Imladris.Core {
                 return RuntimeSource.MANAGED_GLOBAL;
             }
 
-            // Tier 3: Host / System Environment Fallback
-            string? local_path = GLib.Environment.find_program_in_path (binary_name);
-            if (local_path != null) {
-                resolved_path = local_path;
-                return RuntimeSource.HOST_NATIVE;
+            string data_dir = GLib.Environment.get_user_data_dir ();
+            string home_dir = GLib.Environment.get_home_dir ();
+            string[] managed_tinytex = {
+                GLib.Path.build_filename (data_dir, "TinyTeX", "bin", "x86_64-linux", binary_name),
+                GLib.Path.build_filename (data_dir, "TinyTeX", "bin", "aarch64-linux", binary_name),
+                GLib.Path.build_filename (home_dir, ".TinyTeX", "bin", "x86_64-linux", binary_name),
+                GLib.Path.build_filename (home_dir, ".TinyTeX", "bin", "aarch64-linux", binary_name)
+            };
+            foreach (string tt_bin in managed_tinytex) {
+                if (GLib.FileUtils.test (tt_bin, GLib.FileTest.IS_EXECUTABLE)) {
+                    resolved_path = tt_bin;
+                    return RuntimeSource.MANAGED_GLOBAL;
+                }
             }
 
+            // Tier 2.5: Flatpak SDK Extension /app or /usr/lib/sdk/texlive
             if (is_flatpak ()) {
+                string[] ext_bins = {
+                    GLib.Path.build_filename ("/usr/lib/sdk/texlive/bin/x86_64-linux", binary_name),
+                    GLib.Path.build_filename ("/usr/lib/sdk/texlive/bin/aarch64-linux", binary_name),
+                    GLib.Path.build_filename ("/app/bin", binary_name)
+                };
+                foreach (string ext_bin in ext_bins) {
+                    if (GLib.FileUtils.test (ext_bin, GLib.FileTest.IS_EXECUTABLE)) {
+                        resolved_path = ext_bin;
+                        return RuntimeSource.FLATPAK_EXTENSION;
+                    }
+                }
+
+                // Check host system via flatpak-spawn BEFORE container /usr/bin/*
                 string? host_path = resolve_host_program_path (binary_name);
                 if (host_path != null) {
                     resolved_path = host_path;
@@ -118,8 +149,22 @@ namespace Imladris.Core {
                 }
             }
 
+            // Tier 3: Native / Container System Environment Fallback
+            string? local_path = GLib.Environment.find_program_in_path (binary_name);
+            if (local_path != null) {
+                resolved_path = local_path;
+                return RuntimeSource.HOST_NATIVE;
+            }
+
             // Tier 4: Missing
             return RuntimeSource.MISSING;
+        }
+
+        public static void clear_runtime_caches () {
+            _cache_mutex.lock ();
+            if (_availability_cache != null) _availability_cache.remove_all ();
+            if (_path_cache != null) _path_cache.remove_all ();
+            _cache_mutex.unlock ();
         }
 
         /**
@@ -164,20 +209,24 @@ namespace Imladris.Core {
             }
             string path_val = string.joinv (":", path_arr);
 
-            launcher.set_environ (GLib.Environment.list_variables ());
             launcher.setenv ("PATH", path_val, true);
             if (has_prefix) {
-                launcher.setenv ("CONDA_PREFIX", env_prefix, true);
-                launcher.setenv ("PKG_CONFIG_PATH", pkg_dir, true);
-                launcher.setenv ("R_HOME", r_home, true);
+                bool is_venv = GLib.Path.get_basename (env_prefix) == ".venv";
+                if (is_venv) {
+                    launcher.setenv ("VIRTUAL_ENV", env_prefix, true);
+                } else {
+                    launcher.setenv ("CONDA_PREFIX", env_prefix, true);
+                    launcher.setenv ("PKG_CONFIG_PATH", pkg_dir, true);
+                    launcher.setenv ("R_HOME", r_home, true);
+                    string r_bin = GLib.Path.build_filename (bin_dir, "R");
+                    if (GLib.FileUtils.test (r_bin, GLib.FileTest.EXISTS)) {
+                        launcher.setenv ("QUARTO_R", r_bin, true);
+                    }
+                }
 
                 string py_bin = GLib.Path.build_filename (bin_dir, "python3");
                 if (GLib.FileUtils.test (py_bin, GLib.FileTest.EXISTS)) {
                     launcher.setenv ("QUARTO_PYTHON", py_bin, true);
-                }
-                string r_bin = GLib.Path.build_filename (bin_dir, "R");
-                if (GLib.FileUtils.test (r_bin, GLib.FileTest.EXISTS)) {
-                    launcher.setenv ("QUARTO_R", r_bin, true);
                 }
             }
 
@@ -291,21 +340,43 @@ namespace Imladris.Core {
          * if running inside Flatpak.
          */
         public static string[] build_host_command (string[] argv, string? working_dir = null) {
+            return build_host_command_with_env (argv, working_dir, null);
+        }
+
+        public static string[] build_host_command_with_env (
+            string[] argv,
+            string? working_dir = null,
+            string[]? env_vars = null
+        ) {
             if (!is_flatpak ()) {
                 return argv;
             }
 
-            int base_count = (working_dir != null && working_dir != "") ? 4 : 3;
-            string[] result = new string[base_count + argv.length];
-            result[0] = "flatpak-spawn";
-            result[1] = "--host";
-            result[2] = "--watch-bus";
-            int idx = 3;
-            if (working_dir != null && working_dir != "") {
-                result[idx++] = "--directory=" + working_dir;
+            var cmd = new GLib.GenericArray<string> ();
+            cmd.add ("flatpak-spawn");
+            cmd.add ("--host");
+            cmd.add ("--watch-bus");
+
+            if (working_dir != null && working_dir != "" &&
+                !working_dir.has_prefix ("/app/") && !working_dir.has_prefix ("/run/build/")) {
+                cmd.add ("--directory=" + working_dir);
             }
+
+            if (env_vars != null) {
+                foreach (string kv in env_vars) {
+                    if (kv != null && kv.contains ("=")) {
+                        cmd.add ("--env=" + kv);
+                    }
+                }
+            }
+
             for (int i = 0; i < argv.length; i++) {
-                result[idx++] = argv[i];
+                cmd.add (argv[i]);
+            }
+
+            string[] result = new string[cmd.length];
+            for (int i = 0; i < cmd.length; i++) {
+                result[i] = cmd[i];
             }
             return result;
         }

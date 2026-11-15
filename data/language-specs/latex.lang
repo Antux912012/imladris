@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<language id="latex" name="LaTeX" version="2.0" _section="Markup">
+  <metadata>
+    <property name="mimetypes">text/x-tex</property>
+    <property name="globs">*.tex;*.ltx</property>
+    <property name="line-comment-start">% </property>
+  </metadata>
+
+  <styles>
+    <style id="comment" name="Comment" map-to="def:comment"/>
+    <style id="command" name="Command" map-to="def:keyword"/>
+    <style id="math" name="Math" map-to="def:string"/>
+    <style id="section" name="Section" map-to="def:type"/>
+    <style id="brace" name="Braces" map-to="def:operator"/>
+  </styles>
+
+  <definitions>
+    <context id="comment" style-ref="comment" end-at-line-end="true">
+      <start>%</start>
+    </context>
+
+    <context id="display-math" style-ref="math">
+      <start>\$\$|\\\[</start>
+      <end>\$\$|\\\]</end>
+    </context>
+
+    <context id="inline-math" style-ref="math">
+      <match>\$[^$\n]+\$|\\\([^)]*\\\)</match>
+    </context>
+
+    <context id="section-cmd" style-ref="section">
+      <match>\\(part|chapter|section|subsection|subsubsection|paragraph|documentclass|usepackage|begin|end)\b</match>
+    </context>
+
+    <context id="command" style-ref="command">
+      <match>\\[a-zA-Z@]+\*?|\\%|\\\$|\\&amp;|\\#|\\_|\\\{|\\\}</match>
+    </context>
+
+    <context id="latex">
+      <include>
+        <context ref="comment"/>
+        <context ref="display-math"/>
+        <context ref="inline-math"/>
+        <context ref="section-cmd"/>
+        <context ref="command"/>
+      </include>
+    </context>
+  </definitions>
+</language>

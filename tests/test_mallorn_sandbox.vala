@@ -279,9 +279,13 @@ plot(x)
 
 And some text in between.
 
-```python
+```{python}
 import numpy as np
 print(np.mean([1, 2, 3]))
+```
+
+```json
+{"display_only": true}
 ```
 """;
         var chunks = Core.ChunkParser.parse_chunks (doc);
@@ -815,16 +819,15 @@ x <- 42
             string converted_md = Core.NotebookSerializer.ipynb_to_markdown (generated_ipynb);
             assert (converted_md.contains ("# Section 1: Overview"));
             assert (converted_md.contains ("```{python}"));
-            assert (converted_md.contains ("#| cell_id: cell_0001"));
-            assert (converted_md.contains ("#| execution_count: 42"));
-            assert (converted_md.contains ("#| tags: [\"parameters\", \"export\"]"));
+            assert (converted_md.contains ("imladris:cell"));
+            assert (converted_md.contains ("cell_0001"));
+            assert (converted_md.contains ("\"parameters\""));
             assert (converted_md.contains ("x = np.linspace(0, 10, 100)"));
             assert (converted_md.contains ("```{r}"));
-            assert (converted_md.contains ("#| cell_id: cell_0002"));
-            assert (converted_md.contains ("#| execution_count: 7"));
+            assert (converted_md.contains ("cell_0002"));
 
             // 4. Test secondary round-trip (idempotency check)
-            string round_trip_ipynb = Core.NotebookSerializer.markdown_to_ipynb (converted_md);
+            string round_trip_ipynb = Core.NotebookSerializer.markdown_to_ipynb (converted_md, generated_ipynb);
             var parser2 = new Json.Parser ();
             parser2.load_from_data (round_trip_ipynb);
             var root2 = parser2.get_root ().get_object ();
@@ -1180,10 +1183,11 @@ df_omics = pd.read_csv("counts.tsv")
 }""";
         try {
             string md_nb = Core.NotebookSerializer.ipynb_to_markdown (sample_ipynb);
-            assert ("#| outputs_b64:" in md_nb);
-            assert ("::: {.ipynb-output}" in md_nb);
-            assert ("> 42" in md_nb);
-            string saved_ipynb = Core.NotebookSerializer.markdown_to_ipynb (md_nb, "python");
+            assert ("imladris:cell" in md_nb);
+            assert ("cell-1" in md_nb);
+            assert (!("outputs_b64" in md_nb));
+            assert ("print(42)" in md_nb);
+            string saved_ipynb = Core.NotebookSerializer.markdown_to_ipynb (md_nb, sample_ipynb);
             assert ("\"output_type\":\"stream\"" in saved_ipynb.replace (" ", "") || "\"output_type\": \"stream\"" in saved_ipynb);
             assert (!("ipynb-output" in saved_ipynb));
         } catch (GLib.Error e) {

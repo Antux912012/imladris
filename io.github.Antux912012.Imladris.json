@@ -1,8 +1,11 @@
 {
     "id": "io.github.Antux912012.Imladris",
     "runtime": "org.gnome.Platform",
-    "runtime-version": "51",
+    "runtime-version": "50",
     "sdk": "org.gnome.Sdk",
+    "sdk-extensions": [
+        "org.freedesktop.Sdk.Extension.rust-stable"
+    ],
     "command": "imladris",
     "finish-args": [
         "--share=ipc",
@@ -10,8 +13,17 @@
         "--socket=fallback-x11",
         "--socket=wayland",
         "--device=dri",
-        "--filesystem=home"
+        "--talk-name=org.freedesktop.Flatpak",
+        "--filesystem=home",
+        "--filesystem=xdg-cache/imladris:create"
     ],
+    "build-options": {
+        "append-path": "/usr/lib/sdk/rust-stable/bin",
+        "env": {
+            "CARGO_HOME": "/run/build/imladris/cargo",
+            "CARGO_NET_OFFLINE": "true"
+        }
+    },
     "cleanup": [
         "/include",
         "/lib/pkgconfig",

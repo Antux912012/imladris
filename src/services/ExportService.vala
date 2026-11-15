@@ -50,9 +50,27 @@ namespace Imladris.Services {
             }
         }
 
+        private static string resolve_pandoc_from (DocumentFormat fmt) {
+            switch (fmt) {
+                case DocumentFormat.IPYNB:
+                    return "ipynb";
+                case DocumentFormat.HTML:
+                    return "html";
+                case DocumentFormat.TEX:
+                    return "latex";
+                case DocumentFormat.MD:
+                    return "gfm";
+                default:
+                    return "markdown";
+            }
+        }
+
         private static string materialize_input (string input_path, string? raw_buffer_fallback, out string? temp_file) throws GLib.Error {
             temp_file = null;
-            if (GLib.FileUtils.test (input_path, GLib.FileTest.EXISTS) || raw_buffer_fallback == null) {
+            if (raw_buffer_fallback == null && GLib.FileUtils.test (input_path, GLib.FileTest.EXISTS)) {
+                return input_path;
+            }
+            if (raw_buffer_fallback == null) {
                 return input_path;
             }
             string base_name = GLib.Path.get_basename (input_path);
@@ -104,7 +122,7 @@ namespace Imladris.Services {
             string? temp_src = null;
             string actual_input = materialize_input (input_path, raw_buffer_fallback, out temp_src);
             string src_dir = GLib.Path.get_dirname (actual_input);
-            string pandoc_from = (fmt == DocumentFormat.IPYNB) ? "ipynb" : ((fmt == DocumentFormat.HTML) ? "html" : "markdown");
+            string pandoc_from = resolve_pandoc_from (fmt);
 
             try {
                 if ((fmt == DocumentFormat.QMD || fmt == DocumentFormat.IPYNB) &&
@@ -150,7 +168,7 @@ namespace Imladris.Services {
             string? temp_src = null;
             string actual_input = materialize_input (input_path, raw_buffer_fallback, out temp_src);
             string src_dir = GLib.Path.get_dirname (actual_input);
-            string pandoc_from = (fmt == DocumentFormat.IPYNB) ? "ipynb" : ((fmt == DocumentFormat.HTML) ? "html" : "markdown");
+            string pandoc_from = resolve_pandoc_from (fmt);
 
             try {
                 string? soffice_bin = Core.PlatformUtils.find_program ("soffice", src_dir)
@@ -219,7 +237,7 @@ namespace Imladris.Services {
             string? temp_src = null;
             string actual_input = materialize_input (input_path, raw_buffer_fallback, out temp_src);
             string src_dir = GLib.Path.get_dirname (actual_input);
-            string pandoc_from = (fmt == DocumentFormat.IPYNB) ? "ipynb" : ((fmt == DocumentFormat.HTML) ? "html" : "markdown");
+            string pandoc_from = resolve_pandoc_from (fmt);
 
             try {
                 if ((fmt == DocumentFormat.QMD || fmt == DocumentFormat.IPYNB) &&
@@ -316,7 +334,7 @@ namespace Imladris.Services {
             string? temp_src = null;
             string actual_input = materialize_input (input_path, raw_buffer_fallback, out temp_src);
             string src_dir = GLib.Path.get_dirname (actual_input);
-            string pandoc_from = (fmt == DocumentFormat.IPYNB) ? "ipynb" : ((fmt == DocumentFormat.HTML) ? "html" : "markdown");
+            string pandoc_from = resolve_pandoc_from (fmt);
 
             try {
                 // Stage 1: Try Quarto / RMarkdown direct PDF render if notebook
@@ -425,7 +443,7 @@ namespace Imladris.Services {
             string? temp_src = null;
             string actual_input = materialize_input (input_path, raw_buffer_fallback, out temp_src);
             string src_dir = GLib.Path.get_dirname (actual_input);
-            string pandoc_from = (fmt == DocumentFormat.IPYNB) ? "ipynb" : ((fmt == DocumentFormat.HTML) ? "html" : "markdown");
+            string pandoc_from = resolve_pandoc_from (fmt);
 
             try {
                 if (Core.PlatformUtils.is_program_available ("pandoc", src_dir)) {
@@ -469,6 +487,8 @@ namespace Imladris.Services {
             return _instance;
         }
 
+        public string last_error_message { get; private set; default = ""; }
+
         public async bool export_document_async (string input_path, string output_path, string format_target, string? raw_buffer = null) {
             string ext_label = format_target.up ();
             string src_path = input_path;
@@ -476,6 +496,7 @@ namespace Imladris.Services {
             string raw_text = raw_buffer != null ? raw_buffer : read_source_or_fallback (input_path, null);
             bool ok = false;
             string err_msg = "";
+            last_error_message = "";
 
             GLib.SourceFunc callback = export_document_async.callback;
             new GLib.Thread<void*> ("imladris-export-worker", () => {
@@ -492,9 +513,13 @@ namespace Imladris.Services {
                     } else {
                         export_to_odt (src_path, output_path, raw_text);
                     }
-                    ok = true;
+                    ok = GLib.FileUtils.test (output_path, GLib.FileTest.EXISTS);
+                    if (!ok) {
+                        err_msg = @"Export completed without producing $(GLib.Path.get_basename (output_path))";
+                    }
                 } catch (GLib.Error e) {
                     err_msg = e.message;
+                    ok = false;
                 }
                 GLib.Idle.add ((owned) callback);
                 return null;
@@ -502,6 +527,7 @@ namespace Imladris.Services {
             yield;
 
             if (!ok && err_msg != "") {
+                last_error_message = err_msg;
                 GLib.warning ("Export to %s failed: %s", ext_label, err_msg);
             }
             return ok;
@@ -677,8 +703,17 @@ namespace Imladris.Services {
         }
 
         private static bool convert_with_libreoffice (string soffice_bin, string input_file, string target_ext, string out_dir, string output_path) {
+            string lo_profile = GLib.Path.build_filename (
+                Core.PlatformUtils.get_shared_cache_dir ("lo-profile"),
+                @"prof_$(GLib.Random.next_int ())"
+            );
             try {
-                string[] raw_lo_argv = { soffice_bin, "--headless", "--convert-to", target_ext, input_file, "--outdir", out_dir };
+                var pdir = GLib.File.new_for_path (lo_profile);
+                if (!pdir.query_exists ()) {
+                    pdir.make_directory_with_parents (null);
+                }
+                string user_inst = "-env:UserInstallation=" + GLib.Filename.to_uri (lo_profile);
+                string[] raw_lo_argv = { soffice_bin, user_inst, "--headless", "--convert-to", target_ext, input_file, "--outdir", out_dir };
                 string[] lo_argv = Core.PlatformUtils.build_host_command (raw_lo_argv, out_dir);
                 var lo_proc = new GLib.Subprocess.newv (lo_argv, GLib.SubprocessFlags.STDOUT_SILENCE | GLib.SubprocessFlags.STDERR_SILENCE);
                 if (lo_proc.wait_check ()) {
@@ -744,8 +779,18 @@ with zipfile.ZipFile(payload['out_path'], 'w') as zf:
             gen.set_root (jb.get_root ());
             string stdin_json = gen.to_data (null);
 
-            string[] argv = { "python3", "-c", py_packer };
-            var proc = new GLib.Subprocess.newv (argv, GLib.SubprocessFlags.STDIN_PIPE | GLib.SubprocessFlags.STDOUT_SILENCE | GLib.SubprocessFlags.STDERR_SILENCE);
+            string? py_bin = null;
+            string? py_env = null;
+            var py_src = Core.PlatformUtils.resolve_runtime ("python3", null, out py_bin, out py_env);
+            var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDIN_PIPE | GLib.SubprocessFlags.STDOUT_SILENCE | GLib.SubprocessFlags.STDERR_SILENCE);
+            string[] argv;
+            if (py_src == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
+                argv = Core.PlatformUtils.build_host_command ({ "python3", "-c", py_packer }, null);
+            } else {
+                Core.PlatformUtils.configure_managed_env (launcher, py_env);
+                argv = { py_bin ?? "python3", "-c", py_packer };
+            }
+            var proc = launcher.spawnv (argv);
             proc.communicate_utf8 (stdin_json, null, null, null);
             if (!proc.get_successful ()) {
                 throw new IOError.FAILED ("Failed to package OASIS ZIP archive");

@@ -1324,6 +1324,9 @@ namespace Imladris.Core {
                 ce_idx = s.index_of ("\\ce{");
             }
 
+            // Escape literal angle brackets before injecting HTML tags so `x < y` renders intact
+            s = s.replace ("<", "&lt;").replace (">", "&gt;");
+
             // Convert pmatrix / bmatrix environments
             s = render_matrix_environments_html (s);
 
@@ -1413,11 +1416,7 @@ namespace Imladris.Core {
                 { "\\,", " " }
             };
 
-            for (int i = 0; i < sym_map.length[0]; i++) {
-                s = s.replace (sym_map[i, 0], sym_map[i, 1]);
-            }
-
-            // Simple single-character ^x and _x remaining
+            // Simple single-character ^x and _x BEFORE symbol spans are emitted
             try {
                 var rem_sup = new GLib.Regex ("\\^([a-zA-Z0-9+-])");
                 s = rem_sup.replace (s, -1, 0, "<sup>\\1</sup>");
@@ -1425,10 +1424,42 @@ namespace Imladris.Core {
                 s = rem_sub.replace (s, -1, 0, "<sub>\\1</sub>");
             } catch (GLib.RegexError e) {}
 
+            // Replace LaTeX commands in a single longest-command regex pass (prevents \int -> ∈t)
+            var sym_table = new Gee.HashMap<string, string> ();
+            for (int i = 0; i < sym_map.length[0]; i++) {
+                sym_table.set (sym_map[i, 0], sym_map[i, 1]);
+            }
+            sym_table.set ("\\sim", "∼");
+            sym_table.set ("\\cong", "≅");
+            sym_table.set ("\\simeq", "≃");
+            sym_table.set ("\\ll", "≪");
+            sym_table.set ("\\gg", "≫");
+            sym_table.set ("\\langle", "⟨");
+            sym_table.set ("\\rangle", "⟩");
+            sym_table.set ("\\dots", "…");
+            sym_table.set ("\\cdots", "⋯");
+            sym_table.set ("\\vdots", "⋮");
+            sym_table.set ("\\Re", "ℜ");
+            sym_table.set ("\\Im", "ℑ");
+            sym_table.set ("\\partial", "∂");
+
+            try {
+                var cmd_rx = new GLib.Regex ("\\\\([A-Za-z]+|[,|\\(\\)\\[\\]])");
+                s = cmd_rx.replace_eval (s, -1, 0, 0, (mi, res) => {
+                    string full = mi.fetch (0);
+                    if (sym_table.has_key (full)) {
+                        res.append (sym_table.get (full));
+                    } else {
+                        res.append (full);
+                    }
+                    return false;
+                });
+            } catch (GLib.RegexError e) {}
+
             if (display_block) {
                 return @"<div class=\"math-display-card\">$s</div>";
             }
-            return s;
+            return @"<span class=\"math-inline\">$s</span>";
         }
 
         private static string render_matrix_environments_html (string input) {

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<language id="rmd" name="R Markdown" version="2.0" _section="Scientific">
+  <metadata>
+    <property name="mimetypes">text/x-rmd;text/markdown</property>
+    <property name="globs">*.Rmd;*.rmd</property>
+    <property name="line-comment-start"># </property>
+  </metadata>
+
+  <styles>
+    <style id="yaml-delim" name="YAML Delimiter" map-to="def:preprocessor"/>
+    <style id="chunk-fence" name="Chunk Fence" map-to="def:keyword"/>
+    <style id="math" name="Math Formula" map-to="def:string"/>
+    <style id="citation" name="Citation" map-to="def:identifier"/>
+  </styles>
+
+  <definitions>
+    <context id="yaml-frontmatter" style-ref="yaml-delim">
+      <start>\%^---$</start>
+      <end>^(---|\.\.\.)$</end>
+      <include>
+        <context ref="yaml:yaml" ignore-style="true"/>
+      </include>
+    </context>
+
+    <context id="chunk-r">
+      <start>^(`{3,})\s*\{\s*r\b[^}]*\}\s*$</start>
+      <end>^(\%{1@start})</end>
+      <include>
+        <context sub-pattern="0" where="start" style-ref="chunk-fence"/>
+        <context sub-pattern="0" where="end" style-ref="chunk-fence"/>
+        <context ref="r:r" ignore-style="true"/>
+      </include>
+    </context>
+
+    <context id="chunk-python">
+      <start>^(`{3,})\s*\{\s*(python|py)\b[^}]*\}\s*$</start>
+      <end>^(\%{1@start})</end>
+      <include>
+        <context sub-pattern="0" where="start" style-ref="chunk-fence"/>
+        <context sub-pattern="0" where="end" style-ref="chunk-fence"/>
+        <context ref="python3:python3" ignore-style="true"/>
+      </include>
+    </context>
+
+    <context id="display-math" style-ref="math">
+      <start>\$\$</start>
+      <end>\$\$</end>
+    </context>
+
+    <context id="inline-math" style-ref="math">
+      <match>\$[^$\n]+\$</match>
+    </context>
+
+    <context id="citation" style-ref="citation">
+      <match>\[@[-a-zA-Z0-9_.:; ]+\]|@[a-zA-Z][a-zA-Z0-9_.:-]*</match>
+    </context>
+
+    <context id="rmd">
+      <include>
+        <context ref="yaml-frontmatter"/>
+        <context ref="chunk-r"/>
+        <context ref="chunk-python"/>
+        <context ref="display-math"/>
+        <context ref="inline-math"/>
+        <context ref="citation"/>
+        <context ref="markdown:markdown"/>
+      </include>
+    </context>
+  </definitions>
+</language>

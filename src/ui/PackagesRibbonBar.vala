@@ -491,6 +491,21 @@ namespace Imladris.UI {
             return pop;
         }
 
+        public static bool is_valid_r_package_spec (string spec) {
+            string s = spec.strip ();
+            if (s.length == 0 || s.contains ("..")) return false;
+            try {
+                var rx = new GLib.Regex ("^[A-Za-z0-9._/-]+$");
+                return rx.match (s);
+            } catch (GLib.RegexError e) {
+                return false;
+            }
+        }
+
+        private static string escape_r_string (string raw) {
+            return raw.replace ("\\", "\\\\").replace ("\"", "\\\"");
+        }
+
         private void trigger_cran_install () {
             string raw = r_search_entry.text.strip ();
             if (raw.length == 0) return;
@@ -501,8 +516,12 @@ namespace Imladris.UI {
             foreach (string t in tokens) {
                 string clean = t.strip ();
                 if (clean.length > 0) {
+                    if (!is_valid_r_package_spec (clean)) {
+                        GLib.warning ("Rejected unsafe R package identifier: %s", clean);
+                        return;
+                    }
                     if (count > 0) builder.append (", ");
-                    builder.append_printf ("\"%s\"", clean);
+                    builder.append_printf ("\"%s\"", escape_r_string (clean));
                     count++;
                 }
             }
@@ -550,15 +569,20 @@ namespace Imladris.UI {
 
         private void install_from_github (bool is_r, string repo_spec) {
             if (is_r) {
+                if (!is_valid_r_package_spec (repo_spec)) {
+                    GLib.warning ("Rejected unsafe R GitHub repo spec: %s", repo_spec);
+                    return;
+                }
+                string safe_spec = escape_r_string (repo_spec.strip ());
                 string deps = deps_check.active ? "TRUE" : "FALSE";
                 string r_cmd;
                 if (is_sandboxed) {
                     r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(\"%s\"); renv::snapshot(prompt = FALSE) } else { renv::install(\"%s\"); renv::snapshot(prompt = FALSE) }".printf (
-                        repo_spec, repo_spec
+                        safe_spec, safe_spec
                     );
                 } else {
                     r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(\"%s\") } else { if (!requireNamespace('remotes', quietly = TRUE)) install.packages('remotes', repos = 'https://cloud.r-project.org'); remotes::install_github(\"%s\", dependencies = %s) }".printf (
-                        repo_spec, repo_spec, deps
+                        safe_spec, safe_spec, deps
                     );
                 }
                 dispatch_r_install (r_cmd, repo_spec);
@@ -604,10 +628,11 @@ namespace Imladris.UI {
 
                 string local_path = file.get_path ();
                 if (is_r) {
+                    string safe_path = escape_r_string (local_path);
                     string deps = deps_check.active ? "TRUE" : "FALSE";
                     string r_cmd = is_sandboxed
-                        ? "renv::install(\"%s\"); renv::snapshot(prompt = FALSE)".printf (local_path)
-                        : "install.packages(\"%s\", repos = NULL, type = \"source\", dependencies = %s)".printf (local_path, deps);
+                        ? "renv::install(\"%s\"); renv::snapshot(prompt = FALSE)".printf (safe_path)
+                        : "install.packages(\"%s\", repos = NULL, type = \"source\", dependencies = %s)".printf (safe_path, deps);
                     dispatch_r_install (r_cmd, Path.get_basename (local_path));
                 } else {
                     var args = build_base_pip_argv ();
@@ -621,7 +646,7 @@ namespace Imladris.UI {
 
         private GenericArray<string> build_base_pip_argv () {
             var argv = new GenericArray<string> ();
-            string? uv_bin = Environment.find_program_in_path ("uv");
+            string? uv_bin = Core.PlatformUtils.find_program ("uv", project_root);
 
             if (uv_bin != null) {
                 argv.add (uv_bin);

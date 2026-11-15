@@ -209,7 +209,7 @@ public class TestGalaxyBridge {
     public static void test_secret_schema () {
         var schema = GalaxyClient.get_secret_schema ();
         assert (schema != null);
-        assert (schema.name == "org.ardatech.Imladris.GalaxyApiKey");
+        assert (schema.name == "io.github.Antux912012.Imladris.GalaxyApiKey");
     }
 
     /**

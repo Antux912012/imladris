@@ -191,9 +191,24 @@ namespace Imladris.Tests {
     }
 
     public static int main (string[] args) {
+        string tmp_xdg = "";
+        try {
+            tmp_xdg = GLib.DirUtils.make_tmp ("imladris-dock-test-XXXXXX");
+            GLib.Environment.set_variable ("XDG_CONFIG_HOME", GLib.Path.build_filename (tmp_xdg, "config"), true);
+            GLib.Environment.set_variable ("XDG_DATA_HOME", GLib.Path.build_filename (tmp_xdg, "data"), true);
+            GLib.Environment.set_variable ("XDG_CACHE_HOME", GLib.Path.build_filename (tmp_xdg, "cache"), true);
+        } catch (GLib.Error e) {
+            warning ("Temp dir setup failed: %s", e.message);
+        }
+
         bool has_display = Gtk.init_check ();
         Test.init (ref args);
         DockEnvironmentTests.register_tests (has_display);
-        return Test.run ();
+        int rc = Test.run ();
+
+        if (tmp_xdg != "") {
+            Core.PlatformUtils.delete_directory_recursive (GLib.File.new_for_path (tmp_xdg));
+        }
+        return rc;
     }
 }

@@ -2,6 +2,10 @@
 <gresources>
   <gresource prefix="/org/imladris/app">
     <file compressed="true">style.css</file>
+    <file>language-specs/quarto.lang</file>
+    <file>language-specs/rmd.lang</file>
+    <file>language-specs/typescript.lang</file>
+    <file>language-specs/latex.lang</file>
   </gresource>
   <gresource prefix="/org/imladris/icons/papirus">
     <file alias="index.theme">icons/papirus/index.theme</file>

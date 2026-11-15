@@ -423,7 +423,7 @@ namespace Imladris.UI {
                 }
             }
             if (chip_active_file.active) {
-                string doc_text = doc_page.source_buffer.text;
+                string doc_text = doc_page.get_clean_source_text ();
                 if (doc_text.length > 4000) {
                     doc_text = doc_text.substring (0, 4000) + "\n... [truncated]";
                 }
@@ -481,7 +481,7 @@ namespace Imladris.UI {
                 if (controller.is_ready) {
                     response = yield controller.write_with_elrond (
                         doc_page.doc_type,
-                        chip_active_file.active ? doc_page.source_buffer.text : "",
+                        chip_active_file.active ? doc_page.get_clean_source_text () : "",
                         env_summary,
                         combined_prompt
                     );
@@ -710,7 +710,7 @@ namespace Imladris.UI {
                 if (fmt == DocumentFormat.QMD || fmt == DocumentFormat.RMD || fmt == DocumentFormat.IPYNB) {
                     Gtk.TextIter cur_it;
                     doc_page.source_buffer.get_iter_at_mark (out cur_it, doc_page.source_buffer.get_insert ());
-                    var chunk = Core.ChunkParser.find_chunk_at_line (doc_page.source_buffer.text, cur_it.get_line ());
+                    var chunk = Core.ChunkParser.find_chunk_at_line (doc_page.get_clean_source_text (), cur_it.get_line ());
                     if (chunk == null && (code_engine == "r" || code_engine == "python" || code_engine == "bash")) {
                         to_insert = "\n```{" + code_engine + "}\n" + code_copy.strip () + "\n```\n";
                     }
@@ -765,7 +765,7 @@ namespace Imladris.UI {
                 int body_start_line = -1;
                 int end_fence_line = -1;
                 if (!Editor.AiBufferEditHelper.get_active_chunk_body_range (
-                        doc_page.source_buffer.text, cur_it.get_line (), out body_start_line, out end_fence_line)) {
+                        doc_page.get_clean_source_text (), cur_it.get_line (), out body_start_line, out end_fence_line)) {
                     if (parent_window != null) {
                         parent_window.show_toast ("Place cursor inside a code chunk to update it");
                     }

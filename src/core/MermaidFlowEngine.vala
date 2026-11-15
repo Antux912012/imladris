@@ -1411,13 +1411,18 @@ namespace Imladris.Core {
          */
         public static string export_to_svg (
             Gee.ArrayList<MermaidNode> nodes,
-            Gee.ArrayList<MermaidEdge> edges
+            Gee.ArrayList<MermaidEdge> edges,
+            MermaidDiagramKind kind = MermaidDiagramKind.FLOWCHART
         ) {
             double max_x = 800.0;
             double max_y = 520.0;
             foreach (var n in nodes) {
                 if (n.x + n.width / 2.0 + 60.0 > max_x) max_x = n.x + n.width / 2.0 + 60.0;
                 if (n.y + n.height / 2.0 + 60.0 > max_y) max_y = n.y + n.height / 2.0 + 60.0;
+            }
+            if (kind == MermaidDiagramKind.SEQUENCE) {
+                double seq_needed_y = 175.0 + edges.size * 48.0;
+                if (seq_needed_y > max_y) max_y = seq_needed_y;
             }
 
             var sb = new StringBuilder ();
@@ -1428,26 +1433,42 @@ namespace Imladris.Core {
             sb.append ("      <path d=\"M 0 1 L 10 5 L 0 9 z\" fill=\"#475569\"/>\n");
             sb.append ("    </marker>\n");
             sb.append ("  </defs>\n");
-            sb.append (@"  <rect width=\"100%\" height=\"100%\" fill=\"#ffffff\"/>\n");
+            sb.append ("  <rect width=\"100%\" height=\"100%\" fill=\"transparent\"/>\n");
 
             var node_lookup = new Gee.HashMap<string, MermaidNode> ();
             foreach (var n in nodes) {
                 node_lookup.set (n.id, n);
             }
 
-            foreach (var e in edges) {
-                if (!node_lookup.has_key (e.from_id) || !node_lookup.has_key (e.to_id)) continue;
-                var src = node_lookup.get (e.from_id);
-                var dst = node_lookup.get (e.to_id);
-                string dash = (e.style == MermaidEdgeStyle.DOTTED_ARROW) ? " stroke-dasharray=\"6,4\"" : "";
-                string marker = (e.style == MermaidEdgeStyle.SOLID_LINE) ? "" : " marker-end=\"url(#arrow)\"";
-                sb.append (@"  <line x1=\"$((int) src.x)\" y1=\"$((int) src.y)\" x2=\"$((int) dst.x)\" y2=\"$((int) dst.y)\" stroke=\"#475569\" stroke-width=\"2\"$dash$marker/>\n");
-                if (e.label.strip ().length > 0) {
-                    int mx = (int) ((src.x + dst.x) / 2.0);
-                    int my = (int) ((src.y + dst.y) / 2.0) - 6;
-                    string esc = Markup.escape_text (e.label.strip ());
-                    sb.append (@"  <text x=\"$mx\" y=\"$my\" font-family=\"Inter, Cantarell, sans-serif\" font-size=\"11\" fill=\"#334155\" text-anchor=\"middle\">$esc</text>\n");
+            if (kind == MermaidDiagramKind.SEQUENCE) {
+                double seq_max_y = 140.0 + edges.size * 48.0;
+                foreach (var n in nodes) {
+                    double rx = n.x - n.width / 2.0;
+                    double ry = n.y - n.height / 2.0;
+                    string fill = n.palette.get_fill_hex ();
+                    string stroke = n.palette.get_stroke_hex ();
+                    string text_col = n.palette.get_text_hex ();
+                    string esc_lbl = Markup.escape_text (n.label);
+                    sb.append (@"  <line x1=\"$((int) n.x)\" y1=\"$((int) (n.y + n.height / 2.0))\" x2=\"$((int) n.x)\" y2=\"$((int) seq_max_y)\" stroke=\"#94a3b8\" stroke-width=\"1.5\" stroke-dasharray=\"5,5\"/>\n");
+                    sb.append (@"  <rect x=\"$((int) rx)\" y=\"$((int) ry)\" width=\"$((int) n.width)\" height=\"$((int) n.height)\" rx=\"6\" fill=\"$fill\" stroke=\"$stroke\" stroke-width=\"2\"/>\n");
+                    sb.append (@"  <text x=\"$((int) n.x)\" y=\"$((int) n.y + 4)\" font-family=\"Inter, Cantarell, sans-serif\" font-size=\"13\" font-weight=\"600\" fill=\"$text_col\" text-anchor=\"middle\">$esc_lbl</text>\n");
                 }
+                for (int idx = 0; idx < edges.size; idx++) {
+                    var e = edges[idx];
+                    if (!node_lookup.has_key (e.from_id) || !node_lookup.has_key (e.to_id)) continue;
+                    var src = node_lookup.get (e.from_id);
+                    var dst = node_lookup.get (e.to_id);
+                    int y = 145 + idx * 46;
+                    string dash = (e.style == MermaidEdgeStyle.DOTTED_ARROW) ? " stroke-dasharray=\"6,4\"" : "";
+                    sb.append (@"  <line x1=\"$((int) src.x)\" y1=\"$y\" x2=\"$((int) dst.x)\" y2=\"$y\" stroke=\"#475569\" stroke-width=\"2\"$dash marker-end=\"url(#arrow)\"/>\n");
+                    if (e.label.strip ().length > 0) {
+                        int mx = (int) ((src.x + dst.x) / 2.0);
+                        string esc = Markup.escape_text (e.label.strip ());
+                        sb.append (@"  <text x=\"$mx\" y=\"$(y - 7)\" font-family=\"Inter, Cantarell, sans-serif\" font-size=\"11\" fill=\"#475569\" text-anchor=\"middle\">$esc</text>\n");
+                    }
+                }
+                sb.append ("</svg>\n");
+                return sb.str;
             }
 
             foreach (var n in nodes) {
@@ -1457,7 +1478,6 @@ namespace Imladris.Core {
                 string stroke = n.palette.get_stroke_hex ();
                 string text_col = n.palette.get_text_hex ();
                 int corner = (n.shape == MermaidNodeShape.STADIUM) ? 26 : ((n.shape == MermaidNodeShape.ROUNDED) ? 12 : 6);
-                string esc_lbl = Markup.escape_text (n.label);
 
                 if (n.shape == MermaidNodeShape.CIRCLE) {
                     int r = (int) (n.width / 2.0);
@@ -1471,7 +1491,65 @@ namespace Imladris.Core {
                 } else {
                     sb.append (@"  <rect x=\"$((int) rx)\" y=\"$((int) ry)\" width=\"$((int) n.width)\" height=\"$((int) n.height)\" rx=\"$corner\" fill=\"$fill\" stroke=\"$stroke\" stroke-width=\"2\"/>\n");
                 }
-                sb.append (@"  <text x=\"$((int) n.x)\" y=\"$((int) n.y + 4)\" font-family=\"Inter, Cantarell, sans-serif\" font-size=\"13\" font-weight=\"600\" fill=\"$text_col\" text-anchor=\"middle\">$esc_lbl</text>\n");
+
+                string[] label_lines = n.label.replace ("<br/>", "\n").replace ("<br>", "\n").split ("\n");
+                if (label_lines.length <= 1) {
+                    string esc_lbl = Markup.escape_text (n.label);
+                    sb.append (@"  <text x=\"$((int) n.x)\" y=\"$((int) n.y + 4)\" font-family=\"Inter, Cantarell, sans-serif\" font-size=\"13\" font-weight=\"600\" fill=\"$text_col\" text-anchor=\"middle\">$esc_lbl</text>\n");
+                } else {
+                    double base_y = n.y - ((label_lines.length - 1) * 7.5) + 4.0;
+                    sb.append (@"  <text x=\"$((int) n.x)\" y=\"$((int) base_y)\" font-family=\"Inter, Cantarell, sans-serif\" font-size=\"13\" font-weight=\"600\" fill=\"$text_col\" text-anchor=\"middle\">");
+                    for (int li = 0; li < label_lines.length; li++) {
+                        string dy = (li == 0) ? "0" : "15";
+                        string esc_l = Markup.escape_text (label_lines[li].strip ());
+                        sb.append (@"<tspan x=\"$((int) n.x)\" dy=\"$dy\">$esc_l</tspan>");
+                    }
+                    sb.append ("</text>\n");
+                }
+            }
+
+            // Draw edges clipped to node boundaries so arrowheads remain clearly visible
+            foreach (var e in edges) {
+                if (!node_lookup.has_key (e.from_id) || !node_lookup.has_key (e.to_id)) continue;
+                var src = node_lookup.get (e.from_id);
+                var dst = node_lookup.get (e.to_id);
+                string dash = (e.style == MermaidEdgeStyle.DOTTED_ARROW) ? " stroke-dasharray=\"6,4\"" : "";
+                string marker = (e.style == MermaidEdgeStyle.SOLID_LINE) ? "" : " marker-end=\"url(#arrow)\"";
+
+                if (src.id == dst.id) {
+                    int sx = (int) (src.x + src.width / 2.0);
+                    int sy = (int) src.y;
+                    int tx = (int) src.x;
+                    int ty = (int) (src.y - src.height / 2.0 - 2);
+                    sb.append (@"  <path d=\"M $sx $sy C $(sx + 48) $(sy - 48), $(tx + 48) $(ty - 48), $tx $ty\" fill=\"none\" stroke=\"#475569\" stroke-width=\"2\"$dash$marker/>\n");
+                    continue;
+                }
+
+                double dx = dst.x - src.x;
+                double dy = dst.y - src.y;
+                double dist = Math.sqrt (dx * dx + dy * dy);
+                if (dist < 1.0) continue;
+
+                double sx_off = Math.fabs (dx) > 0.001 ? (src.width / 2.0) / Math.fabs (dx / dist) : 1e9;
+                double sy_off = Math.fabs (dy) > 0.001 ? (src.height / 2.0) / Math.fabs (dy / dist) : 1e9;
+                double s_t = Math.fmin (sx_off, sy_off);
+
+                double dx_off = Math.fabs (dx) > 0.001 ? (dst.width / 2.0 + 4.0) / Math.fabs (dx / dist) : 1e9;
+                double dy_off = Math.fabs (dy) > 0.001 ? (dst.height / 2.0 + 4.0) / Math.fabs (dy / dist) : 1e9;
+                double d_t = Math.fmin (dx_off, dy_off);
+
+                int x1 = (int) (src.x + (dx / dist) * s_t);
+                int y1 = (int) (src.y + (dy / dist) * s_t);
+                int x2 = (int) (dst.x - (dx / dist) * d_t);
+                int y2 = (int) (dst.y - (dy / dist) * d_t);
+
+                sb.append (@"  <line x1=\"$x1\" y1=\"$y1\" x2=\"$x2\" y2=\"$y2\" stroke=\"#475569\" stroke-width=\"2\"$dash$marker/>\n");
+                if (e.label.strip ().length > 0) {
+                    int mx = (x1 + x2) / 2;
+                    int my = (y1 + y2) / 2 - 6;
+                    string esc = Markup.escape_text (e.label.strip ());
+                    sb.append (@"  <text x=\"$mx\" y=\"$my\" font-family=\"Inter, Cantarell, sans-serif\" font-size=\"11\" fill=\"#334155\" text-anchor=\"middle\">$esc</text>\n");
+                }
             }
 
             sb.append ("</svg>\n");

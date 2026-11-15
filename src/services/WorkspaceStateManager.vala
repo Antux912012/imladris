@@ -8,12 +8,8 @@ namespace Imladris.Services {
         RSTUDIO;
 
         public static LayoutMode from_extension (string filename) {
-            var fmt = DocumentFormat.from_filename (filename);
-            if (fmt.is_computational_notebook () || fmt.is_r_primary () || fmt.is_python_primary ()) {
-                return RSTUDIO;
-            }
-            // Pillar 10: Simple .md and .html default to fast-path Apostrophe mode
-            return APOSTROPHE;
+            var profile = Core.FormatProfile.for_filename (filename);
+            return profile.default_rstudio_layout ? RSTUDIO : APOSTROPHE;
         }
 
         public string to_label () {
@@ -62,8 +58,48 @@ namespace Imladris.Services {
         public SplitMode active_split { get; set; default = SplitMode.VERTICAL_SPLIT; }
         public bool user_override_lock { get; set; default = false; }
 
+        private GLib.HashTable<string, int> doc_layouts = new GLib.HashTable<string, int> (GLib.str_hash, GLib.str_equal);
+        private GLib.HashTable<string, int> doc_splits = new GLib.HashTable<string, int> (GLib.str_hash, GLib.str_equal);
+        private GLib.HashTable<string, bool> doc_overrides = new GLib.HashTable<string, bool> (GLib.str_hash, GLib.str_equal);
+
         public signal void layout_changed (LayoutMode new_layout);
         public signal void split_changed (SplitMode new_split);
+
+        public LayoutMode get_layout_for_doc (string doc_id, string filename) {
+            if (doc_layouts.contains (doc_id)) {
+                return (LayoutMode) doc_layouts.lookup (doc_id);
+            }
+            return LayoutMode.from_extension (filename);
+        }
+
+        public void set_layout_for_doc (string doc_id, LayoutMode mode, bool user_manual_override = false) {
+            doc_layouts.insert (doc_id, (int) mode);
+            if (user_manual_override) {
+                doc_overrides.insert (doc_id, true);
+            }
+            if (active_layout != mode) {
+                active_layout = mode;
+                layout_changed (mode);
+            }
+        }
+
+        public SplitMode get_split_for_doc (string doc_id) {
+            if (doc_splits.contains (doc_id)) {
+                return (SplitMode) doc_splits.lookup (doc_id);
+            }
+            return active_split;
+        }
+
+        public void set_split_for_doc (string doc_id, SplitMode mode) {
+            doc_splits.insert (doc_id, (int) mode);
+            set_split_mode (mode);
+        }
+
+        public void clear_doc_state (string doc_id) {
+            doc_layouts.remove (doc_id);
+            doc_splits.remove (doc_id);
+            doc_overrides.remove (doc_id);
+        }
 
         public void set_layout_mode (LayoutMode mode, bool user_manual_override = false) {
             if (user_manual_override) {

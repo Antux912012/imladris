@@ -84,6 +84,25 @@ namespace Imladris.UI {
         private ulong shiny_status_hid = 0;
         private ulong shiny_url_hid = 0;
         private uint cit_search_debounce_id = 0;
+        private GLib.Cancellable? active_exec_cancellable = null;
+
+        public string get_session_key () {
+            if (doc_page.current_project_dir != "") {
+                return doc_page.current_project_dir;
+            }
+            if (doc_page.file_location != null) {
+                var parent = doc_page.file_location.get_parent ();
+                if (parent != null && parent.get_path () != null) {
+                    return parent.get_path ();
+                }
+                return doc_page.file_location.get_path () ?? "default";
+            }
+            return "default";
+        }
+
+        public Services.PersistentSessionManager get_session_manager () {
+            return Services.PersistentSessionManager.for_key (get_session_key ());
+        }
 
         public PersistentPanelRegistry (DocumentPage page, Window? win) {
             this.doc_page = page;
@@ -96,6 +115,10 @@ namespace Imladris.UI {
         }
 
         public void cleanup () {
+            if (active_exec_cancellable != null) {
+                active_exec_cancellable.cancel ();
+                active_exec_cancellable = null;
+            }
             if (cit_search_debounce_id != 0) {
                 GLib.Source.remove (cit_search_debounce_id);
                 cit_search_debounce_id = 0;
@@ -104,7 +127,7 @@ namespace Imladris.UI {
             if (hist_added_hid != 0) { hist.disconnect (hist_added_hid); hist_added_hid = 0; }
             if (hist_cleared_hid != 0) { hist.disconnect (hist_cleared_hid); hist_cleared_hid = 0; }
 
-            var sess = Services.PersistentSessionManager.get_default ();
+            var sess = get_session_manager ();
             if (sess_cwd_hid != 0) { sess.disconnect (sess_cwd_hid); sess_cwd_hid = 0; }
             if (sess_plot_hid != 0) { sess.disconnect (sess_plot_hid); sess_plot_hid = 0; }
 
@@ -123,7 +146,7 @@ namespace Imladris.UI {
             string bib_rel = "references.bib";
             Core.FrontmatterData? fm = null;
             string fm_body = "";
-            Core.FrontmatterParser.split_frontmatter (doc_page.source_buffer.text, out fm, out fm_body);
+            Core.FrontmatterParser.split_frontmatter (doc_page.get_clean_source_text (), out fm, out fm_body);
             if (fm != null && fm.bibliography != null && fm.bibliography.strip () != "") {
                 bib_rel = fm.bibliography.strip ();
             }
@@ -276,13 +299,13 @@ namespace Imladris.UI {
             notebook_cell_toolbar.append (cell_badge);
 
             var run_cell_btn = new Gtk.Button () {
-                tooltip_text = "Execute active code cell or chunk (Ctrl+Enter)"
+                tooltip_text = "Execute active code cell or chunk (Ctrl+Shift+Enter)"
             };
             run_cell_btn.add_css_class ("flat");
             run_cell_btn.add_css_class ("ribbon-compact-btn");
             var rc_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
             rc_box.append (new Gtk.Image.from_icon_name ("media-playback-start-symbolic"));
-            rc_box.append (new Gtk.Label ("Run Cell (Ctrl+Enter)"));
+            rc_box.append (new Gtk.Label ("Run Cell (Ctrl+Shift+Enter)"));
             run_cell_btn.set_child (rc_box);
             run_cell_btn.clicked.connect (() => {
                 execute_active_cell ();
@@ -381,7 +404,13 @@ namespace Imladris.UI {
             });
             notebook_cell_toolbar.append (add_math_chem_btn);
 
-            source_editor_panel.append (notebook_cell_toolbar);
+            var cell_toolbar_scroll = new Gtk.ScrolledWindow () {
+                hscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
+                vscrollbar_policy = Gtk.PolicyType.NEVER,
+                hexpand = true,
+                child = notebook_cell_toolbar
+            };
+            source_editor_panel.append (cell_toolbar_scroll);
             source_editor_panel.append (doc_page.editor_scroller);
             panels.set (PanelId.SOURCE_EDITOR, source_editor_panel);
 
@@ -486,7 +515,11 @@ namespace Imladris.UI {
             stop_btn.add_css_class ("flat");
             stop_btn.add_css_class ("destructive-action");
             stop_btn.clicked.connect (() => {
-                Services.PersistentSessionManager.get_default ().interrupt_active_execution ();
+                if (active_exec_cancellable != null) {
+                    active_exec_cancellable.cancel ();
+                    active_exec_cancellable = null;
+                }
+                get_session_manager ().interrupt_active_execution ();
                 doc_page.append_console_log ("\n[Execution interrupted by user]");
             });
 
@@ -550,6 +583,7 @@ namespace Imladris.UI {
 
             // 5. ENVIRONMENT PANEL (Active Dataframe & Variable Inspector)
             environment_controller = new EnvironmentController (main_window);
+            environment_controller.session_key = get_session_key ();
             environment_controller.view_dataframe_requested.connect ((name, eng) => {
                 open_dataframe_in_viewer (name, eng);
             });
@@ -561,6 +595,7 @@ namespace Imladris.UI {
 
             // DATA VIEWER PANEL (Virtualized Matrix & Dataframe Inspector)
             data_grid_viewer = new DataGridViewer ();
+            data_grid_viewer.session_key = get_session_key ();
             panels.set (PanelId.DATA_VIEWER, data_grid_viewer);
 
             // ELROND AI CHAT PANEL (Local Copilot Tab)
@@ -1032,7 +1067,8 @@ namespace Imladris.UI {
             panels.set (PanelId.FILES, files_box);
 
             // Connect PersistentSessionManager signals for pwd & plots sync
-            sess_cwd_hid = Services.PersistentSessionManager.get_default ().working_directory_changed.connect ((new_dir) => {
+            var sess_mgr = get_session_manager ();
+            sess_cwd_hid = sess_mgr.working_directory_changed.connect ((new_dir) => {
                 this.current_browser_dir = new_dir;
                 this.root_project_dir = new_dir;
                 populate_files_browser ();
@@ -1040,10 +1076,8 @@ namespace Imladris.UI {
                 terminal_view.buffer.get_end_iter (out end);
                 terminal_view.buffer.insert (ref end, @"\n[Working Directory changed to: $new_dir]\n$$ ", -1);
             });
-            sess_plot_hid = Services.PersistentSessionManager.get_default ().plot_generated.connect ((plot_path) => {
-                plot_gallery.add (plot_path);
-                active_plot_idx = plot_gallery.size - 1;
-                update_plot_view ();
+            sess_plot_hid = sess_mgr.plot_generated.connect ((plot_path) => {
+                register_generated_plot (plot_path);
             });
 
             // 11. PACKAGES PANEL (Installed Packages Explorer & Library Toggle)
@@ -1319,9 +1353,14 @@ namespace Imladris.UI {
             doc_page.source_buffer.get_iter_at_mark (out cursor, doc_page.source_buffer.get_insert ());
             int cursor_line = cursor.get_line ();
 
-            var chunk = Core.ChunkParser.find_chunk_at_line (doc_page.source_buffer.text, cursor_line);
+            var chunk = Core.ChunkParser.find_chunk_at_line (doc_page.get_clean_source_text (), cursor_line);
             if (chunk != null) {
                 return chunk.language;
+            }
+
+            var profile = Core.FormatProfile.for_format (doc_page.get_document_format ());
+            if (profile.default_kernel.length > 0) {
+                return profile.default_kernel;
             }
 
             if (doc_page.doc_type == "r" || (doc_page.file_location != null && doc_page.file_location.get_basename ().has_suffix (".R"))) {
@@ -1333,11 +1372,53 @@ namespace Imladris.UI {
             return "python";
         }
 
+        private Gtk.TextMark create_line_end_mark (int line) {
+            Gtk.TextIter iter;
+            int max_line = int.max (0, doc_page.source_buffer.get_line_count () - 1);
+            int clamped = line.clamp (0, max_line);
+            doc_page.source_buffer.get_iter_at_line (out iter, clamped);
+            if (!iter.ends_line ()) {
+                iter.forward_to_line_end ();
+            }
+            return doc_page.source_buffer.create_mark (null, iter, false);
+        }
+
+        private GLib.Cancellable reset_exec_cancellable () {
+            if (active_exec_cancellable != null) {
+                active_exec_cancellable.cancel ();
+            }
+            active_exec_cancellable = new GLib.Cancellable ();
+            return active_exec_cancellable;
+        }
+
+        private async void execute_chunks_sequentially_async (Gee.ArrayList<Core.CodeChunk> chunks) {
+            var cancellable = reset_exec_cancellable ();
+            var marks = new Gee.ArrayList<Gtk.TextMark> ();
+            foreach (var ch in chunks) {
+                marks.add (create_line_end_mark (ch.end_line));
+            }
+
+            for (int i = 0; i < chunks.size; i++) {
+                if (cancellable.is_cancelled ()) {
+                    break;
+                }
+                var ch = chunks.get (i);
+                var mark = marks.get (i);
+                yield run_code_snippet_in_console_async (ch.language, ch.code, mark, cancellable);
+            }
+
+            foreach (var mark in marks) {
+                if (!mark.get_deleted ()) {
+                    doc_page.source_buffer.delete_mark (mark);
+                }
+            }
+        }
+
         /**
          * Pillar 4 & 11: Chunk Execution (Ctrl+Shift+Enter) with Inline Card Output
          */
         public void execute_active_cell () {
-            string text = doc_page.source_buffer.text;
+            string text = doc_page.get_clean_source_text ();
             Gtk.TextIter cursor;
             doc_page.source_buffer.get_iter_at_mark (out cursor, doc_page.source_buffer.get_insert ());
             int cursor_line = cursor.get_line ();
@@ -1353,12 +1434,16 @@ namespace Imladris.UI {
         }
 
         public void execute_all_cells () {
-            string text = doc_page.source_buffer.text;
+            string text = doc_page.get_clean_source_text ();
             var chunks = Core.ChunkParser.parse_chunks (text);
+            var runnable = new Gee.ArrayList<Core.CodeChunk> ();
             foreach (var ch in chunks) {
                 if (ch.eval_enabled && ch.code.length > 0) {
-                    run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
+                    runnable.add (ch);
                 }
+            }
+            if (runnable.size > 0) {
+                execute_chunks_sequentially_async.begin (runnable);
             }
         }
 
@@ -1367,7 +1452,7 @@ namespace Imladris.UI {
          * If at the end of the document, appends a new code cell of the same language.
          */
         public void execute_active_cell_and_advance () {
-            string text = doc_page.source_buffer.text;
+            string text = doc_page.get_clean_source_text ();
             Gtk.TextIter cursor;
             doc_page.source_buffer.get_iter_at_mark (out cursor, doc_page.source_buffer.get_insert ());
             int cursor_line = cursor.get_line ();
@@ -1408,7 +1493,11 @@ namespace Imladris.UI {
          * Jupyter Parity: Restarts active REPL session kernel and resets state.
          */
         public void restart_kernel () {
-            Services.PersistentSessionManager.get_default ().restart_all_sessions ();
+            if (active_exec_cancellable != null) {
+                active_exec_cancellable.cancel ();
+                active_exec_cancellable = null;
+            }
+            get_session_manager ().restart_all_sessions ();
             execution_counter = 0;
             doc_page.append_console_log ("\n--- Kernel Restarted: Session State Cleared ---");
             if (main_window != null) {
@@ -1429,34 +1518,43 @@ namespace Imladris.UI {
         }
 
         public void execute_cells_above () {
-            string text = doc_page.source_buffer.text;
+            string text = doc_page.get_clean_source_text ();
             Gtk.TextIter cursor;
             doc_page.source_buffer.get_iter_at_mark (out cursor, doc_page.source_buffer.get_insert ());
             int cursor_line = cursor.get_line ();
 
             var chunks = Core.ChunkParser.parse_chunks (text);
+            var runnable = new Gee.ArrayList<Core.CodeChunk> ();
             foreach (var ch in chunks) {
                 if (ch.end_line < cursor_line && ch.eval_enabled && ch.code.length > 0) {
-                    run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
+                    runnable.add (ch);
                 }
+            }
+            if (runnable.size > 0) {
+                execute_chunks_sequentially_async.begin (runnable);
             }
         }
 
         public void execute_cells_below () {
-            string text = doc_page.source_buffer.text;
+            string text = doc_page.get_clean_source_text ();
             Gtk.TextIter cursor;
             doc_page.source_buffer.get_iter_at_mark (out cursor, doc_page.source_buffer.get_insert ());
             int cursor_line = cursor.get_line ();
 
             var chunks = Core.ChunkParser.parse_chunks (text);
+            var runnable = new Gee.ArrayList<Core.CodeChunk> ();
             foreach (var ch in chunks) {
                 if (ch.end_line >= cursor_line && ch.eval_enabled && ch.code.length > 0) {
-                    run_code_snippet_in_console (ch.language, ch.code, ch.end_line);
+                    runnable.add (ch);
                 }
+            }
+            if (runnable.size > 0) {
+                execute_chunks_sequentially_async.begin (runnable);
             }
         }
 
         public void open_dataframe_in_viewer (string object_name, string engine = "r") {
+            data_grid_viewer.session_key = get_session_key ();
             data_grid_viewer.fetch_and_display.begin (object_name, engine);
 
             foreach (var qid in QuadrantId.all ()) {
@@ -1467,29 +1565,77 @@ namespace Imladris.UI {
                 }
             }
 
-            // If not found in any quadrant, mount in Q1_TOP_LEFT
-            doc_page.dock_layout_state.move_tab (QuadrantId.Q1_TOP_LEFT, QuadrantId.Q1_TOP_LEFT, PanelId.DATA_VIEWER, 1);
+            // If not found in any quadrant, add to Q1_TOP_LEFT and activate
+            var q1 = doc_page.dock_layout_state.quadrants.get (QuadrantId.Q1_TOP_LEFT);
+            if (q1 != null && !q1.tabs.contains (PanelId.DATA_VIEWER)) {
+                q1.tabs.add (PanelId.DATA_VIEWER);
+            }
             doc_page.dock_layout_state.activate_tab (QuadrantId.Q1_TOP_LEFT, PanelId.DATA_VIEWER);
         }
 
+        private string? extract_view_object (string code) {
+            // Strip # comments and quoted literals so View(...) inside strings/comments is ignored
+            var sanitized = new GLib.StringBuilder ();
+            bool in_single = false;
+            bool in_double = false;
+            bool escaped = false;
+            bool in_comment = false;
+            for (int i = 0; i < code.length; i++) {
+                char c = code[i];
+                if (c == '\n') {
+                    in_comment = false;
+                    in_single = false;
+                    in_double = false;
+                    escaped = false;
+                    sanitized.append_c (c);
+                    continue;
+                }
+                if (in_comment) continue;
+                if (escaped) { escaped = false; continue; }
+                if (c == '\\' && (in_single || in_double)) { escaped = true; continue; }
+                if (c == '\'' && !in_double) { in_single = !in_single; continue; }
+                if (c == '"' && !in_single) { in_double = !in_double; continue; }
+                if (in_single || in_double) continue;
+                if (c == '#') { in_comment = true; continue; }
+                sanitized.append_c (c);
+            }
+
+            try {
+                var rx = new GLib.Regex ("\\bView\\s*\\(\\s*([A-Za-z_\\.][A-Za-z0-9_\\.]*)\\s*\\)");
+                GLib.MatchInfo mi;
+                if (rx.match (sanitized.str, 0, out mi)) {
+                    return mi.fetch (1);
+                }
+            } catch (GLib.RegexError e) {}
+            return null;
+        }
+
         public void run_code_snippet_in_console (string engine, string code, int inline_chunk_line = -1) {
+            Gtk.TextMark? mark = null;
+            if (inline_chunk_line >= 0) {
+                mark = create_line_end_mark (inline_chunk_line);
+            }
+            var cancellable = reset_exec_cancellable ();
+            run_code_snippet_in_console_async.begin (engine, code, mark, cancellable, (obj, res) => {
+                run_code_snippet_in_console_async.end (res);
+                if (mark != null && !mark.get_deleted ()) {
+                    doc_page.source_buffer.delete_mark (mark);
+                }
+            });
+        }
+
+        public async void run_code_snippet_in_console_async (
+            string engine,
+            string code,
+            Gtk.TextMark? end_mark = null,
+            GLib.Cancellable? cancellable = null
+        ) {
             execution_counter++;
             int count = execution_counter;
             doc_page.append_console_log (@"\nIn [$count] ($engine):\n$code");
             Services.HistoryManager.get_default ().add_entry (code, engine);
 
-            // Hook R/Python View(...) command to open interactive matrix & dataframe viewer
-            if (code.contains ("View(") || code.contains ("View (")) {
-                int v_idx = code.index_of ("View");
-                int open_paren = code.index_of ("(", v_idx);
-                int close_paren = code.index_of (")", open_paren);
-                if (open_paren != -1 && close_paren != -1 && close_paren > open_paren) {
-                    string obj = code.substring (open_paren + 1, close_paren - open_paren - 1).strip ();
-                    if (obj.length > 0 && !obj.contains ("\n")) {
-                        open_dataframe_in_viewer (obj, engine);
-                    }
-                }
-            }
+            string? view_obj = extract_view_object (code);
 
             // Hook R ?topic or help(topic) documentation command
             if (code.has_prefix ("?") || code.has_prefix ("help(") || code.has_prefix ("help (")) {
@@ -1508,90 +1654,133 @@ namespace Imladris.UI {
                 }
             }
 
+            int resolve_target_line () {
+                if (end_mark != null && !end_mark.get_deleted ()) {
+                    Gtk.TextIter iter;
+                    doc_page.source_buffer.get_iter_at_mark (out iter, end_mark);
+                    return iter.get_line ();
+                }
+                return -1;
+            }
+
             int64 start_us = GLib.get_monotonic_time ();
-            if (engine == "r") {
+            var sess_mgr = get_session_manager ();
+            string norm_engine = engine.down ().strip ();
+
+            if (norm_engine == "r") {
                 string? plot_file = null;
                 bool any_line_streamed = false;
-                ulong sig_id = 0;
-                sig_id = Services.PersistentSessionManager.get_default ().session_output_received.connect ((eng, line, is_err) => {
-                    if (eng == "r") {
+                string output = yield sess_mgr.execute_r_with_options (
+                    code,
+                    (line, is_err) => {
                         any_line_streamed = true;
                         doc_page.append_console_log (line);
+                    },
+                    cancellable,
+                    60000,
+                    true,
+                    out plot_file
+                );
+                output = output.strip ();
+                double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
+                if (!any_line_streamed && output.length > 0) {
+                    doc_page.append_console_log (@"Out [$count]:\n$output");
+                    if (output.contains ("Install Toolchain") && main_window != null) {
+                        main_window.show_toolchain_setup_dialog ();
                     }
-                });
-
-                Services.PersistentSessionManager.get_default ().execute_r.begin (code, (obj, res) => {
-                    Services.PersistentSessionManager.get_default ().disconnect (sig_id);
-                    string output = Services.PersistentSessionManager.get_default ().execute_r.end (res, out plot_file).strip ();
-                    double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
-                    if (!any_line_streamed && output.length > 0) {
-                        doc_page.append_console_log (@"Out [$count]:\n$output");
-                        if (output.contains ("Install Toolchain") && main_window != null) {
-                            main_window.show_toolchain_setup_dialog ();
-                        }
-                    }
-                    if (plot_file != null) {
-                        register_generated_plot (plot_file);
-                        string base_plot = GLib.Path.get_basename (plot_file);
-                        doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
-                    }
-                    if (inline_chunk_line >= 0) {
-                        doc_page.display_inline_chunk_output (inline_chunk_line, output, plot_file, count, elapsed_ms);
-                    }
-                    refresh_environment_and_outline ();
-                    environment_controller.active_engine = "r";
-                    environment_controller.refresh_environment.begin ();
-                });
-            } else if (engine == "python") {
+                }
+                if (plot_file != null && plot_file.length > 0) {
+                    register_generated_plot (plot_file);
+                    activate_panel_in_dock (PanelId.PLOTS);
+                    string base_plot = GLib.Path.get_basename (plot_file);
+                    doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
+                }
+                int target_line = resolve_target_line ();
+                if (target_line >= 0) {
+                    doc_page.display_inline_chunk_output (target_line, output, plot_file, count, elapsed_ms);
+                }
+                if (view_obj != null && view_obj.length > 0) {
+                    open_dataframe_in_viewer (view_obj, "r");
+                }
+                refresh_environment_and_outline ();
+                environment_controller.active_engine = "r";
+                environment_controller.refresh_environment.begin ();
+            } else if (norm_engine == "python" || norm_engine == "py") {
                 string? plot_file = null;
                 bool any_line_streamed = false;
-                ulong sig_id = 0;
-                sig_id = Services.PersistentSessionManager.get_default ().session_output_received.connect ((eng, line, is_err) => {
-                    if (eng == "python") {
+                string output = yield sess_mgr.execute_python_with_options (
+                    code,
+                    (line, is_err) => {
                         any_line_streamed = true;
                         doc_page.append_console_log (line);
+                    },
+                    cancellable,
+                    60000,
+                    true,
+                    out plot_file
+                );
+                output = output.strip ();
+                double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
+                if (!any_line_streamed && output.length > 0) {
+                    doc_page.append_console_log (@"Out [$count]:\n$output");
+                    if (output.contains ("Install Toolchain") && main_window != null) {
+                        main_window.show_toolchain_setup_dialog ();
                     }
-                });
-
-                Services.PersistentSessionManager.get_default ().execute_python.begin (code, (obj, res) => {
-                    Services.PersistentSessionManager.get_default ().disconnect (sig_id);
-                    string output = Services.PersistentSessionManager.get_default ().execute_python.end (res, out plot_file).strip ();
-                    double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
-                    if (!any_line_streamed && output.length > 0) {
-                        doc_page.append_console_log (@"Out [$count]:\n$output");
-                        if (output.contains ("Install Toolchain") && main_window != null) {
-                            main_window.show_toolchain_setup_dialog ();
-                        }
-                    }
-                    if (plot_file != null) {
-                        register_generated_plot (plot_file);
-                        string base_plot = GLib.Path.get_basename (plot_file);
-                        doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
-                    }
-                    if (inline_chunk_line >= 0) {
-                        doc_page.display_inline_chunk_output (inline_chunk_line, output, plot_file, count, elapsed_ms);
-                    }
-                    refresh_environment_and_outline ();
-                    environment_controller.active_engine = "python";
-                    environment_controller.refresh_environment.begin ();
-                });
-            } else if (engine == "bash" || engine == "sh" || engine == "zsh") {
-                ExecutionEngine.capture_command_async.begin ({ "bash", "-c", code }, (obj, res) => {
-                    string output = ExecutionEngine.capture_command_async.end (res).strip ();
-                    double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
-                    if (output.length > 0) {
-                        doc_page.append_console_log (@"Out [$count]:\n$output");
-                    }
-                    if (inline_chunk_line >= 0) {
-                        doc_page.display_inline_chunk_output (inline_chunk_line, output, null, count, elapsed_ms);
-                    }
-                    refresh_environment_and_outline ();
-                });
+                }
+                if (plot_file != null && plot_file.length > 0) {
+                    register_generated_plot (plot_file);
+                    activate_panel_in_dock (PanelId.PLOTS);
+                    string base_plot = GLib.Path.get_basename (plot_file);
+                    doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
+                }
+                int target_line = resolve_target_line ();
+                if (target_line >= 0) {
+                    doc_page.display_inline_chunk_output (target_line, output, plot_file, count, elapsed_ms);
+                }
+                if (view_obj != null && view_obj.length > 0) {
+                    open_dataframe_in_viewer (view_obj, "python");
+                }
+                refresh_environment_and_outline ();
+                environment_controller.active_engine = "python";
+                environment_controller.refresh_environment.begin ();
+            } else if (norm_engine == "ts" || norm_engine == "typescript") {
+                string? proj_dir = doc_page.current_project_dir != "" ? doc_page.current_project_dir : null;
+                var ts_res = yield Runners.TypeScriptRunner.run_snippet_async (code, proj_dir, cancellable);
+                double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
+                var combined = new GLib.StringBuilder ();
+                if (ts_res.stdout_text.strip ().length > 0) {
+                    combined.append (ts_res.stdout_text.strip ());
+                }
+                if (ts_res.stderr_text.strip ().length > 0) {
+                    if (combined.len > 0) combined.append ("\n");
+                    combined.append (ts_res.stderr_text.strip ());
+                }
+                string output = combined.str;
+                if (output.length > 0) {
+                    doc_page.append_console_log (@"Out [$count] ($(ts_res.runtime_used)):\n$output");
+                }
+                int target_line = resolve_target_line ();
+                if (target_line >= 0) {
+                    doc_page.display_inline_chunk_output (target_line, output, null, count, elapsed_ms);
+                }
+                refresh_environment_and_outline ();
+            } else if (norm_engine == "bash" || norm_engine == "sh" || norm_engine == "zsh") {
+                string output = (yield ExecutionEngine.capture_command_async ({ "bash", "-c", code })).strip ();
+                double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
+                if (output.length > 0) {
+                    doc_page.append_console_log (@"Out [$count]:\n$output");
+                }
+                int target_line = resolve_target_line ();
+                if (target_line >= 0) {
+                    doc_page.display_inline_chunk_output (target_line, output, null, count, elapsed_ms);
+                }
+                refresh_environment_and_outline ();
             } else {
-                string msg = @"✖ Unsupported chunk engine '$engine'. Supported interactive engines: r, python, bash/sh.";
+                string msg = @"✖ Unsupported chunk engine '$engine'. Supported interactive engines: r, python, ts/typescript, bash/sh.";
                 doc_page.append_console_log (msg);
-                if (inline_chunk_line >= 0) {
-                    doc_page.display_inline_chunk_output (inline_chunk_line, msg, null, count, 0.0);
+                int target_line = resolve_target_line ();
+                if (target_line >= 0) {
+                    doc_page.display_inline_chunk_output (target_line, msg, null, count, 0.0);
                 }
             }
         }
@@ -1601,7 +1790,7 @@ namespace Imladris.UI {
             terminal_view.buffer.get_end_iter (out end);
             terminal_view.buffer.insert (ref end, cmd + "\n", -1);
 
-            ExecutionEngine.capture_command_async.begin ({ "bash", "-c", cmd }, (obj, res) => {
+            ExecutionEngine.capture_command_async.begin ({ "bash", "-c", cmd }, null, 60000, (obj, res) => {
                 string output = ExecutionEngine.capture_command_async.end (res);
                 Gtk.TextIter e2;
                 terminal_view.buffer.get_end_iter (out e2);
@@ -1624,52 +1813,48 @@ namespace Imladris.UI {
                 child = next;
             }
 
-            string text = doc_page.source_buffer.text;
+            string text = doc_page.get_clean_source_text ();
+            string fmt_code = doc_page.get_document_format ().get_extension ().replace (".", "").down ();
+            string outline_json = Core.NativeCore.extract_outline_json (text, fmt_code);
+            try {
+                var jp = new Json.Parser ();
+                jp.load_from_data (outline_json, -1);
+                var root = jp.get_root ();
+                if (root != null && root.get_node_type () == Json.NodeType.ARRAY) {
+                    var arr = root.get_array ();
+                    for (uint idx = 0; idx < arr.get_length (); idx++) {
+                        var item = arr.get_object_element (idx);
+                        int level = (int) item.get_int_member ("level");
+                        string title = item.get_string_member ("title");
+                        int line1 = (int) item.get_int_member ("line");
+                        string kind = item.get_string_member ("kind");
+                        int line0 = line1 > 0 ? line1 - 1 : 0;
+
+                        var row = new Gtk.ListBoxRow ();
+                        var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
+                            margin_top = 4,
+                            margin_bottom = 4,
+                            margin_start = 6 + ((level - 1) * 10),
+                            margin_end = 6
+                        };
+                        string icon_name = kind == "chunk" ? "utilities-terminal-symbolic" : "format-text-bold-symbolic";
+                        hbox.append (new Gtk.Image.from_icon_name (icon_name));
+                        var lbl = new Gtk.Label (title) { xalign = 0, hexpand = true };
+                        if (kind == "chunk") lbl.add_css_class ("monospace");
+                        hbox.append (lbl);
+                        hbox.append (new Gtk.Label (@"L$line1") { css_classes = { "dim-label", "caption" } });
+                        row.set_child (hbox);
+                        row.set_data<int> ("target-line", line0);
+                        outline_list.append (row);
+                    }
+                }
+            } catch (GLib.Error e) {
+                GLib.warning ("Outline parse failed: %s", e.message);
+            }
+
             string[] lines = text.split ("\n");
-
-            int chunk_idx = 0;
-            bool in_chunk = false;
-
             for (int i = 0; i < lines.length; i++) {
-                string line = lines[i];
-                string trimmed = line.strip ();
-
-                if (trimmed.has_prefix ("```{")) {
-                    in_chunk = true;
-                    chunk_idx++;
-                    var row = new Gtk.ListBoxRow ();
-                    var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
-                        margin_top = 4, margin_bottom = 4, margin_start = 14, margin_end = 6
-                    };
-                    hbox.append (new Gtk.Image.from_icon_name ("utilities-terminal-symbolic"));
-                    hbox.append (new Gtk.Label (@"Chunk #$chunk_idx: $trimmed") { xalign = 0, hexpand = true, css_classes = { "monospace", "caption" } });
-                    hbox.append (new Gtk.Label (@"L$(i + 1)") { css_classes = { "dim-label", "caption" } });
-                    row.set_child (hbox);
-                    row.set_data<int> ("target-line", i);
-                    outline_list.append (row);
-                    continue;
-                } else if (in_chunk && trimmed == "```") {
-                    in_chunk = false;
-                    continue;
-                }
-
-                if (in_chunk) {
-                    continue;
-                }
-
-                // 1. Outline headings
-                if (trimmed.has_prefix ("#")) {
-                    var row = new Gtk.ListBoxRow ();
-                    var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
-                        margin_top = 4, margin_bottom = 4, margin_start = 6, margin_end = 6
-                    };
-                    hbox.append (new Gtk.Image.from_icon_name ("format-text-bold-symbolic"));
-                    hbox.append (new Gtk.Label (trimmed) { xalign = 0, hexpand = true });
-                    hbox.append (new Gtk.Label (@"L$(i + 1)") { css_classes = { "dim-label", "caption" } });
-                    row.set_child (hbox);
-                    row.set_data<int> ("target-line", i);
-                    outline_list.append (row);
-                }
+                string trimmed = lines[i].strip ();
 
                 // 2. Citations detection (@key) excluding Quarto cross-refs (@fig-, @tbl-, @sec-, @eq-, @lst-, @thm-)
                 if (trimmed.contains ("@") && !trimmed.has_prefix ("mailto:")) {
@@ -1712,7 +1897,23 @@ namespace Imladris.UI {
             environment_list.append (row);
         }
 
+        private void get_plot_theme_colors (out string bg, out string text, out string card_bg, out string card_border, out string title_col, out string sub_col) {
+            var app_theme = Core.SettingsManager.get_default ().app_theme;
+            bool is_dark = Adw.StyleManager.get_default ().dark;
+            bool use_dark = (app_theme == Core.AppTheme.DARK) || (app_theme == Core.AppTheme.SYSTEM && is_dark);
+            bool use_sepia = (app_theme == Core.AppTheme.EYE_FRIENDLY);
+
+            bg = use_dark ? "#1e1e1e" : (use_sepia ? "#faf5ee" : "#ffffff");
+            text = use_dark ? "#e2e8f0" : (use_sepia ? "#383431" : "#1e293b");
+            card_bg = use_dark ? "#262626" : (use_sepia ? "#f0e7dc" : "#f8fafc");
+            card_border = use_dark ? "#404040" : (use_sepia ? "#dcd0c2" : "#e2e8f0");
+            title_col = use_dark ? "#f8fafc" : (use_sepia ? "#2b2623" : "#0f172a");
+            sub_col = use_dark ? "#94a3b8" : (use_sepia ? "#5c534b" : "#64748b");
+        }
+
         public void render_default_scientific_plot () {
+            string bg, text, card_bg, card_border, title_col, sub_col;
+            get_plot_theme_colors (out bg, out text, out card_bg, out card_border, out title_col, out sub_col);
             string svg_html = """<!DOCTYPE html>
 <html>
 <head>
@@ -1721,19 +1922,19 @@ namespace Imladris.UI {
   body {
     margin: 0;
     padding: 16px;
-    background: #ffffff;
+    background: %s;
     font-family: system-ui, sans-serif;
-    color: #1e293b;
+    color: %s;
     display: flex;
     flex-direction: column;
     align-items: center;
   }
   .plot-card {
-    border: 1px solid #e2e8f0;
+    border: 1px solid %s;
     border-radius: 8px;
     padding: 16px;
-    background: #f8fafc;
-    width: 92%;
+    background: %s;
+    width: 92%%;
     max-width: 560px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
@@ -1741,11 +1942,11 @@ namespace Imladris.UI {
     font-size: 14px;
     font-weight: 700;
     margin-bottom: 4px;
-    color: #0f172a;
+    color: %s;
   }
   .plot-sub {
     font-size: 11px;
-    color: #64748b;
+    color: %s;
     margin-bottom: 12px;
   }
 </style>
@@ -1754,7 +1955,7 @@ namespace Imladris.UI {
   <div class="plot-card">
     <div class="plot-title">mtcars: Miles Per Gallon (mpg) vs Horsepower (hp)</div>
     <div class="plot-sub">Rendered SVG Figure • RStudio Quadrant 4 Output</div>
-    <svg viewBox="0 0 460 240" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 460 240" width="100%%" height="auto" xmlns="http://www.w3.org/2000/svg">
       <rect x="40" y="10" width="400" height="195" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
       <!-- Grid lines -->
       <line x1="40" y1="50" x2="440" y2="50" stroke="#f1f5f9" stroke-width="1"/>
@@ -1777,12 +1978,12 @@ namespace Imladris.UI {
       <circle cx="355" cy="168" r="5" fill="#ef4444" opacity="0.85"/>
       <circle cx="395" cy="180" r="5" fill="#ef4444" opacity="0.85"/>
       <!-- Axis labels -->
-      <text x="240" y="230" font-size="11" text-anchor="middle" fill="#475569">Gross Horsepower (hp)</text>
-      <text x="15" y="110" font-size="11" text-anchor="middle" fill="#475569" transform="rotate(-90 15,110)">MPG</text>
+      <text x="240" y="230" font-size="11" text-anchor="middle" fill="%s">Gross Horsepower (hp)</text>
+      <text x="15" y="110" font-size="11" text-anchor="middle" fill="%s" transform="rotate(-90 15,110)">MPG</text>
     </svg>
   </div>
 </body>
-</html>""";
+</html>""".printf (bg, text, card_border, card_bg, title_col, sub_col, sub_col, sub_col);
             plots_webview.load_html (svg_html, "file:///");
         }
 
@@ -1795,6 +1996,8 @@ namespace Imladris.UI {
                 uri = "file://" + plot_file_path;
             }
             string fname = GLib.Path.get_basename (plot_file_path);
+            string bg, text, card_bg, card_border, title_col, sub_col;
+            get_plot_theme_colors (out bg, out text, out card_bg, out card_border, out title_col, out sub_col);
             string html = """<!DOCTYPE html>
 <html>
 <head>
@@ -1803,18 +2006,18 @@ namespace Imladris.UI {
   body {
     margin: 0;
     padding: 16px;
-    background: #ffffff;
+    background: %s;
     font-family: system-ui, sans-serif;
-    color: #1e293b;
+    color: %s;
     display: flex;
     flex-direction: column;
     align-items: center;
   }
   .plot-card {
-    border: 1px solid #e2e8f0;
+    border: 1px solid %s;
     border-radius: 8px;
     padding: 14px;
-    background: #f8fafc;
+    background: %s;
     width: 94%%;
     max-width: 650px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
@@ -1824,17 +2027,17 @@ namespace Imladris.UI {
     max-width: 100%%;
     height: auto;
     border-radius: 6px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid %s;
   }
   .plot-title {
     font-size: 13px;
     font-weight: 700;
     margin-top: 10px;
-    color: #0f172a;
+    color: %s;
   }
   .plot-sub {
     font-size: 11px;
-    color: #64748b;
+    color: %s;
     margin-top: 2px;
   }
 </style>
@@ -1846,7 +2049,7 @@ namespace Imladris.UI {
     <div class="plot-sub">Rendered Graphic Output • Quadrant 4</div>
   </div>
 </body>
-</html>""".printf (uri, fname);
+</html>""".printf (bg, text, card_border, card_bg, card_border, title_col, sub_col, uri, GLib.Markup.escape_text (fname));
             plots_webview.load_html (html, "file:///");
         }
 
@@ -1864,7 +2067,7 @@ namespace Imladris.UI {
             if (root_project_dir != "") {
                 current_browser_dir = root_project_dir;
             } else {
-                current_browser_dir = Services.PersistentSessionManager.get_default ().current_working_dir;
+                current_browser_dir = get_session_manager ().current_working_dir;
             }
             populate_files_browser ();
         }
@@ -1881,7 +2084,7 @@ namespace Imladris.UI {
                 if (doc_page.file_location != null && doc_page.file_location.get_parent () != null) {
                     current_browser_dir = doc_page.file_location.get_parent ().get_path ();
                 } else {
-                    current_browser_dir = Services.PersistentSessionManager.get_default ().current_working_dir;
+                    current_browser_dir = get_session_manager ().current_working_dir;
                 }
             }
             if (root_project_dir == "") {
@@ -2231,7 +2434,7 @@ namespace Imladris.UI {
             btn_swd.add_css_class ("flat");
             btn_swd.clicked.connect (() => {
                 pop.popdown ();
-                Services.PersistentSessionManager.get_default ().set_working_directory (current_browser_dir);
+                get_session_manager ().set_working_directory (current_browser_dir);
                 if (main_window != null) main_window.show_toast (@"Working directory set to: $(GLib.Path.get_basename (current_browser_dir))");
             });
             vbox.append (btn_swd);
@@ -2240,7 +2443,7 @@ namespace Imladris.UI {
             btn_gwd.add_css_class ("flat");
             btn_gwd.clicked.connect (() => {
                 pop.popdown ();
-                current_browser_dir = Services.PersistentSessionManager.get_default ().current_working_dir;
+                current_browser_dir = get_session_manager ().current_working_dir;
                 populate_files_browser ();
             });
             vbox.append (btn_gwd);
@@ -2284,7 +2487,7 @@ namespace Imladris.UI {
         }
 
         private void save_history_dialog () {
-            string cwd = Services.PersistentSessionManager.get_default ().current_working_dir;
+            string cwd = get_session_manager ().current_working_dir;
             if (cwd.length == 0) cwd = GLib.Environment.get_current_dir ();
             string rhistory_path = GLib.Path.build_filename (cwd, ".Rhistory");
 
@@ -2358,7 +2561,7 @@ local({
 })
 """;
             string? plot_out = null;
-            string out_str = yield Services.PersistentSessionManager.get_default ().execute_r (r_probe, out plot_out);
+            string out_str = yield get_session_manager ().execute_r (r_probe, out plot_out);
 
             if (out_str.contains ("___IMLADRIS_PKGS_START___")) {
                 int s = out_str.index_of ("___IMLADRIS_PKGS_START___") + "___IMLADRIS_PKGS_START___".length;
@@ -2502,7 +2705,7 @@ local({
 """.replace ("__IMLADRIS_TOPIC__", sanitized);
 
             string? plot_out = null;
-            string out_str = yield Services.PersistentSessionManager.get_default ().execute_r (r_probe, out plot_out);
+            string out_str = yield get_session_manager ().execute_r (r_probe, out plot_out);
 
             if (out_str.contains ("___IMLADRIS_HELP_START___")) {
                 int s = out_str.index_of ("___IMLADRIS_HELP_START___") + "___IMLADRIS_HELP_START___".length;

@@ -2,6 +2,18 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.26.0] - 2026-11-15
+
+### Added
+- **Hybrid Rust Core (`imladris_core`)**: CommonMark/GFM/math/Mermaid HTML renderer, lossless `.ipynb` round-trip serializer, YAML frontmatter parser, LaTeX outline analyzer, and TypeScript symbol analyzer exposed via C-ABI.
+- **Format-Adaptive UI (`FormatProfile`)**: Adaptive ribbon, headerbar, comment toggles, and `GtkSourceView 5` language specs across `.qmd`, `.Rmd`, `.ipynb`, `.md`, `.tex`, `.ts`, and `.html`.
+- **LaTeX & TypeScript Runners (`LatexBuildRunner`, `TypeScriptRunner`)**: Native `latexmk`/`xelatex`/`lualatex`/`pdflatex` compilation with `.log` diagnostics and `tsx`/`node`/`deno`/`bun`/`tsc` execution & typechecking.
+
+### Fixed & Hardened
+- Sequential chunk execution with `Gtk.TextMark` anchoring, `\uFFFC` clean-text extraction, per-tab/project `PersistentSessionManager` pooling, and polyglot R + Python `EnvironmentController`.
+- `ExportService` real error propagation, LibreOffice `-env:UserInstallation` isolation, `_quarto.yml` `output-dir` resolution, and `.venv` Python preservation.
+- Flatpak `--talk-name=org.freedesktop.Flatpak` & `--filesystem=xdg-cache/imladris:create`, `MallornManager` symlink archive rejection, `PluginManager` pre-extraction manifest/zip validation, `PackagesRibbonBar` CRAN/GitHub identifier validation, and `RecoveryService` SHA-256 IDs + mutex/generation locking.
+
 ## [0.25.0] - 2026-11-14
 
 ### Functions Added

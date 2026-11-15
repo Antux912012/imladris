@@ -899,31 +899,39 @@ function onunload() {
                 var dest_file = File.new_for_path (local_archive);
                 src_file.copy (dest_file, FileCopyFlags.OVERWRITE);
 
-                // Extract using python3 -m zipfile
-                string[] argv = { "python3", "-m", "zipfile", "-e", local_archive, tmp_dir };
-                var subp = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
-                yield subp.wait_check_async ();
-
-                // Search for manifest.json
-                string? found_manifest_path = find_manifest_file (tmp_dir);
-                if (found_manifest_path == null) {
-                    throw new IOError.INVALID_DATA ("Invalid plugin archive: manifest.json not found in package.");
+                // 1. Inspect zip entries for path traversal/symlinks and read manifest.json BEFORE extracting to disk
+                string inspect_py = "import sys, zipfile, stat\n"
+                    + "manifest_data = None\n"
+                    + "with zipfile.ZipFile(sys.argv[1], 'r') as zf:\n"
+                    + "    for zi in zf.infolist():\n"
+                    + "        name = zi.filename.replace('\\\\', '/')\n"
+                    + "        if name.startswith('/') or '..' in name.split('/'):\n"
+                    + "            raise ValueError('Unsafe path in plugin archive: ' + zi.filename)\n"
+                    + "        mode = (zi.external_attr >> 16) & 0o170000\n"
+                    + "        if mode == stat.S_IFLNK:\n"
+                    + "            raise ValueError('Symlinks are forbidden in plugin archives: ' + zi.filename)\n"
+                    + "        if name == 'manifest.json' or name.endswith('/manifest.json'):\n"
+                    + "            if manifest_data is None:\n"
+                    + "                manifest_data = zf.read(zi.filename).decode('utf-8')\n"
+                    + "if manifest_data is None:\n"
+                    + "    raise ValueError('manifest.json not found in plugin archive')\n"
+                    + "sys.stdout.write(manifest_data)\n";
+                var inspect_proc = new Subprocess.newv (
+                    { "python3", "-c", inspect_py, local_archive },
+                    SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE
+                );
+                string manifest_json, inspect_err;
+                yield inspect_proc.communicate_utf8_async (null, null, out manifest_json, out inspect_err);
+                if (!inspect_proc.get_successful ()) {
+                    throw new IOError.INVALID_DATA (@"Invalid or unsafe plugin archive: $(inspect_err ?? "verification failed")");
                 }
 
-                string plugin_root_extracted = Path.get_dirname (found_manifest_path);
-                string main_js_path = Path.build_filename (plugin_root_extracted, "main.js");
-                if (!FileUtils.test (main_js_path, FileTest.EXISTS)) {
-                    throw new IOError.INVALID_DATA ("Invalid plugin archive: main.js not found alongside manifest.json.");
-                }
-
-                string manifest_json;
-                FileUtils.get_contents (found_manifest_path, out manifest_json);
                 var manifest = PluginManifest.from_json (manifest_json);
                 if (manifest == null || manifest.id == "") {
                     throw new IOError.INVALID_DATA ("Invalid plugin manifest: missing id or corrupted JSON.");
                 }
 
-                // Check consent via Adw.AlertDialog
+                // Check consent via Adw.AlertDialog BEFORE extracting files
                 var alert = new Adw.AlertDialog (
                     @"Install Plugin: $(manifest.name)",
                     @"Author: $(manifest.author)\n" +
@@ -942,6 +950,23 @@ function onunload() {
                 if (response != "install") {
                     delete_directory_recursive (File.new_for_path (tmp_dir));
                     return false;
+                }
+
+                // Extract using python3 -m zipfile after consent & validation
+                string[] argv = { "python3", "-m", "zipfile", "-e", local_archive, tmp_dir };
+                var subp = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
+                yield subp.wait_check_async ();
+
+                // Search for manifest.json and main.js
+                string? found_manifest_path = find_manifest_file (tmp_dir);
+                if (found_manifest_path == null) {
+                    throw new IOError.INVALID_DATA ("Invalid plugin archive: manifest.json not found in package.");
+                }
+
+                string plugin_root_extracted = Path.get_dirname (found_manifest_path);
+                string main_js_path = Path.build_filename (plugin_root_extracted, "main.js");
+                if (!FileUtils.test (main_js_path, FileTest.EXISTS)) {
+                    throw new IOError.INVALID_DATA ("Invalid plugin archive: main.js not found alongside manifest.json.");
                 }
 
                 // Destination

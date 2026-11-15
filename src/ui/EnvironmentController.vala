@@ -15,14 +15,16 @@ namespace Imladris.UI {
         public string memory_size { get; set; }
         public bool is_dataframe { get; set; }
         public string initial_preview { get; set; }
+        public string var_engine { get; set; default = "r"; }
 
-        public EnvVariableItem (string name, string var_type, string dims, string mem, bool is_df, string prev = "") {
+        public EnvVariableItem (string name, string var_type, string dims, string mem, bool is_df, string prev = "", string engine = "r") {
             this.name = name;
             this.var_type = var_type;
             this.dimensions = dims;
             this.memory_size = mem;
             this.is_dataframe = is_df;
             this.initial_preview = prev;
+            this.var_engine = engine;
         }
     }
 
@@ -47,6 +49,11 @@ namespace Imladris.UI {
         private Gee.ArrayList<EnvVariableItem> last_items;
 
         public string active_engine { get; set; default = "r"; }
+        public string session_key { get; set; default = "default"; }
+
+        private PersistentSessionManager get_session_manager () {
+            return PersistentSessionManager.for_key (session_key);
+        }
 
         public Gee.ArrayList<EnvVariableItem> get_cached_variables () {
             return last_items;
@@ -169,13 +176,14 @@ namespace Imladris.UI {
             refresh_spinner.visible = true;
             refresh_spinner.spinning = true;
 
-            if (active_engine == "r") {
+            if (active_engine == "r" || active_engine == "polyglot") {
                 string? plot_out = null;
-                yield PersistentSessionManager.get_default ().execute_r (
+                yield get_session_manager ().execute_r (
                     "rm(list = ls(all.names = TRUE)); gc(verbose = FALSE)\n",
                     out plot_out
                 );
-            } else {
+            }
+            if (active_engine != "r") {
                 string? plot_out = null;
                 string py_clear = """
 for _k in list(globals().keys()):
@@ -185,7 +193,7 @@ for _k in list(globals().keys()):
         except Exception:
             pass
 """;
-                yield PersistentSessionManager.get_default ().execute_python (py_clear, out plot_out);
+                yield get_session_manager ().execute_python (py_clear, out plot_out);
             }
 
             toast_requested ("Cleared all objects from Global Environment");
@@ -200,8 +208,11 @@ for _k in list(globals().keys()):
             refresh_spinner.spinning = true;
 
             var items = new Gee.ArrayList<EnvVariableItem> ();
-
-            if (active_engine == "r") {
+            string norm = active_engine.down ().strip ();
+            if (norm == "polyglot") {
+                yield fetch_r_environment (items);
+                yield fetch_python_environment (items);
+            } else if (norm == "r") {
                 yield fetch_r_environment (items);
             } else {
                 yield fetch_python_environment (items);
@@ -272,9 +283,9 @@ for _k in list(globals().keys()):
                                 ? @"read.delim(\"$safe_path\", stringsAsFactors = FALSE)"
                                 : @"read.csv(\"$safe_path\")";
                             string r_code = @"$var_name <- $r_cmd\nView($var_name)\n";
-                            PersistentSessionManager.get_default ().execute_r.begin (r_code, (o, r) => {
+                            get_session_manager ().execute_r.begin (r_code, (o, r) => {
                                 string? unused_plot = null;
-                                PersistentSessionManager.get_default ().execute_r.end (r, out unused_plot);
+                                get_session_manager ().execute_r.end (r, out unused_plot);
                                 refresh_environment.begin ();
                                 view_dataframe_requested (var_name, "r");
                             });
@@ -283,9 +294,9 @@ for _k in list(globals().keys()):
                                 ? @"pd.read_csv(\"$safe_path\", sep=\"\\t\")"
                                 : @"pd.read_csv(\"$safe_path\")";
                             string py_code = @"import pandas as pd\n$var_name = $py_cmd\n";
-                            PersistentSessionManager.get_default ().execute_python.begin (py_code, (o, r) => {
+                            get_session_manager ().execute_python.begin (py_code, (o, r) => {
                                 string? unused_plot = null;
-                                PersistentSessionManager.get_default ().execute_python.end (r, out unused_plot);
+                                get_session_manager ().execute_python.end (r, out unused_plot);
                                 refresh_environment.begin ();
                                 view_dataframe_requested (var_name, "python");
                             });
@@ -301,10 +312,10 @@ for _k in list(globals().keys()):
         private async void fetch_r_environment (Gee.ArrayList<EnvVariableItem> items) {
             string r_probe = """
 local({
-  objs <- ls(all.names = FALSE)
+  objs <- ls(envir = .GlobalEnv, all.names = FALSE)
   res <- lapply(objs, function(x) {
     tryCatch({
-      val <- get(x)
+      val <- get(x, envir = .GlobalEnv)
       cls <- paste(class(val), collapse=", ")
       dim_str <- if(!is.null(dim(val))) paste0(nrow(val), " × ", ncol(val)) else if(length(val) > 0) as.character(length(val)) else ""
       sz <- format(object.size(val), units = "auto")
@@ -318,8 +329,8 @@ local({
 })
 """;
             string? plot_out = null;
-            string out_str = yield PersistentSessionManager.get_default ().execute_r (r_probe, out plot_out);
-            parse_env_output (out_str, items);
+            string out_str = yield get_session_manager ().execute_r_with_options (r_probe, null, null, 15000, false, out plot_out);
+            parse_env_output (out_str, items, "r");
         }
 
         private async void fetch_python_environment (Gee.ArrayList<EnvVariableItem> items) {
@@ -342,11 +353,11 @@ print("\n".join(res))
 print("___IMLADRIS_ENV_END___")
 """;
             string? plot_out = null;
-            string out_str = yield PersistentSessionManager.get_default ().execute_python (py_probe, out plot_out);
-            parse_env_output (out_str, items);
+            string out_str = yield get_session_manager ().execute_python_with_options (py_probe, null, null, 15000, false, out plot_out);
+            parse_env_output (out_str, items, "python");
         }
 
-        private void parse_env_output (string raw, Gee.ArrayList<EnvVariableItem> items) {
+        private void parse_env_output (string raw, Gee.ArrayList<EnvVariableItem> items, string engine) {
             if (!raw.contains ("___IMLADRIS_ENV_START___")) return;
             int start_idx = raw.index_of ("___IMLADRIS_ENV_START___") + "___IMLADRIS_ENV_START___".length;
             int end_idx = raw.index_of ("___IMLADRIS_ENV_END___");
@@ -354,15 +365,17 @@ print("___IMLADRIS_ENV_END___")
 
             string block = raw.substring (start_idx, end_idx - start_idx).strip ();
             string[] lines = block.split ("\n");
+            bool show_badge = (active_engine.down ().strip () == "polyglot");
+            string badge = (engine == "r") ? "[R] " : "[Py] ";
             foreach (var line in lines) {
                 string[] parts = line.strip ().split ("\t");
                 if (parts.length >= 5) {
                     string name = parts[0].strip ();
-                    string cls = parts[1].strip ();
+                    string cls = (show_badge ? badge : "") + parts[1].strip ();
                     string dims = parts[2].strip ();
                     string sz = parts[3].strip ();
                     bool is_df = (parts[4].strip () == "1");
-                    items.add (new EnvVariableItem (name, cls, dims, sz, is_df));
+                    items.add (new EnvVariableItem (name, cls, dims, sz, is_df, "", engine));
                 }
             }
         }
@@ -466,8 +479,9 @@ print("___IMLADRIS_ENV_END___")
                 };
                 view_btn.add_css_class ("flat");
                 string obj_to_view = item.name;
+                string obj_eng = item.var_engine;
                 view_btn.clicked.connect (() => {
-                    view_dataframe_requested (obj_to_view, active_engine);
+                    view_dataframe_requested (obj_to_view, obj_eng);
                 });
                 expander_row.add_suffix (view_btn);
             }
@@ -491,10 +505,11 @@ print("___IMLADRIS_ENV_END___")
 
             bool fetched = false;
             string vname = item.name;
+            string vengine = item.var_engine;
             expander_row.notify["expanded"].connect (() => {
                 if (expander_row.expanded && !fetched) {
                     fetched = true;
-                    fetch_variable_summary.begin (vname, summary_label);
+                    fetch_variable_summary.begin (vname, vengine, summary_label);
                 }
             });
 
@@ -502,12 +517,12 @@ print("___IMLADRIS_ENV_END___")
             list_box.append (expander_row);
         }
 
-        private async void fetch_variable_summary (string var_name, Gtk.Label target_label) {
+        private async void fetch_variable_summary (string var_name, string var_engine, Gtk.Label target_label) {
             target_label.label = "Loading summary...";
-            if (active_engine == "r") {
+            if (var_engine == "r") {
                 string r_cmd = """
 local({
-  v <- get('%s')
+  v <- get('%s', envir = .GlobalEnv)
   cat('--- str() ---\n')
   str(v)
   cat('\n--- summary() ---\n')
@@ -515,7 +530,7 @@ local({
 })
 """.printf (var_name);
                 string? plot_out = null;
-                string res = yield PersistentSessionManager.get_default ().execute_r (r_cmd, out plot_out);
+                string res = yield get_session_manager ().execute_r_with_options (r_cmd, null, null, 15000, false, out plot_out);
                 target_label.label = res.strip ().length > 0 ? res.strip () : "No summary available.";
             } else {
                 string py_cmd = """
@@ -534,7 +549,7 @@ except Exception as e:
     print(str(e))
 """.printf (var_name);
                 string? plot_out = null;
-                string res = yield PersistentSessionManager.get_default ().execute_python (py_cmd, out plot_out);
+                string res = yield get_session_manager ().execute_python_with_options (py_cmd, null, null, 15000, false, out plot_out);
                 target_label.label = res.strip ().length > 0 ? res.strip () : "No summary available.";
             }
         }

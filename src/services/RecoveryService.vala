@@ -25,30 +25,60 @@ namespace Imladris.Services {
         }
 
         private string cache_dir;
+        private GLib.Mutex snapshot_mutex = GLib.Mutex ();
+        private Gee.HashMap<string, uint64?> doc_generations = new Gee.HashMap<string, uint64?> ();
 
         public RecoveryService () {
             Object ();
-            cache_dir = Core.PlatformUtils.get_shared_cache_dir ("recovery");
+            cache_dir = GLib.Path.build_filename (GLib.Environment.get_user_cache_dir (), "imladris", "recovery");
             ensure_directory ();
         }
-
-        private GLib.Mutex snapshot_mutex = GLib.Mutex ();
 
         private void ensure_directory () {
             GLib.DirUtils.create_with_parents (cache_dir, 0700);
         }
 
+        private static string sanitize_doc_id (string doc_id) {
+            return GLib.Checksum.compute_for_string (GLib.ChecksumType.SHA256, doc_id, -1);
+        }
+
+        private string shadow_path_for_id (string doc_id) {
+            return GLib.Path.build_filename (cache_dir, @"$(sanitize_doc_id (doc_id)).shadow");
+        }
+
+        private void purge_document_cache_locked (string doc_id) {
+            try {
+                string hashed = shadow_path_for_id (doc_id);
+                var f = GLib.File.new_for_path (hashed);
+                if (f.query_exists ()) f.delete ();
+                // Also clean any legacy unsanitized path if safe basename
+                if (!doc_id.contains ("/") && !doc_id.contains ("..")) {
+                    string legacy = GLib.Path.build_filename (cache_dir, @"$(doc_id).shadow");
+                    var lf = GLib.File.new_for_path (legacy);
+                    if (lf.query_exists ()) lf.delete ();
+                }
+            } catch (GLib.Error e) {}
+        }
+
         public async void snapshot_async (string doc_id, string? file_path, string doc_type, string content, int line, int offset, bool is_dirty) {
             SourceFunc callback = snapshot_async.callback;
-            
+
+            snapshot_mutex.lock ();
+            uint64 gen = (doc_generations.has_key (doc_id) ? doc_generations.get (doc_id) : 0) + 1;
+            doc_generations.set (doc_id, gen);
+            snapshot_mutex.unlock ();
+
             new Thread<void*> ("imladris-recovery-worker", () => {
                 snapshot_mutex.lock ();
                 try {
-                    if (!is_dirty) {
-                        purge_document_cache (doc_id);
+                    uint64 latest = doc_generations.has_key (doc_id) ? doc_generations.get (doc_id) : 0;
+                    if (latest != gen) {
+                        // Stale snapshot superseded by newer snapshot or purge
+                    } else if (!is_dirty) {
+                        purge_document_cache_locked (doc_id);
                     } else {
                         ensure_directory ();
-                        string doc_cache_file = GLib.Path.build_filename (cache_dir, @"$(doc_id).shadow");
+                        string doc_cache_file = shadow_path_for_id (doc_id);
                         string doc_temp_file = @"$(doc_cache_file).$(GLib.get_monotonic_time ()).tmp";
 
                         var builder = new Json.Builder ();
@@ -69,9 +99,9 @@ namespace Imladris.Services {
                         builder.add_string_value (content);
                         builder.end_object ();
 
-                        var gen = new Json.Generator ();
-                        gen.set_root (builder.get_root ());
-                        gen.to_file (doc_temp_file);
+                        var json_gen = new Json.Generator ();
+                        json_gen.set_root (builder.get_root ());
+                        json_gen.to_file (doc_temp_file);
 
                         // Atomic rename
                         var tmp = GLib.File.new_for_path (doc_temp_file);
@@ -92,14 +122,13 @@ namespace Imladris.Services {
         }
 
         public void purge_document_cache (string doc_id) {
+            snapshot_mutex.lock ();
             try {
-                string doc_cache_file = GLib.Path.build_filename (cache_dir, @"$(doc_id).shadow");
-                var f = GLib.File.new_for_path (doc_cache_file);
-                if (f.query_exists ()) {
-                    f.delete ();
-                }
-            } catch (GLib.Error e) {
-                // Ignore silent cleanup errors
+                uint64 gen = (doc_generations.has_key (doc_id) ? doc_generations.get (doc_id) : 0) + 1;
+                doc_generations.set (doc_id, gen);
+                purge_document_cache_locked (doc_id);
+            } finally {
+                snapshot_mutex.unlock ();
             }
         }
 

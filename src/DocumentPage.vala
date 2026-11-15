@@ -49,10 +49,68 @@ namespace Imladris {
         public RStudioDockGrid rstudio_dock_grid { get; private set; }
         public ProjectType project_type { get; set; default = ProjectType.STANDARD; }
         private Services.LayoutMode current_layout_mode = Services.LayoutMode.APOSTROPHE;
+        public Services.SplitMode preferred_split_mode { get; set; default = Services.SplitMode.HORIZONTAL_SPLIT; }
+        public bool user_layout_override { get; set; default = false; }
+        public string raw_ipynb_source { get; set; default = ""; }
+        private static bool lang_specs_registered = false;
         private ulong ai_settings_handler_id = 0;
         private ulong theme_changed_handler_id = 0;
         private ulong dark_notify_handler_id = 0;
         private ulong physics_changed_handler_id = 0;
+        private double last_preview_scroll_y = 0.0;
+        private bool has_loaded_preview = false;
+
+        public Services.LayoutMode get_workbench_mode () {
+            return current_layout_mode;
+        }
+
+        public string get_clean_source_text () {
+            return source_buffer.text.replace ("\xef\xbf\xbc", "");
+        }
+
+        public void set_initial_content (string text, bool mark_unmodified = true) {
+            source_buffer.begin_irreversible_action ();
+            try {
+                source_buffer.text = text;
+            } finally {
+                source_buffer.end_irreversible_action ();
+            }
+            if (mark_unmodified) {
+                source_buffer.set_modified (false);
+            }
+        }
+
+        private static void ensure_bundled_language_specs () {
+            if (lang_specs_registered) return;
+            lang_specs_registered = true;
+
+            var lm = GtkSource.LanguageManager.get_default ();
+            string cache_specs_dir = GLib.Path.build_filename (
+                GLib.Environment.get_user_cache_dir (), "imladris", "language-specs"
+            );
+            try {
+                GLib.DirUtils.create_with_parents (cache_specs_dir, 0755);
+                string[] specs = { "quarto.lang", "rmd.lang", "typescript.lang", "latex.lang" };
+                foreach (string spec in specs) {
+                    string res_path = @"/org/imladris/app/language-specs/$spec";
+                    if (GLib.resources_get_info (res_path, GLib.ResourceLookupFlags.NONE, null, null)) {
+                        GLib.Bytes bytes = GLib.resources_lookup_data (res_path, GLib.ResourceLookupFlags.NONE);
+                        string out_path = GLib.Path.build_filename (cache_specs_dir, spec);
+                        GLib.FileUtils.set_data (out_path, bytes.get_data ());
+                    }
+                }
+            } catch (GLib.Error e) {
+                GLib.warning ("Could not stage bundled language-specs: %s", e.message);
+            }
+
+            string[] existing = lm.get_search_path ();
+            var paths = new GLib.GenericArray<string> ();
+            paths.add (cache_specs_dir);
+            foreach (string p in existing) {
+                if (p != cache_specs_dir) paths.add (p);
+            }
+            lm.set_search_path (paths.data);
+        }
 
         public DocumentFormat get_document_format () {
             if (file_location != null) {
@@ -65,21 +123,28 @@ namespace Imladris {
         }
 
         private Gee.HashMap<string, Gtk.TextMark> chunk_marks = new Gee.HashMap<string, Gtk.TextMark> ();
+        private Gee.HashMap<string, Gtk.TextChildAnchor> chunk_anchors = new Gee.HashMap<string, Gtk.TextChildAnchor> ();
         private Gee.HashMap<string, UI.InlineChunkOutputWidget> inline_chunk_widgets = new Gee.HashMap<string, UI.InlineChunkOutputWidget> ();
 
         /**
          * Pillar 11: Embeds an inline output card directly below the executed chunk.
-         * Uses persistent Gtk.TextMark tracking to survive line insertions above the chunk.
+         * Uses persistent Gtk.TextMark tracking to survive line insertions above the chunk,
+         * wrapped in irreversible actions so Undo history and modified state are never poisoned.
          */
         public void display_inline_chunk_output (int end_line, string text_output, string? plot_path, int count, double elapsed_ms = -1.0) {
             string? matched_key = null;
             foreach (var entry in chunk_marks.entries) {
+                if (entry.value == null || entry.value.get_deleted ()) continue;
                 Gtk.TextIter mark_iter;
                 source_buffer.get_iter_at_mark (out mark_iter, entry.value);
                 int mark_line = mark_iter.get_line ();
                 if (mark_line == end_line || mark_line == end_line + 1) {
-                    matched_key = entry.key;
-                    break;
+                    var anc = chunk_anchors.get (entry.key);
+                    var w = inline_chunk_widgets.get (entry.key);
+                    if (anc != null && !anc.get_deleted () && w != null && w.get_parent () != null) {
+                        matched_key = entry.key;
+                        break;
+                    }
                 }
             }
 
@@ -93,7 +158,8 @@ namespace Imladris {
                 source_buffer.get_iter_at_line (out iter, end_line);
                 iter.forward_to_line_end ();
 
-                source_buffer.begin_user_action ();
+                bool was_modified = source_buffer.get_modified ();
+                source_buffer.begin_irreversible_action ();
                 try {
                     source_buffer.insert (ref iter, "\n", 1);
                     var anchor = source_buffer.create_child_anchor (iter);
@@ -105,9 +171,13 @@ namespace Imladris {
                     string key = GLib.Uuid.string_random ();
                     var mark = source_buffer.create_mark (null, after_anchor, false);
                     chunk_marks.set (key, mark);
+                    chunk_anchors.set (key, anchor);
                     inline_chunk_widgets.set (key, widget);
                 } finally {
-                    source_buffer.end_user_action ();
+                    source_buffer.end_irreversible_action ();
+                    if (!was_modified) {
+                        source_buffer.set_modified (false);
+                    }
                 }
             }
 
@@ -120,7 +190,8 @@ namespace Imladris {
                     w.unparent ();
                 }
             }
-            source_buffer.begin_user_action ();
+            bool was_modified = source_buffer.get_modified ();
+            source_buffer.begin_irreversible_action ();
             try {
                 foreach (var mark in chunk_marks.values) {
                     if (mark != null && !mark.get_deleted ()) {
@@ -138,9 +209,13 @@ namespace Imladris {
                     }
                 }
             } finally {
-                source_buffer.end_user_action ();
+                source_buffer.end_irreversible_action ();
+                if (!was_modified) {
+                    source_buffer.set_modified (false);
+                }
             }
             inline_chunk_widgets.clear ();
+            chunk_anchors.clear ();
             chunk_marks.clear ();
         }
 
@@ -154,12 +229,20 @@ namespace Imladris {
             this.doc_id = GLib.Uuid.string_random ();
 
             // 1. Setup GtkSource.Buffer with Syntax Highlighting + Rich TextTags
+            ensure_bundled_language_specs ();
             var lang_manager = GtkSource.LanguageManager.get_default ();
             var fmt = DocumentFormat.from_filename (title);
             string syntax_code = fmt.to_syntax_lang ();
             var language = lang_manager.get_language (syntax_code);
             if (language == null && lang_id.length > 0) {
-                language = lang_manager.get_language (lang_id == "rmd" ? "markdown" : lang_id);
+                language = lang_manager.get_language (lang_id);
+            }
+            if (language == null) {
+                if (syntax_code == "quarto" || syntax_code == "rmd" || syntax_code == "latex") {
+                    language = lang_manager.get_language ("markdown");
+                } else if (syntax_code == "typescript") {
+                    language = lang_manager.get_language ("js");
+                }
             }
             source_buffer = new GtkSource.Buffer.with_language (language);
             source_buffer.highlight_syntax = true;
@@ -211,11 +294,18 @@ namespace Imladris {
             // 2. Shared WebKitGTK 6.0 & Console Instances (Kept alive in PersistentPanelRegistry)
             web_view = UI.WebViewFactory.create ();
             var settings = web_view.get_settings ();
-            settings.enable_developer_extras = true;
             settings.enable_javascript = true;
-            settings.allow_file_access_from_file_urls = true;
-            settings.allow_universal_access_from_file_urls = true;
             settings.enable_spatial_navigation = false;
+
+            web_view.load_changed.connect ((load_event) => {
+                if (load_event == WebKit.LoadEvent.FINISHED) {
+                    has_loaded_preview = true;
+                    if (last_preview_scroll_y > 0.0) {
+                        double target_y = last_preview_scroll_y;
+                        web_view.evaluate_javascript.begin (@"window.scrollTo(0, $(target_y));", -1, null, null, null);
+                    }
+                }
+            });
 
             int web_process_crashes = 0;
             web_view.web_process_terminated.connect ((reason) => {
@@ -369,8 +459,11 @@ namespace Imladris {
             this.append (paned);
             this.append (rstudio_dock_grid);
 
-            // Mount initial layout based on file extension
-            var initial_mode = Services.LayoutMode.from_extension (title);
+            // Mount initial layout based on FormatProfile
+            var initial_profile = Core.FormatProfile.for_format (get_document_format ());
+            var initial_mode = initial_profile.default_rstudio_layout
+                ? Services.LayoutMode.RSTUDIO
+                : Services.LayoutMode.APOSTROPHE;
             set_workbench_mode (initial_mode);
 
             refresh_live_preview ();
@@ -382,7 +475,7 @@ namespace Imladris {
                 }
                 update_debounce_id = GLib.Timeout.add (250, () => {
                     update_debounce_id = 0;
-                    string doc_text = source_buffer.text;
+                    string doc_text = get_clean_source_text ();
                     emit_buffer_stats (doc_text);
                     refresh_live_preview (doc_text);
                     panel_registry.refresh_environment_and_outline ();
@@ -466,7 +559,7 @@ namespace Imladris {
                     if ((state & Gdk.ModifierType.SHIFT_MASK) != 0) {
                         Gtk.TextIter iter;
                         source_buffer.get_iter_at_mark (out iter, source_buffer.get_insert ());
-                        var chunk = Core.ChunkParser.find_chunk_at_line (source_buffer.text, iter.get_line ());
+                        var chunk = Core.ChunkParser.find_chunk_at_line (get_clean_source_text (), iter.get_line ());
                         if (chunk != null) {
                             panel_registry.execute_active_cell_and_advance ();
                             return true;
@@ -500,7 +593,8 @@ namespace Imladris {
                 paned.visible = false;
                 rstudio_dock_grid.visible = true;
 
-                panel_registry.notebook_cell_toolbar.visible = true;
+                var profile = Core.FormatProfile.for_format (get_document_format ());
+                panel_registry.notebook_cell_toolbar.visible = profile.supports_chunks;
                 source_view.left_margin = 28;
                 source_view.right_margin = 28;
 
@@ -521,8 +615,12 @@ namespace Imladris {
         }
 
         private void populate_starter_template (string title, string lang_id) {
-            if (lang_id == "markdown" || lang_id == "rmd") {
-                source_buffer.text = """---
+            var fmt = DocumentFormat.from_filename (title);
+            string safe_title = title.replace ("\"", "\\\"");
+            string content = "";
+
+            if (fmt == DocumentFormat.QMD || lang_id == "quarto") {
+                content = """---
 title: "%s"
 format:
   html: default
@@ -543,9 +641,59 @@ summary(mtcars[, 1:4])
 import sys
 print("Python Kernel Ready:", sys.version.split()[0])
 ```
+""".printf (safe_title);
+            } else if (fmt == DocumentFormat.RMD || lang_id == "rmd") {
+                content = """---
+title: "%s"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Analysis
+
+Write your R Markdown report here.
+
+```{r}
+summary(cars)
+```
+""".printf (safe_title);
+            } else if (fmt == DocumentFormat.MD && lang_id == "markdown") {
+                content = """# %s
+
+Start writing in **Markdown**.
+
+- Clean prose without computational chunks
+- Supports inline math ($E = mc^2$) and diagrams
+- Export to HTML, PDF, ODT, or RTF
 """.printf (title);
-            } else if (lang_id == "typescript") {
-                source_buffer.text = """// Imladris TypeScript Module
+            } else if (fmt == DocumentFormat.TEX || lang_id == "latex" || lang_id == "tex") {
+                content = """\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,mhchem,graphicx}
+
+\title{%s}
+\author{%s}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+Write your LaTeX manuscript here. Inline math $\alpha + \beta = \gamma$ and chemistry $\ce{H2O}$.
+
+\begin{equation}
+  \int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}
+\end{equation}
+
+\end{document}
+""".printf (title, GLib.Environment.get_real_name ());
+            } else if (fmt == DocumentFormat.TS || lang_id == "typescript") {
+                content = """// Imladris TypeScript Module
 export interface DataPoint {
   id: number;
   label: string;
@@ -555,26 +703,51 @@ export interface DataPoint {
 export function summarize(points: DataPoint[]): number {
   return points.reduce((acc, item) => acc + item.value, 0);
 }
+
+console.log("Total:", summarize([{ id: 1, label: "A", value: 42 }]));
 """;
-            } else if (lang_id == "r") {
-                source_buffer.text = """# Imladris R Script Session
+            } else if (fmt == DocumentFormat.RSCRIPT || lang_id == "r") {
+                content = """# Imladris R Script Session
 # Author: %s
 summary(mtcars[, 1:4])
 """.printf (GLib.Environment.get_real_name ());
-            } else if (lang_id == "python3") {
-                source_buffer.text = """#!/usr/bin/env python3
+            } else if (fmt == DocumentFormat.PYSCRIPT || lang_id == "python3") {
+                content = """#!/usr/bin/env python3
 # Imladris Python Script Session
 import sys
 print("Python Interpreter:", sys.version.split()[0])
 """;
-            } else if (lang_id == "html") {
-                source_buffer.text = """<!DOCTYPE html>
+            } else if (fmt == DocumentFormat.CSS || lang_id == "css") {
+                content = """/* Imladris Stylesheet */
+:root {
+  --accent: #3584e4;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  line-height: 1.6;
+}
+""";
+            } else if (fmt == DocumentFormat.BIB || lang_id == "bibtex") {
+                content = """@article{example2026,
+  author  = {Author, First and Collaborator, Second},
+  title   = {Reproducible Scientific Authoring in Imladris},
+  journal = {Journal of Open Science},
+  year    = {2026},
+  volume  = {1},
+  pages   = {1--10}
+}
+""";
+            } else if (fmt == DocumentFormat.HTML || lang_id == "html") {
+                content = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="color-scheme" content="light dark">
   <title>Imladris Live HTML Document</title>
   <style>
-    body { font-family: system-ui, sans-serif; padding: 2rem; color: #1e293b; }
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; padding: 2rem; line-height: 1.6; }
     h1 { color: #2b73d2; }
   </style>
 </head>
@@ -585,7 +758,7 @@ print("Python Interpreter:", sys.version.split()[0])
 </html>
 """;
             }
-            source_buffer.set_modified (false);
+            set_initial_content (content, true);
         }
 
         private void update_style_scheme () {
@@ -618,18 +791,23 @@ print("Python Interpreter:", sys.version.split()[0])
             pending_preview_refresh = false;
             pending_preview_uri = null;
 
-            string raw = preloaded_text != null ? preloaded_text : source_buffer.text;
+            string raw = preloaded_text != null ? preloaded_text : get_clean_source_text ();
             string? base_uri = null;
             if (file_location != null) {
                 var parent = file_location.get_parent ();
                 base_uri = parent != null ? parent.get_uri () + "/" : file_location.get_uri ();
             } else {
-                base_uri = "file:///";
+                string cwd = GLib.Environment.get_current_dir ();
+                if (cwd != null && cwd.length > 0) {
+                    base_uri = GLib.File.new_for_path (cwd).get_uri () + "/";
+                } else {
+                    base_uri = "file:///";
+                }
             }
 
             var fmt = get_document_format ();
             if (doc_type == "html" || fmt == DocumentFormat.HTML) {
-                web_view.load_html (Adapters.DocumentAdapter.render_html_with_latex (raw), base_uri);
+                load_html_preserving_scroll (Adapters.DocumentAdapter.render_html_with_latex (raw), base_uri);
                 return;
             }
 
@@ -751,13 +929,31 @@ print("Python Interpreter:", sys.version.split()[0])
                 fmt.to_badge_label (), body_html
             );
 
-            web_view.load_html (html, base_uri);
+            load_html_preserving_scroll (html, base_uri);
         }
 
-        public void set_split_orientation (Services.SplitMode split) {
+        private void load_html_preserving_scroll (string html, string base_uri) {
+            if (!has_loaded_preview) {
+                web_view.load_html (html, base_uri);
+                return;
+            }
+            web_view.evaluate_javascript.begin ("window.scrollY || 0", -1, null, null, null, (obj, res) => {
+                try {
+                    var js_val = web_view.evaluate_javascript.end (res);
+                    if (js_val != null && js_val.is_number ()) {
+                        last_preview_scroll_y = js_val.to_double ();
+                    }
+                } catch (GLib.Error e) {}
+                web_view.load_html (html, base_uri);
+            });
+        }
+
+        public void set_split_orientation (Services.SplitMode split, bool force_activate_preview = false) {
+            preferred_split_mode = split;
             if (current_layout_mode == Services.LayoutMode.RSTUDIO) {
-                // In RStudio mode, activate the corresponding panel regardless of which quadrant hosts it
-                dock_layout_state.activate_panel (PanelId.LIVE_PREVIEW);
+                if (force_activate_preview) {
+                    dock_layout_state.activate_panel (PanelId.LIVE_PREVIEW);
+                }
                 return;
             }
 
@@ -997,9 +1193,12 @@ print("Python Interpreter:", sys.version.split()[0])
             source_buffer.insert_at_cursor (sb.str, -1);
         }
 
-        public void append_console_log (string text) {
-            if (current_layout_mode == Services.LayoutMode.RSTUDIO) {
-                dock_layout_state.activate_tab (QuadrantId.Q2_BOTTOM_LEFT, PanelId.CONSOLE);
+        public void append_console_log (string text, bool focus_console = false) {
+            if (focus_console && current_layout_mode == Services.LayoutMode.RSTUDIO) {
+                var q2 = dock_layout_state.quadrants[QuadrantId.Q2_BOTTOM_LEFT];
+                if (q2 != null && q2.active_tab != PanelId.CONSOLE) {
+                    dock_layout_state.activate_tab (QuadrantId.Q2_BOTTOM_LEFT, PanelId.CONSOLE);
+                }
             }
             Gtk.TextIter end;
             console_view.buffer.get_end_iter (out end);
@@ -1007,7 +1206,7 @@ print("Python Interpreter:", sys.version.split()[0])
         }
 
         public void emit_buffer_stats (string? preloaded_text = null) {
-            string txt = preloaded_text != null ? preloaded_text : source_buffer.text;
+            string txt = preloaded_text != null ? preloaded_text : get_clean_source_text ();
             int words = 0;
             bool in_word = false;
             for (int i = 0; i < txt.length; i++) {

@@ -252,7 +252,7 @@ namespace Imladris {
             var doc = window.get_active_document ();
             if (name == "get_active_document") {
                 if (doc == null) return "No active document open.";
-                return @"Language: $(doc.doc_type)\nLines: $(doc.source_buffer.get_line_count ())\n\nContent:\n$(doc.source_buffer.text)";
+                return @"Language: $(doc.doc_type)\nLines: $(doc.source_buffer.get_line_count ())\n\nContent:\n$(doc.get_clean_source_text ())";
             } else if (name == "insert_text") {
                 if (doc == null) return "No active document open.";
                 string txt = (args != null && args.has_member ("text") && !args.get_null_member ("text")) ? (args.get_string_member ("text") ?? "") : "";
@@ -279,8 +279,10 @@ namespace Imladris {
                 }
                 if (parts.length == 0) return "Error: Empty command.";
                 string bin = GLib.Path.get_basename (parts[0]);
-                if (bin != "Rscript" && bin != "python3" && bin != "quarto") {
-                    return @"Security Error: MCP execute_code only permits Rscript, python3, or quarto (got '$bin').";
+                if (bin != "Rscript" && bin != "python3" && bin != "quarto" &&
+                    bin != "latexmk" && bin != "pdflatex" && bin != "xelatex" && bin != "lualatex" &&
+                    bin != "deno" && bin != "tsx" && bin != "bun" && bin != "tsc") {
+                    return @"Security Error: MCP execute_code only permits Rscript, python3, quarto, LaTeX, or TypeScript runtimes (got '$bin').";
                 }
                 ExecutionEngine.run_command_async.begin (parts, doc);
                 return @"▶ Executing command asynchronously: $cmd";

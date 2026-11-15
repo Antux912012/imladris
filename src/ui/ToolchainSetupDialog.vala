@@ -239,7 +239,7 @@ namespace Imladris.UI {
             bool do_py = py_switch.active;
             bool do_quarto = quarto_switch.active;
 
-            tm.create_or_update_base_environment_async.begin (do_r, do_py, do_quarto, do_tidy, (obj, res) => {
+            tm.create_or_update_base_environment_async.begin (do_r, do_py, do_quarto, do_tidy, false, false, (obj, res) => {
                 bool ok = tm.create_or_update_base_environment_async.end (res);
                 disconnect_tm_signals ();
                 Core.PlatformUtils.clear_caches ();

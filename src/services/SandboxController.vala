@@ -9,31 +9,27 @@ namespace Imladris.Services {
          * Pillars 6 & 7: Manages renv (R) and venv (Python) sandboxes based on primary format.
          */
         public static async void init_sandbox (string project_root, DocumentFormat fmt) throws GLib.Error {
+            bool needs_r = (fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.RMD || fmt == DocumentFormat.QMD);
+            bool needs_py = (fmt == DocumentFormat.PYSCRIPT || fmt == DocumentFormat.IPYNB || fmt == DocumentFormat.QMD);
+            bool needs_quarto = (fmt == DocumentFormat.QMD);
+
             var tm = Core.ToolchainManager.get_default ();
-            if (tm.is_micromamba_installed ()) {
+            if (tm.is_micromamba_installed () && (needs_r || needs_py || needs_quarto)) {
                 yield tm.create_project_sandbox_async (
                     project_root,
-                    fmt == DocumentFormat.RMD || fmt == DocumentFormat.QMD,
-                    fmt == DocumentFormat.IPYNB || fmt == DocumentFormat.QMD,
-                    fmt == DocumentFormat.QMD
+                    needs_r,
+                    needs_py,
+                    needs_quarto
                 );
+                Core.PlatformUtils.clear_runtime_caches ();
             }
 
-            var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
-            launcher.set_cwd (project_root);
-
-            if (fmt == DocumentFormat.RMD || fmt == DocumentFormat.QMD) {
+            if (needs_r) {
                 init_r_sandbox (project_root);
             }
 
-            if (fmt == DocumentFormat.IPYNB || fmt == DocumentFormat.QMD) {
-                string[] py_argv = { "python3", "-m", "venv", ".venv" };
-                try {
-                    var py_proc = launcher.spawnv (py_argv);
-                    yield py_proc.wait_check_async ();
-                } catch (GLib.Error e) {
-                    init_py_sandbox (project_root);
-                }
+            if (needs_py) {
+                init_py_sandbox (project_root);
 
                 string req_path = Path.build_filename (project_root, "requirements.txt");
                 if (!FileUtils.test (req_path, FileTest.EXISTS)) {
@@ -408,7 +404,9 @@ dst = sys.argv[2]
 def ignore_patterns(folder, contents):
     ignored = set()
     for name in contents:
-        if name in ('.venv', '__pycache__', '.git', 'build'):
+        if name in ('.venv', '.imladris-env', '__pycache__', '.git', 'build', 'node_modules'):
+            ignored.add(name)
+        elif name == 'library' and os.path.basename(folder) == 'renv':
             ignored.add(name)
         elif name.endswith('.pyc'):
             ignored.add(name)

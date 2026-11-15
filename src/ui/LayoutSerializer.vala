@@ -165,26 +165,54 @@ namespace Imladris.UI {
 
             switch (topo) {
                 case LayoutTopology.LEFT_TALL_3:
-                    // Q1 tall on left (Editor + Console), Q3 & Q4 stacked on right
+                    // Q1 tall on left (migrate Q2 tabs into Q1 so Console/Terminal stay accessible)
                     state.ratios.set_clamped (0.60, 0.70, 0.50);
                     var q1 = state.quadrants.get (QuadrantId.Q1_TOP_LEFT);
                     var q2 = state.quadrants.get (QuadrantId.Q2_BOTTOM_LEFT);
-                    if (q2 != null) q2.size_state = QuadrantSizeState.MINIMIZED;
-                    if (q1 != null) q1.size_state = QuadrantSizeState.NORMAL;
+                    if (q1 != null && q2 != null) {
+                        foreach (var pid in q2.tabs) {
+                            if (!q1.tabs.contains (pid)) {
+                                q1.tabs.add (pid);
+                            }
+                        }
+                        q2.size_state = QuadrantSizeState.MINIMIZED;
+                        q1.size_state = QuadrantSizeState.NORMAL;
+                    }
                     break;
 
                 case LayoutTopology.RIGHT_TALL_3:
-                    // Q1 and Q2 stacked on left, Q4 tall on right
+                    // Q1 and Q2 stacked on left, Q4 tall on right (migrate Q3 tabs into Q4)
                     state.ratios.set_clamped (0.45, 0.50, 0.70);
                     var q3 = state.quadrants.get (QuadrantId.Q3_TOP_RIGHT);
                     var q4 = state.quadrants.get (QuadrantId.Q4_BOTTOM_RIGHT);
-                    if (q3 != null) q3.size_state = QuadrantSizeState.MINIMIZED;
-                    if (q4 != null) q4.size_state = QuadrantSizeState.NORMAL;
+                    if (q3 != null && q4 != null) {
+                        foreach (var pid in q3.tabs) {
+                            if (!q4.tabs.contains (pid)) {
+                                q4.tabs.add (pid);
+                            }
+                        }
+                        q3.size_state = QuadrantSizeState.MINIMIZED;
+                        q4.size_state = QuadrantSizeState.NORMAL;
+                    }
                     break;
 
                 case LayoutTopology.QUAD_4:
                 default:
                     state.ratios.set_clamped (0.55, 0.68, 0.45);
+                    var q1_rest = state.quadrants.get (QuadrantId.Q1_TOP_LEFT);
+                    var q2_rest = state.quadrants.get (QuadrantId.Q2_BOTTOM_LEFT);
+                    var q3_rest = state.quadrants.get (QuadrantId.Q3_TOP_RIGHT);
+                    var q4_rest = state.quadrants.get (QuadrantId.Q4_BOTTOM_RIGHT);
+                    if (q1_rest != null && q2_rest != null) {
+                        foreach (var pid in q2_rest.tabs) {
+                            if (pid != PanelId.SOURCE_EDITOR) q1_rest.tabs.remove (pid);
+                        }
+                    }
+                    if (q3_rest != null && q4_rest != null) {
+                        foreach (var pid in q3_rest.tabs) {
+                            q4_rest.tabs.remove (pid);
+                        }
+                    }
                     foreach (var qid in QuadrantId.all ()) {
                         var q = state.quadrants.get (qid);
                         if (q != null) q.size_state = QuadrantSizeState.NORMAL;

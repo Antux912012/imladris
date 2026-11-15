@@ -10,7 +10,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.25.0";
+        public const string APP_VERSION = "0.26.0";
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },
@@ -19,6 +19,7 @@ namespace Imladris {
             { "new_qmd", on_new_qmd },
             { "new_rmd", on_new_rmd },
             { "new_ipynb", on_new_ipynb },
+            { "new_tex", on_new_tex },
             { "new_r", on_new_r },
             { "new_shiny", on_new_shiny },
             { "run_shiny_app", on_run_shiny_app },
@@ -221,7 +222,7 @@ namespace Imladris {
 
         private void on_new_qmd () {
             var win = this.active_window as Window;
-            if (win != null) win.add_document_tab ("analysis.qmd", "markdown");
+            if (win != null) win.add_document_tab ("analysis.qmd", "quarto");
         }
 
         private void on_new_rmd () {
@@ -233,8 +234,13 @@ namespace Imladris {
             var win = this.active_window as Window;
             if (win != null) {
                 string template = Core.NotebookSerializer.get_default_ipynb_markdown_template ();
-                win.add_document_tab ("notebook.ipynb", "markdown", template);
+                win.add_document_tab ("notebook.ipynb", "quarto", template);
             }
+        }
+
+        private void on_new_tex () {
+            var win = this.active_window as Window;
+            if (win != null) win.add_document_tab ("document.tex", "latex");
         }
 
         private void on_new_r () {

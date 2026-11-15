@@ -412,12 +412,58 @@ namespace Imladris.UI {
             center_crosshair = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {
                 width_request = 14,
                 height_request = 14,
-                halign = Gtk.Align.CENTER,
-                valign = Gtk.Align.CENTER,
+                halign = Gtk.Align.START,
+                valign = Gtk.Align.START,
                 tooltip_text = "Drag 4-Way Splitter Intersection (60 FPS Simultaneous Resize)"
             };
             center_crosshair.add_css_class ("dock-center-crosshair");
             center_crosshair.set_cursor_from_name ("move");
+
+            uint splitter_save_id = 0;
+            GLib.SourceFunc schedule_ratio_save = () => {
+                if (splitter_save_id != 0) {
+                    GLib.Source.remove (splitter_save_id);
+                }
+                splitter_save_id = GLib.Timeout.add (250, () => {
+                    splitter_save_id = 0;
+                    dock_state.save_to_disk ();
+                    return GLib.Source.REMOVE;
+                });
+                return GLib.Source.REMOVE;
+            };
+
+            main_hpaned.notify["position"].connect (() => {
+                if (syncing_ratios) return;
+                int total_w = main_hpaned.get_width ();
+                if (total_w >= 200) {
+                    double col = SplitterRatios.clamp_ratio (main_hpaned.position / (double) total_w);
+                    dock_state.ratios.set_clamped (col, dock_state.ratios.left_horizontal, dock_state.ratios.right_horizontal);
+                    update_crosshair_position ();
+                    schedule_ratio_save ();
+                }
+            });
+
+            left_vpaned.notify["position"].connect (() => {
+                if (syncing_ratios) return;
+                int total_h = left_vpaned.get_height ();
+                if (total_h >= 200) {
+                    double lh = SplitterRatios.clamp_ratio (left_vpaned.position / (double) total_h);
+                    dock_state.ratios.set_clamped (dock_state.ratios.main_vertical, lh, dock_state.ratios.right_horizontal);
+                    update_crosshair_position ();
+                    schedule_ratio_save ();
+                }
+            });
+
+            right_vpaned.notify["position"].connect (() => {
+                if (syncing_ratios) return;
+                int total_h = right_vpaned.get_height ();
+                if (total_h >= 200) {
+                    double rh = SplitterRatios.clamp_ratio (right_vpaned.position / (double) total_h);
+                    dock_state.ratios.set_clamped (dock_state.ratios.main_vertical, dock_state.ratios.left_horizontal, rh);
+                    update_crosshair_position ();
+                    schedule_ratio_save ();
+                }
+            });
 
             var drag_gesture = new Gtk.GestureDrag ();
             drag_gesture.drag_begin.connect ((start_x, start_y) => {
@@ -493,6 +539,15 @@ namespace Imladris.UI {
                 right_vpaned.position = (int) (dock_state.ratios.right_horizontal * total_h);
             }
             syncing_ratios = false;
+            update_crosshair_position ();
+        }
+
+        private void update_crosshair_position () {
+            if (center_crosshair == null || !center_crosshair.visible) return;
+            int x = main_hpaned.position - 7;
+            int y = ((left_vpaned.position + right_vpaned.position) / 2) - 7;
+            center_crosshair.margin_start = x > 0 ? x : 0;
+            center_crosshair.margin_top = y > 0 ? y : 0;
         }
 
         public void refresh_dock_layout () {

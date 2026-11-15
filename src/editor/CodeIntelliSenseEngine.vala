@@ -100,6 +100,7 @@ namespace Imladris.Editor {
 
         private static ArrayList<IntelliSenseItem>? r_catalog = null;
         private static ArrayList<IntelliSenseItem>? py_catalog = null;
+        private static ArrayList<IntelliSenseItem>? ts_catalog = null;
         private static ArrayList<IntelliSenseItem>? quarto_opt_catalog = null;
         private static ArrayList<IntelliSenseItem>? yaml_catalog = null;
         private static ArrayList<IntelliSenseItem>? latex_catalog = null;
@@ -112,6 +113,7 @@ namespace Imladris.Editor {
 
             r_catalog = new ArrayList<IntelliSenseItem> ();
             py_catalog = new ArrayList<IntelliSenseItem> ();
+            ts_catalog = new ArrayList<IntelliSenseItem> ();
             quarto_opt_catalog = new ArrayList<IntelliSenseItem> ();
             yaml_catalog = new ArrayList<IntelliSenseItem> ();
             latex_catalog = new ArrayList<IntelliSenseItem> ();
@@ -297,6 +299,43 @@ namespace Imladris.Editor {
             add_latex ("\\neq", "\\neq", "≠", "Not equal to", 0);
             add_latex ("\\approx", "\\approx", "≈", "Approximately equal to", 0);
             add_latex ("\\sim", "\\sim", "∼", "Distributed as / tilde relation", 0);
+            add_latex ("\\documentclass", "\\documentclass{article}", "LaTeX", "Document class declaration", 1);
+            add_latex ("\\usepackage", "\\usepackage{}", "LaTeX", "Import LaTeX package", 1);
+            add_latex ("\\begin{document}", "\\begin{document}\n\n\\end{document}", "env", "Document body environment", 15);
+            add_latex ("\\begin{equation}", "\\begin{equation}\n\n\\end{equation}", "env", "Numbered equation environment", 15);
+            add_latex ("\\begin{align}", "\\begin{align}\n\n\\end{align}", "env", "Aligned multi-line equations", 12);
+            add_latex ("\\begin{figure}", "\\begin{figure}[htbp]\n  \\centering\n  \\caption{}\n\\end{figure}", "env", "Floating figure environment", 13);
+            add_latex ("\\begin{table}", "\\begin{table}[htbp]\n  \\centering\n  \\caption{}\n\\end{table}", "env", "Floating table environment", 12);
+            add_latex ("\\section", "\\section{}", "LaTeX", "Top-level section heading", 1);
+            add_latex ("\\subsection", "\\subsection{}", "LaTeX", "Subsection heading", 1);
+            add_latex ("\\subsubsection", "\\subsubsection{}", "LaTeX", "Subsubsection heading", 1);
+            add_latex ("\\textbf", "\\textbf{}", "LaTeX", "Bold text", 1);
+            add_latex ("\\textit", "\\textit{}", "LaTeX", "Italic text", 1);
+            add_latex ("\\cite", "\\cite{}", "LaTeX", "Bibliography citation", 1);
+            add_latex ("\\ref", "\\ref{}", "LaTeX", "Cross-reference label", 1);
+            add_latex ("\\label", "\\label{}", "LaTeX", "Define cross-reference label", 1);
+
+            // TypeScript & JavaScript Scientific/App Catalog
+            add_ts ("const", "const ", "keyword", "Block-scoped constant declaration", IntelliSenseSymbolKind.KEYWORD, 0);
+            add_ts ("let", "let ", "keyword", "Block-scoped variable declaration", IntelliSenseSymbolKind.KEYWORD, 0);
+            add_ts ("function", "function name() {\n  \n}", "keyword", "Function declaration", IntelliSenseSymbolKind.KEYWORD, 4);
+            add_ts ("async function", "async function name() {\n  \n}", "keyword", "Async function returning Promise", IntelliSenseSymbolKind.KEYWORD, 4);
+            add_ts ("interface", "interface Name {\n  \n}", "type", "TypeScript interface definition", IntelliSenseSymbolKind.KEYWORD, 4);
+            add_ts ("type", "type Name = ", "type", "TypeScript type alias", IntelliSenseSymbolKind.KEYWORD, 0);
+            add_ts ("enum", "enum Name {\n  \n}", "type", "TypeScript enum definition", IntelliSenseSymbolKind.KEYWORD, 4);
+            add_ts ("export", "export ", "keyword", "Export module binding", IntelliSenseSymbolKind.KEYWORD, 0);
+            add_ts ("import", "import {  } from \"\";", "keyword", "ES module import", IntelliSenseSymbolKind.KEYWORD, 10);
+            add_ts ("console.log", "console.log()", "(...data: any[]): void", "Print to stdout", IntelliSenseSymbolKind.FUNCTION, 1);
+            add_ts ("console.error", "console.error()", "(...data: any[]): void", "Print to stderr", IntelliSenseSymbolKind.FUNCTION, 1);
+            add_ts ("Promise.all", "Promise.all([])", "(values: Iterable<Promise<T>>)", "Await all promises concurrently", IntelliSenseSymbolKind.FUNCTION, 2);
+            add_ts ("JSON.stringify", "JSON.stringify()", "(value, replacer?, space?)", "Serialize value to JSON string", IntelliSenseSymbolKind.FUNCTION, 1);
+            add_ts ("JSON.parse", "JSON.parse()", "(text: string)", "Parse JSON string", IntelliSenseSymbolKind.FUNCTION, 1);
+            add_ts ("fetch", "fetch(\"\")", "(input: RequestInfo): Promise<Response>", "Perform HTTP request", IntelliSenseSymbolKind.FUNCTION, 2);
+            add_ts ("Array.from", "Array.from()", "(iterable)", "Create Array from iterable", IntelliSenseSymbolKind.FUNCTION, 1);
+            add_ts ("Map", "new Map<>()", "Map<K, V>", "Key-value collection", IntelliSenseSymbolKind.FUNCTION, 3);
+            add_ts ("Set", "new Set<>()", "Set<T>", "Unique value collection", IntelliSenseSymbolKind.FUNCTION, 3);
+            add_ts ("Record", "Record<string, unknown>", "utility type", "Object key-value type", IntelliSenseSymbolKind.KEYWORD, 0);
+            add_ts ("Partial", "Partial<>", "utility type", "Make all properties optional", IntelliSenseSymbolKind.KEYWORD, 1);
         }
 
         private static void add_r (string label, string insert, string sig, string detail, IntelliSenseSymbolKind kind, int backtrack) {
@@ -305,6 +344,10 @@ namespace Imladris.Editor {
 
         private static void add_py (string label, string insert, string sig, string detail, IntelliSenseSymbolKind kind, int backtrack) {
             py_catalog.add (new IntelliSenseItem (label, insert, sig, detail, kind, backtrack));
+        }
+
+        private static void add_ts (string label, string insert, string sig, string detail, IntelliSenseSymbolKind kind, int backtrack) {
+            ts_catalog.add (new IntelliSenseItem (label, insert, sig, detail, kind, backtrack));
         }
 
         private static void add_quarto_opt (string label, string insert, string sig, string detail, int backtrack = 0) {
@@ -341,9 +384,12 @@ namespace Imladris.Editor {
                 if (chunk.language == "bash") {
                     return IntelliSenseContext.BASH_CODE;
                 }
+                if (chunk.language == "ts" || chunk.language == "typescript") {
+                    return IntelliSenseContext.TYPESCRIPT_CODE;
+                }
             }
 
-            // 3. Dedicated script files (.R, .py, .ts)
+            // 3. Dedicated script files (.R, .py, .ts, .tex)
             string lower_type = doc_type.down ();
             if (lower_type == "r" || lower_type == "rscript") {
                 return IntelliSenseContext.R_CODE;
@@ -353,6 +399,9 @@ namespace Imladris.Editor {
             }
             if (lower_type == "typescript" || lower_type == "ts" || lower_type == "javascript") {
                 return IntelliSenseContext.TYPESCRIPT_CODE;
+            }
+            if (lower_type == "tex" || lower_type == "latex") {
+                return IntelliSenseContext.LATEX_MATH_CHEM;
             }
 
             // 4. Check YAML frontmatter at top of document
@@ -452,15 +501,50 @@ namespace Imladris.Editor {
         /**
          * Scans the active document buffer for user-defined variables, functions, and DataFrame columns.
          */
-        public static ArrayList<IntelliSenseItem> scan_buffer_symbols (string document_text, IntelliSenseContext ctx, out HashMap<string, ArrayList<string>> discovered_columns) {
+        public static ArrayList<IntelliSenseItem> scan_buffer_symbols (
+            string document_text,
+            IntelliSenseContext ctx,
+            out HashMap<string, ArrayList<string>> discovered_columns,
+            string doc_type = "markdown"
+        ) {
             var symbols = new ArrayList<IntelliSenseItem> ();
             discovered_columns = new HashMap<string, ArrayList<string>> ();
+            if (ctx == IntelliSenseContext.TYPESCRIPT_CODE) {
+                string json_str = Core.NativeCore.analyze_typescript_symbols_json (document_text);
+                try {
+                    var parser = new Json.Parser ();
+                    parser.load_from_data (json_str, -1);
+                    var root = parser.get_root ();
+                    if (root != null && root.get_node_type () == Json.NodeType.ARRAY) {
+                        var arr = root.get_array ();
+                        var seen_ts = new HashSet<string> ();
+                        for (uint i = 0; i < arr.get_length (); i++) {
+                            var obj = arr.get_object_element (i);
+                            string name = obj.has_member ("name") ? (obj.get_string_member ("name") ?? "") : "";
+                            string kind_str = obj.has_member ("kind") ? (obj.get_string_member ("kind") ?? "symbol") : "symbol";
+                            if (name.length > 0 && !seen_ts.contains (name)) {
+                                seen_ts.add (name);
+                                var sym_kind = (kind_str == "function" || kind_str == "method" || kind_str == "class")
+                                    ? IntelliSenseSymbolKind.FUNCTION
+                                    : IntelliSenseSymbolKind.VARIABLE;
+                                string ins = (kind_str == "function" || kind_str == "method") ? name + "()" : name;
+                                int bt = (kind_str == "function" || kind_str == "method") ? 1 : 0;
+                                symbols.add (new IntelliSenseItem (name, ins, kind_str, "TypeScript symbol in document", sym_kind, bt));
+                            }
+                        }
+                    }
+                } catch (GLib.Error e) {}
+                return symbols;
+            }
+
             if (ctx != IntelliSenseContext.R_CODE && ctx != IntelliSenseContext.PYTHON_CODE) {
                 return symbols;
             }
 
             var seen = new HashSet<string> ();
-            bool has_fences = document_text.contains ("```");
+            string lower_dt = doc_type.down ();
+            bool is_pure_script = (lower_dt == "r" || lower_dt == "rscript" || lower_dt == "python" || lower_dt == "python3" || lower_dt == "pyscript" || lower_dt == "ts" || lower_dt == "typescript");
+            bool has_fences = !is_pure_script && document_text.contains ("```");
             string active_fence_lang = "";
             bool in_fence = false;
 
@@ -656,7 +740,7 @@ namespace Imladris.Editor {
             }
 
             HashMap<string, ArrayList<string>> discovered_cols;
-            var buffer_symbols = scan_buffer_symbols (document_text, ctx, out discovered_cols);
+            var buffer_symbols = scan_buffer_symbols (document_text, ctx, out discovered_cols, doc_type);
 
             // 5. R Code Context (including df$col and pkg::fn triggers)
             if (ctx == IntelliSenseContext.R_CODE) {
@@ -761,6 +845,27 @@ namespace Imladris.Editor {
                     }
                 }
                 foreach (var item in py_catalog) {
+                    int sc = compute_match_score (item.label, token);
+                    if (sc > 0) {
+                        results.add (clone_with_score (item, sc));
+                    }
+                }
+                sort_by_score (results);
+                return results;
+            }
+
+            // 7. TypeScript / JavaScript Code Context
+            if (ctx == IntelliSenseContext.TYPESCRIPT_CODE) {
+                if (token.length == 0) {
+                    return results;
+                }
+                foreach (var sym in buffer_symbols) {
+                    int sc = compute_match_score (sym.label, token);
+                    if (sc > 0) {
+                        results.add (clone_with_score (sym, sc + 50));
+                    }
+                }
+                foreach (var item in ts_catalog) {
                     int sc = compute_match_score (item.label, token);
                     if (sc > 0) {
                         results.add (clone_with_score (item, sc));

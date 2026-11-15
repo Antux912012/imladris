@@ -55,7 +55,9 @@ namespace Imladris {
         RMD,
         QMD,
         IPYNB,
-        PYSCRIPT;
+        PYSCRIPT,
+        TEX,
+        TS;
 
         public string get_extension () {
             switch (this) {
@@ -68,6 +70,8 @@ namespace Imladris {
                 case QMD:      return ".qmd";
                 case IPYNB:    return ".ipynb";
                 case PYSCRIPT: return ".py";
+                case TEX:      return ".tex";
+                case TS:       return ".ts";
                 default:       return ".qmd";
             }
         }
@@ -83,6 +87,8 @@ namespace Imladris {
                 case QMD:      return "Quarto Document (.qmd)";
                 case IPYNB:    return "Jupyter Notebook (.ipynb)";
                 case PYSCRIPT: return "Python Script (.py)";
+                case TEX:      return "LaTeX Document (.tex)";
+                case TS:       return "TypeScript (.ts)";
                 default:       return "Quarto Document (.qmd)";
             }
         }
@@ -98,10 +104,12 @@ namespace Imladris {
                 case BIB:      return "bibtex";
                 case RSCRIPT:  return "r";
                 case RMD:      return "rmd";
-                case IPYNB:    return "json";
+                case QMD:      return "quarto";
+                case IPYNB:    return "quarto";
                 case PYSCRIPT: return "python3";
+                case TEX:      return "latex";
+                case TS:       return "typescript";
                 case MD:
-                case QMD:
                 default:       return "markdown";
             }
         }
@@ -117,6 +125,8 @@ namespace Imladris {
                 case QMD:      return "Qmd";
                 case IPYNB:    return "Ipynb";
                 case PYSCRIPT: return "PyScript";
+                case TEX:      return "Tex";
+                case TS:       return "Ts";
                 default:       return "Qmd";
             }
         }
@@ -132,6 +142,8 @@ namespace Imladris {
             if (c == "qmd" || c == "quarto") return QMD;
             if (c == "ipynb" || c == "jupyter") return IPYNB;
             if (c == "pyscript" || c == "py" || c == "python") return PYSCRIPT;
+            if (c == "tex" || c == "ltx" || c == "latex") return TEX;
+            if (c == "ts" || c == "tsx" || c == "mts" || c == "cts" || c == "typescript") return TS;
             return QMD;
         }
 
@@ -140,6 +152,9 @@ namespace Imladris {
             if (lower.has_suffix (".ipynb")) return IPYNB;
             if (lower.has_suffix (".qmd")) return QMD;
             if (lower.has_suffix (".rmd")) return RMD;
+            if (lower.has_suffix (".tex") || lower.has_suffix (".ltx")) return TEX;
+            if (lower.has_suffix (".tsx") || lower.has_suffix (".mts") ||
+                lower.has_suffix (".cts") || lower.has_suffix (".ts")) return TS;
             if (lower.has_suffix (".r")) return RSCRIPT;
             if (lower.has_suffix (".py")) return PYSCRIPT;
             if (lower.has_suffix (".css")) return CSS;
@@ -197,7 +212,8 @@ namespace Imladris {
 
         public static File create_project (ProjectConfig config) throws GLib.Error {
             // 1. Resolve Root Project Directory
-            string base_docs = Path.build_filename (Environment.get_home_dir (), "Documents");
+            string base_docs = Environment.get_user_special_dir (UserDirectory.DOCUMENTS)
+                ?? Path.build_filename (Environment.get_home_dir (), "Documents");
             string root_path = config.custom_project_dir.strip () != ""
                 ? config.custom_project_dir.strip ()
                 : Path.build_filename (base_docs, sanitize_dirname (config.project_name));

@@ -147,23 +147,38 @@ namespace Imladris.UI {
          */
         public Gtk.PopoverMenu create_move_panel_menu (QuadrantId current_quad, PanelId pid) {
             var menu = new GLib.Menu ();
+            var group = new GLib.SimpleActionGroup ();
 
             var section = new GLib.Menu ();
             if (current_quad != QuadrantId.Q1_TOP_LEFT) {
-                section.append ("Move to Top-Left (Editor)", @"win.move_panel_$(pid.to_id_string ())_Q1");
+                var a1 = new GLib.SimpleAction ("move_q1", null);
+                a1.activate.connect (() => { dock_state.move_tab (current_quad, QuadrantId.Q1_TOP_LEFT, pid); });
+                group.add_action (a1);
+                section.append ("Move to Top-Left (Editor)", "dock.move_q1");
             }
             if (current_quad != QuadrantId.Q2_BOTTOM_LEFT) {
-                section.append ("Move to Bottom-Left (Console)", @"win.move_panel_$(pid.to_id_string ())_Q2");
+                var a2 = new GLib.SimpleAction ("move_q2", null);
+                a2.activate.connect (() => { dock_state.move_tab (current_quad, QuadrantId.Q2_BOTTOM_LEFT, pid); });
+                group.add_action (a2);
+                section.append ("Move to Bottom-Left (Console)", "dock.move_q2");
             }
             if (current_quad != QuadrantId.Q3_TOP_RIGHT) {
-                section.append ("Move to Top-Right (Environment)", @"win.move_panel_$(pid.to_id_string ())_Q3");
+                var a3 = new GLib.SimpleAction ("move_q3", null);
+                a3.activate.connect (() => { dock_state.move_tab (current_quad, QuadrantId.Q3_TOP_RIGHT, pid); });
+                group.add_action (a3);
+                section.append ("Move to Top-Right (Environment)", "dock.move_q3");
             }
             if (current_quad != QuadrantId.Q4_BOTTOM_RIGHT) {
-                section.append ("Move to Bottom-Right (Outputs)", @"win.move_panel_$(pid.to_id_string ())_Q4");
+                var a4 = new GLib.SimpleAction ("move_q4", null);
+                a4.activate.connect (() => { dock_state.move_tab (current_quad, QuadrantId.Q4_BOTTOM_RIGHT, pid); });
+                group.add_action (a4);
+                section.append ("Move to Bottom-Right (Outputs)", "dock.move_q4");
             }
             menu.append_section ("Move Panel To Quadrant", section);
 
-            return new Gtk.PopoverMenu.from_model (menu);
+            var popover = new Gtk.PopoverMenu.from_model (menu);
+            popover.insert_action_group ("dock", group);
+            return popover;
         }
     }
 }

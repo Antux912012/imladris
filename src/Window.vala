@@ -22,7 +22,14 @@ namespace Imladris {
 
         private Adw.ToastOverlay toast_overlay;
         private Gtk.ToggleButton? tab_btn_home = null;
+        private Gtk.ToggleButton? tab_btn_run = null;
+        private Gtk.ToggleButton? tab_btn_publish = null;
         private Gtk.ToggleButton? tab_btn_packages = null;
+        private Gtk.Box? ribbon_tabs_box = null;
+        private Gtk.Box? tier3_box = null;
+        private Gtk.Button? btn_render_quarto = null;
+        private Adw.ButtonContent? render_content = null;
+        private Gtk.MenuButton? sci_tools_btn = null;
         private UI.PackagesRibbonBar? packages_ribbon_bar = null;
         private Gtk.Label elrond_telemetry_label;
 
@@ -137,10 +144,12 @@ namespace Imladris {
             new_submenu.append ("R Markdown (.Rmd)", "app.new_rmd");
             new_submenu.append ("Jupyter Notebook (.ipynb)", "app.new_ipynb");
             new_submenu.append ("Simple Markdown (.md)", "app.new_md");
+            new_submenu.append ("LaTeX Document (.tex)", "app.new_tex");
+            new_submenu.append ("TypeScript File (.ts)", "app.new_ts");
+            new_submenu.append ("HTML5 + CSS + LaTeX (.html)", "app.new_html");
             new_submenu.append ("R Script (.R)", "app.new_r");
             new_submenu.append ("Shiny Web App (.R)", "app.new_shiny");
             new_submenu.append ("Python Script (.py)", "app.new_py");
-            new_submenu.append ("HTML5 + CSS + LaTeX (.html)", "app.new_html");
             new_submenu.append ("CSS Stylesheet (.css)", "app.new_css");
             new_submenu.append ("BibTeX Bibliography (.bib)", "app.new_bib");
 
@@ -188,7 +197,7 @@ namespace Imladris {
                 transition_duration = Core.SettingsManager.get_default ().animation_physics.get_stack_duration_ms ()
             };
 
-            var ribbon_tabs_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 2) {
+            ribbon_tabs_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 2) {
                 valign = Gtk.Align.CENTER
             };
             ribbon_tabs_box.add_css_class ("linked");
@@ -202,8 +211,14 @@ namespace Imladris {
                 var tab_btn = new Gtk.ToggleButton.with_label (cat);
                 tab_btn.add_css_class ("ribbon-tab-btn");
                 if (cat == "Home") tab_btn_home = tab_btn;
-                if (cat == "Run") tab_btn.add_css_class ("ribbon-tab-scientific");
-                if (cat == "Publish") tab_btn.add_css_class ("ribbon-tab-web");
+                if (cat == "Run") {
+                    tab_btn.add_css_class ("ribbon-tab-scientific");
+                    tab_btn_run = tab_btn;
+                }
+                if (cat == "Publish") {
+                    tab_btn.add_css_class ("ribbon-tab-web");
+                    tab_btn_publish = tab_btn;
+                }
                 if (cat == "Packages") {
                     tab_btn.add_css_class ("ribbon-tab-packages");
                     tab_btn_packages = tab_btn;
@@ -240,12 +255,12 @@ namespace Imladris {
             };
             export_format_selector.add_css_class ("flat");
 
-            var btn_render_quarto = new Gtk.Button () {
+            btn_render_quarto = new Gtk.Button () {
                 tooltip_text = "Compile Scientific Document / Deck / Poster (Ctrl+Shift+K)",
                 valign = Gtk.Align.CENTER
             };
             btn_render_quarto.add_css_class ("suggested-action");
-            var render_content = new Adw.ButtonContent () {
+            render_content = new Adw.ButtonContent () {
                 icon_name = "media-playback-start-symbolic",
                 label = "Render"
             };
@@ -385,7 +400,7 @@ namespace Imladris {
             sci_box.append (btn_elbereth_inline);
             sci_popover.set_child (sci_box);
 
-            var sci_tools_btn = new Gtk.MenuButton () {
+            sci_tools_btn = new Gtk.MenuButton () {
                 icon_name = "applications-science-symbolic",
                 tooltip_text = "Scientific Tools, Citations & Templates",
                 valign = Gtk.Align.CENTER,
@@ -447,7 +462,7 @@ namespace Imladris {
             // =================================================================
             // TIER 3: STREAMLINED TAB BAR WITH AI & LAYOUT TOGGLES
             // =================================================================
-            var tier3_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
+            tier3_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
             tier3_box.add_css_class ("imladris-subbar");
 
             var ai_quick_btn = RibbonFactory.create_compact_button ("system-run-symbolic", "Elrond AI");
@@ -479,21 +494,16 @@ namespace Imladris {
                 return true;
             });
             tab_view.page_detached.connect ((page, pos) => {
+                var doc = page.child as DocumentPage;
+                if (doc != null) {
+                    Services.WorkspaceStateManager.get_default ().clear_doc_state (doc.doc_id);
+                }
                 if (tab_view.n_pages == 0) {
-                    content_stack.visible_child_name = "welcome";
-                    tab_bar.visible = false;
-                    tier3_box.visible = false;
-                    ribbon_scroller.visible = false;
-                    status_bar.visible = false;
+                    set_welcome_chrome (true);
                 }
             });
             tab_view.page_attached.connect ((page, pos) => {
-                var sm_ui = Core.SettingsManager.get_default ();
-                content_stack.visible_child_name = "editor";
-                tab_bar.visible = true;
-                tier3_box.visible = true;
-                ribbon_scroller.visible = sm_ui.show_ribbon_toolbar && btn_collapse_ribbon.active;
-                status_bar.visible = sm_ui.show_status_bar;
+                set_welcome_chrome (false);
             });
             tab_bar = new Adw.TabBar () {
                 view = tab_view,
@@ -626,11 +636,7 @@ namespace Imladris {
             welcome_page = build_welcome_page ();
             content_stack.add_named (welcome_page, "welcome");
             content_stack.add_named (tab_view, "editor");
-            content_stack.visible_child_name = "welcome";
-            tab_bar.visible = false;
-            tier3_box.visible = false;
-            ribbon_scroller.visible = false;
-            status_bar.visible = false;
+            set_welcome_chrome (true);
 
             toast_overlay.set_child (content_stack);
             toolbar_view.set_content (toast_overlay);
@@ -642,7 +648,7 @@ namespace Imladris {
             Services.WorkspaceStateManager.get_default ().split_changed.connect ((split) => {
                 var d = get_active_document ();
                 if (d != null) {
-                    d.set_split_orientation (split);
+                    d.set_split_orientation (split, false);
                 }
             });
 
@@ -650,8 +656,13 @@ namespace Imladris {
                 var d = get_active_document ();
                 if (d != null) {
                     string fname = d.file_location != null ? d.file_location.get_basename () : (d.initial_title.contains (".") ? d.initial_title : @"untitled.$(d.doc_type)");
-                    Services.WorkspaceStateManager.get_default ().resolve_mode_for_file (fname);
-                    d.set_split_orientation (Services.WorkspaceStateManager.get_default ().active_split);
+                    var wsm = Services.WorkspaceStateManager.get_default ();
+                    var doc_layout = wsm.get_layout_for_doc (d.doc_id, fname);
+                    if (d.get_workbench_mode () != doc_layout) {
+                        d.set_workbench_mode (doc_layout);
+                    }
+                    var doc_split = wsm.get_split_for_doc (d.doc_id);
+                    d.set_split_orientation (doc_split, false);
                     var fmt = d.get_document_format ();
                     update_ribbon_state_machine (fmt, current_project_type);
                     if (d.file_location != null && d.file_location.get_parent () != null) {
@@ -660,14 +671,15 @@ namespace Imladris {
                         );
                     }
                     if (btn_shiny_app != null) {
-                        bool is_shiny = Services.ShinyService.get_default ().is_shiny_file (fname, d.source_buffer.text);
-                        btn_shiny_app.visible = is_shiny || (d.doc_type == "r" || d.doc_type == "rmd");
+                        var profile = Core.FormatProfile.for_format (fmt);
+                        bool is_shiny = profile.supports_shiny_detection &&
+                            Services.ShinyService.get_default ().is_shiny_file (fname, d.get_clean_source_text ());
+                        btn_shiny_app.visible = is_shiny || (fmt == DocumentFormat.RSCRIPT);
                     }
                 }
             });
 
             // Launch on Welcome Dashboard; new document tab created only on user action
-            update_ribbon_state_machine (DocumentFormat.QMD, current_project_type);
 
             var pm = Imladris.Plugins.PluginManager.get_default ();
             pm.active_window = this;
@@ -714,11 +726,33 @@ namespace Imladris {
                     button_label = "Restore",
                     timeout = 0
                 };
+                bool restored = false;
                 toast.button_clicked.connect (() => {
+                    restored = true;
                     foreach (var rec in recs) {
                         string title = rec.file_path != null ? GLib.Path.get_basename (rec.file_path) : "Recovered-Document.md";
                         GLib.File? f = rec.file_path != null ? GLib.File.new_for_path (rec.file_path) : null;
                         add_document_tab (title, rec.doc_type, rec.content, f);
+                        var restored_doc = get_active_document ();
+                        if (restored_doc != null && restored_doc.source_buffer != null) {
+                            restored_doc.source_buffer.set_modified (rec.is_dirty);
+                            Gtk.TextIter cur_it;
+                            int max_line = int.max (0, restored_doc.source_buffer.get_line_count () - 1);
+                            int target_line = rec.cursor_line.clamp (0, max_line);
+                            restored_doc.source_buffer.get_iter_at_line_offset (out cur_it, target_line, 0);
+                            int line_len = cur_it.get_chars_in_line ();
+                            if (rec.cursor_offset > 0 && rec.cursor_offset < line_len) {
+                                cur_it.set_line_offset (rec.cursor_offset);
+                            }
+                            restored_doc.source_buffer.place_cursor (cur_it);
+                        }
+                    }
+                });
+                toast.dismissed.connect (() => {
+                    if (!restored) {
+                        foreach (var rec in recs) {
+                            Services.RecoveryService.get_default ().purge_document_cache (rec.doc_id);
+                        }
                     }
                 });
                 if (toast_overlay != null) {
@@ -755,7 +789,7 @@ namespace Imladris {
         public string get_active_editor_text () {
             var doc = get_active_document ();
             if (doc != null && doc.source_buffer != null) {
-                return doc.source_buffer.text;
+                return doc.get_clean_source_text ();
             }
             return "";
         }
@@ -982,16 +1016,40 @@ namespace Imladris {
             }
         }
 
-        public void add_document_tab (string title, string lang_id, string? initial_text = null, GLib.File? file = null) {
+        private void set_welcome_chrome (bool is_welcome) {
+            if (is_welcome) {
+                content_stack.visible_child_name = "welcome";
+                tab_bar.visible = false;
+                tier3_box.visible = false;
+                ribbon_scroller.visible = false;
+                status_bar.visible = false;
+                if (ribbon_tabs_box != null) ribbon_tabs_box.visible = false;
+                if (export_format_selector != null) export_format_selector.visible = false;
+                if (btn_render_quarto != null) btn_render_quarto.visible = false;
+                if (btn_shiny_app != null) btn_shiny_app.visible = false;
+                if (sci_tools_btn != null) sci_tools_btn.visible = false;
+            } else {
+                var sm_ui = Core.SettingsManager.get_default ();
+                content_stack.visible_child_name = "editor";
+                tab_bar.visible = true;
+                tier3_box.visible = true;
+                ribbon_scroller.visible = sm_ui.show_ribbon_toolbar && btn_collapse_ribbon.active;
+                status_bar.visible = sm_ui.show_status_bar;
+                if (ribbon_tabs_box != null) ribbon_tabs_box.visible = true;
+                if (sci_tools_btn != null) sci_tools_btn.visible = true;
+            }
+        }
+
+        public void add_document_tab (string title, string lang_id, string? initial_text = null, GLib.File? file = null, string? raw_source = null) {
             var doc_page = new DocumentPage (title, lang_id, this);
             if (file != null) {
                 doc_page.file_location = file;
             }
+            if (raw_source != null) {
+                doc_page.raw_ipynb_source = raw_source;
+            }
             if (initial_text != null) {
-                doc_page.source_buffer.text = initial_text;
-                if (file != null) {
-                    doc_page.source_buffer.set_modified (false);
-                }
+                doc_page.set_initial_content (initial_text, file != null);
             }
             doc_page.project_type = current_project_type;
             doc_page.stats_changed.connect ((words, lines, badge) => {
@@ -1037,9 +1095,33 @@ namespace Imladris {
             qmd_row.add_prefix (new Gtk.Image.from_icon_name ("x-office-document-symbolic"));
             qmd_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
             qmd_row.activated.connect (() => {
-                add_document_tab ("analysis.qmd", "markdown", "---\ntitle: \"Untitled Quarto Analysis\"\nauthor: \"Scientist\"\nformat: html\n---\n\n## Introduction\n\n");
+                add_document_tab ("analysis.qmd", "quarto");
             });
             quick_group.add (qmd_row);
+
+            var md_row = new Adw.ActionRow () {
+                title = "New Markdown Document (.md)",
+                subtitle = "Clean focused prose with live preview and math/diagram support",
+                activatable = true
+            };
+            md_row.add_prefix (new Gtk.Image.from_icon_name ("document-edit-symbolic"));
+            md_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            md_row.activated.connect (() => {
+                add_document_tab ("notes.md", "markdown");
+            });
+            quick_group.add (md_row);
+
+            var tex_row = new Adw.ActionRow () {
+                title = "New LaTeX Manuscript (.tex)",
+                subtitle = "Typeset articles with equations, BibTeX citations, and PDF builds",
+                activatable = true
+            };
+            tex_row.add_prefix (new Gtk.Image.from_icon_name ("x-office-document-symbolic"));
+            tex_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            tex_row.activated.connect (() => {
+                add_document_tab ("document.tex", "latex");
+            });
+            quick_group.add (tex_row);
 
             var shiny_row = new Adw.ActionRow () {
                 title = "New R Script or Shiny App (.R)",
@@ -1098,9 +1180,33 @@ namespace Imladris {
             ipynb_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
             ipynb_row.activated.connect (() => {
                 string template = Core.NotebookSerializer.get_default_ipynb_markdown_template ();
-                add_document_tab ("notebook.ipynb", "markdown", template);
+                add_document_tab ("notebook.ipynb", "quarto", template);
             });
             more_expander.add_row (ipynb_row);
+
+            var ts_row = new Adw.ActionRow () {
+                title = "New TypeScript Module (.ts)",
+                subtitle = "Typed TypeScript source with Node execution and tsc typechecking",
+                activatable = true
+            };
+            ts_row.add_prefix (new Gtk.Image.from_icon_name ("utilities-terminal-symbolic"));
+            ts_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            ts_row.activated.connect (() => {
+                add_document_tab ("module.ts", "typescript");
+            });
+            more_expander.add_row (ts_row);
+
+            var html_row = new Adw.ActionRow () {
+                title = "New HTML5 Document (.html)",
+                subtitle = "Live WebKitGTK 6.0 DOM preview with embedded CSS and LaTeX math",
+                activatable = true
+            };
+            html_row.add_prefix (new Gtk.Image.from_icon_name ("text-html-symbolic"));
+            html_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            html_row.activated.connect (() => {
+                add_document_tab ("index.html", "html");
+            });
+            more_expander.add_row (html_row);
 
             var rproj_row = new Adw.ActionRow () {
                 title = "New RStudio Project (.Rproj)…",
@@ -1232,18 +1338,9 @@ namespace Imladris {
 
                 var fmt = DocumentFormat.from_filename (name);
                 string text = Adapters.DocumentAdapter.load_to_editor_buffer (raw_text, fmt);
+                string lang = fmt.to_syntax_lang ();
 
-                string lang = "markdown";
-                if (name.has_suffix (".ipynb")) lang = "markdown";
-                else if (name.has_suffix (".ts")) lang = "typescript";
-                else if (name.has_suffix (".css")) lang = "css";
-                else if (name.has_suffix (".bib")) lang = "bibtex";
-                else if (name.has_suffix (".html") || name.has_suffix (".htm")) lang = "html";
-                else if (name.has_suffix (".rmd") || name.has_suffix (".Rmd")) lang = "rmd";
-                else if (name.has_suffix (".r") || name.has_suffix (".R")) lang = "r";
-                else if (name.has_suffix (".py")) lang = "python3";
-
-                add_document_tab (name, lang, text, file);
+                add_document_tab (name, lang, text, file, fmt == DocumentFormat.IPYNB ? raw_text : null);
 
                 // Detect surrounding project sandbox/standard status
                 var parent_dir = file.get_parent ();
@@ -1283,9 +1380,14 @@ namespace Imladris {
 
             if (doc.file_location != null) {
                 try {
-                    string editor_content = doc.source_buffer.text;
+                    string editor_content = doc.get_clean_source_text ();
                     var fmt = DocumentFormat.from_filename (doc.file_location.get_basename ());
-                    string to_save = Adapters.DocumentAdapter.save_from_editor_buffer (editor_content, fmt);
+                    string to_save = Adapters.DocumentAdapter.save_from_editor_buffer (
+                        editor_content, fmt, doc.raw_ipynb_source
+                    );
+                    if (fmt == DocumentFormat.IPYNB) {
+                        doc.raw_ipynb_source = to_save;
+                    }
                     string etag;
                     yield doc.file_location.replace_contents_async (
                         to_save.data,
@@ -1295,6 +1397,7 @@ namespace Imladris {
                         null,
                         out etag
                     );
+                    doc.source_buffer.set_modified (false);
                     Services.RecoveryService.get_default ().purge_document_cache (doc.doc_id);
                     doc.append_console_log (@"✔ Saved $(doc.file_location.get_basename ())");
                 } catch (GLib.Error e) {
@@ -1309,9 +1412,14 @@ namespace Imladris {
                     var file = yield dialog.save (this, null);
                     if (file != null) {
                         doc.file_location = file;
-                        string editor_content = doc.source_buffer.text;
+                        string editor_content = doc.get_clean_source_text ();
                         var fmt = DocumentFormat.from_filename (file.get_basename ());
-                        string to_save = Adapters.DocumentAdapter.save_from_editor_buffer (editor_content, fmt);
+                        string to_save = Adapters.DocumentAdapter.save_from_editor_buffer (
+                            editor_content, fmt, doc.raw_ipynb_source
+                        );
+                        if (fmt == DocumentFormat.IPYNB) {
+                            doc.raw_ipynb_source = to_save;
+                        }
                         string etag;
                         yield file.replace_contents_async (
                             to_save.data,
@@ -1321,6 +1429,7 @@ namespace Imladris {
                             null,
                             out etag
                         );
+                        doc.source_buffer.set_modified (false);
                         Services.RecoveryService.get_default ().purge_document_cache (doc.doc_id);
                         if (tab_view.selected_page != null) {
                             tab_view.selected_page.title = file.get_basename ();
@@ -1391,11 +1500,12 @@ namespace Imladris {
                     string src_ext = doc.get_document_format ().get_extension ();
                     string? doc_path = doc.file_location != null ? doc.file_location.get_path () : null;
                     string src_path = doc_path ?? GLib.Path.build_filename (Core.PlatformUtils.get_shared_cache_dir ("tmp"), @"$base_prefix$src_ext");
+                    string clean_source = doc.get_clean_source_text ();
                     bool ok = yield Services.ExportService.get_default ().export_document_async (
                         src_path,
                         dest_path,
                         format,
-                        doc.source_buffer.text
+                        clean_source
                     );
                     if (ok) {
                         doc.append_console_log (@"✔ Successfully exported to $dest_path");
@@ -1403,7 +1513,7 @@ namespace Imladris {
                         string pdir = (current_project_dir != "") ? current_project_dir : GLib.Path.get_dirname (src_path);
                         Core.ProvenanceAttestationService.generate_attestation_async.begin (
                             src_path,
-                            doc.source_buffer.text,
+                            clean_source,
                             pdir,
                             (obj, att_res) => {
                                 try {
@@ -1415,7 +1525,9 @@ namespace Imladris {
                             }
                         );
                     } else {
-                        doc.append_console_log (@"✖ Export to $(format.up ()) failed. Check console output.");
+                        string err_detail = Services.ExportService.get_default ().last_error_message;
+                        doc.append_console_log (@"✖ Export to $(format.up ()) failed.$(err_detail != "" ? @" $err_detail" : " Check console output.")");
+                        show_toast (@"Export to $(format.up ()) failed");
                     }
                 }
             } catch (GLib.Error e) {
@@ -1566,19 +1678,64 @@ namespace Imladris {
             var doc = get_active_document ();
             if (doc == null) return;
 
+            var doc_fmt = doc.get_document_format ();
             string s_path = "";
             if (doc.file_location != null) {
                 s_path = doc.file_location.get_path ();
                 yield save_document_async ();
             } else {
                 string cache_dir = Core.PlatformUtils.get_shared_cache_dir ("render");
-                s_path = GLib.Path.build_filename (cache_dir, "document.qmd");
+                string ext = (doc_fmt == DocumentFormat.TEX) ? ".tex" : (doc_fmt == DocumentFormat.TS ? ".ts" : ".qmd");
+                s_path = GLib.Path.build_filename (cache_dir, @"document$ext");
                 try {
-                    GLib.FileUtils.set_contents (s_path, doc.source_buffer.text);
+                    GLib.FileUtils.set_contents (s_path, doc.get_clean_source_text ());
                 } catch (GLib.Error e) {
                     show_toast (@"Failed to cache document for rendering: $(e.message)");
                     return;
                 }
+            }
+
+            if (doc_fmt == DocumentFormat.TEX) {
+                doc.append_console_log (@"▶ Building LaTeX document $(GLib.Path.get_basename (s_path))...");
+                var tex_res = yield Runners.LatexBuildRunner.build_async (s_path);
+                if (tex_res.stdout_stderr.strip ().length > 0) {
+                    doc.append_console_log (tex_res.stdout_stderr.strip ());
+                }
+                if (tex_res.success && tex_res.pdf_path != "" && GLib.FileUtils.test (tex_res.pdf_path, GLib.FileTest.EXISTS)) {
+                    show_toast (@"Built $(GLib.Path.get_basename (tex_res.pdf_path)) ($(tex_res.engine_used))");
+                    var pdf_file = GLib.File.new_for_path (tex_res.pdf_path);
+                    var launcher = new Gtk.FileLauncher (pdf_file);
+                    launcher.launch.begin (this, null, null);
+                } else {
+                    string err = tex_res.diagnostics.size > 0
+                        ? tex_res.diagnostics.get (0).message
+                        : (tex_res.stdout_stderr.strip ().length > 0 ? "LaTeX build failed (see console)" : "LaTeX engine not found");
+                    doc.append_console_log (@"✖ $err");
+                    show_toast (@"LaTeX build failed: $err");
+                }
+                return;
+            }
+
+            if (doc_fmt == DocumentFormat.TS) {
+                doc.append_console_log (@"▶ Running TypeScript file $(GLib.Path.get_basename (s_path))...");
+                string? proj_dir = (current_project_dir != "") ? current_project_dir : null;
+                var ts_res = yield Runners.TypeScriptRunner.run_file_async (s_path, proj_dir);
+                if (ts_res.stdout_text.strip ().length > 0) {
+                    doc.append_console_log (ts_res.stdout_text.strip ());
+                }
+                if (ts_res.stderr_text.strip ().length > 0) {
+                    doc.append_console_log (ts_res.stderr_text.strip ());
+                }
+                if (ts_res.success) {
+                    show_toast (@"Executed $(GLib.Path.get_basename (s_path)) ($(ts_res.runtime_used))");
+                } else {
+                    string err = ts_res.stderr_text.strip ().length > 0
+                        ? ts_res.stderr_text.strip ()
+                        : "TypeScript execution failed";
+                    doc.append_console_log (@"✖ $err");
+                    show_toast ("TypeScript run failed");
+                }
+                return;
             }
 
             var engine = new Core.QuartoExportEngine ();
@@ -2113,7 +2270,7 @@ namespace Imladris {
                     string pdir = (current_project_dir != "") ? current_project_dir : GLib.Path.get_dirname (s_path);
                     Core.ProvenanceAttestationService.generate_attestation_async.begin (
                         s_path,
-                        d.source_buffer.text,
+                        d.get_clean_source_text (),
                         pdir,
                         (obj, att_res) => {
                             try {
@@ -2159,11 +2316,34 @@ namespace Imladris {
          * Dynamically adapts visible and sensitive states based on active Project Type and Document Format
          */
         public void update_ribbon_state_machine (DocumentFormat fmt, ProjectType ptype) {
+            var profile = Core.FormatProfile.for_format (fmt);
+            bool is_sandboxed = (ptype == ProjectType.SANDBOXED);
+            bool has_pages = (tab_view != null && tab_view.n_pages > 0);
+            bool is_notebook = profile.supports_chunks;
+            bool is_script = (fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.PYSCRIPT || fmt == DocumentFormat.TS);
             bool is_md = (fmt == DocumentFormat.MD);
             bool is_html = (fmt == DocumentFormat.HTML);
-            bool is_script = (fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.PYSCRIPT);
-            bool is_notebook = (fmt == DocumentFormat.RMD || fmt == DocumentFormat.QMD || fmt == DocumentFormat.IPYNB);
-            bool is_sandboxed = (ptype == ProjectType.SANDBOXED);
+            bool is_tex = (fmt == DocumentFormat.TEX);
+
+            // HeaderBar format adaptation
+            if (btn_render_quarto != null && render_content != null) {
+                bool show_primary = has_pages && (profile.header_action_kind != Core.HeaderActionKind.NONE);
+                btn_render_quarto.visible = show_primary;
+                if (show_primary) {
+                    render_content.label = profile.primary_action_label;
+                    render_content.icon_name = profile.primary_action_icon;
+                    btn_render_quarto.tooltip_text = profile.primary_action_tooltip;
+                }
+            }
+            if (export_format_selector != null) {
+                string[] targets = profile.get_export_targets ();
+                bool show_selector = has_pages && (targets.length > 0);
+                export_format_selector.visible = show_selector;
+                if (show_selector) {
+                    export_format_selector.model = new Gtk.StringList (targets);
+                    export_format_selector.selected = 0;
+                }
+            }
 
             // 1. Insert Chunks
             if (btn_insert_r != null) {
@@ -2177,12 +2357,12 @@ namespace Imladris {
 
             // 2. Chunk Execution Controls
             if (btn_run_chunk != null) {
-                btn_run_chunk.visible = !is_html;
+                btn_run_chunk.visible = is_notebook;
                 btn_run_chunk.sensitive = is_notebook;
             }
             if (btn_run_all != null) {
-                btn_run_all.visible = !is_html;
-                btn_run_all.sensitive = is_notebook;
+                btn_run_all.visible = is_notebook || is_tex || is_script;
+                btn_run_all.sensitive = is_notebook || is_tex || is_script;
             }
             if (btn_run_above != null) {
                 btn_run_above.visible = is_notebook;
@@ -2193,73 +2373,67 @@ namespace Imladris {
                 btn_run_below.sensitive = is_notebook;
             }
 
-            // 3. Script Execution Controls
+            // 3. Script / Compile Execution Controls
             if (btn_run_line != null) {
                 btn_run_line.visible = is_script || is_notebook;
                 btn_run_line.sensitive = is_script || is_notebook;
             }
             if (btn_source_file != null) {
-                btn_source_file.visible = is_script || is_notebook;
-                btn_source_file.sensitive = is_script || is_notebook;
+                btn_source_file.visible = is_script || is_notebook || is_tex;
+                btn_source_file.sensitive = is_script || is_notebook || is_tex;
             }
             if (btn_interrupt != null) {
-                btn_interrupt.visible = is_script || is_notebook;
-                btn_interrupt.sensitive = is_script || is_notebook;
+                btn_interrupt.visible = is_script || is_notebook || is_tex;
+                btn_interrupt.sensitive = is_script || is_notebook || is_tex;
             }
 
             // 4. Kernel / Persistent Sessions
             if (btn_restart_kernel != null) {
-                btn_restart_kernel.visible = !is_md && !is_html;
-                btn_restart_kernel.sensitive = is_script || is_notebook;
+                btn_restart_kernel.visible = is_notebook || (fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.PYSCRIPT);
+                btn_restart_kernel.sensitive = btn_restart_kernel.visible;
             }
 
             // 5. Package Installer
             if (btn_package_installer != null) {
-                btn_package_installer.visible = !is_md && !is_html;
-                btn_package_installer.sensitive = is_script || is_notebook;
+                btn_package_installer.visible = profile.supports_packages_tab;
+                btn_package_installer.sensitive = profile.supports_packages_tab;
             }
 
-            // 6. Snapshot & Restore Environment (Pillar 2 rules)
+            // 6. Snapshot & Restore Environment
             if (btn_snapshot_env != null) {
-                btn_snapshot_env.visible = is_notebook || (is_script && is_sandboxed);
-                if (is_sandboxed) {
-                    btn_snapshot_env.sensitive = true;
-                    btn_snapshot_env.tooltip_text = "Lock environment package versions (renv::snapshot / pip freeze)";
-                } else {
-                    btn_snapshot_env.sensitive = false;
-                    btn_snapshot_env.tooltip_text = "Only available in Sandboxed Projects";
-                }
+                btn_snapshot_env.visible = is_notebook || ((fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.PYSCRIPT) && is_sandboxed);
+                btn_snapshot_env.sensitive = is_sandboxed;
+                btn_snapshot_env.tooltip_text = is_sandboxed
+                    ? "Lock environment package versions (renv::snapshot / pip freeze)"
+                    : "Only available in Sandboxed Projects";
             }
             if (btn_restore_env != null) {
-                btn_restore_env.visible = is_notebook || (is_script && is_sandboxed);
-                if (is_sandboxed) {
-                    btn_restore_env.sensitive = true;
-                    btn_restore_env.tooltip_text = "Restore exact package versions from lockfile (renv::restore / pip install -r)";
-                } else {
-                    btn_restore_env.sensitive = false;
-                    btn_restore_env.tooltip_text = "Only available in Sandboxed Projects";
-                }
+                btn_restore_env.visible = is_notebook || ((fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.PYSCRIPT) && is_sandboxed);
+                btn_restore_env.sensitive = is_sandboxed;
+                btn_restore_env.tooltip_text = is_sandboxed
+                    ? "Restore exact package versions from lockfile (renv::restore / pip install -r)"
+                    : "Only available in Sandboxed Projects";
             }
 
             // 7. Knit / Render / Export
             if (btn_render_html != null) {
-                btn_render_html.visible = true;
-                btn_render_html.sensitive = !is_script;
+                btn_render_html.visible = profile.supports_live_preview || is_tex;
+                btn_render_html.sensitive = profile.supports_live_preview || is_tex;
             }
             if (btn_render_pdf != null) {
-                btn_render_pdf.visible = !is_html;
-                btn_render_pdf.sensitive = !is_script;
+                btn_render_pdf.visible = is_notebook || is_md || is_tex || is_html;
+                btn_render_pdf.sensitive = btn_render_pdf.visible;
             }
             if (btn_export_odt != null) {
-                btn_export_odt.visible = !is_html;
+                btn_export_odt.visible = is_md || is_notebook;
                 btn_export_odt.sensitive = is_md || is_notebook;
             }
             if (btn_export_odp != null) {
-                btn_export_odp.visible = !is_html;
+                btn_export_odp.visible = is_md || is_notebook;
                 btn_export_odp.sensitive = is_md || is_notebook;
             }
             if (btn_export_rtf != null) {
-                btn_export_rtf.visible = !is_html;
+                btn_export_rtf.visible = is_md || is_notebook;
                 btn_export_rtf.sensitive = is_md || is_notebook;
             }
             if (btn_export_mallorn != null) {
@@ -2277,16 +2451,30 @@ namespace Imladris {
 
             // 8. Live preview
             if (btn_live_preview != null) {
-                btn_live_preview.visible = true;
-                btn_live_preview.sensitive = is_md || is_html || is_notebook;
+                btn_live_preview.visible = profile.supports_live_preview;
+                btn_live_preview.sensitive = profile.supports_live_preview;
             }
 
-            // 9. Packages Ribbon Tab (Pillar 2: visible & enabled for computational workflows)
-            bool is_computational = is_script || is_notebook;
+            // 9. Contextual Ribbon Tabs (Run, Publish, Packages)
+            bool show_run_tab = (profile.ribbon_run_mode != Core.RibbonRunMode.HIDDEN);
+            if (tab_btn_run != null) {
+                tab_btn_run.visible = show_run_tab;
+                tab_btn_run.sensitive = show_run_tab;
+                if (!show_run_tab && tab_btn_run.active && tab_btn_home != null) {
+                    tab_btn_home.active = true;
+                }
+            }
+            if (tab_btn_publish != null) {
+                tab_btn_publish.visible = profile.supports_publish_tab;
+                tab_btn_publish.sensitive = profile.supports_publish_tab;
+                if (!profile.supports_publish_tab && tab_btn_publish.active && tab_btn_home != null) {
+                    tab_btn_home.active = true;
+                }
+            }
             if (tab_btn_packages != null) {
-                tab_btn_packages.visible = is_computational;
-                tab_btn_packages.sensitive = is_computational;
-                if (!is_computational && tab_btn_packages.active && tab_btn_home != null) {
+                tab_btn_packages.visible = profile.supports_packages_tab;
+                tab_btn_packages.sensitive = profile.supports_packages_tab;
+                if (!profile.supports_packages_tab && tab_btn_packages.active && tab_btn_home != null) {
                     tab_btn_home.active = true;
                 }
             }
@@ -2636,7 +2824,7 @@ namespace Imladris {
                     string tmp_dir = Core.PlatformUtils.get_shared_cache_dir ("tmp");
                     string tmp_app = GLib.Path.build_filename (tmp_dir, "app.R");
                     try {
-                        GLib.FileUtils.set_contents (tmp_app, doc.source_buffer.text);
+                        GLib.FileUtils.set_contents (tmp_app, doc.get_clean_source_text ());
                         target_path = tmp_app;
                     } catch (GLib.Error e) {
                         doc.append_console_log (@"✖ Failed to write temporary app.R: $(e.message)");
@@ -2780,8 +2968,12 @@ namespace Imladris {
             var doc = get_active_document ();
             if (doc == null) return;
             var buf = doc.source_buffer;
+            var fmt = doc.get_document_format ();
+            var profile = Core.FormatProfile.for_format (fmt);
+
             Gtk.TextIter cursor;
             buf.get_iter_at_mark (out cursor, buf.get_insert ());
+            int cursor_line = cursor.get_line ();
             Gtk.TextIter line_start = cursor;
             line_start.set_line_offset (0);
             Gtk.TextIter line_end = line_start;
@@ -2790,23 +2982,60 @@ namespace Imladris {
             }
             string line_text = buf.get_text (line_start, line_end, false);
             string trimmed = line_text.strip ();
+
+            string line_prefix = profile.line_comment_prefix;
+            string block_open = profile.block_comment_open;
+            string block_close = profile.block_comment_close;
+
+            if (profile.supports_chunks) {
+                var chunk = Core.ChunkParser.find_chunk_at_line (doc.get_clean_source_text (), cursor_line);
+                if (chunk != null) {
+                    string clang = chunk.language.down ();
+                    if (clang == "ts" || clang == "typescript" || clang == "js" || clang == "mermaid" || clang == "css") {
+                        line_prefix = "// ";
+                    } else if (clang == "sql") {
+                        line_prefix = "-- ";
+                    } else {
+                        line_prefix = "# ";
+                    }
+                    block_open = "";
+                    block_close = "";
+                }
+            }
+
             buf.begin_user_action ();
-            if (trimmed.has_prefix ("# ")) {
-                int idx = line_text.index_of ("# ");
-                Gtk.TextIter del_start = line_start;
-                del_start.forward_chars (idx);
-                Gtk.TextIter del_end = del_start;
-                del_end.forward_chars (2);
-                buf.delete (ref del_start, ref del_end);
-            } else if (trimmed.has_prefix ("#")) {
-                int idx = line_text.index_of ("#");
-                Gtk.TextIter del_start = line_start;
-                del_start.forward_chars (idx);
-                Gtk.TextIter del_end = del_start;
-                del_end.forward_chars (1);
-                buf.delete (ref del_start, ref del_end);
-            } else {
-                buf.insert (ref line_start, "# ", -1);
+            if (line_prefix.length > 0) {
+                string bare = line_prefix.strip ();
+                if (trimmed.has_prefix (line_prefix)) {
+                    int bidx = line_text.index_of (line_prefix);
+                    int cidx = line_text.substring (0, bidx).char_count ();
+                    Gtk.TextIter del_start = line_start;
+                    del_start.forward_chars (cidx);
+                    Gtk.TextIter del_end = del_start;
+                    del_end.forward_chars (line_prefix.char_count ());
+                    buf.delete (ref del_start, ref del_end);
+                } else if (bare.length > 0 && trimmed.has_prefix (bare)) {
+                    int bidx = line_text.index_of (bare);
+                    int cidx = line_text.substring (0, bidx).char_count ();
+                    Gtk.TextIter del_start = line_start;
+                    del_start.forward_chars (cidx);
+                    Gtk.TextIter del_end = del_start;
+                    del_end.forward_chars (bare.char_count ());
+                    buf.delete (ref del_start, ref del_end);
+                } else {
+                    buf.insert (ref line_start, line_prefix, -1);
+                }
+            } else if (block_open.length > 0 && block_close.length > 0) {
+                string open_t = block_open.strip ();
+                string close_t = block_close.strip ();
+                if (trimmed.has_prefix (open_t) && trimmed.has_suffix (close_t) && trimmed.length >= open_t.length + close_t.length) {
+                    string unwrapped = trimmed.substring (open_t.length, trimmed.length - open_t.length - close_t.length).strip ();
+                    buf.delete (ref line_start, ref line_end);
+                    buf.insert (ref line_start, unwrapped, -1);
+                } else {
+                    buf.delete (ref line_start, ref line_end);
+                    buf.insert (ref line_start, @"$(block_open)$(line_text)$(block_close)", -1);
+                }
             }
             buf.end_user_action ();
         }
@@ -2818,11 +3047,20 @@ namespace Imladris {
                 if (citation != null && citation.length > 0) {
                     var doc = get_active_document ();
                     if (doc != null) {
+                        var fmt = doc.get_document_format ();
+                        var profile = Core.FormatProfile.for_format (fmt);
                         doc.source_buffer.begin_user_action ();
-                        doc.source_buffer.insert_at_cursor (citation, -1);
+                        if (profile.citation_style == Core.CitationStyle.LATEX_CITE) {
+                            string clean_key = citation.replace ("[@", "").replace ("]", "").replace ("@", "");
+                            doc.source_buffer.insert_at_cursor (@"\\cite{$clean_key}", -1);
+                        } else {
+                            doc.source_buffer.insert_at_cursor (citation, -1);
+                        }
                         doc.source_buffer.end_user_action ();
 
-                        Editor.CitationCompletionProvider.ensure_buffer_bibliography_line (doc.source_buffer, "references.bib");
+                        if (profile.citation_style == Core.CitationStyle.PANDOC_AT) {
+                            Editor.CitationCompletionProvider.ensure_buffer_bibliography_line (doc.source_buffer, "references.bib");
+                        }
                         try {
                             var reg = new Regex ("@([a-zA-Z0-9_:-]+)");
                             MatchInfo mi;
@@ -2862,10 +3100,16 @@ namespace Imladris {
             dlg.insert_citation_requested.connect ((citekey, bib_filename) => {
                 var active = get_active_document ();
                 if (active != null) {
+                    var fmt = active.get_document_format ();
+                    var profile = Core.FormatProfile.for_format (fmt);
                     active.source_buffer.begin_user_action ();
-                    active.source_buffer.insert_at_cursor (@"[@$citekey]", -1);
+                    if (profile.citation_style == Core.CitationStyle.LATEX_CITE) {
+                        active.source_buffer.insert_at_cursor (@"\\cite{$citekey}", -1);
+                    } else {
+                        active.source_buffer.insert_at_cursor (@"[@$citekey]", -1);
+                    }
                     active.source_buffer.end_user_action ();
-                    if (active.get_document_format () != DocumentFormat.BIB) {
+                    if (profile.citation_style == Core.CitationStyle.PANDOC_AT) {
                         Editor.CitationCompletionProvider.ensure_buffer_bibliography_line (active.source_buffer, bib_filename);
                     }
                 }
@@ -2876,10 +3120,12 @@ namespace Imladris {
         public void source_active_file () {
             var doc = get_active_document ();
             if (doc == null) return;
-            string code = doc.source_buffer.text.strip ();
+            string code = doc.get_clean_source_text ().strip ();
             if (code.length == 0) return;
             var fmt = doc.get_document_format ();
-            string engine = (fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.RMD) ? "r" : "python";
+            string engine = (fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.RMD)
+                ? "r"
+                : (fmt == DocumentFormat.TS ? "ts" : "python");
             doc.panel_registry.run_code_snippet_in_console (engine, code);
         }
 

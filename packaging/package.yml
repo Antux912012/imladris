@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 name       : imladris
-version    : 0.25.0
+version    : 0.26.0
 release    : 1
 source     :
-    - https://github.com/Antux912012/imladris/archive/refs/tags/v0.25.0.tar.gz : UPDATE_SHA256_ON_PUBLISH
+    - https://github.com/Antux912012/imladris/archive/refs/tags/v0.26.0.tar.gz : UPDATE_SHA256_ON_PUBLISH
 homepage   : https://antux912012.github.io/imladris/
 license    : GPL-3.0-or-later
 component  : editor

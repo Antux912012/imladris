@@ -39,51 +39,138 @@ namespace Imladris {
          * Asynchronously runs a CLI command (Rscript, python3, deno, tsc, quarto)
          * and streams stdout/stderr to the active DocumentPage's console pane.
          */
-        public static async void run_command_async (string[] argv, DocumentPage page) {
+        public static async void run_command_async (
+            string[] argv,
+            DocumentPage page,
+            GLib.Cancellable? cancellable = null,
+            uint timeout_ms = 120000
+        ) {
             if (argv.length == 0) return;
             page.append_console_log (@"▶ Executing: $(string.joinv (" ", argv))");
 
-            string? working_dir = (page.file_location != null && page.file_location.get_parent () != null)
-                ? page.file_location.get_parent ().get_path ()
-                : null;
+            string? working_dir = null;
+            if (page.current_project_dir != "") {
+                working_dir = page.current_project_dir;
+            } else if (page.file_location != null && page.file_location.get_parent () != null) {
+                working_dir = page.file_location.get_parent ().get_path ();
+            }
+
+            var linked_cancellable = new GLib.Cancellable ();
+            ulong cancel_hid = 0;
+            if (cancellable != null) {
+                if (cancellable.is_cancelled ()) {
+                    linked_cancellable.cancel ();
+                } else {
+                    cancel_hid = cancellable.connect (() => {
+                        linked_cancellable.cancel ();
+                    });
+                }
+            }
+
+            uint timeout_id = 0;
+            bool timed_out = false;
+            GLib.Subprocess? proc = null;
+            if (timeout_ms > 0) {
+                timeout_id = GLib.Timeout.add (timeout_ms, () => {
+                    timed_out = true;
+                    linked_cancellable.cancel ();
+                    if (proc != null) {
+                        proc.force_exit ();
+                    }
+                    timeout_id = 0;
+                    return false;
+                });
+            }
 
             try {
-                var proc = spawn_configured_subprocess (
+                proc = spawn_configured_subprocess (
                     argv, working_dir, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE
                 );
                 string? output = null;
-                yield proc.communicate_utf8_async (null, null, out output, null);
-                bool ok = proc.get_successful ();
-                if (output != null && output.strip ().length > 0) {
-                    page.append_console_log (output.strip ());
-                } else if (ok) {
-                    page.append_console_log ("✔ Completed successfully.");
+                yield proc.communicate_utf8_async (null, linked_cancellable, out output, null);
+                if (timed_out) {
+                    page.append_console_log (@"✖ Command timed out after $(timeout_ms / 1000)s.");
                 } else {
-                    page.append_console_log (@"✖ Command exited with status $(proc.get_exit_status ()).");
+                    bool ok = proc.get_successful ();
+                    if (output != null && output.strip ().length > 0) {
+                        page.append_console_log (output.strip ());
+                    } else if (ok) {
+                        page.append_console_log ("✔ Completed successfully.");
+                    } else {
+                        page.append_console_log (@"✖ Command exited with status $(proc.get_exit_status ()).");
+                    }
                 }
             } catch (GLib.Error e) {
-                page.append_console_log (@"✖ Execution Notice: $(e.message)");
+                if (timed_out) {
+                    page.append_console_log (@"✖ Command timed out after $(timeout_ms / 1000)s.");
+                } else {
+                    page.append_console_log (@"✖ Execution Notice: $(e.message)");
+                }
+            } finally {
+                if (timeout_id != 0) GLib.Source.remove (timeout_id);
+                if (cancellable != null && cancel_hid != 0) cancellable.disconnect (cancel_hid);
             }
         }
 
-        public static async string capture_command_async (string[] argv) {
-            return yield capture_command_in_dir_async (argv, null);
+        public static async string capture_command_async (string[] argv, GLib.Cancellable? cancellable = null, uint timeout_ms = 60000) {
+            return yield capture_command_in_dir_async (argv, null, cancellable, timeout_ms);
         }
 
-        public static async string capture_command_in_dir_async (string[] argv, string? working_dir) {
+        public static async string capture_command_in_dir_async (
+            string[] argv,
+            string? working_dir,
+            GLib.Cancellable? cancellable = null,
+            uint timeout_ms = 60000
+        ) {
             if (argv.length == 0) return "";
+            var linked_cancellable = new GLib.Cancellable ();
+            ulong cancel_hid = 0;
+            if (cancellable != null) {
+                if (cancellable.is_cancelled ()) {
+                    linked_cancellable.cancel ();
+                } else {
+                    cancel_hid = cancellable.connect (() => {
+                        linked_cancellable.cancel ();
+                    });
+                }
+            }
+
+            uint timeout_id = 0;
+            bool timed_out = false;
+            GLib.Subprocess? proc = null;
+            if (timeout_ms > 0) {
+                timeout_id = GLib.Timeout.add (timeout_ms, () => {
+                    timed_out = true;
+                    linked_cancellable.cancel ();
+                    if (proc != null) {
+                        proc.force_exit ();
+                    }
+                    timeout_id = 0;
+                    return false;
+                });
+            }
+
             try {
-                var proc = spawn_configured_subprocess (
+                proc = spawn_configured_subprocess (
                     argv, working_dir, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE
                 );
                 string? output = null;
-                yield proc.communicate_utf8_async (null, null, out output, null);
+                yield proc.communicate_utf8_async (null, linked_cancellable, out output, null);
+                if (timed_out) {
+                    return @"✖ Command timed out after $(timeout_ms / 1000)s.";
+                }
                 if (output != null && output.strip ().length > 0) {
                     return output.strip ();
                 }
                 return proc.get_successful () ? "✔ Completed (no output)." : @"✖ Command exited with status $(proc.get_exit_status ()).";
             } catch (GLib.Error e) {
+                if (timed_out) {
+                    return @"✖ Command timed out after $(timeout_ms / 1000)s.";
+                }
                 return @"✖ Execution Notice: $(e.message)";
+            } finally {
+                if (timeout_id != 0) GLib.Source.remove (timeout_id);
+                if (cancellable != null && cancel_hid != 0) cancellable.disconnect (cancel_hid);
             }
         }
     }

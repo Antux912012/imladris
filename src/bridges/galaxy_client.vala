@@ -135,17 +135,10 @@ namespace Imladris {
         /**
          * Returns Secret.Schema definition for storing Galaxy API keys in OS Keyring.
          *
-         * @return Libsecret schema for org.ardatech.Imladris.GalaxyApiKey.
+         * @return Libsecret schema for io.github.Antux912012.Imladris.GalaxyApiKey.
          */
         public static Secret.Schema get_secret_schema () {
-            if (secret_schema == null) {
-                secret_schema = new Secret.Schema (
-                    "org.ardatech.Imladris.GalaxyApiKey",
-                    Secret.SchemaFlags.NONE,
-                    "server_url", Secret.SchemaAttributeType.STRING
-                );
-            }
-            return secret_schema;
+            return Imladris.Core.PlatformUtils.get_galaxy_secret_schema ();
         }
 
         /**
