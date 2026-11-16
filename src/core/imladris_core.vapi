@@ -31,4 +31,7 @@ namespace Imladris.Core.RustFFI {
 
     [CCode (cname = "imladris_analyze_typescript_symbols_json")]
     public char* analyze_typescript_symbols_json_raw (string ts_source_utf8);
+
+    [CCode (cname = "imladris_analyze_manuscript_json")]
+    public char* analyze_manuscript_json_raw (string source_utf8);
 }

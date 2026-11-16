@@ -52,5 +52,9 @@ namespace Imladris.Core {
         public static string analyze_typescript_symbols_json (string ts_source) {
             return take_and_free (RustFFI.analyze_typescript_symbols_json_raw (ts_source));
         }
+
+        public static string analyze_manuscript_json (string source) {
+            return take_and_free (RustFFI.analyze_manuscript_json_raw (source));
+        }
     }
 }
