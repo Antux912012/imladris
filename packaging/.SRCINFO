@@ -1,6 +1,6 @@
 pkgbase = imladris
 	pkgdesc = Native scientific notebook IDE for Quarto, R, Python & Jupyter with GTK4 and AI
-	pkgver = 0.26.0
+	pkgver = 0.27.0
 	pkgrel = 1
 	url = https://antux912012.github.io/imladris/
 	arch = x86_64
