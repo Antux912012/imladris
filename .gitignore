@@ -1,15 +1,15 @@
 # Build directory
-build/
-build-dir/
-builddir/
-build-deb/
-deb-root/
-rpmbuild/
-build-flatpak/
-build-flatpak-app/
-.flatpak-builder/
-flatpak_repo/
-repo/
+/build/
+/build-dir/
+/builddir/
+/build-deb/
+/deb-root/
+/rpmbuild/
+/build-flatpak/
+/build-flatpak-app/
+/.flatpak-builder/
+/flatpak_repo/
+/repo/
 *.flatpak
 *.deb
 *.rpm
@@ -17,10 +17,16 @@ repo/
 *.AppImage
 SHA256SUMS.txt
 *-sbom.*
-subprojects/cmark/
-subprojects/packagecache/
+/subprojects/cmark/
+/subprojects/packagecache/
+/target/
+/rust/imladris_core/target/
+
+# Never ignore files inside vendored Rust crates
+!rust/imladris_core/vendor/**
 *.o
 *.so
 *.a
-
-target/
+!rust/imladris_core/vendor/**/*.o
+!rust/imladris_core/vendor/**/*.so
+!rust/imladris_core/vendor/**/*.a

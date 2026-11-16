@@ -2,7 +2,20 @@
 
 All notable changes to **Imladris** are documented in this file.
 
-## [0.26.0] - 2026-11-15
+## [0.27.1] - 2026-11-16
+
+### Fixed
+- **GitHub CI & Offline Rust Build**: Anchored `.gitignore` `repo/`/`build/`/`target/` rules and re-vendored `rust/imladris_core/vendor` (`syn/tests/repo/mod.rs`) so `cargo build --release --offline` inside Flatpak Builder succeeds.
+- **FlatPark Packaging & Toolchain Add-on**: Marked `io.github.Antux912012.Imladris.Toolchain` with `no-autodownload: true` and bumped release version to trigger a clean FlatPark `extra-data` sync.
+
+## [0.27.0] - 2026-11-16
+
+### Added
+- **Elrond AI Enhancements**: Local intent routing, multi-turn conversation history, and SSE token streaming.
+- **Rust Core Manuscript Analytics**: Zero-copy line parsing, expanded Quarto engines/options, and `imladris_analyze_manuscript_json` exposed in VAPI and `NativeCore`.
+- **Distribution Toolchain Packaging**: Added `.deb`/`.rpm` toolchain meta-packages, Flatpak Toolchain add-on extension, and updated editorial landing page.
+
+## [0.26.0] - 2026-11-15">
 
 ### Added
 - **Hybrid Rust Core (`imladris_core`)**: CommonMark/GFM/math/Mermaid HTML renderer, lossless `.ipynb` round-trip serializer, YAML frontmatter parser, LaTeX outline analyzer, and TypeScript symbol analyzer exposed via C-ABI.

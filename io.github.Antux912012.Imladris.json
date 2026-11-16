@@ -13,7 +13,7 @@
             "version": "50",
             "add-ld-path": "lib",
             "autodelete": true,
-            "no-autodownload": false
+            "no-autodownload": true
         }
     },
     "finish-args": [

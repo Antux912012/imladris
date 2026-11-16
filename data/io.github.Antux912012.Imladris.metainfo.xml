@@ -75,6 +75,25 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.27.1" date="2026-11-16">
+      <description>
+        <p>Release v0.27.1 resolves Flatpak/CI offline Rust build failures and FlatPark packaging synchronization:</p>
+        <ul>
+          <li>CI &amp; Offline Cargo Fix: Anchored .gitignore build/repo rules and restored complete vendored syn test sources so offline Flatpak and GitHub Actions builds succeed reliably.</li>
+          <li>FlatPark &amp; Toolchain Extension Fix: Synchronized release metadata and marked the optional Toolchain Flatpak add-on with no-autodownload=true to prevent install blocks.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.27.0" date="2026-11-16">
+      <description>
+        <p>Release v0.27.0 expands Elrond AI, Rust core manuscript analytics, Quarto engines, and Linux distribution packaging:</p>
+        <ul>
+          <li>Elrond AI Routing &amp; Streaming: Added local intent routing, multi-turn conversation history, and SSE token streaming.</li>
+          <li>Rust Core &amp; Quarto Analytics: Added zero-copy line parsing, expanded Quarto engines/options, and exposed imladris_analyze_manuscript_json via VAPI and NativeCore.</li>
+          <li>Distribution Toolchain Packaging: Added toolchain meta-packages (.deb/.rpm), Flatpak Toolchain add-on extension, and updated landing page documentation.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.26.0" date="2026-11-15">
       <description>
         <p>Release v0.26.0 introduces the hybrid Rust core (imladris_core) + Vala/GTK4 architecture, format-adaptive UI across all 7 scientific formats (.qmd, .Rmd, .ipynb, .md, .tex, .ts, .html), sequential chunk execution, LaTeX/TypeScript runners, and Flatpak/security hardening:</p>
