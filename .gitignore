@@ -4,6 +4,7 @@
 /builddir/
 /build-deb/
 /deb-root/
+/deb-toolchain-root/
 /rpmbuild/
 /build-flatpak/
 /build-flatpak-app/

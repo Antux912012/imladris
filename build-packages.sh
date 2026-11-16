@@ -37,7 +37,7 @@ run_meson_build() {
         meson compile -C "${build_dir}"
         DESTDIR="${dest_dir}" meson install -C "${build_dir}"
     else
-        flatpak run --system --command=bash --devel --filesystem="${PROJECT_DIR}" org.gnome.Sdk//${sdk_ver} -c \
+        flatpak run --system --command=bash --devel --filesystem=home --filesystem="${PROJECT_DIR}" org.gnome.Sdk//${sdk_ver} -c \
             "cd '${PROJECT_DIR}' && rm -rf '${build_dir}' && meson setup '${build_dir}' --prefix='${prefix_dir}' && meson compile -C '${build_dir}' && DESTDIR='${dest_dir}' meson install -C '${build_dir}'"
     fi
 }
@@ -146,6 +146,11 @@ PYEOF
   flatpak build-update-repo repo || true
   flatpak build-bundle repo "${BUNDLE_NAME}" "${APP_ID}" master
   echo "✔ Flatpak bundle generated: ${BUNDLE_NAME} ($(du -h "${BUNDLE_NAME}" | cut -f1))"
+
+  FLATPAK_TAR_NAME="${APP_ID}-flatpak-x86_64.tar.gz"
+  rm -f "${FLATPAK_TAR_NAME}"
+  tar -C build-flatpak-app/files -czf "${FLATPAK_TAR_NAME}" .
+  echo "✔ Flatpak /app tarball generated: ${FLATPAK_TAR_NAME} ($(du -h "${FLATPAK_TAR_NAME}" | cut -f1))"
 fi
 
 # 2. Build Debian Package (.deb)

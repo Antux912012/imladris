@@ -16,7 +16,7 @@ Imladris is officially distributed on [Flatpark](https://flatpark.org/apps/io.gi
 ### Method A: Install via the Flatpark Repository
 ```bash
 # 1. Add the Flatpark repository
-flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo
+flatpak remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
 
 # 2. Install Imladris directly
 flatpak install flatpark io.github.Antux912012.Imladris

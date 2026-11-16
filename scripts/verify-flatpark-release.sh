@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Description: Verifies that the latest Imladris GitHub release is synchronized
-# with the FlatPark package registry. If a version mismatch is detected, this
-# script notifies the FlatPark release webhook to trigger an automatic update.
+# with the FlatPark package registry and that FlatPark uses the Flatpak archive
+# format (never .deb). If a mismatch is detected, this script notifies the
+# FlatPark release webhook to trigger an automatic update.
 
 set -euo pipefail
 
@@ -21,24 +22,30 @@ LATEST_TAG="$(jq -r '.tag_name' <<<"$RELEASE_JSON")"
 LATEST_VERSION="$(jq -r '.tag_name | ltrimstr("v")' <<<"$RELEASE_JSON")"
 echo "  Latest GitHub Release: ${LATEST_TAG} (version: ${LATEST_VERSION})"
 
-echo "[2/3] Checking the active package version on FlatPark..."
+echo "[2/3] Checking the active package version and format on FlatPark..."
 FLATPARK_MANIFEST="$(curl -fsSL "${FLATPARK_RAW_URL}")"
 FLATPARK_URL="$(grep -E 'url: https://github.com/.*/releases/download/' <<<"$FLATPARK_MANIFEST" | head -n1 | awk '{print $2}')"
 
-if [[ "$FLATPARK_URL" =~ /v([^/]+)/imladris_.*\.deb ]]; then
+FORMAT_ERROR=0
+if [[ "$FLATPARK_URL" == *.deb ]]; then
+  echo "  ERROR: FlatPark manifest points to a .deb package (${FLATPARK_URL}) instead of the Flatpak format!" >&2
+  FORMAT_ERROR=1
+fi
+
+if [[ "$FLATPARK_URL" =~ /v([^/]+)/ ]]; then
   FLATPARK_VERSION="${BASH_REMATCH[1]}"
-  echo "  Active FlatPark Version: ${FLATPARK_VERSION}"
+  echo "  Active FlatPark Version: ${FLATPARK_VERSION} (${FLATPARK_URL})"
 else
   echo "  Warning: Could not parse version from FlatPark manifest URL: ${FLATPARK_URL}"
   FLATPARK_VERSION="unknown"
 fi
 
-echo "[3/3] Comparing release versions..."
-if [ "${LATEST_VERSION}" = "${FLATPARK_VERSION}" ]; then
-  echo "SUCCESS: FlatPark is fully synchronized with the latest release (${LATEST_VERSION})."
+echo "[3/3] Comparing release versions and format..."
+if [ "${FORMAT_ERROR}" -eq 0 ] && [ "${LATEST_VERSION}" = "${FLATPARK_VERSION}" ]; then
+  echo "SUCCESS: FlatPark is synchronized with ${LATEST_VERSION} using the Flatpak format."
   exit 0
 else
-  echo "MISMATCH DETECTED: GitHub is on ${LATEST_VERSION}, but FlatPark registry has ${FLATPARK_VERSION}."
+  echo "MISMATCH DETECTED: GitHub=${LATEST_VERSION}, FlatPark=${FLATPARK_VERSION}, format_error=${FORMAT_ERROR}."
   echo "Sending release notification to FlatPark webhook..."
 
   PAYLOAD="$(jq -n --arg a "$APP_ID" --arg t "$LATEST_TAG" --arg r "$REPO" \
@@ -50,4 +57,9 @@ else
 
   echo "FlatPark response: ${RESPONSE}"
   echo "FlatPark received the notification and is updating the package."
+
+  if [ "${FORMAT_ERROR}" -ne 0 ]; then
+    echo "ERROR: FlatPark registry must be updated to use ${APP_ID}-flatpak-x86_64.tar.gz instead of .deb." >&2
+    exit 1
+  fi
 fi

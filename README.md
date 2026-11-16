@@ -194,7 +194,7 @@ wget -qO- https://antux912012.github.io/imladris/install.sh | bash
 ### Flatpak / Flatpark (Recommended)
 Imladris is officially available on [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/):
 ```bash
-flatpak remote-add --if-not-exists flatpark https://flatpark.org/repo/flatpark.flatpakrepo
+flatpak remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
 flatpak install flatpark io.github.Antux912012.Imladris
 flatpak run io.github.Antux912012.Imladris
 ```

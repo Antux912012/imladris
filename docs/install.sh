@@ -16,9 +16,9 @@
 
 set -euo pipefail
 
-VERSION="0.25.0"
+VERSION="0.27.1"
 REPO="Antux912012/imladris"
-FLATPARK_REPO="https://flatpark.org/repo/flatpark.flatpakrepo"
+FLATPARK_REPO="https://dl.flatpark.org/flatpark.flatpakrepo"
 APP_ID="io.github.Antux912012.Imladris"
 
 # Nordic Color Palette for Terminal
