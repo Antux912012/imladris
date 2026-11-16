@@ -35,6 +35,69 @@ namespace Imladris {
             return launcher.spawnv (final_argv);
         }
 
+        private static async bool execute_with_timeout_async (
+            string[] argv,
+            string? working_dir,
+            GLib.Cancellable? cancellable,
+            uint timeout_ms,
+            out string? output,
+            out int exit_status,
+            out bool timed_out,
+            out string? error_message
+        ) {
+            output = null;
+            exit_status = -1;
+            timed_out = false;
+            error_message = null;
+
+            var linked_cancellable = new GLib.Cancellable ();
+            ulong cancel_hid = 0;
+            if (cancellable != null) {
+                if (cancellable.is_cancelled ()) {
+                    linked_cancellable.cancel ();
+                } else {
+                    cancel_hid = cancellable.connect (() => {
+                        linked_cancellable.cancel ();
+                    });
+                }
+            }
+
+            uint timeout_id = 0;
+            bool did_timeout = false;
+            GLib.Subprocess? proc = null;
+            if (timeout_ms > 0) {
+                timeout_id = GLib.Timeout.add (timeout_ms, () => {
+                    did_timeout = true;
+                    linked_cancellable.cancel ();
+                    if (proc != null) {
+                        proc.force_exit ();
+                    }
+                    timeout_id = 0;
+                    return false;
+                });
+            }
+
+            try {
+                proc = spawn_configured_subprocess (
+                    argv, working_dir, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE
+                );
+                yield proc.communicate_utf8_async (null, linked_cancellable, out output, null);
+                timed_out = did_timeout;
+                if (!did_timeout) {
+                    exit_status = proc.get_exit_status ();
+                    return proc.get_successful ();
+                }
+                return false;
+            } catch (GLib.Error e) {
+                timed_out = did_timeout;
+                error_message = e.message;
+                return false;
+            } finally {
+                if (timeout_id != 0) GLib.Source.remove (timeout_id);
+                if (cancellable != null && cancel_hid != 0) cancellable.disconnect (cancel_hid);
+            }
+        }
+
         /**
          * Asynchronously runs a CLI command (Rscript, python3, deno, tsc, quarto)
          * and streams stdout/stderr to the active DocumentPage's console pane.
@@ -55,60 +118,25 @@ namespace Imladris {
                 working_dir = page.file_location.get_parent ().get_path ();
             }
 
-            var linked_cancellable = new GLib.Cancellable ();
-            ulong cancel_hid = 0;
-            if (cancellable != null) {
-                if (cancellable.is_cancelled ()) {
-                    linked_cancellable.cancel ();
-                } else {
-                    cancel_hid = cancellable.connect (() => {
-                        linked_cancellable.cancel ();
-                    });
-                }
-            }
+            string? output;
+            int exit_status;
+            bool timed_out;
+            string? error_message;
+            bool ok = yield execute_with_timeout_async (
+                argv, working_dir, cancellable, timeout_ms,
+                out output, out exit_status, out timed_out, out error_message
+            );
 
-            uint timeout_id = 0;
-            bool timed_out = false;
-            GLib.Subprocess? proc = null;
-            if (timeout_ms > 0) {
-                timeout_id = GLib.Timeout.add (timeout_ms, () => {
-                    timed_out = true;
-                    linked_cancellable.cancel ();
-                    if (proc != null) {
-                        proc.force_exit ();
-                    }
-                    timeout_id = 0;
-                    return false;
-                });
-            }
-
-            try {
-                proc = spawn_configured_subprocess (
-                    argv, working_dir, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE
-                );
-                string? output = null;
-                yield proc.communicate_utf8_async (null, linked_cancellable, out output, null);
-                if (timed_out) {
-                    page.append_console_log (@"✖ Command timed out after $(timeout_ms / 1000)s.");
-                } else {
-                    bool ok = proc.get_successful ();
-                    if (output != null && output.strip ().length > 0) {
-                        page.append_console_log (output.strip ());
-                    } else if (ok) {
-                        page.append_console_log ("✔ Completed successfully.");
-                    } else {
-                        page.append_console_log (@"✖ Command exited with status $(proc.get_exit_status ()).");
-                    }
-                }
-            } catch (GLib.Error e) {
-                if (timed_out) {
-                    page.append_console_log (@"✖ Command timed out after $(timeout_ms / 1000)s.");
-                } else {
-                    page.append_console_log (@"✖ Execution Notice: $(e.message)");
-                }
-            } finally {
-                if (timeout_id != 0) GLib.Source.remove (timeout_id);
-                if (cancellable != null && cancel_hid != 0) cancellable.disconnect (cancel_hid);
+            if (timed_out) {
+                page.append_console_log (@"✖ Command timed out after $(timeout_ms / 1000)s.");
+            } else if (error_message != null) {
+                page.append_console_log (@"✖ Execution Notice: $error_message");
+            } else if (output != null && output.strip ().length > 0) {
+                page.append_console_log (output.strip ());
+            } else if (ok) {
+                page.append_console_log ("✔ Completed successfully.");
+            } else {
+                page.append_console_log (@"✖ Command exited with status $exit_status.");
             }
         }
 
@@ -123,55 +151,25 @@ namespace Imladris {
             uint timeout_ms = 60000
         ) {
             if (argv.length == 0) return "";
-            var linked_cancellable = new GLib.Cancellable ();
-            ulong cancel_hid = 0;
-            if (cancellable != null) {
-                if (cancellable.is_cancelled ()) {
-                    linked_cancellable.cancel ();
-                } else {
-                    cancel_hid = cancellable.connect (() => {
-                        linked_cancellable.cancel ();
-                    });
-                }
-            }
+            string? output;
+            int exit_status;
+            bool timed_out;
+            string? error_message;
+            bool ok = yield execute_with_timeout_async (
+                argv, working_dir, cancellable, timeout_ms,
+                out output, out exit_status, out timed_out, out error_message
+            );
 
-            uint timeout_id = 0;
-            bool timed_out = false;
-            GLib.Subprocess? proc = null;
-            if (timeout_ms > 0) {
-                timeout_id = GLib.Timeout.add (timeout_ms, () => {
-                    timed_out = true;
-                    linked_cancellable.cancel ();
-                    if (proc != null) {
-                        proc.force_exit ();
-                    }
-                    timeout_id = 0;
-                    return false;
-                });
+            if (timed_out) {
+                return @"✖ Command timed out after $(timeout_ms / 1000)s.";
             }
-
-            try {
-                proc = spawn_configured_subprocess (
-                    argv, working_dir, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE
-                );
-                string? output = null;
-                yield proc.communicate_utf8_async (null, linked_cancellable, out output, null);
-                if (timed_out) {
-                    return @"✖ Command timed out after $(timeout_ms / 1000)s.";
-                }
-                if (output != null && output.strip ().length > 0) {
-                    return output.strip ();
-                }
-                return proc.get_successful () ? "✔ Completed (no output)." : @"✖ Command exited with status $(proc.get_exit_status ()).";
-            } catch (GLib.Error e) {
-                if (timed_out) {
-                    return @"✖ Command timed out after $(timeout_ms / 1000)s.";
-                }
-                return @"✖ Execution Notice: $(e.message)";
-            } finally {
-                if (timeout_id != 0) GLib.Source.remove (timeout_id);
-                if (cancellable != null && cancel_hid != 0) cancellable.disconnect (cancel_hid);
+            if (error_message != null) {
+                return @"✖ Execution Notice: $error_message";
             }
+            if (output != null && output.strip ().length > 0) {
+                return output.strip ();
+            }
+            return ok ? "✔ Completed (no output)." : @"✖ Command exited with status $exit_status.";
         }
     }
 }

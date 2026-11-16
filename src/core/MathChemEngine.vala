@@ -108,6 +108,15 @@ namespace Imladris.Core {
      */
     public class MathChemEngine : GLib.Object {
 
+        private static GLib.Regex? detect_chem_rx = null;
+        private static GLib.Regex? detect_ion_rx = null;
+        private static GLib.Regex? pderiv2_rx = null;
+        private static GLib.Regex? pderiv_rx = null;
+        private static GLib.Regex? dderiv_rx = null;
+        private static GLib.Regex? exp_rx = null;
+        private static GLib.Regex? sub_rx = null;
+        private static GLib.Regex? ws_rx = null;
+
         /**
          * Return built-in presets for common mathematical formulas and chemical reactions.
          *
@@ -269,12 +278,16 @@ namespace Imladris.Core {
 
             // Check for chemical formula patterns like H2O, CO2, CH3, SO4^2-, NaOH, Fe2O3
             try {
-                var chem_regex = new GLib.Regex ("\\b[0-9]*[A-Z][a-z]?[0-9]+([A-Z][a-z]?[0-9]*)*(\\^[0-9]*[+-])?\\b");
-                if (chem_regex.match (s)) {
+                if (detect_chem_rx == null) {
+                    detect_chem_rx = new GLib.Regex ("\\b[0-9]*[A-Z][a-z]?[0-9]+([A-Z][a-z]?[0-9]*)*(\\^[0-9]*[+-])?\\b");
+                }
+                if (detect_chem_rx.match (s)) {
                     return FormulaMode.CHEMISTRY;
                 }
-                var ion_regex = new GLib.Regex ("\\b[A-Z][a-zA-Z0-9]*\\^[0-9]*[+-]");
-                if (ion_regex.match (s)) {
+                if (detect_ion_rx == null) {
+                    detect_ion_rx = new GLib.Regex ("\\b[A-Z][a-zA-Z0-9]*\\^[0-9]*[+-]");
+                }
+                if (detect_ion_rx.match (s)) {
                     return FormulaMode.CHEMISTRY;
                 }
             } catch (GLib.RegexError e) {}
@@ -400,13 +413,13 @@ namespace Imladris.Core {
             // 3. Convert derivative shorthands before general fraction expansion
             s = s.replace ("partial^2 / partial", "\\frac{\\partial^2}{\\partial}");
             try {
-                var pderiv2_rx = new GLib.Regex ("partial\\^2\\s*([a-zA-Z0-9_]+)\\s*/\\s*partial\\s*([a-zA-Z0-9_]+)\\^2");
+                if (pderiv2_rx == null) pderiv2_rx = new GLib.Regex ("partial\\^2\\s*([a-zA-Z0-9_]+)\\s*/\\s*partial\\s*([a-zA-Z0-9_]+)\\^2");
                 s = pderiv2_rx.replace (s, -1, 0, "\\\\frac{\\\\partial^2 \\1}{\\\\partial \\2^2}");
 
-                var pderiv_rx = new GLib.Regex ("partial\\s*([a-zA-Z0-9_]*)\\s*/\\s*partial\\s*([a-zA-Z0-9_]+)");
+                if (pderiv_rx == null) pderiv_rx = new GLib.Regex ("partial\\s*([a-zA-Z0-9_]*)\\s*/\\s*partial\\s*([a-zA-Z0-9_]+)");
                 s = pderiv_rx.replace (s, -1, 0, "\\\\frac{\\\\partial \\1}{\\\\partial \\2}");
 
-                var dderiv_rx = new GLib.Regex ("\\bd([a-zA-Z0-9_]*)\\s*/\\s*d([a-zA-Z0-9_]+)\\b");
+                if (dderiv_rx == null) dderiv_rx = new GLib.Regex ("\\bd([a-zA-Z0-9_]*)\\s*/\\s*d([a-zA-Z0-9_]+)\\b");
                 s = dderiv_rx.replace (s, -1, 0, "\\\\frac{d\\1}{d\\2}");
             } catch (GLib.RegexError e) {}
 
@@ -419,10 +432,10 @@ namespace Imladris.Core {
 
             // 6. Convert multi-character simple exponents/subscripts: x^2 -> x^{2}, x_i -> x_{i}
             try {
-                var exp_rx = new GLib.Regex ("\\^([+-]?[a-zA-Z0-9]+)");
+                if (exp_rx == null) exp_rx = new GLib.Regex ("\\^([+-]?[a-zA-Z0-9]+)");
                 s = exp_rx.replace (s, -1, 0, "^{\\1}");
 
-                var sub_rx = new GLib.Regex ("_([a-zA-Z0-9]+)");
+                if (sub_rx == null) sub_rx = new GLib.Regex ("_([a-zA-Z0-9]+)");
                 s = sub_rx.replace (s, -1, 0, "_{\\1}");
             } catch (GLib.RegexError e) {}
 
@@ -446,7 +459,7 @@ namespace Imladris.Core {
 
             // Clean up redundant whitespace
             try {
-                var ws_rx = new GLib.Regex ("  +");
+                if (ws_rx == null) ws_rx = new GLib.Regex ("  +");
                 s = ws_rx.replace (s, -1, 0, " ");
             } catch (GLib.RegexError e) {}
 

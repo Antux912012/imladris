@@ -751,12 +751,7 @@ function onunload() {
             list.remove (plugin_id);
             save_enabled_set (list);
 
-            try {
-                delete_directory_recursive (File.new_for_path (instance.dir_path));
-            } catch (GLib.Error e) {
-                warning ("Could not delete plugin directory: %s", e.message);
-                return false;
-            }
+            Core.PlatformUtils.delete_directory_recursive (File.new_for_path (instance.dir_path));
 
             plugins_changed ();
             return true;
@@ -948,7 +943,7 @@ function onunload() {
 
                 string response = yield alert.choose (parent_window, null);
                 if (response != "install") {
-                    delete_directory_recursive (File.new_for_path (tmp_dir));
+                    Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
                     return false;
                 }
 
@@ -976,11 +971,11 @@ function onunload() {
                     if (plugins.has_key (manifest.id)) {
                         disable_plugin (manifest.id);
                     }
-                    delete_directory_recursive (target_file);
+                    Core.PlatformUtils.delete_directory_recursive (target_file);
                 }
 
                 copy_directory_recursive (File.new_for_path (plugin_root_extracted), target_file);
-                delete_directory_recursive (File.new_for_path (tmp_dir));
+                Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
 
                 // Load and enable
                 var inst = load_plugin_from_directory (target_dir);
@@ -991,7 +986,7 @@ function onunload() {
 
                 return true;
             } catch (GLib.Error e) {
-                delete_directory_recursive (File.new_for_path (tmp_dir));
+                Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
                 throw e;
             }
         }
@@ -1074,10 +1069,6 @@ function onunload() {
             } finally {
                 try { enumerator.close (); } catch (GLib.Error e) {}
             }
-        }
-
-        public static void delete_directory_recursive (File dir) throws GLib.Error {
-            Core.PlatformUtils.delete_directory_recursive (dir);
         }
     }
 }

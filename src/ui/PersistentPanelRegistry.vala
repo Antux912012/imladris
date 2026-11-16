@@ -1798,7 +1798,7 @@ namespace Imladris.UI {
             });
         }
 
-        public void refresh_environment_and_outline () {
+        public void refresh_environment_and_outline (string? cached_text = null) {
             Gtk.Widget? child = outline_list.get_first_child ();
             while (child != null) {
                 var next = child.get_next_sibling ();
@@ -1813,7 +1813,7 @@ namespace Imladris.UI {
                 child = next;
             }
 
-            string text = doc_page.get_clean_source_text ();
+            string text = cached_text ?? doc_page.get_clean_source_text ();
             string fmt_code = doc_page.get_document_format ().get_extension ().replace (".", "").down ();
             string outline_json = Core.NativeCore.extract_outline_json (text, fmt_code);
             try {
@@ -1886,15 +1886,6 @@ namespace Imladris.UI {
                     }
                 }
             }
-        }
-
-        private void add_env_row (string name, string type_str, string val_preview) {
-            var row = new Adw.ActionRow () {
-                title = name,
-                subtitle = @"$type_str — $val_preview"
-            };
-            row.add_prefix (new Gtk.Image.from_icon_name ("view-list-symbolic"));
-            environment_list.append (row);
         }
 
         private void get_plot_theme_colors (out string bg, out string text, out string card_bg, out string card_border, out string title_col, out string sub_col) {

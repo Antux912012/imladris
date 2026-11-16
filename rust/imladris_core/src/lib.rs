@@ -56,8 +56,8 @@ pub extern "C" fn imladris_free_string(ptr: *mut c_char) {
 
 #[no_mangle]
 pub extern "C" fn imladris_parse_frontmatter_json(source_utf8: *const c_char) -> *mut c_char {
-    let src = cstr_to_str(source_utf8).to_string();
-    ffi_json(|| frontmatter::parse_frontmatter_json(&src))
+    let src = cstr_to_str(source_utf8);
+    ffi_json(|| frontmatter::parse_frontmatter_json(src))
 }
 
 #[no_mangle]
@@ -65,9 +65,9 @@ pub extern "C" fn imladris_parse_chunks_json(
     source_utf8: *const c_char,
     format_code: *const c_char,
 ) -> *mut c_char {
-    let src = cstr_to_str(source_utf8).to_string();
-    let fmt = cstr_to_str(format_code).to_string();
-    ffi_json(|| chunks::parse_chunks_json(&src, &fmt))
+    let src = cstr_to_str(source_utf8);
+    let fmt = cstr_to_str(format_code);
+    ffi_json(|| chunks::parse_chunks_json(src, fmt))
 }
 
 #[no_mangle]
@@ -75,9 +75,9 @@ pub extern "C" fn imladris_extract_outline_json(
     source_utf8: *const c_char,
     format_code: *const c_char,
 ) -> *mut c_char {
-    let src = cstr_to_str(source_utf8).to_string();
-    let fmt = cstr_to_str(format_code).to_string();
-    ffi_json(|| outline::extract_outline_json(&src, &fmt))
+    let src = cstr_to_str(source_utf8);
+    let fmt = cstr_to_str(format_code);
+    ffi_json(|| outline::extract_outline_json(src, fmt))
 }
 
 #[no_mangle]
@@ -85,15 +85,15 @@ pub extern "C" fn imladris_render_markdown_html(
     body_utf8: *const c_char,
     options_json: *const c_char,
 ) -> *mut c_char {
-    let body = cstr_to_str(body_utf8).to_string();
-    let opts = cstr_to_str(options_json).to_string();
-    ffi_json(|| markdown::render_markdown_html(&body, &opts))
+    let body = cstr_to_str(body_utf8);
+    let opts = cstr_to_str(options_json);
+    ffi_json(|| markdown::render_markdown_html(body, opts))
 }
 
 #[no_mangle]
 pub extern "C" fn imladris_ipynb_to_editor_json(ipynb_json_utf8: *const c_char) -> *mut c_char {
-    let raw = cstr_to_str(ipynb_json_utf8).to_string();
-    ffi_json(|| ipynb::ipynb_to_editor_json(&raw))
+    let raw = cstr_to_str(ipynb_json_utf8);
+    ffi_json(|| ipynb::ipynb_to_editor_json(raw))
 }
 
 #[no_mangle]
@@ -102,22 +102,22 @@ pub extern "C" fn imladris_editor_to_ipynb_json(
     existing_ipynb_utf8: *const c_char,
     outputs_map_json: *const c_char,
 ) -> *mut c_char {
-    let ed = cstr_to_str(editor_utf8).to_string();
-    let ex = cstr_to_str(existing_ipynb_utf8).to_string();
-    let om = cstr_to_str(outputs_map_json).to_string();
-    ffi_json(|| ipynb::editor_to_ipynb_json(&ed, &ex, &om))
+    let ed = cstr_to_str(editor_utf8);
+    let ex = cstr_to_str(existing_ipynb_utf8);
+    let om = cstr_to_str(outputs_map_json);
+    ffi_json(|| ipynb::editor_to_ipynb_json(ed, ex, om))
 }
 
 #[no_mangle]
 pub extern "C" fn imladris_parse_latex_log_json(log_utf8: *const c_char) -> *mut c_char {
-    let log = cstr_to_str(log_utf8).to_string();
-    ffi_json(|| diagnostics::parse_latex_log_json(&log))
+    let log = cstr_to_str(log_utf8);
+    ffi_json(|| diagnostics::parse_latex_log_json(log))
 }
 
 #[no_mangle]
 pub extern "C" fn imladris_analyze_typescript_symbols_json(
     ts_source_utf8: *const c_char,
 ) -> *mut c_char {
-    let src = cstr_to_str(ts_source_utf8).to_string();
-    ffi_json(|| diagnostics::analyze_typescript_symbols_json(&src))
+    let src = cstr_to_str(ts_source_utf8);
+    ffi_json(|| diagnostics::analyze_typescript_symbols_json(src))
 }

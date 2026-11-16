@@ -5,9 +5,26 @@ namespace Imladris.Adapters {
 
     public class DocumentAdapter : GLib.Object {
 
-        private static GLib.Regex? chunk_regex = null;
         private static GLib.Regex? display_math_regex = null;
         private static GLib.Regex? equation_env_regex = null;
+        private static GLib.Regex? latex_title_regex = null;
+        private static GLib.Regex? latex_author_regex = null;
+        private static GLib.Regex? latex_date_regex = null;
+        private static GLib.Regex? latex_verb_regex = null;
+        private static GLib.Regex? latex_bracket_math_regex = null;
+        private static GLib.Regex? latex_env_math_regex = null;
+        private static GLib.Regex? latex_dd_math_regex = null;
+        private static GLib.Regex? latex_paren_math_regex = null;
+        private static GLib.Regex? latex_ce_regex = null;
+        private static GLib.Regex? latex_inline_dollar_regex = null;
+        private static GLib.Regex? latex_maketitle_regex = null;
+        private static GLib.Regex? latex_sec_regex = null;
+        private static GLib.Regex? latex_subsec_regex = null;
+        private static GLib.Regex? latex_subsubsec_regex = null;
+        private static GLib.Regex? latex_textbf_regex = null;
+        private static GLib.Regex? latex_emph_regex = null;
+        private static GLib.Regex? latex_texttt_regex = null;
+        private static GLib.Regex? latex_cite_regex = null;
 
         public static Imladris.DocumentFormat detect_format (string? filename) {
             if (filename == null || filename == "") return Imladris.DocumentFormat.MD;
@@ -146,17 +163,17 @@ namespace Imladris.Adapters {
                 string author = "";
                 string date = "";
                 try {
-                    var title_re = new GLib.Regex ("\\\\title\\{([^\\}]*)\\}");
-                    var author_re = new GLib.Regex ("\\\\author\\{([^\\}]*)\\}");
-                    var date_re = new GLib.Regex ("\\\\date\\{([^\\}]*)\\}");
+                    if (latex_title_regex == null) latex_title_regex = new GLib.Regex ("\\\\title\\{([^\\}]*)\\}");
+                    if (latex_author_regex == null) latex_author_regex = new GLib.Regex ("\\\\author\\{([^\\}]*)\\}");
+                    if (latex_date_regex == null) latex_date_regex = new GLib.Regex ("\\\\date\\{([^\\}]*)\\}");
                     GLib.MatchInfo mi;
-                    if (title_re.match (preamble, 0, out mi) || title_re.match (body, 0, out mi)) {
+                    if (latex_title_regex.match (preamble, 0, out mi) || latex_title_regex.match (body, 0, out mi)) {
                         title = mi.fetch (1).strip ();
                     }
-                    if (author_re.match (preamble, 0, out mi) || author_re.match (body, 0, out mi)) {
+                    if (latex_author_regex.match (preamble, 0, out mi) || latex_author_regex.match (body, 0, out mi)) {
                         author = mi.fetch (1).strip ();
                     }
-                    if (date_re.match (preamble, 0, out mi) || date_re.match (body, 0, out mi)) {
+                    if (latex_date_regex.match (preamble, 0, out mi) || latex_date_regex.match (body, 0, out mi)) {
                         date = mi.fetch (1).strip ();
                     }
                 } catch (GLib.RegexError e) {}
@@ -180,52 +197,52 @@ namespace Imladris.Adapters {
             var prot = new Gee.ArrayList<string> ();
             string working = body;
             try {
-                var verb_re = new GLib.Regex ("\\\\begin\\{(verbatim|lstlisting)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
-                working = verb_re.replace_eval (working, -1, 0, 0, (mi, res) => {
+                if (latex_verb_regex == null) latex_verb_regex = new GLib.Regex ("\\\\begin\\{(verbatim|lstlisting)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
+                working = latex_verb_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add ("<pre><code>" + GLib.Markup.escape_text (mi.fetch (2)) + "</code></pre>");
                     res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
                     return false;
                 });
 
-                var bracket_math = new GLib.Regex ("\\\\\\[([\\s\\S]*?)\\\\\\]");
-                working = bracket_math.replace_eval (working, -1, 0, 0, (mi, res) => {
+                if (latex_bracket_math_regex == null) latex_bracket_math_regex = new GLib.Regex ("\\\\\\[([\\s\\S]*?)\\\\\\]");
+                working = latex_bracket_math_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), true));
                     res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
                     return false;
                 });
-                var env_math = new GLib.Regex ("\\\\begin\\{(equation|equation\\*|align|align\\*|gather|gather\\*)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
-                working = env_math.replace_eval (working, -1, 0, 0, (mi, res) => {
+                if (latex_env_math_regex == null) latex_env_math_regex = new GLib.Regex ("\\\\begin\\{(equation|equation\\*|align|align\\*|gather|gather\\*)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
+                working = latex_env_math_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (2).strip (), true));
                     res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
                     return false;
                 });
-                var dd_math = new GLib.Regex ("\\$\\$([\\s\\S]*?)\\$\\$");
-                working = dd_math.replace_eval (working, -1, 0, 0, (mi, res) => {
+                if (latex_dd_math_regex == null) latex_dd_math_regex = new GLib.Regex ("\\$\\$([\\s\\S]*?)\\$\\$");
+                working = latex_dd_math_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), true));
                     res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
                     return false;
                 });
 
-                var paren_math = new GLib.Regex ("\\\\\\(([\\s\\S]*?)\\\\\\)");
-                working = paren_math.replace_eval (working, -1, 0, 0, (mi, res) => {
+                if (latex_paren_math_regex == null) latex_paren_math_regex = new GLib.Regex ("\\\\\\(([\\s\\S]*?)\\\\\\)");
+                working = latex_paren_math_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), false));
                     res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
                     return false;
                 });
-                var ce_re = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
-                working = ce_re.replace_eval (working, -1, 0, 0, (mi, res) => {
+                if (latex_ce_regex == null) latex_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
+                working = latex_ce_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html ("\\ce{" + mi.fetch (1) + "}", false));
                     res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
                     return false;
                 });
-                var inline_dollar = new GLib.Regex ("(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)");
-                working = inline_dollar.replace_eval (working, -1, 0, 0, (mi, res) => {
+                if (latex_inline_dollar_regex == null) latex_inline_dollar_regex = new GLib.Regex ("(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)");
+                working = latex_inline_dollar_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), false));
                     res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
@@ -235,14 +252,22 @@ namespace Imladris.Adapters {
 
             working = GLib.Markup.escape_text (working);
             try {
-                working = new GLib.Regex ("\\\\maketitle").replace (working, -1, 0, "");
-                working = new GLib.Regex ("\\\\section\\*?\\{([^\\}]*)\\}").replace (working, -1, 0, "<h2>\\1</h2>");
-                working = new GLib.Regex ("\\\\subsection\\*?\\{([^\\}]*)\\}").replace (working, -1, 0, "<h3>\\1</h3>");
-                working = new GLib.Regex ("\\\\subsubsection\\*?\\{([^\\}]*)\\}").replace (working, -1, 0, "<h4>\\1</h4>");
-                working = new GLib.Regex ("\\\\textbf\\{([^\\}]*)\\}").replace (working, -1, 0, "<strong>\\1</strong>");
-                working = new GLib.Regex ("\\\\(?:textit|emph)\\{([^\\}]*)\\}").replace (working, -1, 0, "<em>\\1</em>");
-                working = new GLib.Regex ("\\\\texttt\\{([^\\}]*)\\}").replace (working, -1, 0, "<code>\\1</code>");
-                working = new GLib.Regex ("\\\\cite\\{([^\\}]*)\\}").replace (working, -1, 0, "<span class=\"frontmatter-badge\">[\\1]</span>");
+                if (latex_maketitle_regex == null) latex_maketitle_regex = new GLib.Regex ("\\\\maketitle");
+                if (latex_sec_regex == null) latex_sec_regex = new GLib.Regex ("\\\\section\\*?\\{([^\\}]*)\\}");
+                if (latex_subsec_regex == null) latex_subsec_regex = new GLib.Regex ("\\\\subsection\\*?\\{([^\\}]*)\\}");
+                if (latex_subsubsec_regex == null) latex_subsubsec_regex = new GLib.Regex ("\\\\subsubsection\\*?\\{([^\\}]*)\\}");
+                if (latex_textbf_regex == null) latex_textbf_regex = new GLib.Regex ("\\\\textbf\\{([^\\}]*)\\}");
+                if (latex_emph_regex == null) latex_emph_regex = new GLib.Regex ("\\\\(?:textit|emph)\\{([^\\}]*)\\}");
+                if (latex_texttt_regex == null) latex_texttt_regex = new GLib.Regex ("\\\\texttt\\{([^\\}]*)\\}");
+                if (latex_cite_regex == null) latex_cite_regex = new GLib.Regex ("\\\\cite\\{([^\\}]*)\\}");
+                working = latex_maketitle_regex.replace (working, -1, 0, "");
+                working = latex_sec_regex.replace (working, -1, 0, "<h2>\\1</h2>");
+                working = latex_subsec_regex.replace (working, -1, 0, "<h3>\\1</h3>");
+                working = latex_subsubsec_regex.replace (working, -1, 0, "<h4>\\1</h4>");
+                working = latex_textbf_regex.replace (working, -1, 0, "<strong>\\1</strong>");
+                working = latex_emph_regex.replace (working, -1, 0, "<em>\\1</em>");
+                working = latex_texttt_regex.replace (working, -1, 0, "<code>\\1</code>");
+                working = latex_cite_regex.replace (working, -1, 0, "<span class=\"frontmatter-badge\">[\\1]</span>");
             } catch (GLib.RegexError e) {}
 
             var lines = working.split ("\n");
@@ -401,42 +426,6 @@ namespace Imladris.Adapters {
             return result;
         }
 
-        private static GLib.Regex? img_regex = null;
-        private static GLib.Regex? video_regex = null;
-
-        private static string transform_media_tags (string text) {
-            string result = text;
-            try {
-                // Quarto video shortcodes: {{< video path >}}
-                if (video_regex == null) {
-                    video_regex = new GLib.Regex ("\\{\\{<\\s*video\\s+([^\\s>]+)[^>]*>\\}\\}");
-                }
-                result = video_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
-                    string vpath = match_info.fetch (1);
-                    res.append_printf ("<div class=\"media-video-container\" style=\"margin: 16px 0; text-align: center;\"><video src=\"%s\" controls style=\"max-width: 100%%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);\"></video></div>", GLib.Markup.escape_text (vpath));
-                    return false;
-                });
-
-                // Markdown images: ![caption](path)
-                if (img_regex == null) {
-                    img_regex = new GLib.Regex ("!\\[([^\\]]*)\\]\\(([^\\)]+)\\)");
-                }
-                result = img_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
-                    string alt = match_info.fetch (1);
-                    string ipath = match_info.fetch (2);
-                    res.append_printf ("<figure style=\"margin: 16px 0; text-align: center;\"><img src=\"%s\" alt=\"%s\" style=\"max-width: 100%%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);\"/>", GLib.Markup.escape_text (ipath), GLib.Markup.escape_text (alt));
-                    if (alt.strip ().length > 0) {
-                        res.append_printf ("<figcaption style=\"font-size: 0.9em; color: #64748b; margin-top: 6px;\">%s</figcaption>", GLib.Markup.escape_text (alt));
-                    }
-                    res.append ("</figure>");
-                    return false;
-                });
-            } catch (GLib.RegexError e) {}
-            return result;
-        }
-
-        private static GLib.Regex? plain_mermaid_regex = null;
-
         private static string render_mermaid_svg_inline (string code) {
             Core.MermaidDiagramKind kind;
             Core.MermaidFlowDirection dir;
@@ -453,302 +442,6 @@ namespace Imladris.Adapters {
                 svg = svg.substring (svg_start);
             }
             return "<div class=\"mermaid-diagram-card\" style=\"margin: 1em 0; overflow-x: auto;\">" + svg + "</div>\n";
-        }
-
-        private static string transform_code_chunks (string text) {
-            string step1 = text;
-            try {
-                if (chunk_regex == null) {
-                    chunk_regex = new GLib.Regex ("```\\{([a-zA-Z0-9_-]+)([^\\}]*)\\}([\\s\\S]*?)```");
-                }
-                step1 = chunk_regex.replace_eval (step1, -1, 0, 0, (match_info, result) => {
-                    string lang = match_info.fetch (1);
-                    string opts = match_info.fetch (2).strip ();
-                    string code = match_info.fetch (3);
-
-                    if (lang.down () == "mermaid") {
-                        result.append (render_mermaid_svg_inline (code));
-                        return false;
-                    }
-
-                    result.append ("<div class=\"code-chunk-card\">\n");
-                    result.append_printf ("  <div class=\"code-chunk-header\"><span class=\"badge\">%s</span>", GLib.Markup.escape_text (lang.up ()));
-                    if (opts != "") {
-                        result.append_printf (" <span class=\"chunk-opts\">%s</span>", GLib.Markup.escape_text (opts));
-                    }
-                    result.append ("</div>\n");
-                    result.append_printf ("  <pre><code class=\"language-%s\">%s</code></pre>\n", lang, GLib.Markup.escape_text (code));
-                    result.append ("</div>\n");
-                    return false;
-                });
-                if (plain_mermaid_regex == null) {
-                    plain_mermaid_regex = new GLib.Regex ("```mermaid\\s*\\n([\\s\\S]*?)```");
-                }
-                step1 = plain_mermaid_regex.replace_eval (step1, -1, 0, 0, (match_info, result) => {
-                    string code = match_info.fetch (1);
-                    result.append (render_mermaid_svg_inline (code));
-                    return false;
-                });
-            } catch (GLib.RegexError e) {
-                return text;
-            }
-            return step1;
-        }
-
-        private static GLib.Regex? inline_code_regex = null;
-        private static GLib.Regex? inline_bold_regex = null;
-        private static GLib.Regex? inline_italic_regex = null;
-        private static GLib.Regex? inline_strike_regex = null;
-        private static GLib.Regex? inline_sub_regex = null;
-        private static GLib.Regex? inline_sup_regex = null;
-        private static GLib.Regex? inline_link_regex = null;
-        private static GLib.Regex? inline_math_regex = null;
-        private static GLib.Regex? inline_ce_regex = null;
-        private static GLib.Regex? ordered_list_regex = null;
-
-        private static string format_inline_markdown (string line) {
-            string escaped = GLib.Markup.escape_text (line);
-            try {
-                if (inline_code_regex == null) inline_code_regex = new GLib.Regex ("`([^`]+)`");
-                if (inline_bold_regex == null) inline_bold_regex = new GLib.Regex ("\\*\\*([^\\*]+)\\*\\*");
-                if (inline_italic_regex == null) inline_italic_regex = new GLib.Regex ("(?<!\\*)\\*([^\\*]+)\\*(?!\\*)");
-                if (inline_strike_regex == null) inline_strike_regex = new GLib.Regex ("~~([^~]+)~~");
-                if (inline_sub_regex == null) inline_sub_regex = new GLib.Regex ("(?<!~)~([^~\\s]+)~(?!~)");
-                if (inline_sup_regex == null) inline_sup_regex = new GLib.Regex ("\\^([^\\^\\s]+)\\^");
-                if (inline_link_regex == null) inline_link_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
-                if (inline_ce_regex == null) inline_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
-                if (inline_math_regex == null) inline_math_regex = new GLib.Regex ("(?<!\\$)\\$([^\\$\\n]+)\\$(?!\\$)");
-
-                // Render inline \ce{...} and $...$ math/chemistry expressions first
-                escaped = inline_ce_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
-                    string expr = "\\ce{" + match_info.fetch (1) + "}";
-                    res.append (Core.MathChemEngine.render_latex_to_html (expr, false));
-                    return false;
-                });
-                escaped = inline_math_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
-                    string expr = match_info.fetch (1);
-                    res.append (Core.MathChemEngine.render_latex_to_html (expr, false));
-                    return false;
-                });
-
-                escaped = inline_code_regex.replace (escaped, -1, 0, "<code>\\1</code>");
-                escaped = inline_bold_regex.replace (escaped, -1, 0, "<strong>\\1</strong>");
-                escaped = inline_italic_regex.replace (escaped, -1, 0, "<em>\\1</em>");
-                escaped = inline_strike_regex.replace (escaped, -1, 0, "<del>\\1</del>");
-                escaped = inline_sub_regex.replace (escaped, -1, 0, "<sub>\\1</sub>");
-                escaped = inline_sup_regex.replace (escaped, -1, 0, "<sup>\\1</sup>");
-                escaped = inline_link_regex.replace (escaped, -1, 0, "<a href=\"\\2\">\\1</a>");
-            } catch (GLib.RegexError e) {}
-            return escaped;
-        }
-
-        private static string basic_markdown_to_html (string text) {
-            var lines = text.split ("\n");
-            var res = new StringBuilder ();
-            bool in_pre = false;
-            bool in_html_pre = false;
-            bool in_callout = false;
-            bool in_ul = false;
-            bool in_ol = false;
-            bool in_table = false;
-
-            foreach (var line in lines) {
-                string trimmed_line = line.strip ();
-                if (in_html_pre) {
-                    res.append (line);
-                    res.append ("\n");
-                    if (line.contains ("</pre>")) {
-                        in_html_pre = false;
-                    }
-                    continue;
-                }
-
-                if (trimmed_line.has_prefix ("<div") || trimmed_line.has_prefix ("</div") ||
-                    trimmed_line.has_prefix ("<pre") || trimmed_line.has_prefix ("</pre") ||
-                    trimmed_line.has_prefix ("<header") || trimmed_line.has_prefix ("</header") ||
-                    trimmed_line.has_prefix ("<figure") || trimmed_line.has_prefix ("</figure") ||
-                    trimmed_line.has_prefix ("<video") || trimmed_line.has_prefix ("</video") ||
-                    trimmed_line.has_prefix ("<figcaption") || trimmed_line.has_prefix ("</figcaption") ||
-                    trimmed_line.has_prefix ("<img")) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    if (in_table) { res.append ("</tbody></table>\n"); in_table = false; }
-                    res.append (line);
-                    res.append ("\n");
-                    if (line.contains ("<pre") && !line.contains ("</pre>")) {
-                        in_html_pre = true;
-                    }
-                    continue;
-                }
-
-                // Quarto fenced callout blocks: ::: {.callout-note} ... :::
-                if (trimmed_line.has_prefix (":::")) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    if (in_table) { res.append ("</tbody></table>\n"); in_table = false; }
-                    if (!in_callout && trimmed_line.length > 3) {
-                        string lower = trimmed_line.down ();
-                        string accent = "#3584e4";
-                        string label = "Note";
-                        if (lower.contains ("callout-warning")) { accent = "#e5a50a"; label = "Warning"; }
-                        else if (lower.contains ("callout-tip")) { accent = "#26a269"; label = "Tip"; }
-                        else if (lower.contains ("callout-important")) { accent = "#c01c28"; label = "Important"; }
-                        else if (lower.contains ("callout-caution")) { accent = "#e66100"; label = "Caution"; }
-                        else if (lower.contains ("panel-tabset")) { accent = "#6366f1"; label = "Tabset"; }
-                        res.append_printf ("<div style=\"border-left: 4px solid %s; background: rgba(148,163,184,0.08); border-radius: 6px; padding: 10px 14px; margin: 12px 0;\">\n<div style=\"font-weight: 700; font-size: 12px; text-transform: uppercase; color: %s; margin-bottom: 4px;\">%s</div>\n", accent, accent, label);
-                        in_callout = true;
-                    } else if (in_callout) {
-                        res.append ("</div>\n");
-                        in_callout = false;
-                    }
-                    continue;
-                }
-
-                if (line.has_prefix ("```")) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    if (in_table) { res.append ("</tbody></table>\n"); in_table = false; }
-                    if (!in_pre) {
-                        string lang = line.substring (3).strip ();
-                        res.append_printf ("<pre><code class=\"language-%s\">", lang != "" ? lang : "text");
-                        in_pre = true;
-                    } else {
-                        res.append ("</code></pre>\n");
-                        in_pre = false;
-                    }
-                    continue;
-                }
-
-                if (in_pre) {
-                    res.append (GLib.Markup.escape_text (line));
-                    res.append ("\n");
-                    continue;
-                }
-
-                // Markdown table rows: | col1 | col2 |
-                if (trimmed_line.has_prefix ("|") && trimmed_line.has_suffix ("|") && trimmed_line.length > 2) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-
-                    string inner_row = trimmed_line.substring (1, trimmed_line.length - 2);
-                    string[] cells = inner_row.split ("|");
-
-                    // Check if separator row (e.g. |---|---|)
-                    bool is_sep = true;
-                    foreach (var cell in cells) {
-                        string c = cell.strip ().replace ("-", "").replace (":", "");
-                        if (c.length > 0) {
-                            is_sep = false;
-                            break;
-                        }
-                    }
-                    if (is_sep) {
-                        continue;
-                    }
-
-                    if (!in_table) {
-                        res.append ("<table style=\"border-collapse: collapse; width: 100%; margin: 12px 0;\">\n<thead><tr>");
-                        foreach (var cell in cells) {
-                            res.append_printf ("<th style=\"border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left;\">%s</th>",
-                                format_inline_markdown (cell.strip ()));
-                        }
-                        res.append ("</tr></thead>\n<tbody>\n");
-                        in_table = true;
-                    } else {
-                        res.append ("<tr>");
-                        foreach (var cell in cells) {
-                            res.append_printf ("<td style=\"border: 1px solid #cbd5e1; padding: 6px 10px;\">%s</td>",
-                                format_inline_markdown (cell.strip ()));
-                        }
-                        res.append ("</tr>\n");
-                    }
-                    continue;
-                } else if (in_table) {
-                    res.append ("</tbody></table>\n");
-                    in_table = false;
-                }
-
-                if (line.has_prefix ("#### ")) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    res.append_printf ("<h4>%s</h4>\n", format_inline_markdown (line.substring (5)));
-                } else if (line.has_prefix ("### ")) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    res.append_printf ("<h3>%s</h3>\n", format_inline_markdown (line.substring (4)));
-                } else if (line.has_prefix ("## ")) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    res.append_printf ("<h2>%s</h2>\n", format_inline_markdown (line.substring (3)));
-                } else if (line.has_prefix ("# ")) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    res.append_printf ("<h1>%s</h1>\n", format_inline_markdown (line.substring (2)));
-                } else if (trimmed_line == "---" || trimmed_line == "***") {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    res.append ("<hr/>\n");
-                } else if (line.has_prefix ("> ")) {
-                    if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    res.append_printf ("<blockquote style=\"border-left: 4px solid #6366f1; margin: 10px 0; padding: 4px 14px; color: #64748b;\">%s</blockquote>\n",
-                        format_inline_markdown (line.substring (2)));
-                } else if (line.has_prefix ("- ") || line.has_prefix ("* ")) {
-                    if (in_ol) { res.append ("</ol>\n"); in_ol = false; }
-                    if (!in_ul) {
-                        res.append ("<ul>\n");
-                        in_ul = true;
-                    }
-                    res.append_printf ("  <li>%s</li>\n", format_inline_markdown (line.substring (2)));
-                } else {
-                    string ordered_item_text = "";
-                    if (is_ordered_list_item (trimmed_line, out ordered_item_text)) {
-                        if (in_ul) { res.append ("</ul>\n"); in_ul = false; }
-                        if (!in_ol) {
-                            res.append ("<ol>\n");
-                            in_ol = true;
-                        }
-                        res.append_printf ("  <li>%s</li>\n", format_inline_markdown (ordered_item_text));
-                    } else {
-                        if (in_ul) {
-                            res.append ("</ul>\n");
-                            in_ul = false;
-                        }
-                        if (in_ol) {
-                            res.append ("</ol>\n");
-                            in_ol = false;
-                        }
-                        if (trimmed_line == "") {
-                            res.append ("\n");
-                        } else {
-                            res.append_printf ("<p>%s</p>\n", format_inline_markdown (line));
-                        }
-                    }
-                }
-            }
-
-            if (in_ul) res.append ("</ul>\n");
-            if (in_ol) res.append ("</ol>\n");
-            if (in_table) res.append ("</tbody></table>\n");
-            if (in_pre) res.append ("</code></pre>\n");
-            if (in_callout) res.append ("</div>\n");
-
-            return res.str;
-        }
-
-        private static bool is_ordered_list_item (string trimmed_line, out string item_content) {
-            item_content = "";
-            try {
-                if (ordered_list_regex == null) {
-                    ordered_list_regex = new GLib.Regex ("^[0-9]+\\.\\s+(.+)$");
-                }
-                GLib.MatchInfo mi;
-                if (ordered_list_regex.match (trimmed_line, 0, out mi)) {
-                    item_content = mi.fetch (1);
-                    return true;
-                }
-            } catch (GLib.RegexError e) {}
-            return false;
         }
     }
 }

@@ -143,7 +143,7 @@ function onunload() {
             assert (last_toast == "Test Plugin Finalized");
             assert (last_btn_removed == "run-full-test");
 
-            PluginManager.delete_directory_recursive (File.new_for_path (tmp_dir));
+            Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
         } catch (GLib.Error e) {
             assert_not_reached ();
         }
@@ -211,7 +211,7 @@ function onunload() {}
             assert (last_toast.contains ("denied") || last_toast.contains ("permission"));
 
             plugin.unload ();
-            PluginManager.delete_directory_recursive (File.new_for_path (tmp_dir));
+            Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
         } catch (GLib.Error e) {
             assert_not_reached ();
         }

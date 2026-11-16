@@ -478,7 +478,7 @@ namespace Imladris {
                     string doc_text = get_clean_source_text ();
                     emit_buffer_stats (doc_text);
                     refresh_live_preview (doc_text);
-                    panel_registry.refresh_environment_and_outline ();
+                    panel_registry.refresh_environment_and_outline (doc_text);
 
                     if (!source_buffer.get_modified ()) {
                         return GLib.Source.REMOVE;

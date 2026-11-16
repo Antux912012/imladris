@@ -119,59 +119,5 @@ namespace Imladris.Core {
                 GLib.warning ("FrontmatterParser JSON decode error: %s", e.message);
             }
         }
-
-        private static FrontmatterData parse_yaml_block (string yaml) {
-            var meta = new FrontmatterData ();
-            string[] lines = yaml.split ("\n");
-
-            foreach (var raw_line in lines) {
-                string line = raw_line.strip ();
-                if (line.has_prefix ("#") || line == "") {
-                    continue;
-                }
-
-                int colon_idx = line.index_of (":");
-                if (colon_idx == -1) {
-                    continue;
-                }
-
-                string key = line.substring (0, colon_idx).strip ().down ();
-                string val = clean_val (line.substring (colon_idx + 1).strip ());
-
-                switch (key) {
-                    case "title":
-                        meta.title = val;
-                        break;
-                    case "author":
-                        meta.author = val;
-                        break;
-                    case "date":
-                        meta.date = val;
-                        break;
-                    case "bibliography":
-                        meta.bibliography = val;
-                        break;
-                    case "format":
-                        meta.format_type = val;
-                        break;
-                    case "output":
-                        meta.output = val;
-                        break;
-                    case "abstract":
-                        meta.abstract_text = val;
-                        break;
-                }
-            }
-            return meta;
-        }
-
-        private static string clean_val (string val) {
-            string cleaned = val;
-            if ((cleaned.has_prefix ("\"") && cleaned.has_suffix ("\"")) ||
-                (cleaned.has_prefix ("'") && cleaned.has_suffix ("'"))) {
-                cleaned = cleaned.substring (1, cleaned.length - 2);
-            }
-            return cleaned.strip ();
-        }
     }
 }
