@@ -48,6 +48,37 @@ Imladris provides a sub-second, distraction-free environment for technical autho
 biostatisticians, and data scientists. Includes Direct Editor Writing with local
 and free-tier AI quota failover, GitHub Copilot OAuth, and reproducible sandboxes.
 
+%package toolchain
+Summary:        Meta-package providing R, Python, Pandoc, and scientific runtime dependencies for Imladris
+BuildArch:      noarch
+Requires:       %{name} = %{version}-%{release}
+Requires:       R-core
+Requires:       python3
+Requires:       python3-pip
+Requires:       pandoc
+Requires:       curl
+Requires:       bzip2
+Requires:       git
+Recommends:     texlive-scheme-basic
+Recommends:     libreoffice-writer
+
+%description toolchain
+Meta-package that installs and verifies the scientific computing toolchain
+(R, Python, Pandoc, curl, bzip2, git) for Imladris.
+
+%post toolchain
+echo "=== Imladris Toolchain Dependency Check ==="
+for cmd in Rscript python3 pandoc uv quarto pdflatex; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+        echo "  [OK] $cmd -> $(command -v "$cmd")"
+    else
+        echo "  [OPTIONAL] $cmd not found on PATH"
+    fi
+done
+
+%files toolchain
+%license LICENSE
+
 %prep
 %autosetup -n %{name}-%{version}
 

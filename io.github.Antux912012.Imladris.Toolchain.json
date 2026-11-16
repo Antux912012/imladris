@@ -1,0 +1,28 @@
+{
+    "id": "io.github.Antux912012.Imladris.Toolchain",
+    "branch": "50",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "50",
+    "sdk": "org.gnome.Sdk",
+    "build-extension": true,
+    "separate-locales": false,
+    "appstream-compose": false,
+    "modules": [
+        {
+            "name": "imladris-toolchain-bootstrap",
+            "buildsystem": "simple",
+            "build-commands": [
+                "mkdir -p /app/toolchain/bin /app/toolchain/lib",
+                "install -Dm755 scripts/install-llama-server.sh /app/toolchain/bin/imladris-install-llama",
+                "cat <<'EOF' > /app/toolchain/bin/imladris-toolchain-check\n#!/usr/bin/env bash\necho '=== Imladris Flatpak Toolchain Extension ==='\nfor cmd in python3 Rscript quarto pandoc uv micromamba pdflatex; do\n  if command -v \"$cmd\" >/dev/null 2>&1; then\n    echo \"  [OK] $cmd -> $(command -v \"$cmd\")\"\n  else\n    echo \"  [--] $cmd (optional/not present in sandbox)\"\n  fi\ndone\nEOF",
+                "chmod +x /app/toolchain/bin/imladris-toolchain-check"
+            ],
+            "sources": [
+                {
+                    "type": "dir",
+                    "path": "."
+                }
+            ]
+        }
+    ]
+}

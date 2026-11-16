@@ -7,6 +7,15 @@
         "org.freedesktop.Sdk.Extension.rust-stable"
     ],
     "command": "imladris",
+    "add-extensions": {
+        "io.github.Antux912012.Imladris.Toolchain": {
+            "directory": "toolchain",
+            "version": "50",
+            "add-ld-path": "lib",
+            "autodelete": true,
+            "no-autodownload": false
+        }
+    },
     "finish-args": [
         "--share=ipc",
         "--share=network",
@@ -15,7 +24,8 @@
         "--device=dri",
         "--talk-name=org.freedesktop.Flatpak",
         "--filesystem=home",
-        "--filesystem=xdg-cache/imladris:create"
+        "--filesystem=xdg-cache/imladris:create",
+        "--env=PATH=/app/bin:/app/toolchain/bin:/usr/bin"
     ],
     "build-options": {
         "append-path": "/usr/lib/sdk/rust-stable/bin",
@@ -37,6 +47,9 @@
             "buildsystem": "meson",
             "config-opts": [
                 "--buildtype=release"
+            ],
+            "post-install": [
+                "mkdir -p /app/toolchain"
             ],
             "sources": [
                 {

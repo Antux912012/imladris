@@ -15,6 +15,9 @@ RUN dnf -y update && \
       vala \
       cargo \
       rust \
+      flatpak \
+      flatpak-builder \
+      rpm-build \
       pkgconfig \
       desktop-file-utils \
       libappstream-glib \

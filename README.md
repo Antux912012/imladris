@@ -18,7 +18,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
   <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
-  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.26.0"><img src="https://img.shields.io/badge/Release-v0.26.0-blue?style=flat-square" alt="Release v0.26.0"></a>
+  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.27.0"><img src="https://img.shields.io/badge/Release-v0.27.0-blue?style=flat-square" alt="Release v0.27.0"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-0.56%2B-green?style=flat-square" alt="Vala">
   <img src="https://img.shields.io/badge/Rust-1.75%2B-orange?style=flat-square" alt="Rust">
@@ -27,7 +27,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Official Landing Page</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.26.0">⬇️ Download v0.26.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.27.0">⬇️ Download v0.27.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Technical Wiki</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong>
@@ -243,7 +243,32 @@ nix build .#default
 ./result/bin/imladris
 ```
 
-Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.26.0](https://github.com/Antux912012/imladris/releases/tag/v0.26.0).
+Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.27.0](https://github.com/Antux912012/imladris/releases/tag/v0.27.0).
+
+### Scientific Toolchain Meta-Packages & Cross-Distro Dependencies
+To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
+- **Flatpak Add-On Extension (`io.github.Antux912012.Imladris.Toolchain`):**
+  ```bash
+  flatpak install io.github.Antux912012.Imladris.Toolchain.flatpak
+  ```
+  Mounts at `/app/toolchain` and is automatically added to `PATH` inside the Imladris sandbox.
+- **Debian / Ubuntu (`imladris-toolchain` meta-package with `postinst` verification):**
+  ```bash
+  sudo apt install ./imladris_0.27.0_amd64.deb ./imladris-toolchain_0.27.0_all.deb
+  ```
+- **Fedora / RHEL (`imladris-toolchain` RPM meta-package with `%post` verification):**
+  ```bash
+  sudo dnf install ./imladris-0.27.0-1.fc41.x86_64.rpm ./imladris-toolchain-0.27.0-1.fc41.noarch.rpm
+  ```
+- **Arch Linux:**
+  ```bash
+  sudo pacman -S --needed gtk4 libadwaita gtksourceview5 webkitgtk-6.0 libsecret libsoup3 json-glib libgee r python python-pip pandoc texlive-basic
+  ```
+- **openSUSE Tumbleweed:**
+  ```bash
+  sudo zypper install gtk4-devel libadwaita-devel gtksourceview5-devel webkitgtk6-devel R-base python3 python3-pip pandoc texlive-scheme-basic
+  ```
+- **NixOS:** Use the included `flake.nix` (`nix develop` or `nix profile install .#default`).
 
 ### Build from Source (Meson & Ninja)
 Requires `valac >= 0.56`, `meson >= 0.60`, `ninja`, `gtk4 >= 4.12`, `libadwaita-1 >= 1.5`, `gtksourceview-5 >= 5.10`, `webkitgtk-6.0 >= 2.40`, `javascriptcoregtk-6.0`, `libsoup-3.0`, `json-glib-1.0`, `libsecret-1`, and `libgee-0.8`.

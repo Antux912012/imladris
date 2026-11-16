@@ -127,9 +127,10 @@ namespace Imladris.Core {
                 }
             }
 
-            // Tier 2.5: Flatpak SDK Extension /app or /usr/lib/sdk/texlive
+            // Tier 2.5: Flatpak SDK Extension /app/toolchain, /app/bin, or /usr/lib/sdk/texlive
             if (is_flatpak ()) {
                 string[] ext_bins = {
+                    GLib.Path.build_filename ("/app/toolchain/bin", binary_name),
                     GLib.Path.build_filename ("/usr/lib/sdk/texlive/bin/x86_64-linux", binary_name),
                     GLib.Path.build_filename ("/usr/lib/sdk/texlive/bin/aarch64-linux", binary_name),
                     GLib.Path.build_filename ("/app/bin", binary_name)
