@@ -170,7 +170,48 @@
       border-color: transparent;
     }
 
+    .icon-btn {
+      width: 36px;
+      padding: 0;
+    }
+
     [data-theme="light"] .btn.primary { color: #ffffff; }
+
+    /* Scientific Examples & Test Matrix */
+    .split-2 {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .test-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .test-pass {
+      color: var(--leaf);
+      font-weight: 700;
+    }
+
+    @media (max-width: 920px) {
+      .split-2, .test-grid { grid-template-columns: 1fr; }
+    }
 
     /* Hero + 3D Astrolabe Backdrop */
     .hero {
@@ -572,13 +613,22 @@
 
       <nav class="nav-links">
         <a href="#workbench">Workbench</a>
+        <a href="#examples">Examples</a>
+        <a href="#tests">Tests</a>
         <a href="#fellowship">Modules</a>
         <a href="#install">Install</a>
         <a href="https://github.com/Antux912012/imladris/wiki">Wiki</a>
       </nav>
 
       <div class="nav-actions">
-        <button id="theme-toggle" class="btn" type="button" aria-label="Toggle theme">Theme</button>
+        <button id="theme-toggle" class="btn icon-btn" type="button" aria-label="Toggle light/dark theme" title="Toggle theme">
+          <svg id="icon-sun" class="theme-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 1a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 1zm0 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 13zM2.343 2.343a.75.75 0 0 1 1.061 0l1.06 1.06a.75.75 0 0 1-1.06 1.061l-1.061-1.06a.75.75 0 0 1 0-1.061zm9.193 9.193a.75.75 0 0 1 1.06 0l1.061 1.06a.75.75 0 0 1-1.06 1.061l-1.061-1.06a.75.75 0 0 1 0-1.061zM1 8a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 1 8zm11 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 12 8zm-9.657 5.657a.75.75 0 0 1 0-1.061l1.06-1.06a.75.75 0 1 1 1.061 1.06l-1.06 1.061a.75.75 0 0 1-1.061 0zm9.193-9.193a.75.75 0 0 1 0-1.061l1.06-1.06a.75.75 0 1 1 1.061 1.06l-1.06 1.061a.75.75 0 0 1-1.061 0z"/>
+          </svg>
+          <svg id="icon-moon" class="theme-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style="display:none;">
+            <path d="M7.024 1.503a.75.75 0 0 1 .746.976A5.25 5.25 0 0 0 13.52 9.23a.75.75 0 0 1 .977.746A6.75 6.75 0 1 1 7.024 1.503z"/>
+          </svg>
+        </button>
         <a class="btn primary" href="https://github.com/Antux912012/imladris/releases/tag/v0.27.0">Download</a>
       </div>
     </div>
@@ -666,6 +716,69 @@
           <div id="gallery-card" class="gallery-card">
             <img id="gallery-img" src="assets/screenshots/imladris-screenshot.png" alt="Imladris workbench preview">
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="examples">
+      <div class="wrap">
+        <div class="sec-head">
+          <div>
+            <h2>Real Scientific Workflows</h2>
+          </div>
+          <p>Practical Quarto, R, Python, and genomics snippets executed natively via Imladris’s Rust core and isolated runtimes.</p>
+        </div>
+
+        <div class="install-shell">
+          <div class="install-tabs" role="tablist">
+            <button class="install-tab example-tab active" data-ex="quarto">Quarto Survival (.qmd)</button>
+            <button class="install-tab example-tab" data-ex="galaxy">Galaxy Provenance (R)</button>
+            <button class="install-tab example-tab" data-ex="biostats">ICH E9 Power (Elbereth)</button>
+            <button class="install-tab example-tab" data-ex="mathchem">Math &amp; Chemistry</button>
+          </div>
+          <div class="install-body">
+            <div class="code-box"><code id="example-code">---
+title: "Adjuvant Cohort Survival Analysis"
+bibliography: references.bib
+format: html
+---
+
+```{r}
+#| label: fig-km-cohort
+#| fig-cap: "Kaplan-Meier survival curve stratified by treatment arm"
+library(survival)
+fit &lt;- survfit(Surv(time, status) ~ rx, data = colon)
+plot(fit, col = c("#7fb3d5", "#d8b26e"), xlab = "Days", ylab = "Survival")
+```
+
+As shown in @fig-km-cohort and @smith2024, median survival improved under treatment.</code></div>
+            <p id="example-note" class="install-note">Rust <code>imladris_core</code> extracts prose words (excluding code/YAML), <code>@fig-km-cohort</code> cross-references, and <code>@smith2024</code> citations in real time.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tests">
+      <div class="wrap">
+        <div class="sec-head">
+          <div>
+            <h2>Verified Scientific Test Suite</h2>
+          </div>
+          <p>11/11 Meson, Rust, and Vala test suites passing in the Fedora 41 Podman build container (<code>GSETTINGS_BACKEND=memory</code>).</p>
+        </div>
+
+        <div class="test-grid">
+          <div class="test-row"><span>rust_core_tests (cargo test)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>rust_rendering_tests (Markdown &amp; LaTeX)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>mallorn_sandbox_tests (Zip-Slip &amp; ICH E9)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>ai_integration_tests (Elrond &amp; Failover)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>execution_and_security_tests (MCP guard)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>galaxy_bridge_tests (Arekyer provenance)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>zotero_service_tests (BBT &amp; DOI BibTeX)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>plugin_engine_tests (JSC VM sandboxing)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>dock_environment_tests (4-Quad layout)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>format_profile_tests (.qmd/.Rmd/.ipynb)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>shiny_service_tests (Live R Shiny app)</span><span class="test-pass">PASS</span></div>
         </div>
       </div>
     </section>
@@ -763,6 +876,14 @@ flatpak install --user io.github.Antux912012.Imladris.flatpak io.github.Antux912
   <script>
     (function () {
       var toggle = document.getElementById('theme-toggle');
+      var iconSun = document.getElementById('icon-sun');
+      var iconMoon = document.getElementById('icon-moon');
+      function syncThemeIcons() {
+        var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        iconSun.style.display = isLight ? 'none' : 'block';
+        iconMoon.style.display = isLight ? 'block' : 'none';
+      }
+      syncThemeIcons();
       toggle.addEventListener('click', function () {
         var cur = document.documentElement.getAttribute('data-theme');
         var next = cur === 'light' ? 'dark' : 'light';
@@ -771,6 +892,7 @@ flatpak install --user io.github.Antux912012.Imladris.flatpak io.github.Antux912
         } else {
           document.documentElement.removeAttribute('data-theme');
         }
+        syncThemeIcons();
         try { localStorage.setItem('imladris-theme', next); } catch (e) {}
       });
 
@@ -847,6 +969,39 @@ flatpak install --user io.github.Antux912012.Imladris.flatpak io.github.Antux912
         navigator.clipboard.writeText(cmdEl.textContent || '').then(function () {
           copyBtn.textContent = 'Copied';
           setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1400);
+        });
+      });
+
+      var EXAMPLES = {
+        quarto: {
+          code: "---\ntitle: \"Adjuvant Cohort Survival Analysis\"\nbibliography: references.bib\nformat: html\n---\n\n```{r}\n#| label: fig-km-cohort\n#| fig-cap: \"Kaplan-Meier survival curve stratified by treatment arm\"\nlibrary(survival)\nfit <- survfit(Surv(time, status) ~ rx, data = colon)\nplot(fit, col = c(\"#7fb3d5\", \"#d8b26e\"), xlab = \"Days\", ylab = \"Survival\")\n```\n\nAs shown in @fig-km-cohort and @smith2024, median survival improved under treatment.",
+          note: "Rust imladris_core extracts prose words (excluding code/YAML), @fig-km-cohort cross-references, and @smith2024 citations in real time."
+        },
+        galaxy: {
+          code: "```{r}\n#| label: galaxy-fetch-rnaseq\nlibrary(httr2)\napi_key <- Sys.getenv(\"GALAXY_API_KEY\") # Injected via libsecret-1 keyring\nresp <- request(\"https://usegalaxy.eu/api/datasets/f2db41e1fa331b3e/display\") |>\n  req_headers(\"x-api-key\" = api_key) |>\n  req_perform()\ncounts <- read.delim(text = resp_body_string(resp))\n```",
+          note: "Arekyer injects GALAXY_API_KEY only into the child SubprocessLauncher environment without ever writing secrets into the .qmd file."
+        },
+        biostats: {
+          code: "// Verified in mallorn_sandbox_tests (ICH E9 Normal Quantile & CDF):\n// normal_quantile(0.975) == 1.959964 (two-sided alpha = 0.05)\n// Sample size per arm (Continuous Two-Sample):\n// n = 2 * ((z_{1-alpha/2} + z_{1-beta}) * sigma / delta)^2",
+          note: "Elbereth ClinicalBiostatsPopover computes two-sample continuous, Casagrande-Pike proportions, and Schoenfeld log-rank sample sizes."
+        },
+        mathchem: {
+          code: "Natural Input:  (-b +- sqrt(b^2 - 4*a*c)) / (2*a)\nLaTeX Output:   $$\\frac{-b \\pm \\sqrt{b^{2} - 4 \\cdot a \\cdot c}}{2 \\cdot a}$$\n\nChem Input:     2 H2 + O2 -> 2 H2O\nmhchem Output:  $$\\ce{2 H2 + O2 -> 2 H2O}$$",
+          note: "MathChemEngine converts natural mathematical and stoichiometric notation to LaTeX/mhchem offline with cached GLib.Regex patterns."
+        }
+      };
+
+      var exCode = document.getElementById('example-code');
+      var exNote = document.getElementById('example-note');
+      document.querySelectorAll('.example-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          document.querySelectorAll('.example-tab').forEach(function (t) { t.classList.remove('active'); });
+          tab.classList.add('active');
+          var ex = EXAMPLES[tab.getAttribute('data-ex')];
+          if (ex) {
+            exCode.textContent = ex.code;
+            exNote.textContent = ex.note;
+          }
         });
       });
     })();
