@@ -9,6 +9,7 @@ pub mod frontmatter;
 pub mod ipynb;
 pub mod markdown;
 pub mod outline;
+pub mod science;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -120,4 +121,10 @@ pub extern "C" fn imladris_analyze_typescript_symbols_json(
 ) -> *mut c_char {
     let src = cstr_to_str(ts_source_utf8);
     ffi_json(|| diagnostics::analyze_typescript_symbols_json(src))
+}
+
+#[no_mangle]
+pub extern "C" fn imladris_analyze_manuscript_json(source_utf8: *const c_char) -> *mut c_char {
+    let src = cstr_to_str(source_utf8);
+    ffi_json(|| science::analyze_manuscript_json(src))
 }

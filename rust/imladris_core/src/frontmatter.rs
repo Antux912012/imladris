@@ -72,8 +72,10 @@ fn get_str_field(obj: &JsonValue, key: &str) -> String {
 }
 
 pub fn split_frontmatter(source: &str) -> (bool, String, String, usize) {
-    let normalized = source.replace("\r\n", "\n");
-    let lines: Vec<&str> = normalized.split('\n').collect();
+    let lines: Vec<&str> = source
+        .split('\n')
+        .map(|l| l.strip_suffix('\r').unwrap_or(l))
+        .collect();
     if lines.is_empty() || lines[0].trim() != "---" {
         return (false, String::new(), source.to_string(), 0);
     }

@@ -37,8 +37,10 @@ fn extract_braced_arg(s: &str) -> Option<String> {
 
 pub fn extract_outline_json(source: &str, format_code: &str) -> String {
     let fmt = format_code.trim().to_ascii_lowercase();
-    let normalized = source.replace("\r\n", "\n");
-    let lines: Vec<&str> = normalized.split('\n').collect();
+    let lines: Vec<&str> = source
+        .split('\n')
+        .map(|l| l.strip_suffix('\r').unwrap_or(l))
+        .collect();
     let mut items = Vec::new();
 
     if fmt == "tex" || fmt == "latex" || fmt == "ltx" {
@@ -183,16 +185,48 @@ pub fn extract_outline_json(source: &str, format_code: &str) -> String {
         if let Some(fence) = parse_opening_fence(line) {
             if fence.info.starts_with('{') && fence.info.ends_with('}') {
                 let inner = fence.info[1..fence.info.len() - 1].trim();
-                let label = inner
+                let mut head_parts = inner
                     .split(',')
                     .next()
                     .unwrap_or("")
-                    .trim()
+                    .split_whitespace();
+                let engine = head_parts.next().unwrap_or("").trim();
+                let mut chunk_label = head_parts
+                    .next()
+                    .filter(|s| !s.contains('='))
+                    .unwrap_or("")
                     .to_string();
-                if !label.is_empty() {
+
+                if chunk_label.is_empty() {
+                    for peek in lines.iter().skip(i + 1).take(12) {
+                        let ts = peek.trim_start();
+                        let Some(rest) = ts
+                            .strip_prefix("#|")
+                            .or_else(|| ts.strip_prefix("--|"))
+                            .or_else(|| ts.strip_prefix("//|"))
+                        else {
+                            break;
+                        };
+                        if let Some((k, v)) = rest.split_once(':') {
+                            if k.trim() == "label" {
+                                chunk_label = v.trim().trim_matches('"').trim_matches('\'').to_string();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                let title = if !chunk_label.is_empty() && !engine.is_empty() {
+                    format!("Chunk: {chunk_label} ({engine})")
+                } else if !engine.is_empty() {
+                    format!("Chunk: {engine}")
+                } else {
+                    String::new()
+                };
+                if !title.is_empty() {
                     items.push(OutlineItem {
                         level: 4,
-                        title: format!("Chunk: {label}"),
+                        title,
                         line: i + 1,
                         kind: "chunk".to_string(),
                     });

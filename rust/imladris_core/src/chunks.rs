@@ -20,8 +20,12 @@ pub struct ParsedChunk {
     pub warning: bool,
     pub error: bool,
     pub fig_cap: String,
+    pub fig_alt: String,
+    pub tbl_cap: String,
     pub fig_width: Option<f64>,
     pub fig_height: Option<f64>,
+    pub cache: bool,
+    pub code_fold: bool,
     pub raw_header: String,
     pub code: String,
     pub fence_start_line: usize,
@@ -144,14 +148,21 @@ fn normalize_engine(raw: &str) -> String {
         "py" | "python3" | "python" => "python".to_string(),
         "ts" | "typescript" => "typescript".to_string(),
         "sh" | "bash" => "bash".to_string(),
+        "jl" | "julia" => "julia".to_string(),
+        "ojs" => "ojs".to_string(),
+        "stan" => "stan".to_string(),
+        "sql" => "sql".to_string(),
+        "rcpp" => "rcpp".to_string(),
         "r" => "r".to_string(),
         other => other.to_string(),
     }
 }
 
 pub fn parse_chunks(source: &str, _format_code: &str) -> Vec<ParsedChunk> {
-    let normalized = source.replace("\r\n", "\n");
-    let lines: Vec<&str> = normalized.split('\n').collect();
+    let lines: Vec<&str> = source
+        .split('\n')
+        .map(|l| l.strip_suffix('\r').unwrap_or(l))
+        .collect();
     let mut chunks = Vec::new();
     let mut i = 0usize;
 
@@ -200,8 +211,12 @@ pub fn parse_chunks(source: &str, _format_code: &str) -> Vec<ParsedChunk> {
         let mut warning = true;
         let mut error = false;
         let mut fig_cap = String::new();
+        let mut fig_alt = String::new();
+        let mut tbl_cap = String::new();
         let mut fig_width = None;
         let mut fig_height = None;
+        let mut cache = false;
+        let mut code_fold = false;
 
         if info.starts_with('{') && info.ends_with('}') && info.len() >= 2 {
             let inner = info[1..info.len() - 1].trim();
@@ -278,13 +293,19 @@ pub fn parse_chunks(source: &str, _format_code: &str) -> Vec<ParsedChunk> {
 
         for (offset, raw_line) in lines[start_line + 1..body_end_exclusive].iter().enumerate() {
             let trimmed_start = raw_line.trim_start();
-            if in_quarto_header && trimmed_start.starts_with("#|") {
-                yaml_lines.push(trimmed_start[2..].trim_start().to_string());
-                code_start_line = start_line + 1 + offset + 1;
-            } else {
-                in_quarto_header = false;
-                code_lines.push(*raw_line);
+            let opt_line = trimmed_start
+                .strip_prefix("#|")
+                .or_else(|| trimmed_start.strip_prefix("--|"))
+                .or_else(|| trimmed_start.strip_prefix("//|"));
+            if in_quarto_header {
+                if let Some(rest) = opt_line {
+                    yaml_lines.push(rest.trim_start().to_string());
+                    code_start_line = start_line + 1 + offset + 1;
+                    continue;
+                }
             }
+            in_quarto_header = false;
+            code_lines.push(*raw_line);
         }
 
         if !yaml_lines.is_empty() {
@@ -299,6 +320,8 @@ pub fn parse_chunks(source: &str, _format_code: &str) -> Vec<ParsedChunk> {
                         "include" => if let Some(b) = v.as_bool() { include = b; },
                         "warning" => if let Some(b) = v.as_bool() { warning = b; },
                         "error" => if let Some(b) = v.as_bool() { error = b; },
+                        "cache" => if let Some(b) = v.as_bool() { cache = b; },
+                        "code-fold" => if let Some(b) = v.as_bool() { code_fold = b; },
                         "output" => {
                             if let Some(b) = v.as_bool() {
                                 output_mode = if b { "true" } else { "false" }.to_string();
@@ -307,6 +330,8 @@ pub fn parse_chunks(source: &str, _format_code: &str) -> Vec<ParsedChunk> {
                             }
                         }
                         "fig-cap" => if let Some(s) = v.as_str() { fig_cap = s.to_string(); },
+                        "fig-alt" => if let Some(s) = v.as_str() { fig_alt = s.to_string(); },
+                        "tbl-cap" => if let Some(s) = v.as_str() { tbl_cap = s.to_string(); },
                         "fig-width" => fig_width = v.as_f64(),
                         "fig-height" => fig_height = v.as_f64(),
                         _ => {}
@@ -334,8 +359,12 @@ pub fn parse_chunks(source: &str, _format_code: &str) -> Vec<ParsedChunk> {
             warning,
             error,
             fig_cap,
+            fig_alt,
+            tbl_cap,
             fig_width,
             fig_height,
+            cache,
+            code_fold,
             raw_header: info.to_string(),
             code: code_lines.join("\n"),
             fence_start_line: start_line,
