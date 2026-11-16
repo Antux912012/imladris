@@ -143,7 +143,7 @@ function onunload() {
             assert (last_toast == "Test Plugin Finalized");
             assert (last_btn_removed == "run-full-test");
 
-            Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
+            Imladris.Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
         } catch (GLib.Error e) {
             assert_not_reached ();
         }
@@ -211,7 +211,7 @@ function onunload() {}
             assert (last_toast.contains ("denied") || last_toast.contains ("permission"));
 
             plugin.unload ();
-            Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
+            Imladris.Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
         } catch (GLib.Error e) {
             assert_not_reached ();
         }

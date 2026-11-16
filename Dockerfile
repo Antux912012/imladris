@@ -13,6 +13,8 @@ RUN dnf -y update && \
       meson \
       ninja-build \
       vala \
+      cargo \
+      rust \
       pkgconfig \
       desktop-file-utils \
       libappstream-glib \
@@ -31,7 +33,8 @@ RUN dnf -y update && \
 WORKDIR /src
 COPY . .
 
-RUN meson setup build-release --buildtype=release --prefix=/usr && \
+RUN rm -rf rust/imladris_core/vendor rust/imladris_core/.cargo && \
+    meson setup build-release --buildtype=release --prefix=/usr && \
     meson compile -C build-release && \
     GSETTINGS_BACKEND=memory meson test -C build-release --print-errorlogs && \
     DESTDIR=/out meson install -C build-release

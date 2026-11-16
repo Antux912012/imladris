@@ -872,7 +872,10 @@ namespace Imladris {
             if (root == "" || !GLib.FileUtils.test (root, GLib.FileTest.IS_DIR)) {
                 return new string[0];
             }
-            var spec = (pattern.length > 0 && pattern != "*") ? new GLib.PatternSpec (pattern) : null;
+            GLib.PatternSpec? spec = null;
+            if (pattern.length > 0 && pattern != "*") {
+                spec = new GLib.PatternSpec (pattern);
+            }
             scan_dir_for_workspace_files (root, root, results, spec);
             string[] arr = new string[results.size];
             for (int i = 0; i < results.size; i++) {

@@ -497,18 +497,16 @@ You specialize in R (tidyverse, ggplot2, biostatistics), Python (pandas, numpy, 
             string active_language,
             string document_narrative,
             string dataframe_schemas,
-            string current_code,
-            Gee.ArrayList<ElrondChatTurn>? history = null,
-            Cancellable? cancellable = null
+            string current_code
         ) throws Error {
             return yield write_with_elrond_stream_async (
                 active_language,
                 document_narrative,
                 dataframe_schemas,
                 current_code,
-                history,
                 null,
-                cancellable
+                null,
+                null
             );
         }
 
