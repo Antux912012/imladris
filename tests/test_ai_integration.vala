@@ -29,6 +29,7 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/ai/failover_error_classification", test_failover_error_classification);
         GLib.Test.add_func ("/ai/copilot_json_parsing", test_copilot_json_parsing);
         GLib.Test.add_func ("/ai/chunk_edit_preserving_options", test_chunk_edit_preserving_options);
+        GLib.Test.add_func ("/ai/elrond_intent_routing_and_history", test_elrond_intent_routing_and_history);
 
         return GLib.Test.run ();
     }
@@ -595,5 +596,16 @@ namespace Imladris.Tests {
             doc, 0, "x <- 1"
         );
         assert (outside == null);
+    }
+
+    private static void test_elrond_intent_routing_and_history () {
+        assert (Imladris.AI.ElrondEngineController.classify_intent_fast ("Balance \\ce{H2 + O2 -> H2O}") == Imladris.AI.ElrondIntent.MATH_CHEM);
+        assert (Imladris.AI.ElrondEngineController.classify_intent_fast ("Find BibTeX for doi:10.1038/s41586-020-2649-2") == Imladris.AI.ElrondIntent.CITATION_LOOKUP);
+        assert (Imladris.AI.ElrondEngineController.classify_intent_fast ("Fix this ggplot2 dataframe plot") == Imladris.AI.ElrondIntent.CODE_EDIT);
+        assert (Imladris.AI.ElrondEngineController.classify_intent_fast ("Summarize the key takeaways") == Imladris.AI.ElrondIntent.GENERAL_CHAT);
+
+        var turn = new Imladris.AI.ElrondChatTurn ("user", "hello");
+        assert (turn.role == "user");
+        assert (turn.content == "hello");
     }
 }

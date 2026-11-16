@@ -4,9 +4,39 @@
 using GLib;
 using Soup;
 using Json;
+using Gee;
 using Imladris.Core;
 
 namespace Imladris.AI {
+
+    public enum ElrondIntent {
+        CODE_EDIT,
+        MATH_CHEM,
+        CITATION_LOOKUP,
+        GENERAL_CHAT;
+
+        public string to_label () {
+            switch (this) {
+                case CODE_EDIT: return "Code";
+                case MATH_CHEM: return "Math/Chem";
+                case CITATION_LOOKUP: return "Citations";
+                case GENERAL_CHAT:
+                default: return "Chat";
+            }
+        }
+    }
+
+    public class ElrondChatTurn : GLib.Object {
+        public string role { owned get; set; }
+        public string content { owned get; set; }
+
+        public ElrondChatTurn (string role, string content) {
+            this.role = role;
+            this.content = content;
+        }
+    }
+
+    public delegate void StreamTokenCallback (string delta);
 
     /**
      * ElrondEngineController
@@ -360,23 +390,147 @@ namespace Imladris.AI {
         }
 
         /**
+         * Fast, zero-latency local intent router ("System 1" triage) that classifies
+         * user prompts without burning an LLM roundtrip.
+         */
+        public static ElrondIntent classify_intent_fast (string prompt) {
+            string lower = prompt.down ().strip ();
+            if (lower.length == 0) return ElrondIntent.GENERAL_CHAT;
+
+            if (lower.contains ("\\ce{") || lower.contains ("\\frac") || lower.contains ("$$") ||
+                lower.contains ("equation") || lower.contains ("integral") || lower.contains ("derivative") ||
+                lower.contains ("stoichiometry") || lower.contains ("molarity") || lower.contains ("latex math")) {
+                return ElrondIntent.MATH_CHEM;
+            }
+
+            if (lower.contains ("doi:") || lower.contains ("bibtex") || lower.contains ("zotero") ||
+                lower.contains ("citation") || lower.contains ("bibliography") || lower.contains ("@")) {
+                return ElrondIntent.CITATION_LOOKUP;
+            }
+
+            string[] code_hints = {
+                "```", "ggplot", "tidyverse", "dplyr", "pandas", "numpy", "dataframe",
+                "function", "refactor", "debug", "error", "traceback", "plot", "chunk",
+                "rscript", "python", "sql", "typescript", "quarto", "fix ", "write code"
+            };
+            foreach (string kw in code_hints) {
+                if (lower.contains (kw)) {
+                    return ElrondIntent.CODE_EDIT;
+                }
+            }
+
+            return ElrondIntent.GENERAL_CHAT;
+        }
+
+        private static string build_system_prompt_for_intent (ElrondIntent intent) {
+            string base_prompt = """You are Elrond, the built-in local AI coding and data analysis assistant inside Imladris IDE.
+You specialize in R (tidyverse, ggplot2, biostatistics), Python (pandas, numpy, scipy, matplotlib, seaborn), SQL, HTML, and Quarto/RMarkdown scientific reports.""";
+            switch (intent) {
+                case ElrondIntent.MATH_CHEM:
+                    return base_prompt + "\nFocus on exact LaTeX math ($...$, $$...$$) and mhchem (\\ce{...}) notation, derivations, and dimensional accuracy.";
+                case ElrondIntent.CITATION_LOOKUP:
+                    return base_prompt + "\nFocus on accurate BibTeX entries, Quarto/Pandoc citation keys ([@key]), and reproducible literature formatting.";
+                case ElrondIntent.CODE_EDIT:
+                    return base_prompt + "\nAnalyze the report narrative and active dataframe columns to suggest optimal, clean, executable ```r or ```python code chunks.";
+                default:
+                    return base_prompt + "\nProvide concise, accurate scientific and coding guidance.";
+            }
+        }
+
+        private string build_chat_payload (
+            string system_prompt,
+            string user_context,
+            int max_tokens,
+            bool stream,
+            Gee.ArrayList<ElrondChatTurn>? history
+        ) {
+            var builder = new Json.Builder ();
+            builder.begin_object ();
+            builder.set_member_name ("model");
+            builder.add_string_value (active_model_name.length > 0 ? active_model_name : "default");
+            builder.set_member_name ("temperature");
+            builder.add_double_value (0.15);
+            builder.set_member_name ("max_tokens");
+            builder.add_int_value (max_tokens);
+            builder.set_member_name ("stream");
+            builder.add_boolean_value (stream);
+            builder.set_member_name ("messages");
+            builder.begin_array ();
+
+            builder.begin_object ();
+            builder.set_member_name ("role");
+            builder.add_string_value ("system");
+            builder.set_member_name ("content");
+            builder.add_string_value (system_prompt);
+            builder.end_object ();
+
+            if (history != null) {
+                foreach (var turn in history) {
+                    builder.begin_object ();
+                    builder.set_member_name ("role");
+                    builder.add_string_value (turn.role);
+                    builder.set_member_name ("content");
+                    builder.add_string_value (turn.content);
+                    builder.end_object ();
+                }
+            }
+
+            builder.begin_object ();
+            builder.set_member_name ("role");
+            builder.add_string_value ("user");
+            builder.set_member_name ("content");
+            builder.add_string_value (user_context);
+            builder.end_object ();
+
+            builder.end_array ();
+            builder.end_object ();
+
+            var gen = new Json.Generator ();
+            gen.set_root (builder.get_root ());
+            return gen.to_data (null);
+        }
+
+        /**
          * Core "Write with Elrond Assistance (AI)" inference call.
          */
         public async string write_with_elrond (
             string active_language,
             string document_narrative,
             string dataframe_schemas,
-            string current_code
+            string current_code,
+            Gee.ArrayList<ElrondChatTurn>? history = null,
+            Cancellable? cancellable = null
+        ) throws Error {
+            return yield write_with_elrond_stream_async (
+                active_language,
+                document_narrative,
+                dataframe_schemas,
+                current_code,
+                history,
+                null,
+                cancellable
+            );
+        }
+
+        /**
+         * Streaming-capable Elrond inference call with multi-turn history and local intent routing.
+         */
+        public async string write_with_elrond_stream_async (
+            string active_language,
+            string document_narrative,
+            string dataframe_schemas,
+            string current_code,
+            Gee.ArrayList<ElrondChatTurn>? history = null,
+            StreamTokenCallback? on_token = null,
+            Cancellable? cancellable = null
         ) throws Error {
             if (!is_ready) {
                 throw new IOError.NOT_CONNECTED ("No local AI server or agent harness is connected. Please start Ollama, LM Studio, Cherry Studio, or Antigravity (agy).");
             }
 
             var level = SettingsManager.get_default ().elrond_level;
-
-            string system_prompt = """You are Elrond, the built-in local AI coding and data analysis assistant inside Imladris IDE.
-You specialize in R (tidyverse, ggplot2, biostatistics), Python (pandas, numpy, scipy, matplotlib, seaborn), SQL, HTML, and Quarto/RMarkdown scientific reports.
-Analyze the report narrative and active dataframe columns to suggest the optimal statistical graph, model function, or clean executable code chunk.""";
+            var intent = classify_intent_fast (current_code);
+            string system_prompt = build_system_prompt_for_intent (intent);
 
             string user_context;
             if (level == AiAssistanceLevel.LOW) {
@@ -393,40 +547,17 @@ Analyze the report narrative and active dataframe columns to suggest the optimal
 
             if (active_mode == ElrondMode.ANTIGRAVITY) {
                 string full_prompt = system_prompt + "\n\n" + user_context;
-                return yield run_agy_prompt_async (full_prompt);
+                string agy_out = yield run_agy_prompt_async (full_prompt, cancellable);
+                if (on_token != null && agy_out.length > 0) {
+                    on_token (agy_out);
+                }
+                return agy_out;
             }
 
-            var builder = new Json.Builder ();
-            builder.begin_object ();
-            builder.set_member_name ("model");
-            builder.add_string_value (active_model_name.length > 0 ? active_model_name : "default");
-            builder.set_member_name ("temperature");
-            builder.add_double_value (0.15);
-            builder.set_member_name ("max_tokens");
-            builder.add_int_value (level.get_max_tokens ());
-            builder.set_member_name ("messages");
-            builder.begin_array ();
-
-            builder.begin_object ();
-            builder.set_member_name ("role");
-            builder.add_string_value ("system");
-            builder.set_member_name ("content");
-            builder.add_string_value (system_prompt);
-            builder.end_object ();
-
-            builder.begin_object ();
-            builder.set_member_name ("role");
-            builder.add_string_value ("user");
-            builder.set_member_name ("content");
-            builder.add_string_value (user_context);
-            builder.end_object ();
-
-            builder.end_array ();
-            builder.end_object ();
-
-            var gen = new Json.Generator ();
-            gen.set_root (builder.get_root ());
-            string payload = gen.to_data (null);
+            bool use_stream = (on_token != null);
+            string payload = build_chat_payload (
+                system_prompt, user_context, level.get_max_tokens (), use_stream, history
+            );
 
             string completions_url = active_endpoint.has_suffix ("/chat/completions")
                 ? active_endpoint
@@ -435,13 +566,67 @@ Analyze the report narrative and active dataframe columns to suggest the optimal
             var msg = new Soup.Message ("POST", completions_url);
             msg.set_request_body_from_bytes ("application/json", new Bytes (payload.data));
 
-            Bytes bytes = yield soup_session.send_and_read_async (msg, Priority.DEFAULT, null);
+            if (use_stream) {
+                InputStream stream = yield soup_session.send_async (msg, Priority.DEFAULT, cancellable);
+                if (msg.status_code != Soup.Status.OK) {
+                    throw new IOError.FAILED ("Local AI server error (HTTP %u: %s)", msg.status_code, msg.reason_phrase);
+                }
+
+                var dis = new DataInputStream (stream);
+                var full_sb = new StringBuilder ();
+                string? line;
+                while ((line = yield dis.read_line_async (Priority.DEFAULT, cancellable)) != null) {
+                    string trimmed = line.strip ();
+                    if (trimmed.length == 0 || trimmed == "data: [DONE]") {
+                        if (trimmed == "data: [DONE]") break;
+                        continue;
+                    }
+                    string json_part = trimmed.has_prefix ("data:") ? trimmed.substring (5).strip () : trimmed;
+                    if (!json_part.has_prefix ("{")) continue;
+
+                    try {
+                        var parser = new Json.Parser ();
+                        parser.load_from_data (json_part, -1);
+                        var root = parser.get_root ();
+                        if (root == null || root.get_node_type () != Json.NodeType.OBJECT) continue;
+                        var obj = root.get_object ();
+                        if (!obj.has_member ("choices") || obj.get_null_member ("choices")) continue;
+                        var choices = obj.get_array_member ("choices");
+                        if (choices.get_length () == 0) continue;
+                        var ch0 = choices.get_object_element (0);
+                        if (ch0.has_member ("delta") && !ch0.get_null_member ("delta")) {
+                            var delta = ch0.get_object_member ("delta");
+                            if (delta.has_member ("content") && !delta.get_null_member ("content")) {
+                                string? tok = delta.get_string_member ("content");
+                                if (tok != null && tok.length > 0) {
+                                    full_sb.append (tok);
+                                    on_token (tok);
+                                }
+                            }
+                        } else if (ch0.has_member ("message") && !ch0.get_null_member ("message")) {
+                            var mobj = ch0.get_object_member ("message");
+                            if (mobj.has_member ("content") && !mobj.get_null_member ("content")) {
+                                string? whole = mobj.get_string_member ("content");
+                                if (whole != null && whole.length > 0) {
+                                    full_sb.append (whole);
+                                    on_token (whole);
+                                }
+                            }
+                        }
+                    } catch (GLib.Error e) {
+                        // Ignore malformed SSE chunk and continue reading stream
+                    }
+                }
+                return full_sb.str;
+            }
+
+            Bytes bytes = yield soup_session.send_and_read_async (msg, Priority.DEFAULT, cancellable);
             if (msg.status_code != Soup.Status.OK) {
                 throw new IOError.FAILED ("Local AI server error (HTTP %u: %s)", msg.status_code, msg.reason_phrase);
             }
 
             var parser = new Json.Parser ();
-            yield parser.load_from_stream_async (new MemoryInputStream.from_bytes (bytes), null);
+            yield parser.load_from_stream_async (new MemoryInputStream.from_bytes (bytes), cancellable);
 
             var root = parser.get_root ();
             if (root == null || root.get_node_type () != Json.NodeType.OBJECT) {

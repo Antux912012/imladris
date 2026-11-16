@@ -53,6 +53,7 @@ namespace Imladris.UI {
         private unowned Window? parent_window;
 
         private Cancellable? cancellable = null;
+        private Gee.ArrayList<ElrondChatTurn> conversation_history = new Gee.ArrayList<ElrondChatTurn> ();
         private bool is_busy = false;
 
         public ElrondChatPanel (DocumentPage page, PersistentPanelRegistry reg, Window? win) {
@@ -370,6 +371,7 @@ namespace Imladris.UI {
         }
 
         public void clear_chat_history () {
+            conversation_history.clear ();
             Gtk.Widget? child = message_list.get_first_child ();
             while (child != null) {
                 var next = child.get_next_sibling ();
@@ -477,14 +479,33 @@ namespace Imladris.UI {
                     }
                 }
 
+                var intent = ElrondEngineController.classify_intent_fast (prompt);
+                status_indicator.label = @"Elrond • $(intent.to_label ())";
+
                 string response;
                 if (controller.is_ready) {
-                    response = yield controller.write_with_elrond (
+                    Gtk.Box stream_box;
+                    Gtk.Label stream_lbl;
+                    create_streaming_assistant_card (out stream_box, out stream_lbl);
+                    var stream_sb = new StringBuilder ();
+
+                    response = yield controller.write_with_elrond_stream_async (
                         doc_page.doc_type,
                         chip_active_file.active ? doc_page.get_clean_source_text () : "",
                         env_summary,
-                        combined_prompt
+                        combined_prompt,
+                        conversation_history,
+                        (delta) => {
+                            stream_sb.append (delta);
+                            stream_lbl.label = stream_sb.str;
+                            scroll_to_bottom ();
+                        },
+                        cancellable
                     );
+
+                    stream_box.remove (stream_lbl);
+                    render_markdown_blocks (stream_box, response);
+                    scroll_to_bottom ();
                 } else if (has_cloud_or_local_api || has_failover_backup) {
                     var ai_client = new AiClient ();
                     ai_client.provider_failover_triggered.connect ((from_p, to_p) => {
@@ -492,12 +513,18 @@ namespace Imladris.UI {
                     });
                     string sys_prompt = "You are Elrond AI, an expert scientific writing and data science copilot inside Imladris (R, Python, Quarto, LaTeX, Biostats). Give concise, accurate answers with fenced ```r or ```python code blocks when helpful.";
                     response = yield ai_client.send_chat_completion_async (sys_prompt, combined_prompt, cancellable);
+                    append_assistant_card (response);
                 } else {
                     // Antigravity or local fallback
                     response = yield ElrondEngineController.run_agy_prompt_async (combined_prompt, cancellable);
+                    append_assistant_card (response);
                 }
 
-                append_assistant_card (response);
+                conversation_history.add (new ElrondChatTurn ("user", prompt));
+                conversation_history.add (new ElrondChatTurn ("assistant", response));
+                while (conversation_history.size > 10) {
+                    conversation_history.remove_at (0);
+                }
             } catch (GLib.Error e) {
                 if (e is GLib.IOError.CANCELLED) {
                     append_assistant_card ("*Generation cancelled.*");
@@ -572,6 +599,45 @@ namespace Imladris.UI {
             row.set_child (box);
             message_list.append (row);
             scroll_to_bottom ();
+        }
+
+        private void create_streaming_assistant_card (out Gtk.Box box_out, out Gtk.Label label_out) {
+            var row = new Gtk.ListBoxRow ();
+            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
+                margin_start = 4,
+                margin_end = 24,
+                margin_top = 4,
+                margin_bottom = 4
+            };
+            box.add_css_class ("card");
+            box.add_css_class ("assistant-message-card");
+
+            var header = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+                margin_start = 8,
+                margin_end = 8,
+                margin_top = 6
+            };
+            header.append (new Gtk.Image.from_icon_name ("ai-elrond"));
+            header.append (new Gtk.Label ("Elrond AI") { css_classes = { "heading", "caption" } });
+            box.append (header);
+
+            var lbl = new Gtk.Label ("") {
+                wrap = true,
+                wrap_mode = Pango.WrapMode.WORD_CHAR,
+                xalign = 0,
+                selectable = true,
+                margin_start = 8,
+                margin_end = 8,
+                margin_bottom = 8
+            };
+            box.append (lbl);
+
+            row.set_child (box);
+            message_list.append (row);
+            scroll_to_bottom ();
+
+            box_out = box;
+            label_out = lbl;
         }
 
         private void append_assistant_card (string raw_text) {
