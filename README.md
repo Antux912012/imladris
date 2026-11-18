@@ -21,7 +21,6 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <a href="https://github.com/Antux912012/imladris/releases/tag/v0.30.0"><img src="https://img.shields.io/badge/Release-v0.30.0-blue?style=flat-square" alt="Release v0.30.0"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-0.56%2B-green?style=flat-square" alt="Vala">
-  <img src="https://img.shields.io/badge/Rust-1.75%2B-orange?style=flat-square" alt="Rust">
   <img src="https://img.shields.io/badge/License-GPL--3.0--or--later-brightgreen?style=flat-square" alt="License">
 </p>
 
@@ -81,8 +80,9 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ## What’s New in v0.30.0
 
+* **Pure Vala/C Native Core**: Replaced the Rust FFI layer with native `NativeCore` in Vala/GLib, eliminating Cargo build overhead and simplifying cross-distro packaging.
 * **Additional Document Formats**: Plain text, CSV, TSV, RStudio `.Rproj`, and `.bibliography` files now receive format detection and editor profiles tailored to each format.
-* **Elrond Model Controls**: Select account-enabled Gemini models, tune answer detail and temperature, or download curated local GGUFs and run them with managed `llama-server`.
+* **Elrond Model Controls & Routing Fix**: Select account-enabled Gemini models, tune answer detail and temperature, or download curated local GGUFs and run them with managed `llama-server`. Configured cloud providers (including Gemini) are no longer intercepted by a ready local Elrond server.
 * **Optional Runtime Setup**: Choose the micromamba installation folder and install only the R, Python, Quarto, Node/TypeScript, and TeX components you need.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, improvements, and bugs fixed.
@@ -266,7 +266,7 @@ To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
   ```
 - **Fedora / RHEL (`imladris-toolchain` RPM meta-package with `%post` verification):**
   ```bash
-  sudo dnf install ./imladris-0.30.0-1.fc41.x86_64.rpm ./imladris-toolchain-0.30.0-1.fc41.noarch.rpm
+  sudo dnf install ./imladris-0.30.0-1.fc44.x86_64.rpm ./imladris-toolchain-0.30.0-1.fc44.noarch.rpm
   ```
 - **Arch Linux:**
   ```bash

@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Imladris v0.30.0 — Native Scientific Workbench</title>
-  <meta name="description" content="The Last Homely House East of the Sea for reproducible science. Native GTK4, Vala &amp; Rust workbench for Quarto, R, Python, Jupyter, and LaTeX.">
+  <meta name="description" content="The Last Homely House East of the Sea for reproducible science. Native GTK4 &amp; Vala workbench for Quarto, R, Python, Jupyter, and LaTeX.">
   <meta name="author" content="Antonio De Gaetano">
   <link rel="canonical" href="https://antux912012.github.io/imladris/">
 
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://antux912012.github.io/imladris/">
   <meta property="og:title" content="Imladris v0.30.0 — Native Scientific Workbench">
-  <meta property="og:description" content="Zero Electron overhead. Compiled Vala, GTK4 &amp; Rust core for Quarto, R, Python, Jupyter, and LaTeX.">
+  <meta property="og:description" content="Zero Electron overhead. Compiled Vala, C &amp; GTK4 core for Quarto, R, Python, Jupyter, and LaTeX.">
   <meta property="og:image" content="https://antux912012.github.io/imladris/assets/screenshots/imladris-screenshot.png">
 
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
@@ -652,7 +652,7 @@
           </div>
           <h1>A quiet refuge for <em>reproducible</em> science.</h1>
           <p class="lead">
-            Compiled <strong>Vala, GTK4 &amp; Rust</strong> (<code>imladris_core</code>) for Quarto, R, Python, Jupyter, and LaTeX.
+            Compiled <strong>Vala, C &amp; GTK4</strong> (<code>NativeCore</code>) for Quarto, R, Python, Jupyter, and LaTeX.
             Built to leave your RAM and GPU for models, matrices, and local inference—not browser tabs.
           </p>
 
@@ -669,7 +669,7 @@
             </div>
             <div class="spec-item">
               <strong>&lt; 0.6 s launch</strong>
-              <span>Compiled Rust + Vala</span>
+              <span>Compiled Vala + GTK4</span>
             </div>
             <div class="spec-item">
               <strong>Zero Telemetry</strong>
@@ -680,7 +680,7 @@
 
         <div class="stage-3d-wrap">
           <div id="hero-stage" class="stage-3d">
-            <div class="float-chip chip-top">Rust core · Pulldown + YAML + nbformat 4.5</div>
+            <div class="float-chip chip-top">NativeCore · Markdown + YAML + nbformat 4.5</div>
             <div class="window-frame">
               <div class="window-bar">
                 <span class="window-dots"><i></i><i></i><i></i></span>
@@ -726,7 +726,7 @@
           <div>
             <h2>Real Scientific Workflows</h2>
           </div>
-          <p>Practical Quarto, R, Python, and genomics snippets executed natively via Imladris’s Rust core and isolated runtimes. v0.30.0 also adds editor profiles for plain text, CSV, TSV, RStudio projects, and bibliography files.</p>
+          <p>Practical Quarto, R, Python, and genomics snippets executed natively via Imladris’s Vala/C core and isolated runtimes. v0.30.0 also adds editor profiles for plain text, CSV, TSV, RStudio projects, and bibliography files.</p>
         </div>
 
         <div class="install-shell">
@@ -752,7 +752,7 @@ plot(fit, col = c("#7fb3d5", "#d8b26e"), xlab = "Days", ylab = "Survival")
 ```
 
 As shown in @fig-km-cohort and @smith2024, median survival improved under treatment.</code></div>
-            <p id="example-note" class="install-note">Rust <code>imladris_core</code> extracts prose words (excluding code/YAML), <code>@fig-km-cohort</code> cross-references, and <code>@smith2024</code> citations in real time.</p>
+            <p id="example-note" class="install-note"><code>NativeCore</code> extracts prose words (excluding code/YAML), <code>@fig-km-cohort</code> cross-references, and <code>@smith2024</code> citations in real time.</p>
           </div>
         </div>
       </div>
@@ -764,12 +764,11 @@ As shown in @fig-km-cohort and @smith2024, median survival improved under treatm
           <div>
             <h2>Verified Scientific Test Suite</h2>
           </div>
-          <p>11/11 Meson, Rust, and Vala test suites passing in the Fedora 41 Podman build container (<code>GSETTINGS_BACKEND=memory</code>).</p>
+          <p>10/10 Meson and Vala test suites passing in the Fedora 44 Podman build container (<code>GSETTINGS_BACKEND=memory</code>).</p>
         </div>
 
         <div class="test-grid">
-          <div class="test-row"><span>rust_core_tests (cargo test)</span><span class="test-pass">PASS</span></div>
-          <div class="test-row"><span>rust_rendering_tests (Markdown &amp; LaTeX)</span><span class="test-pass">PASS</span></div>
+          <div class="test-row"><span>native_rendering_tests (Markdown, LaTeX &amp; nbformat)</span><span class="test-pass">PASS</span></div>
           <div class="test-row"><span>mallorn_sandbox_tests (Zip-Slip &amp; ICH E9)</span><span class="test-pass">PASS</span></div>
           <div class="test-row"><span>ai_integration_tests (Elrond &amp; Failover)</span><span class="test-pass">PASS</span></div>
           <div class="test-row"><span>execution_and_security_tests (MCP guard)</span><span class="test-pass">PASS</span></div>
@@ -942,16 +941,16 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
           note: "imladris-toolchain installs R, Python, pip/venv, Pandoc, and verifies PATH runtimes during dpkg configure."
         },
         fedora: {
-          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.30.0/imladris-0.30.0-1.fc41.x86_64.rpm\nwget https://github.com/Antux912012/imladris/releases/download/v0.30.0/imladris-toolchain-0.30.0-1.fc41.noarch.rpm\nsudo dnf install ./imladris-0.30.0-1.fc41.x86_64.rpm ./imladris-toolchain-0.30.0-1.fc41.noarch.rpm",
+          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.30.0/imladris-0.30.0-1.fc44.x86_64.rpm\nwget https://github.com/Antux912012/imladris/releases/download/v0.30.0/imladris-toolchain-0.30.0-1.fc44.noarch.rpm\nsudo dnf install ./imladris-0.30.0-1.fc44.x86_64.rpm ./imladris-toolchain-0.30.0-1.fc44.noarch.rpm",
           note: "imladris-toolchain pulls R-core, python3, pandoc, and verifies optional Quarto/LaTeX on install."
         },
         arch: {
           cmd: "sudo pacman -S --needed gtk4 libadwaita gtksourceview5 webkitgtk-6.0 libsecret libsoup3 json-glib libgee r python python-pip pandoc\ncurl -LO https://github.com/Antux912012/imladris/releases/download/v0.30.0/PKGBUILD && makepkg -si",
-          note: "Builds natively from the v0.30.0 PKGBUILD with Rust imladris_core."
+          note: "Builds natively from the v0.30.0 PKGBUILD with pure Vala/C NativeCore."
         },
         nix: {
           cmd: "nix profile install github:Antux912012/imladris/v0.30.0",
-          note: "Reproducible Nix Flake package and devShell with GTK4, Vala, and Cargo."
+          note: "Reproducible Nix Flake package and devShell with GTK4, Libadwaita, and Vala."
         }
       };
 
@@ -980,7 +979,7 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
       var EXAMPLES = {
         quarto: {
           code: "---\ntitle: \"Adjuvant Cohort Survival Analysis\"\nbibliography: references.bib\nformat: html\n---\n\n```{r}\n#| label: fig-km-cohort\n#| fig-cap: \"Kaplan-Meier survival curve stratified by treatment arm\"\nlibrary(survival)\nfit <- survfit(Surv(time, status) ~ rx, data = colon)\nplot(fit, col = c(\"#7fb3d5\", \"#d8b26e\"), xlab = \"Days\", ylab = \"Survival\")\n```\n\nAs shown in @fig-km-cohort and @smith2024, median survival improved under treatment.",
-          note: "Rust imladris_core extracts prose words (excluding code/YAML), @fig-km-cohort cross-references, and @smith2024 citations in real time."
+          note: "NativeCore extracts prose words (excluding code/YAML), @fig-km-cohort cross-references, and @smith2024 citations in real time."
         },
         galaxy: {
           code: "```{r}\n#| label: galaxy-fetch-rnaseq\nlibrary(httr2)\napi_key <- Sys.getenv(\"GALAXY_API_KEY\") # Injected via libsecret-1 keyring\nresp <- request(\"https://usegalaxy.eu/api/datasets/f2db41e1fa331b3e/display\") |>\n  req_headers(\"x-api-key\" = api_key) |>\n  req_perform()\ncounts <- read.delim(text = resp_body_string(resp))\n```",

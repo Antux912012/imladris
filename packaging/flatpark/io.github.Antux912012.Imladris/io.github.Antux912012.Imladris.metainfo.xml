@@ -83,6 +83,7 @@
           <li>AI Model Controls: Discover and select Gemini models, tune response detail and temperature, or download curated Hugging Face GGUF models for managed llama.cpp.</li>
           <li>Low-Memory Local Inference: Compact models use capped context and quantized KV caches, CPU-only inference, one sequence, and retained mmap defaults; this reduces memory use but is not a hard RSS cap.</li>
           <li>Optional Toolchains: Choose the micromamba install folder and select only the R, Python, Quarto, Node/TypeScript, and TeX components needed.</li>
+          <li>Pure Vala/C Native Core: Replaced the Rust FFI layer with native Vala/GLib parsing and rendering, removing Cargo build overhead and streamlining Flatpak builds.</li>
           <li>Elrond Routing: Configured cloud-provider requests are no longer intercepted by a ready local Elrond server.</li>
         </ul>
       </description>
