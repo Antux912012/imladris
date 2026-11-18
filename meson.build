@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.27.1',
+  version: '0.30.0',
   default_options: ['warning_level=1']
 )
 
@@ -11,7 +11,7 @@ cc = meson.get_compiler('c')
 m_dep = cc.find_library('m', required: false)
 
 deps = [
-  dependency('gtk4', version: '>= 4.12'),
+  dependency('gtk4', version: '>= 4.14'),
   dependency('libadwaita-1', version: '>= 1.5'),
   dependency('gtksourceview-5', version: '>= 5.10'),
   dependency('webkitgtk-6.0'),
@@ -24,35 +24,6 @@ deps = [
   dependency('glib-2.0', version: '>= 2.76'),
   m_dep,
 ]
-
-rust_core_inc = include_directories('rust/imladris_core/include')
-rust_core_lib = custom_target('imladris_core_lib',
-  output: 'libimladris_core.a',
-  command: [
-    meson.current_source_dir() / 'scripts' / 'build-rust-core.sh',
-    meson.current_source_dir(),
-    '@OUTPUT@',
-  ],
-  build_by_default: true,
-  build_always_stale: true,
-  console: true,
-)
-
-rust_vala_args = [
-  '--target-glib=2.76',
-  '--vapidir=' + meson.current_source_dir() / 'src' / 'core',
-  '--pkg=imladris_core',
-]
-
-rust_test_exe = find_program('/usr/lib/sdk/rust-stable/bin/cargo', 'cargo', required: false)
-if rust_test_exe.found()
-  test('rust_core_tests', rust_test_exe,
-    args: ['test', '--offline', '--manifest-path', meson.current_source_dir() / 'rust/imladris_core/Cargo.toml'],
-    workdir: meson.current_source_dir() / 'rust/imladris_core',
-    env: ['PATH=/usr/lib/sdk/rust-stable/bin:/app/bin:/usr/bin:/bin'],
-    timeout: 60,
-  )
-endif
 
 resources = gnome.compile_resources(
   'imladris-resources',
@@ -73,6 +44,7 @@ sources = files(
   'src/runners/TypeScriptRunner.vala',
   'src/AiClient.vala',
   'src/ai/ElrondEngineController.vala',
+  'src/ai/LocalModelManager.vala',
   'src/ai/AiCompletionProvider.vala',
   'src/ai/CopilotAuthService.vala',
   'src/McpServer.vala',
@@ -151,9 +123,6 @@ executable('imladris',
   sources,
   resources,
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
   install: true
 )
 
@@ -219,9 +188,6 @@ test_sources = files(
 test_exe = executable('test_mallorn_sandbox',
   test_sources,
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
 )
 
 test('mallorn_sandbox_tests', test_exe, timeout: 120)
@@ -237,15 +203,13 @@ ai_test_sources = files(
   'src/AiClient.vala',
   'src/ai/CopilotAuthService.vala',
   'src/ai/ElrondEngineController.vala',
+  'src/ai/LocalModelManager.vala',
   'src/editor/AiBufferEditHelper.vala',
 )
 
 ai_test_exe = executable('test_ai_integration',
   ai_test_sources,
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
 )
 
 test('ai_integration_tests', ai_test_exe, timeout: 30)
@@ -280,9 +244,6 @@ plugin_test_sources = files(
 plugin_test_exe = executable('test_plugin_engine',
   plugin_test_sources,
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
 )
 
 test('plugin_engine_tests', plugin_test_exe, timeout: 30)
@@ -320,9 +281,6 @@ dock_test_sources = files(
 dock_test_exe = executable('test_dock_environment',
   dock_test_sources,
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
 )
 
 test('dock_environment_tests', dock_test_exe, timeout: 30)
@@ -370,9 +328,6 @@ shiny_test_sources = files(
 shiny_test_exe = executable('test_shiny_service',
   shiny_test_sources,
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
 )
 
 test('shiny_service_tests', shiny_test_exe, timeout: 30)
@@ -415,16 +370,13 @@ format_test_exe = executable('test_format_profile',
     'src/core/ChunkParser.vala',
   ),
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
 )
 
 test('format_profile_tests', format_test_exe, timeout: 30)
 
-rust_rendering_test_exe = executable('test_rust_rendering',
+native_rendering_test_exe = executable('test_native_rendering',
   files(
-    'tests/test_rust_rendering.vala',
+    'tests/test_native_rendering.vala',
     'src/core/frontmatter_parser.vala',
     'src/core/notebook_serializer.vala',
     'src/core/project_scaffolder.vala',
@@ -440,12 +392,9 @@ rust_rendering_test_exe = executable('test_rust_rendering',
     'src/adapters/DocumentAdapter.vala',
   ),
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
 )
 
-test('rust_rendering_tests', rust_rendering_test_exe, timeout: 30)
+test('native_rendering_tests', native_rendering_test_exe, timeout: 30)
 
 exec_sec_test_exe = executable('test_execution_and_security',
   files(
@@ -473,9 +422,6 @@ exec_sec_test_exe = executable('test_execution_and_security',
     'src/ui/PackagesRibbonBar.vala',
   ),
   dependencies: deps,
-  include_directories: [rust_core_inc],
-  link_with: [rust_core_lib],
-  vala_args: rust_vala_args,
 )
 
 test('execution_and_security_tests', exec_sec_test_exe, timeout: 30)

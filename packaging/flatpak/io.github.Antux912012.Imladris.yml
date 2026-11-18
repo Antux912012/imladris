@@ -2,10 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 id: io.github.Antux912012.Imladris
 runtime: org.gnome.Platform
-runtime-version: '50'
+runtime-version: '51'
 sdk: org.gnome.Sdk
-sdk-extensions:
-  - org.freedesktop.Sdk.Extension.rust-stable
 command: imladris
 finish-args:
   - --share=ipc
@@ -17,11 +15,6 @@ finish-args:
   - --filesystem=xdg-documents
   - --filesystem=xdg-download
   - --filesystem=xdg-cache/imladris:create
-build-options:
-  append-path: /usr/lib/sdk/rust-stable/bin
-  env:
-    CARGO_HOME: /run/build/imladris/cargo
-    CARGO_NET_OFFLINE: 'true'
 cleanup:
   - /include
   - /lib/pkgconfig
@@ -34,7 +27,5 @@ modules:
     config-opts:
       - --buildtype=release
     sources:
-      - type: git
-        url: https://github.com/Antux912012/imladris.git
-        tag: v0.26.0
-        commit: 32b9eddd14686dd6edeedf7565f8ee94457c1b6d
+      - type: dir
+        path: ../..

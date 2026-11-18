@@ -9,7 +9,7 @@ using Imladris.Adapters;
 
 namespace Imladris.Tests {
 
-    private static void test_chunk_parser_via_rust () {
+    private static void test_chunk_parser_native () {
         string doc = """---
 title: "Chunk Test"
 ---
@@ -35,7 +35,7 @@ y = 2 * 3
         assert (chunks[1].code.contains ("y = 2 * 3"));
     }
 
-    private static void test_frontmatter_parser_via_rust () {
+    private static void test_frontmatter_parser_native () {
         string doc = """---
 title: "My Paper"
 author: "Ada Lovelace"
@@ -88,7 +88,7 @@ Body paragraph.
             assert (editor_md.contains ("print(40 + 2)"));
 
             string modified_md = editor_md.replace ("print(40 + 2)", "print(41 + 1)");
-            string roundtrip_json = NotebookSerializer.markdown_to_ipynb (modified_md, orig_ipynb);
+            string roundtrip_json = NotebookSerializer.markdown_to_ipynb (modified_md, "", orig_ipynb);
             assert (roundtrip_json.contains ("keep-me"));
             assert (roundtrip_json.contains ("42\\n") || roundtrip_json.contains ("42"));
             assert (roundtrip_json.contains ("print(41 + 1)"));
@@ -144,6 +144,28 @@ price = "$x + y$"
         assert (cmp.contains ("&gt;"));
     }
 
+    private static void test_native_outline_and_typescript_symbols () {
+        string document = "# Notes\n\n```{python setup}\nprint(1)\n```\n\n## Results\n";
+        string outline_json = NativeCore.extract_outline_json (document);
+        assert (outline_json.contains ("\"kind\":\"heading\""));
+        assert (outline_json.contains ("\"kind\":\"chunk\""));
+        assert (outline_json.contains ("setup (python)"));
+
+        string symbols_json = NativeCore.analyze_typescript_symbols_json (
+            "export interface Point { x: number; }\nconst distance = (x: number) => x;"
+        );
+        assert (symbols_json.contains ("Point"));
+        assert (symbols_json.contains ("distance"));
+        assert (symbols_json.contains ("\"kind\":\"function\""));
+    }
+
+    private static void test_native_latex_diagnostics () {
+        string json = NativeCore.parse_latex_log_json ("! Undefined control sequence.\nl.17 \\badcommand\n");
+        assert (json.contains ("Undefined control sequence"));
+        assert (json.contains ("\"line\":17"));
+        assert (json.contains ("\"severity\":\"error\""));
+    }
+
     private static void test_mermaid_engine_fixes () {
         MermaidDiagramKind kind;
         MermaidFlowDirection dir;
@@ -167,12 +189,14 @@ price = "$x + y$"
 
     public static int main (string[] args) {
         Test.init (ref args);
-        Test.add_func ("/rust_rendering/chunk_parser", test_chunk_parser_via_rust);
-        Test.add_func ("/rust_rendering/frontmatter_parser", test_frontmatter_parser_via_rust);
-        Test.add_func ("/rust_rendering/ipynb_roundtrip", test_ipynb_roundtrip_preserves_outputs);
-        Test.add_func ("/rust_rendering/document_adapter_formats", test_document_adapter_code_protection_and_formats);
-        Test.add_func ("/rust_rendering/math_chem_fixes", test_math_chem_engine_fixes);
-        Test.add_func ("/rust_rendering/mermaid_fixes", test_mermaid_engine_fixes);
+        Test.add_func ("/native_rendering/chunk_parser", test_chunk_parser_native);
+        Test.add_func ("/native_rendering/frontmatter_parser", test_frontmatter_parser_native);
+        Test.add_func ("/native_rendering/ipynb_roundtrip", test_ipynb_roundtrip_preserves_outputs);
+        Test.add_func ("/native_rendering/document_adapter_formats", test_document_adapter_code_protection_and_formats);
+        Test.add_func ("/native_rendering/math_chem_fixes", test_math_chem_engine_fixes);
+        Test.add_func ("/native_rendering/mermaid_fixes", test_mermaid_engine_fixes);
+        Test.add_func ("/native_rendering/outline_and_typescript", test_native_outline_and_typescript_symbols);
+        Test.add_func ("/native_rendering/latex_diagnostics", test_native_latex_diagnostics);
         return Test.run ();
     }
 }

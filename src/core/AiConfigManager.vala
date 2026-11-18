@@ -190,7 +190,7 @@ namespace Imladris.Core {
 
         public string get_default_model () {
             switch (this) {
-                case GEMINI: return "gemini-2.0-flash";
+                case GEMINI: return "gemini-3.6-flash";
                 case CLAUDE: return "claude-3-5-sonnet-20241022";
                 case OPENAI: return "gpt-4o";
                 case DEEPSEEK: return "deepseek-chat";
@@ -216,7 +216,7 @@ namespace Imladris.Core {
         public string[] get_recommended_models () {
             switch (this) {
                 case GEMINI:
-                    return { "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-thinking-exp-01-21" };
+                    return { "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-4-hydrogen", "gemini-4-argon", "gemini-4-carbon" };
                 case CLAUDE:
                     return { "claude-3-5-sonnet-20241022", "claude-3-7-sonnet-20250219", "claude-3-5-haiku-20241022", "claude-3-opus-20240229" };
                 case OPENAI:
@@ -347,6 +347,47 @@ namespace Imladris.Core {
         }
     }
 
+    public enum AiResponseDetail {
+        CONCISE,
+        BALANCED,
+        DETAILED;
+
+        public string to_string_id () {
+            switch (this) {
+                case CONCISE: return "concise";
+                case DETAILED: return "detailed";
+                default: return "balanced";
+            }
+        }
+
+        public static AiResponseDetail from_string_id (string id) {
+            switch (id.down ()) {
+                case "concise": return CONCISE;
+                case "detailed": return DETAILED;
+                default: return BALANCED;
+            }
+        }
+
+        public string get_display_name () {
+            switch (this) {
+                case CONCISE: return "Concise";
+                case DETAILED: return "Detailed";
+                default: return "Balanced";
+            }
+        }
+
+        public string get_instruction () {
+            switch (this) {
+                case CONCISE:
+                    return "Keep the answer brief and direct. Include only essential explanation and code.";
+                case DETAILED:
+                    return "Provide a thorough, well-structured answer with relevant assumptions, steps, and caveats.";
+                default:
+                    return "Balance clear explanations with concise, directly usable code.";
+            }
+        }
+    }
+
     public class AiConfigManager : GLib.Object {
         private static AiConfigManager? _instance = null;
 
@@ -369,6 +410,18 @@ namespace Imladris.Core {
             set {
                 if (_temperature != value) {
                     _temperature = value;
+                    config_changed ();
+                    save ();
+                }
+            }
+        }
+
+        private AiResponseDetail _response_detail = AiResponseDetail.BALANCED;
+        public AiResponseDetail response_detail {
+            get { return _response_detail; }
+            set {
+                if (_response_detail != value) {
+                    _response_detail = value;
                     config_changed ();
                     save ();
                 }
@@ -562,6 +615,16 @@ namespace Imladris.Core {
             return provider.get_default_model ();
         }
 
+        public void set_model_for (AiProvider provider, string model) {
+            var settings = get_settings_for (provider);
+            string clean_model = model.strip ();
+            if (settings.model != clean_model) {
+                settings.model = clean_model;
+                config_changed ();
+                save ();
+            }
+        }
+
         public bool has_valid_key (AiProvider provider) {
             if (!provider.requires_api_key ()) {
                 return true;
@@ -656,6 +719,9 @@ namespace Imladris.Core {
                 if (root_obj.has_member ("temperature")) {
                     _temperature = root_obj.get_double_member ("temperature");
                 }
+                if (root_obj.has_member ("response_detail")) {
+                    _response_detail = AiResponseDetail.from_string_id (root_obj.get_string_member ("response_detail"));
+                }
                 if (root_obj.has_member ("auto_failover_enabled")) {
                     auto_failover_enabled = root_obj.get_boolean_member ("auto_failover_enabled");
                 }
@@ -691,6 +757,9 @@ namespace Imladris.Core {
 
                 builder.set_member_name ("temperature");
                 builder.add_double_value (temperature);
+
+                builder.set_member_name ("response_detail");
+                builder.add_string_value (response_detail.to_string_id ());
 
                 builder.set_member_name ("auto_failover_enabled");
                 builder.add_boolean_value (auto_failover_enabled);

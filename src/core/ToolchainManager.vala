@@ -16,6 +16,7 @@ namespace Imladris.Core {
 
         public signal void progress_changed (string step, double fraction, string detail);
         public signal void log_output (string line);
+        public signal void location_changed (string path);
 
         private string _base_dir;
         public string base_dir { get { return _base_dir; } }
@@ -37,11 +38,87 @@ namespace Imladris.Core {
 
         public ToolchainManager () {
             _base_dir = GLib.Path.build_filename (GLib.Environment.get_user_data_dir (), "imladris", "toolchains");
+            load_configured_base_dir ();
+            update_paths ();
+        }
+
+        private void update_paths () {
             _bin_dir = GLib.Path.build_filename (_base_dir, "bin");
             _mamba_bin = GLib.Path.build_filename (_bin_dir, "micromamba");
             _mamba_root = GLib.Path.build_filename (_base_dir, "mamba_root");
             _default_env = GLib.Path.build_filename (_mamba_root, "envs", "base-ds");
             _state_file = GLib.Path.build_filename (_base_dir, "state.json");
+        }
+
+        private string get_location_settings_path () {
+            return GLib.Path.build_filename (GLib.Environment.get_user_config_dir (), "imladris", "toolchain.ini");
+        }
+
+        private void load_configured_base_dir () {
+            string settings_path = get_location_settings_path ();
+            if (!GLib.FileUtils.test (settings_path, GLib.FileTest.EXISTS)) {
+                return;
+            }
+            try {
+                string contents;
+                GLib.FileUtils.get_contents (settings_path, out contents);
+                string configured = contents.strip ();
+                if (is_valid_base_dir_path (configured)) {
+                    _base_dir = GLib.File.new_for_path (configured).get_path () ?? configured;
+                } else {
+                    warning ("Ignoring invalid configured toolchain directory: %s", configured);
+                }
+            } catch (GLib.Error e) {
+                warning ("Could not read the configured toolchain directory: %s", e.message);
+            }
+        }
+
+        public static bool is_valid_base_dir_path (string path) {
+            string candidate = path.strip ();
+            return candidate.length > 0 && GLib.Path.is_absolute (candidate) && candidate != "/";
+        }
+
+        public void set_base_dir (string path) throws GLib.Error {
+            string candidate = path.strip ();
+            if (!is_valid_base_dir_path (candidate)) {
+                throw new GLib.IOError.INVALID_ARGUMENT ("Choose an absolute folder other than the filesystem root.");
+            }
+            candidate = GLib.File.new_for_path (candidate).get_path () ?? candidate;
+            if (GLib.FileUtils.test (candidate, GLib.FileTest.EXISTS) &&
+                !GLib.FileUtils.test (candidate, GLib.FileTest.IS_DIR)) {
+                throw new GLib.IOError.NOT_DIRECTORY ("The selected toolchain path is not a folder.");
+            }
+
+            string writable_parent = candidate;
+            while (!GLib.FileUtils.test (writable_parent, GLib.FileTest.EXISTS)) {
+                string parent = GLib.Path.get_dirname (writable_parent);
+                if (parent == writable_parent) {
+                    break;
+                }
+                writable_parent = parent;
+            }
+            bool parent_writable = false;
+            try {
+                var info = GLib.File.new_for_path (writable_parent).query_info (
+                    GLib.FileAttribute.ACCESS_CAN_WRITE, GLib.FileQueryInfoFlags.NONE
+                );
+                parent_writable = info.get_attribute_boolean (GLib.FileAttribute.ACCESS_CAN_WRITE);
+            } catch (GLib.Error e) {
+                warning ("Could not check toolchain folder permissions: %s", e.message);
+            }
+            if (!GLib.FileUtils.test (writable_parent, GLib.FileTest.IS_DIR) || !parent_writable) {
+                throw new GLib.IOError.PERMISSION_DENIED ("The selected folder or its parent is not writable.");
+            }
+
+            string settings_path = get_location_settings_path ();
+            GLib.DirUtils.create_with_parents (GLib.Path.get_dirname (settings_path), 0755);
+            if (!GLib.FileUtils.set_contents (settings_path, candidate + "\n")) {
+                throw new GLib.IOError.FAILED ("Could not save the selected toolchain folder.");
+            }
+            GLib.FileUtils.chmod (settings_path, 0600);
+            _base_dir = candidate;
+            update_paths ();
+            location_changed (_base_dir);
         }
 
         private static string? cached_arch = null;
@@ -71,7 +148,8 @@ namespace Imladris.Core {
         }
 
         public bool is_base_environment_installed () {
-            return has_r () || has_python ();
+            return has_r () || has_python () || has_quarto () || has_node_typescript () ||
+                has_tectonic () || has_completed_setup_state ();
         }
 
         public bool has_r () {
@@ -87,6 +165,35 @@ namespace Imladris.Core {
         public bool has_quarto () {
             string q_path = GLib.Path.build_filename (default_env, "bin", "quarto");
             return GLib.FileUtils.test (q_path, GLib.FileTest.IS_EXECUTABLE);
+        }
+
+        public bool has_node_typescript () {
+            string node_path = GLib.Path.build_filename (default_env, "bin", "node");
+            string tsc_path = GLib.Path.build_filename (default_env, "bin", "tsc");
+            return GLib.FileUtils.test (node_path, GLib.FileTest.IS_EXECUTABLE) &&
+                GLib.FileUtils.test (tsc_path, GLib.FileTest.IS_EXECUTABLE);
+        }
+
+        public bool has_tectonic () {
+            string tex_path = GLib.Path.build_filename (default_env, "bin", "tectonic");
+            return GLib.FileUtils.test (tex_path, GLib.FileTest.IS_EXECUTABLE);
+        }
+
+        private bool has_completed_setup_state () {
+            if (!GLib.FileUtils.test (state_file, GLib.FileTest.EXISTS)) {
+                return false;
+            }
+            try {
+                var parser = new Json.Parser ();
+                parser.load_from_file (state_file);
+                var root = parser.get_root ();
+                return root != null && root.get_node_type () == Json.NodeType.OBJECT &&
+                    root.get_object ().has_member ("setup_complete") &&
+                    root.get_object ().get_boolean_member ("setup_complete");
+            } catch (GLib.Error e) {
+                warning ("Could not read toolchain setup state: %s", e.message);
+                return false;
+            }
         }
 
         /**
@@ -166,12 +273,6 @@ namespace Imladris.Core {
             bool install_node_ts = false,
             bool install_tex = false
         ) {
-            bool mamba_ok = yield ensure_micromamba_async ();
-            if (!mamba_ok) {
-                log_output ("✖ Aborting environment creation: micromamba binary is missing.");
-                return false;
-            }
-
             var pkgs = new GLib.GenericArray<string> ();
 
             if (install_python) {
@@ -220,7 +321,18 @@ namespace Imladris.Core {
 
             if (pkgs.length == 0) {
                 log_output ("ℹ No components selected for installation.");
+                if (!save_state ()) {
+                    progress_changed ("Could not save toolchain setup state", 0.0, state_file);
+                    return false;
+                }
+                progress_changed ("No toolchain components selected", 1.0, "You can install runtimes later from Preferences.");
                 return true;
+            }
+
+            bool mamba_ok = yield ensure_micromamba_async ();
+            if (!mamba_ok) {
+                log_output ("✖ Aborting environment creation: micromamba binary is missing.");
+                return false;
             }
 
             progress_changed ("Resolving conda-forge packages...", 0.35, "Connecting to conda-forge");
@@ -286,7 +398,10 @@ namespace Imladris.Core {
                     configure_rprofile_site (default_env);
                 }
 
-                save_state (install_r, install_python, install_quarto, install_tidyverse);
+                if (!save_state ()) {
+                    progress_changed ("Could not save toolchain setup state", 0.0, state_file);
+                    return false;
+                }
                 progress_changed ("Toolchain installed successfully", 1.0, "Ready to execute R, Python & Quarto");
                 log_output ("✔ Imladris Managed Toolchain (base-ds) provisioned successfully.");
                 return true;
@@ -425,10 +540,14 @@ local({
          * Returns estimated disk space occupied by toolchains directory in bytes.
          */
         public int64 get_toolchain_disk_usage () {
-            if (!GLib.FileUtils.test (base_dir, GLib.FileTest.IS_DIR)) {
+            return get_toolchain_disk_usage_for (base_dir);
+        }
+
+        public int64 get_toolchain_disk_usage_for (string path) {
+            if (!GLib.FileUtils.test (path, GLib.FileTest.IS_DIR)) {
                 return 0;
             }
-            return compute_dir_size (base_dir);
+            return compute_dir_size (path);
         }
 
         private int64 compute_dir_size (string path) {
@@ -465,23 +584,48 @@ local({
             } catch (GLib.Error e) {}
         }
 
-        private void save_state (bool has_r_pkg, bool has_py_pkg, bool has_q_pkg, bool has_tidy_pkg) {
+        private bool has_tidyverse () {
+            string rscript = GLib.Path.build_filename (default_env, "bin", "Rscript");
+            if (!GLib.FileUtils.test (rscript, GLib.FileTest.IS_EXECUTABLE)) {
+                return false;
+            }
             try {
+                string[] argv = {
+                    rscript, "-e", "if (!requireNamespace('tidyverse', quietly=TRUE)) quit(status=1)"
+                };
+                var proc = new GLib.Subprocess.newv (argv, GLib.SubprocessFlags.NONE);
+                proc.wait_check ();
+                return true;
+            } catch (GLib.Error e) {
+                log_output ("Could not confirm the tidyverse package is installed: " + e.message);
+                return false;
+            }
+        }
+
+        private bool save_state () {
+            try {
+                GLib.DirUtils.create_with_parents (base_dir, 0755);
                 var builder = new Json.Builder ();
                 builder.begin_object ();
                 builder.set_member_name ("installed_at");
                 builder.add_string_value (new GLib.DateTime.now_local ().to_string ());
+                builder.set_member_name ("setup_complete");
+                builder.add_boolean_value (true);
 
                 builder.set_member_name ("components");
                 builder.begin_object ();
                 builder.set_member_name ("r");
-                builder.add_boolean_value (has_r_pkg);
+                builder.add_boolean_value (has_r ());
                 builder.set_member_name ("r_tidyverse");
-                builder.add_boolean_value (has_tidy_pkg);
+                builder.add_boolean_value (has_tidyverse ());
                 builder.set_member_name ("python");
-                builder.add_boolean_value (has_py_pkg);
+                builder.add_boolean_value (has_python ());
                 builder.set_member_name ("quarto");
-                builder.add_boolean_value (has_q_pkg);
+                builder.add_boolean_value (has_quarto ());
+                builder.set_member_name ("node_typescript");
+                builder.add_boolean_value (has_node_typescript ());
+                builder.set_member_name ("tectonic");
+                builder.add_boolean_value (has_tectonic ());
                 builder.end_object ();
 
                 builder.end_object ();
@@ -490,7 +634,11 @@ local({
                 var root = builder.get_root ();
                 generator.set_root (root);
                 generator.to_file (state_file);
-            } catch (GLib.Error e) {}
+                return true;
+            } catch (GLib.Error e) {
+                log_output (@"✖ Failed to save toolchain state: $(e.message)");
+                return false;
+            }
         }
     }
 }

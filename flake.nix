@@ -20,7 +20,7 @@
         {
           default = pkgs.stdenv.mkDerivation {
             pname = "imladris";
-            version = "0.27.0";
+            version = "0.30.0";
 
             src = self;
 
@@ -29,8 +29,6 @@
               ninja
               pkg-config
               vala
-              cargo
-              rustc
               wrapGAppsHook4
               desktop-file-utils
               appstream-glib

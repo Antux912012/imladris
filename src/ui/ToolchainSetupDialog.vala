@@ -16,6 +16,8 @@ namespace Imladris.UI {
         private Adw.SwitchRow tidy_switch;
         private Adw.SwitchRow py_switch;
         private Adw.SwitchRow quarto_switch;
+        private Adw.SwitchRow node_switch;
+        private Adw.SwitchRow tex_switch;
 
         private Gtk.Button install_btn;
         private Gtk.ProgressBar progress_bar;
@@ -27,6 +29,7 @@ namespace Imladris.UI {
         private ulong progress_sig_id = 0;
         private ulong log_sig_id = 0;
         private bool is_disposed = false;
+        private uint location_size_request = 0;
 
         public ToolchainSetupDialog () {
             Object (
@@ -39,6 +42,12 @@ namespace Imladris.UI {
                 disconnect_tm_signals ();
             });
             build_ui ();
+        }
+
+        public void start_installation () {
+            if (!is_disposed && install_btn.sensitive) {
+                on_install_clicked ();
+            }
         }
 
         private void disconnect_tm_signals () {
@@ -65,7 +74,7 @@ namespace Imladris.UI {
             // =================================================================
             var info_group = new Adw.PreferencesGroup () {
                 title = "Automated Toolchain Provisioning",
-                description = "Self-contained, pre-compiled Data Science runtimes powered by micromamba. Works seamlessly inside Flatpak with zero host dependencies and pre-compiled C/C++ libraries."
+                description = "Choose only the runtimes you need. Changing this folder affects future installs and does not move an existing toolchain."
             };
 
             var tm = Core.ToolchainManager.get_default ();
@@ -74,27 +83,47 @@ namespace Imladris.UI {
                 subtitle = tm.base_dir
             };
             location_row.add_prefix (new Gtk.Image.from_icon_name ("drive-harddisk-symbolic"));
-
             var size_badge = new Gtk.Label ("Calculating...") {
                 valign = Gtk.Align.CENTER,
                 visible = false
             };
             size_badge.add_css_class ("dim-label");
             size_badge.add_css_class ("caption");
+            var choose_location_button = new Gtk.Button.with_label ("Choose...") {
+                valign = Gtk.Align.CENTER
+            };
+            choose_location_button.clicked.connect (() => {
+                var chooser = new Gtk.FileChooserNative (
+                    "Choose Toolchain Folder",
+                    this.get_root () as Gtk.Window,
+                    Gtk.FileChooserAction.SELECT_FOLDER,
+                    "Select Folder",
+                    "Cancel"
+                );
+                chooser.set_create_folders (true);
+                chooser.response.connect ((response) => {
+                    if (response == Gtk.ResponseType.ACCEPT) {
+                        var selected_folder = chooser.get_file ();
+                        string? selected_path = selected_folder != null ? selected_folder.get_path () : null;
+                        if (selected_path != null) {
+                            try {
+                                tm.set_base_dir (selected_path);
+                                location_row.subtitle = tm.base_dir;
+                                refresh_location_size (tm, size_badge);
+                            } catch (GLib.Error e) {
+                                progress_box.visible = true;
+                                status_lbl.label = "Could not select that folder: %s".printf (e.message);
+                            }
+                        }
+                    }
+                    chooser.destroy ();
+                });
+                chooser.show ();
+            });
+            location_row.add_suffix (choose_location_button);
             location_row.add_suffix (size_badge);
 
-            new GLib.Thread<void*> ("imladris-toolchain-size", () => {
-                int64 usage = tm.get_toolchain_disk_usage ();
-                GLib.Idle.add (() => {
-                    if (usage > 0) {
-                        double mb = (double) usage / (1024.0 * 1024.0);
-                        size_badge.label = "%.1f MB installed".printf (mb);
-                        size_badge.visible = true;
-                    }
-                    return GLib.Source.REMOVE;
-                });
-                return null;
-            });
+            refresh_location_size (tm, size_badge);
             info_group.add (location_row);
             page.add (info_group);
 
@@ -137,6 +166,22 @@ namespace Imladris.UI {
             };
             quarto_switch.add_prefix (new Gtk.Image.from_icon_name ("document-edit-symbolic"));
             comp_group.add (quarto_switch);
+
+            node_switch = new Adw.SwitchRow () {
+                title = "Node.js + TypeScript",
+                subtitle = "Node.js runtime and TypeScript compiler for .ts documents and code execution.",
+                active = true
+            };
+            node_switch.add_prefix (new Gtk.Image.from_icon_name ("application-x-addon-symbolic"));
+            comp_group.add (node_switch);
+
+            tex_switch = new Adw.SwitchRow () {
+                title = "Tectonic TeX engine",
+                subtitle = "Self-updating TeX engine for compiling .tex documents and PDF output.",
+                active = true
+            };
+            tex_switch.add_prefix (new Gtk.Image.from_icon_name ("x-office-document-symbolic"));
+            comp_group.add (tex_switch);
 
             r_switch.notify["active"].connect (() => {
                 tidy_switch.sensitive = r_switch.active;
@@ -218,6 +263,8 @@ namespace Imladris.UI {
             tidy_switch.sensitive = false;
             py_switch.sensitive = false;
             quarto_switch.sensitive = false;
+            node_switch.sensitive = false;
+            tex_switch.sensitive = false;
 
             progress_box.visible = true;
             progress_bar.fraction = 0.05;
@@ -238,8 +285,10 @@ namespace Imladris.UI {
             bool do_tidy = tidy_switch.active;
             bool do_py = py_switch.active;
             bool do_quarto = quarto_switch.active;
+            bool do_node = node_switch.active;
+            bool do_tex = tex_switch.active;
 
-            tm.create_or_update_base_environment_async.begin (do_r, do_py, do_quarto, do_tidy, false, false, (obj, res) => {
+            tm.create_or_update_base_environment_async.begin (do_r, do_py, do_quarto, do_tidy, do_node, do_tex, (obj, res) => {
                 bool ok = tm.create_or_update_base_environment_async.end (res);
                 disconnect_tm_signals ();
                 Core.PlatformUtils.clear_caches ();
@@ -250,7 +299,7 @@ namespace Imladris.UI {
 
                 if (ok) {
                     progress_bar.fraction = 1.0;
-                    status_lbl.label = "✔ Installation Complete! R, Python and Quarto are ready.";
+                    status_lbl.label = "✔ Installation complete. The selected runtimes are ready.";
                     install_btn.label = "Done";
                     install_btn.sensitive = true;
                     install_btn.remove_css_class ("suggested-action");
@@ -268,6 +317,8 @@ namespace Imladris.UI {
                     tidy_switch.sensitive = r_switch.active;
                     py_switch.sensitive = true;
                     quarto_switch.sensitive = true;
+                    node_switch.sensitive = true;
+                    tex_switch.sensitive = true;
                 }
             });
         }
@@ -283,6 +334,25 @@ namespace Imladris.UI {
                 var mark = buffer.create_mark (null, end, false);
                 log_view.scroll_to_mark (mark, 0.0f, true, 0.0f, 1.0f);
                 return GLib.Source.REMOVE;
+            });
+        }
+
+        private void refresh_location_size (Core.ToolchainManager tm, Gtk.Label size_badge) {
+            uint request = ++location_size_request;
+            string path = tm.base_dir;
+            size_badge.label = "Calculating...";
+            size_badge.visible = false;
+            new GLib.Thread<void*> ("imladris-toolchain-size", () => {
+                int64 usage = tm.get_toolchain_disk_usage_for (path);
+                GLib.Idle.add (() => {
+                    if (request == location_size_request && usage > 0) {
+                        double mb = (double) usage / (1024.0 * 1024.0);
+                        size_badge.label = "%.1f MB installed".printf (mb);
+                        size_badge.visible = true;
+                    }
+                    return GLib.Source.REMOVE;
+                });
+                return null;
             });
         }
     }

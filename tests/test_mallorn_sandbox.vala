@@ -827,7 +827,7 @@ x <- 42
             assert (converted_md.contains ("cell_0002"));
 
             // 4. Test secondary round-trip (idempotency check)
-            string round_trip_ipynb = Core.NotebookSerializer.markdown_to_ipynb (converted_md, generated_ipynb);
+            string round_trip_ipynb = Core.NotebookSerializer.markdown_to_ipynb (converted_md, "", generated_ipynb);
             var parser2 = new Json.Parser ();
             parser2.load_from_data (round_trip_ipynb);
             var root2 = parser2.get_root ().get_object ();
@@ -1187,7 +1187,7 @@ df_omics = pd.read_csv("counts.tsv")
             assert ("cell-1" in md_nb);
             assert (!("outputs_b64" in md_nb));
             assert ("print(42)" in md_nb);
-            string saved_ipynb = Core.NotebookSerializer.markdown_to_ipynb (md_nb, sample_ipynb);
+            string saved_ipynb = Core.NotebookSerializer.markdown_to_ipynb (md_nb, "", sample_ipynb);
             assert ("\"output_type\":\"stream\"" in saved_ipynb.replace (" ", "") || "\"output_type\": \"stream\"" in saved_ipynb);
             assert (!("ipynb-output" in saved_ipynb));
         } catch (GLib.Error e) {

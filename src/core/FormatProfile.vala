@@ -287,6 +287,71 @@ namespace Imladris.Core {
                         new string[] {}
                     );
                 case DocumentFormat.BIB:
+                case DocumentFormat.BIBLIOGRAPHY:
+                    return new FormatProfile (
+                        fmt,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        "none", "% ", "", "",
+                        CitationStyle.NONE,
+                        RibbonRunMode.HIDDEN,
+                        RibbonHomeMode.CODE_EDITING,
+                        HeaderActionKind.NONE,
+                        "", "", "",
+                        "BIB",
+                        new string[] {}
+                    );
+                case DocumentFormat.CSV:
+                    return new FormatProfile (
+                        DocumentFormat.CSV,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        "none", "", "", "",
+                        CitationStyle.NONE,
+                        RibbonRunMode.HIDDEN,
+                        RibbonHomeMode.CODE_EDITING,
+                        HeaderActionKind.NONE,
+                        "", "", "",
+                        "CSV",
+                        new string[] {}
+                    );
+                case DocumentFormat.TSV:
+                    return new FormatProfile (
+                        DocumentFormat.TSV,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        "none", "", "", "",
+                        CitationStyle.NONE,
+                        RibbonRunMode.HIDDEN,
+                        RibbonHomeMode.CODE_EDITING,
+                        HeaderActionKind.NONE,
+                        "", "", "",
+                        "TSV",
+                        new string[] {}
+                    );
+                case DocumentFormat.TXT:
+                    return new FormatProfile (
+                        DocumentFormat.TXT,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        "none", "", "", "",
+                        CitationStyle.NONE,
+                        RibbonRunMode.HIDDEN,
+                        RibbonHomeMode.CODE_EDITING,
+                        HeaderActionKind.NONE,
+                        "", "", "",
+                        "TXT",
+                        new string[] {}
+                    );
+                case DocumentFormat.RPROJ:
+                    return new FormatProfile (
+                        DocumentFormat.RPROJ,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        "none", "", "", "",
+                        CitationStyle.NONE,
+                        RibbonRunMode.HIDDEN,
+                        RibbonHomeMode.CODE_EDITING,
+                        HeaderActionKind.NONE,
+                        "", "", "",
+                        "RPROJ",
+                        new string[] {}
+                    );
                 default:
                     return new FormatProfile (
                         DocumentFormat.BIB,

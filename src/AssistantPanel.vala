@@ -20,6 +20,9 @@ namespace Imladris {
         private Gtk.DropDown engine_dropdown;
         private Gtk.DropDown model_dropdown;
         private Gtk.StringList model_string_list;
+        private Gtk.Button refresh_models_btn;
+        private string[] discovered_models = {};
+        private AiProvider discovered_models_provider = AiProvider.GEMINI;
         private Adw.Banner api_key_banner;
         private Gtk.Label status_lbl;
         private Window parent_window;
@@ -94,6 +97,13 @@ namespace Imladris {
                 tooltip_text = "Select model"
             };
             header_box.append (model_dropdown);
+
+            refresh_models_btn = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
+                tooltip_text = "Refresh models from the selected provider"
+            };
+            refresh_models_btn.add_css_class ("flat");
+            refresh_models_btn.clicked.connect (refresh_models);
+            header_box.append (refresh_models_btn);
 
             var settings_btn = new Gtk.Button.from_icon_name ("emblem-system-symbolic") {
                 tooltip_text = "Configure AI Keys & Endpoints"
@@ -252,17 +262,17 @@ namespace Imladris {
 
             model_dropdown.notify["selected"].connect (() => {
                 if (updating_model_list) return;
+                if (model_dropdown.selected == Gtk.INVALID_LIST_POSITION) return;
                 var item = model_string_list.get_string (model_dropdown.selected);
                 if (item != null && item.length > 0) {
-                    var s = config_mgr.get_settings_for (config_mgr.active_provider);
-                    s.model = item;
-                    config_mgr.save ();
+                    config_mgr.set_model_for (config_mgr.active_provider, item);
                     status_lbl.label = @"Ready ($(config_mgr.active_provider.get_short_name ()) - $item)";
                 }
             });
 
             config_mgr.config_changed.connect (() => {
                 check_key_status ();
+                update_model_dropdown_for_provider (config_mgr.active_provider);
             });
 
             config_mgr.provider_changed.connect ((prov) => {
@@ -289,25 +299,25 @@ namespace Imladris {
             string current_model = config_mgr.get_model_for (provider);
             uint selected_idx = 0;
 
-            for (uint i = 0; i < rec.length; i++) {
-                model_string_list.append (rec[i]);
-                if (rec[i] == current_model) {
-                    selected_idx = i;
+            var options = new Gee.ArrayList<string> ();
+            foreach (string model in rec) {
+                if (!options.contains (model)) options.add (model);
+            }
+            if (discovered_models_provider == provider) {
+                foreach (string model in discovered_models) {
+                    if (!options.contains (model)) options.add (model);
                 }
             }
 
             // If current model is custom and not in recommended list, append it
-            if (current_model.length > 0) {
-                bool found = false;
-                for (uint i = 0; i < rec.length; i++) {
-                    if (rec[i] == current_model) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    model_string_list.append (current_model);
-                    selected_idx = model_string_list.get_n_items () - 1;
+            if (current_model.length > 0 && !options.contains (current_model)) {
+                options.add (current_model);
+            }
+
+            for (int i = 0; i < options.size; i++) {
+                model_string_list.append (options[i]);
+                if (options[i] == current_model) {
+                    selected_idx = (uint) i;
                 }
             }
 
@@ -315,6 +325,25 @@ namespace Imladris {
             updating_model_list = false;
 
             status_lbl.label = @"Ready ($(provider.get_short_name ()) - $current_model)";
+        }
+
+        private void refresh_models () {
+            var provider = config_mgr.active_provider;
+            refresh_models_btn.sensitive = false;
+            status_lbl.label = @"Loading models from $(provider.get_short_name ())...";
+            ai_client.list_models_async.begin (provider, null, (obj, res) => {
+                refresh_models_btn.sensitive = true;
+                try {
+                    discovered_models = ai_client.list_models_async.end (res);
+                    discovered_models_provider = provider;
+                    update_model_dropdown_for_provider (provider);
+                    status_lbl.label = discovered_models.length > 0
+                        ? @"Loaded $(discovered_models.length) models from $(provider.get_short_name ())"
+                        : @"No models were returned by $(provider.get_short_name ())";
+                } catch (GLib.Error e) {
+                    status_lbl.label = @"Model refresh failed: $(e.message)";
+                }
+            });
         }
 
         private void check_key_status () {
@@ -344,9 +373,12 @@ namespace Imladris {
             var elrond_engine = Imladris.AI.ElrondEngineController.get_default ();
             var provider = config_mgr.active_provider;
             bool provider_has_key = !provider.requires_api_key () || config_mgr.has_valid_key (provider);
+            bool custom_endpoint_configured = provider == AiProvider.CUSTOM &&
+                config_mgr.get_endpoint_for (provider).strip ().length > 0;
+            bool selected_provider_ready = provider_has_key || custom_endpoint_configured;
 
-            // If Elrond is enabled and ready, and user hasn't explicitly configured a distinct active provider with a key
-            if (settings.elrond_enabled && elrond_engine.is_ready) {
+            // Only use the Elrond bridge when the selected provider is not configured.
+            if (settings.elrond_enabled && elrond_engine.is_ready && !selected_provider_ready) {
                 string model_name = settings.active_model_name;
 
                 append_to_chat (@"👤 You:\n$user_prompt\n\n🤖 Thinking ($model_name)...");

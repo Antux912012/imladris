@@ -90,12 +90,16 @@ EOF_META
       echo "✔ Bundled Vulkan llama-server from local cache."
     else
       XDG_DATA_HOME="${PROJECT_DIR}/build-flatpak-app/files/share" "${PROJECT_DIR}/scripts/install-llama-server.sh" vulkan || true
-      if [ -f "${PROJECT_DIR}/build-flatpak-app/files/share/imladris/bin/llama-server" ]; then
+      LLAMA_VULKAN_DIR="${PROJECT_DIR}/build-flatpak-app/files/share/imladris/bin/vulkan"
+      if [ -x "${LLAMA_VULKAN_DIR}/llama-server" ]; then
         mkdir -p build-flatpak-app/files/bin build-flatpak-app/files/lib
-        cp -f "${PROJECT_DIR}/build-flatpak-app/files/share/imladris/bin/llama-server" build-flatpak-app/files/bin/
-        cp -f "${PROJECT_DIR}/build-flatpak-app/files/share/imladris/bin/llama-server" build-flatpak-app/files/bin/llama-server-vulkan
-        cp -f "${PROJECT_DIR}/build-flatpak-app/files/share/imladris/bin/vulkan/"*.so* build-flatpak-app/files/lib/ 2>/dev/null || true
+        cp -f "${LLAMA_VULKAN_DIR}/llama-server" build-flatpak-app/files/bin/
+        cp -f "${LLAMA_VULKAN_DIR}/llama-server" build-flatpak-app/files/bin/llama-server-vulkan
+        cp -af "${LLAMA_VULKAN_DIR}/"*.so* build-flatpak-app/files/lib/
+        rm -rf "${PROJECT_DIR}/build-flatpak-app/files/share/imladris/bin"
         echo "✔ Bundled Vulkan llama-server from installer script."
+      else
+        echo "⚠ llama-server unavailable; it will be installed on first model use."
       fi
     fi
   fi
@@ -142,7 +146,7 @@ PYEOF
     --filesystem=home \
     --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
 
-  flatpak build-export repo build-flatpak-app master
+  flatpak build-export --disable-sandbox repo build-flatpak-app master
   flatpak build-update-repo repo || true
   flatpak build-bundle repo "${BUNDLE_NAME}" "${APP_ID}" master
   echo "✔ Flatpak bundle generated: ${BUNDLE_NAME} ($(du -h "${BUNDLE_NAME}" | cut -f1))"
@@ -169,7 +173,7 @@ Priority: optional
 Architecture: ${ARCH}
 Installed-Size: ${INSTALLED_SIZE}
 Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
-Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.12), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3, curl, bzip2
+Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.14), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3, curl, bzip2, tar
 Recommends: pandoc, libreoffice-writer | libreoffice, texlive-latex-base | typst, llama.cpp | llama-cpp
 Homepage: https://antux912012.github.io/imladris/
 Description: Native Scientific Notebook Studio for Quarto, R, Python, and Jupyter

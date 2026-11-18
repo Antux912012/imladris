@@ -23,6 +23,11 @@ namespace Imladris.Tests {
         assert (DocumentFormat.from_filename ("pipeline.PY") == DocumentFormat.PYSCRIPT);
         assert (DocumentFormat.from_filename ("styles.css") == DocumentFormat.CSS);
         assert (DocumentFormat.from_filename ("refs.bib") == DocumentFormat.BIB);
+        assert (DocumentFormat.from_filename ("refs.BIBLIOGRAPHY") == DocumentFormat.BIBLIOGRAPHY);
+        assert (DocumentFormat.from_filename ("notes.txt") == DocumentFormat.TXT);
+        assert (DocumentFormat.from_filename ("table.csv") == DocumentFormat.CSV);
+        assert (DocumentFormat.from_filename ("table.tsv") == DocumentFormat.TSV);
+        assert (DocumentFormat.from_filename ("project.Rproj") == DocumentFormat.RPROJ);
 
         assert (DocumentFormat.TEX.to_syntax_lang () == "latex");
         assert (DocumentFormat.TS.to_syntax_lang () == "typescript");
@@ -61,6 +66,9 @@ namespace Imladris.Tests {
         assert (html.supports_live_preview);
         assert (html.block_comment_open == "<!-- ");
         assert (html.ribbon_run_mode == RibbonRunMode.HIDDEN);
+
+        assert (FormatProfile.for_filename ("notes.txt").ribbon_run_mode == RibbonRunMode.HIDDEN);
+        assert (FormatProfile.for_filename ("project.Rproj").line_comment_prefix == "");
     }
 
     private static void test_workspace_per_doc_isolation () {

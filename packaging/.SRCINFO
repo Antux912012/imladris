@@ -10,7 +10,7 @@ pkgbase = imladris
 	makedepends = vala>=0.56
 	makedepends = pkgconf
 	makedepends = gcc
-	depends = gtk4>=4.12
+	depends = gtk4>=4.14
 	depends = libadwaita>=1.5
 	depends = gtksourceview5>=5.10
 	depends = webkitgtk-6.0

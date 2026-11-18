@@ -1,0 +1,7 @@
+rust/
+build*/
+rpmbuild/
+repo/
+*.deb
+*.rpm
+*.flatpak

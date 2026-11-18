@@ -11,10 +11,22 @@ namespace Imladris.UI {
     public class AiSettingsDialog : Adw.PreferencesDialog {
 
         private AiConfigManager config_mgr;
+        private Imladris.AI.LocalModelManager local_model_manager;
+        private Gtk.ProgressBar? local_model_progress;
+        private Adw.ActionRow? local_model_status;
+        private Gtk.Button? local_model_download_button;
+        private Gtk.Button? local_model_cancel_button;
+        private Cancellable? local_model_cancellable;
 
         public AiSettingsDialog () {
             Object (title: "AI Engine & Model Configuration");
             this.config_mgr = AiConfigManager.get_default ();
+            this.local_model_manager = new Imladris.AI.LocalModelManager ();
+            this.closed.connect (() => {
+                if (local_model_cancellable != null) {
+                    local_model_cancellable.cancel ();
+                }
+            });
 
             setup_pages ();
         }
@@ -28,10 +40,50 @@ namespace Imladris.UI {
                 icon_name = "network-server-symbolic"
             };
 
+            var generation_group = new Adw.PreferencesGroup () {
+                title = "Generation Style",
+                description = "Shared response detail and sampling settings for cloud and local AI."
+            };
+            var detail_options = new Gtk.StringList (null);
+            detail_options.append ("Concise");
+            detail_options.append ("Balanced");
+            detail_options.append ("Detailed");
+            var detail_row = new Adw.ComboRow () {
+                title = "Response Detail",
+                subtitle = "Controls how brief or thorough Elrond's answers should be.",
+                model = detail_options,
+                selected = (uint) config_mgr.response_detail
+            };
+            detail_row.notify["selected"].connect (() => {
+                if (detail_row.selected <= (uint) AiResponseDetail.DETAILED) {
+                    config_mgr.response_detail = (AiResponseDetail) detail_row.selected;
+                }
+            });
+            generation_group.add (detail_row);
+
+            var temperature_row = new Adw.ActionRow () {
+                title = "Temperature",
+                subtitle = "%.2f".printf (config_mgr.temperature)
+            };
+            var temperature_scale = new Gtk.Scale.with_range (Gtk.Orientation.HORIZONTAL, 0.0, 2.0, 0.05) {
+                valign = Gtk.Align.CENTER,
+                width_request = 200,
+                draw_value = false
+            };
+            temperature_scale.set_digits (2);
+            temperature_scale.set_value (config_mgr.temperature);
+            temperature_scale.value_changed.connect (() => {
+                config_mgr.temperature = temperature_scale.get_value ();
+                temperature_row.subtitle = "%.2f".printf (config_mgr.temperature);
+            });
+            temperature_row.add_suffix (temperature_scale);
+            generation_group.add (temperature_row);
+            frontier_page.add (generation_group);
+
             // --- Google Gemini Group ---
             var gemini_group = new Adw.PreferencesGroup () {
                 title = "Google Gemini",
-                description = "Google DeepMind's flagship models with state-of-the-art multimodal reasoning",
+                description = "Select a model in the chat model menu or enter a model ID here. Use Refresh Models to load the models enabled for your API key.",
                 header_suffix = new Gtk.Image.from_icon_name (AiProvider.GEMINI.get_icon_name ()) { pixel_size = 28, valign = Gtk.Align.CENTER }
             };
 
@@ -62,8 +114,7 @@ namespace Imladris.UI {
                 text = gemini_settings.model
             };
             gemini_model_row.notify["text"].connect (() => {
-                gemini_settings.model = gemini_model_row.text;
-                config_mgr.save ();
+                config_mgr.set_model_for (AiProvider.GEMINI, gemini_model_row.text);
             });
             gemini_group.add (gemini_model_row);
 
@@ -713,6 +764,109 @@ namespace Imladris.UI {
 
             local_page.add (custom_group);
 
+            var managed_group = new Adw.PreferencesGroup () {
+                title = "Imladris-Managed GGUF Models",
+                description = "Download curated GGUF models from Hugging Face and run them with Imladris-managed llama.cpp. Compact profiles reduce memory use but are not hard RSS limits; keep swap/zram enabled. Check each repository's model license before use."
+            };
+            var model_catalog = Imladris.AI.LocalModelManager.get_catalog ();
+            var model_names = new Gtk.StringList (null);
+            foreach (var preset in model_catalog) {
+                model_names.append (preset.name);
+            }
+            var model_row = new Adw.ComboRow () {
+                title = "Local Model",
+                subtitle = "Choose a compact model or a larger specialist model.",
+                model = model_names
+            };
+            var model_detail_row = new Adw.ActionRow () {
+                title = "Model Details"
+            };
+            model_row.notify["selected"].connect (() => {
+                int selected = (int) model_row.selected;
+                if (selected >= 0 && selected < model_catalog.size) {
+                    var preset = model_catalog[selected];
+                    string memory_profile = preset.fits_2gb_profile
+                        ? "2 GB profile: 4096 context/Q8 KV, or 2048 context/Q4 KV for Qwen3.5-2B."
+                        : "Low-memory profile: 2048 context, Q8 KV, single CPU sequence.";
+                    model_detail_row.subtitle = "%s Estimated footprint: %s %s".printf (
+                        preset.strengths, preset.footprint, memory_profile
+                    );
+                }
+            });
+            model_row.selected = 0;
+            managed_group.add (model_row);
+            managed_group.add (model_detail_row);
+
+            var repo_row = new Adw.ActionRow () {
+                title = "Hugging Face Repository",
+                subtitle = model_catalog[0].repository
+            };
+            model_row.notify["selected"].connect (() => {
+                int selected = (int) model_row.selected;
+                if (selected >= 0 && selected < model_catalog.size) {
+                    repo_row.subtitle = model_catalog[selected].repository;
+                }
+            });
+            var repo_button = new Gtk.Button.with_label ("Open ↗") { valign = Gtk.Align.CENTER };
+            repo_button.clicked.connect (() => {
+                int selected = (int) model_row.selected;
+                if (selected >= 0 && selected < model_catalog.size) {
+                    AiConfigManager.open_url ("https://huggingface.co/" + model_catalog[selected].repository);
+                }
+            });
+            repo_row.add_suffix (repo_button);
+            managed_group.add (repo_row);
+
+            local_model_status = new Adw.ActionRow () {
+                title = "Download Status",
+                subtitle = "No managed model selected."
+            };
+            local_model_progress = new Gtk.ProgressBar () {
+                valign = Gtk.Align.CENTER,
+                width_request = 220,
+                show_text = true,
+                visible = false
+            };
+            local_model_status.add_suffix (local_model_progress);
+            managed_group.add (local_model_status);
+
+            var download_row = new Adw.ActionRow () {
+                title = "Download and Run",
+                subtitle = "Downloads the model, installs llama.cpp if needed, and starts the managed local server."
+            };
+            local_model_download_button = new Gtk.Button.with_label ("Download & Use") {
+                valign = Gtk.Align.CENTER
+            };
+            local_model_download_button.add_css_class ("suggested-action");
+            local_model_download_button.clicked.connect (() => {
+                int selected = (int) model_row.selected;
+                if (selected >= 0 && selected < model_catalog.size) {
+                    download_and_run_local_model.begin (model_catalog[selected]);
+                }
+            });
+            local_model_cancel_button = new Gtk.Button.with_label ("Cancel") {
+                valign = Gtk.Align.CENTER,
+                sensitive = false
+            };
+            local_model_cancel_button.clicked.connect (() => {
+                if (local_model_cancellable != null) {
+                    local_model_cancellable.cancel ();
+                }
+            });
+            download_row.add_suffix (local_model_download_button);
+            download_row.add_suffix (local_model_cancel_button);
+            managed_group.add (download_row);
+
+            this.local_model_manager.download_progress.connect ((model_id, fraction, status) => {
+                if (local_model_progress != null && local_model_status != null) {
+                    local_model_progress.fraction = fraction;
+                    local_model_progress.text = "%d%%".printf ((int) (fraction * 100.0));
+                    local_model_progress.visible = true;
+                    local_model_status.subtitle = status;
+                }
+            });
+
+            local_page.add (managed_group);
             this.add (local_page);
 
             // ==========================================
@@ -759,6 +913,44 @@ namespace Imladris.UI {
             add_provider_config_group (free_page, AiProvider.FREELMAPI_LOCAL, "FreeLLMAPI Local Proxy", "Local OpenAI-compatible free proxy (localhost:8000) — no API key required", false, true);
 
             this.add (free_page);
+        }
+
+        private async void download_and_run_local_model (Imladris.AI.LocalModelPreset preset) {
+            if (local_model_download_button == null || local_model_cancel_button == null ||
+                local_model_status == null || local_model_progress == null) {
+                return;
+            }
+
+            local_model_cancellable = new Cancellable ();
+            local_model_download_button.sensitive = false;
+            local_model_cancel_button.sensitive = true;
+            local_model_progress.visible = true;
+            local_model_progress.fraction = 0.0;
+            local_model_progress.text = "Preparing";
+            local_model_status.subtitle = "Installing or checking the llama.cpp engine...";
+
+            try {
+                yield Imladris.AI.ElrondEngineController.get_default ().ensure_managed_server_async (
+                    local_model_cancellable
+                );
+                local_model_status.subtitle = "Downloading %s from Hugging Face...".printf (preset.name);
+                string model_path = yield local_model_manager.download_model_async (
+                    preset, local_model_cancellable
+                );
+                var settings = SettingsManager.get_default ();
+                settings.elrond_enabled = false;
+                settings.managed_model_path = model_path;
+                settings.elrond_mode = ElrondMode.MANAGED_LLAMA;
+                settings.elrond_enabled = true;
+                local_model_status.subtitle = "%s downloaded and selected. Starting llama-server...".printf (preset.name);
+            } catch (GLib.Error e) {
+                local_model_status.subtitle = "Model setup failed: %s".printf (e.message);
+                local_model_progress.text = "Failed";
+            } finally {
+                local_model_download_button.sensitive = true;
+                local_model_cancel_button.sensitive = false;
+                local_model_cancellable = null;
+            }
         }
 
         private void add_provider_config_group (

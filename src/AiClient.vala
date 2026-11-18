@@ -69,6 +69,104 @@ namespace Imladris {
             };
         }
 
+        public async string[] list_models_async (AiProvider provider, Cancellable? cancellable = null) throws GLib.Error {
+            string endpoint = config_mgr.get_endpoint_for (provider);
+            string models_url;
+            if (provider == AiProvider.GEMINI) {
+                while (endpoint.has_suffix ("/")) {
+                    endpoint = endpoint.substring (0, endpoint.length - 1);
+                }
+                if (endpoint.has_suffix ("/openai")) {
+                    endpoint = endpoint.substring (0, endpoint.length - "/openai".length);
+                }
+                models_url = AiConfigManager.normalize_endpoint (endpoint, "/models");
+            } else {
+                models_url = AiConfigManager.normalize_endpoint (endpoint, "/models");
+            }
+
+            var msg = new Soup.Message ("GET", models_url);
+            string key = config_mgr.get_api_key_for (provider);
+            if (provider == AiProvider.GEMINI) {
+                if (key.length > 0) {
+                    msg.request_headers.append ("x-goog-api-key", key);
+                }
+            } else if (key.length > 0) {
+                msg.request_headers.append ("Authorization", @"Bearer $key");
+            }
+
+            var bytes = yield session.send_and_read_async (msg, GLib.Priority.DEFAULT, cancellable);
+            string response = AiConfigManager.bytes_to_string (bytes);
+            if (msg.status_code < 200 || msg.status_code >= 300) {
+                throw new GLib.IOError.FAILED (
+                    "Could not retrieve models from %s (HTTP %u: %s). %s".printf (
+                        provider.get_short_name (), msg.status_code, msg.reason_phrase,
+                        parse_error_response (response, msg.status_code, msg.reason_phrase, provider)
+                    )
+                );
+            }
+            return parse_model_ids (response, provider);
+        }
+
+        public static string[] parse_model_ids (string response, AiProvider provider) throws GLib.Error {
+            var parser = new Json.Parser ();
+            parser.load_from_data (response, -1);
+            var root = parser.get_root ();
+            if (root == null || root.get_node_type () != Json.NodeType.OBJECT) {
+                throw new GLib.IOError.INVALID_DATA ("Model list response is not a JSON object.");
+            }
+
+            var result = new Gee.ArrayList<string> ();
+            var root_obj = root.get_object ();
+            if (provider == AiProvider.GEMINI) {
+                if (!root_obj.has_member ("models")) {
+                    throw new GLib.IOError.INVALID_DATA ("Gemini model list does not contain a models array.");
+                }
+                var models = root_obj.get_array_member ("models");
+                for (uint i = 0; i < models.get_length (); i++) {
+                    var model = models.get_object_element (i);
+                    if (!model.has_member ("name")) {
+                        continue;
+                    }
+                    bool can_generate = true;
+                    if (model.has_member ("supportedGenerationMethods")) {
+                        can_generate = false;
+                        var methods = model.get_array_member ("supportedGenerationMethods");
+                        for (uint j = 0; j < methods.get_length (); j++) {
+                            if (methods.get_string_element (j) == "generateContent") {
+                                can_generate = true;
+                                break;
+                            }
+                        }
+                    }
+                    string id = model.get_string_member ("name");
+                    if (id.has_prefix ("models/")) {
+                        id = id.substring ("models/".length);
+                    }
+                    if (can_generate && id.length > 0 && !result.contains (id)) {
+                        result.add (id);
+                    }
+                }
+            } else if (root_obj.has_member ("data")) {
+                var models = root_obj.get_array_member ("data");
+                for (uint i = 0; i < models.get_length (); i++) {
+                    var model = models.get_object_element (i);
+                    if (model.has_member ("id")) {
+                        string id = model.get_string_member ("id").strip ();
+                        if (id.length > 0 && !result.contains (id)) {
+                            result.add (id);
+                        }
+                    }
+                }
+            } else {
+                throw new GLib.IOError.INVALID_DATA ("Model list response does not contain a data array.");
+            }
+            string[] model_ids = new string[result.size];
+            for (int i = 0; i < result.size; i++) {
+                model_ids[i] = result[i];
+            }
+            return model_ids;
+        }
+
         public void cancel_current_request () {
             if (active_cancellable != null && !active_cancellable.is_cancelled ()) {
                 active_cancellable.cancel ();
@@ -83,7 +181,12 @@ namespace Imladris {
             attempted.add (provider);
 
             try {
-                return yield dispatch_provider_request_async (provider, system_prompt, user_prompt, req_cancellable);
+                string detail_prompt = system_prompt;
+                if (detail_prompt.length > 0) {
+                    detail_prompt += "\n\n";
+                }
+                detail_prompt += config_mgr.response_detail.get_instruction ();
+                return yield dispatch_provider_request_async (provider, detail_prompt, user_prompt, req_cancellable);
             } catch (GLib.Error primary_err) {
                 if (!config_mgr.auto_failover_enabled || req_cancellable.is_cancelled () || !is_failover_eligible_error (primary_err)) {
                     throw primary_err;

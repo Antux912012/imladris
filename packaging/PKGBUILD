@@ -7,7 +7,7 @@ arch=('x86_64')
 url="https://antux912012.github.io/imladris/"
 license=('GPL-3.0-or-later')
 depends=(
-    'gtk4>=4.12'
+    'gtk4>=4.14'
     'libadwaita>=1.5'
     'gtksourceview5>=5.10'
     'webkitgtk-6.0'
@@ -36,8 +36,6 @@ makedepends=(
     'meson>=0.60'
     'ninja'
     'vala>=0.56'
-    'cargo'
-    'rust'
     'pkgconf'
     'gcc'
 )

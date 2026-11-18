@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.27.0
+Version:        0.30.0
 Release:        1%{?dist}
 Summary:        Native scientific notebook studio for Quarto, R, Python, and Jupyter
 
@@ -17,10 +17,8 @@ BuildRequires:  ninja-build
 BuildRequires:  libappstream-glib
 %endif
 BuildRequires:  vala >= 0.56
-BuildRequires:  cargo
-BuildRequires:  rust
 BuildRequires:  desktop-file-utils
-BuildRequires:  pkgconfig(gtk4) >= 4.12
+BuildRequires:  pkgconfig(gtk4) >= 4.14
 BuildRequires:  pkgconfig(libadwaita-1) >= 1.5
 BuildRequires:  pkgconfig(gtksourceview-5) >= 5.10
 BuildRequires:  pkgconfig(webkitgtk-6.0)
@@ -35,6 +33,7 @@ Requires:       hicolor-icon-theme
 Requires:       python3
 Requires:       curl
 Requires:       bzip2
+Requires:       tar
 Recommends:     pandoc
 Recommends:     libreoffice-writer
 Recommends:     texlive-scheme-basic

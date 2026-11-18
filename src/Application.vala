@@ -10,7 +10,8 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.26.0";
+        public const string APP_VERSION = "0.30.0";
+        private bool first_launch_toolchain_checked = false;
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },
@@ -187,6 +188,7 @@ namespace Imladris {
                 win = new Window (this);
             }
             win.present ();
+            ensure_toolchain_ready_on_first_launch (win);
         }
 
         protected override void shutdown () {
@@ -203,6 +205,17 @@ namespace Imladris {
                 win.open_file_from_path.begin (file.get_path ());
             }
             win.present ();
+            ensure_toolchain_ready_on_first_launch (win);
+        }
+
+        private void ensure_toolchain_ready_on_first_launch (Window win) {
+            if (first_launch_toolchain_checked) {
+                return;
+            }
+            first_launch_toolchain_checked = true;
+            if (!Core.ToolchainManager.get_default ().is_base_environment_installed ()) {
+                win.show_toolchain_setup_dialog (true);
+            }
         }
 
         private void on_new_project_modal () {

@@ -57,7 +57,12 @@ namespace Imladris {
         IPYNB,
         PYSCRIPT,
         TEX,
-        TS;
+        TS,
+        TXT,
+        CSV,
+        TSV,
+        RPROJ,
+        BIBLIOGRAPHY;
 
         public string get_extension () {
             switch (this) {
@@ -72,6 +77,11 @@ namespace Imladris {
                 case PYSCRIPT: return ".py";
                 case TEX:      return ".tex";
                 case TS:       return ".ts";
+                case TXT:      return ".txt";
+                case CSV:      return ".csv";
+                case TSV:      return ".tsv";
+                case RPROJ:    return ".Rproj";
+                case BIBLIOGRAPHY: return ".bibliography";
                 default:       return ".qmd";
             }
         }
@@ -89,6 +99,11 @@ namespace Imladris {
                 case PYSCRIPT: return "Python Script (.py)";
                 case TEX:      return "LaTeX Document (.tex)";
                 case TS:       return "TypeScript (.ts)";
+                case TXT:      return "Plain Text (.txt)";
+                case CSV:      return "Comma-Separated Values (.csv)";
+                case TSV:      return "Tab-Separated Values (.tsv)";
+                case RPROJ:    return "RStudio Project File (.Rproj)";
+                case BIBLIOGRAPHY: return "Bibliography (.bibliography)";
                 default:       return "Quarto Document (.qmd)";
             }
         }
@@ -109,6 +124,11 @@ namespace Imladris {
                 case PYSCRIPT: return "python3";
                 case TEX:      return "latex";
                 case TS:       return "typescript";
+                case CSV:
+                case TSV:
+                case TXT:      return "";
+                case RPROJ:    return "ini";
+                case BIBLIOGRAPHY: return "bibtex";
                 case MD:
                 default:       return "markdown";
             }
@@ -127,6 +147,11 @@ namespace Imladris {
                 case PYSCRIPT: return "PyScript";
                 case TEX:      return "Tex";
                 case TS:       return "Ts";
+                case TXT:      return "Txt";
+                case CSV:      return "Csv";
+                case TSV:      return "Tsv";
+                case RPROJ:    return "Rproj";
+                case BIBLIOGRAPHY: return "Bibliography";
                 default:       return "Qmd";
             }
         }
@@ -144,6 +169,11 @@ namespace Imladris {
             if (c == "pyscript" || c == "py" || c == "python") return PYSCRIPT;
             if (c == "tex" || c == "ltx" || c == "latex") return TEX;
             if (c == "ts" || c == "tsx" || c == "mts" || c == "cts" || c == "typescript") return TS;
+            if (c == "txt" || c == "text") return TXT;
+            if (c == "csv") return CSV;
+            if (c == "tsv") return TSV;
+            if (c == "rproj") return RPROJ;
+            if (c == "bibliography") return BIBLIOGRAPHY;
             return QMD;
         }
 
@@ -155,6 +185,11 @@ namespace Imladris {
             if (lower.has_suffix (".tex") || lower.has_suffix (".ltx")) return TEX;
             if (lower.has_suffix (".tsx") || lower.has_suffix (".mts") ||
                 lower.has_suffix (".cts") || lower.has_suffix (".ts")) return TS;
+            if (lower.has_suffix (".bibliography")) return BIBLIOGRAPHY;
+            if (lower.has_suffix (".rproj")) return RPROJ;
+            if (lower.has_suffix (".csv")) return CSV;
+            if (lower.has_suffix (".tsv")) return TSV;
+            if (lower.has_suffix (".txt")) return TXT;
             if (lower.has_suffix (".r")) return RSCRIPT;
             if (lower.has_suffix (".py")) return PYSCRIPT;
             if (lower.has_suffix (".css")) return CSS;

@@ -174,7 +174,8 @@ namespace Imladris.Core {
         LM_STUDIO = 2,
         CHERRY_STUDIO = 3,
         ANTIGRAVITY = 4,
-        CUSTOM = 5;
+        CUSTOM = 5,
+        MANAGED_LLAMA = 6;
 
         public string to_string_id () {
             switch (this) {
@@ -183,6 +184,7 @@ namespace Imladris.Core {
                 case CHERRY_STUDIO: return "cherry_studio";
                 case ANTIGRAVITY: return "antigravity";
                 case CUSTOM: return "custom";
+                case MANAGED_LLAMA: return "managed_llama";
                 default: return "auto";
             }
         }
@@ -196,6 +198,7 @@ namespace Imladris.Core {
                 case "agy":
                 case "antigravity": return ANTIGRAVITY;
                 case "custom": return CUSTOM;
+                case "managed_llama": return MANAGED_LLAMA;
                 default: return AUTO_DETECT;
             }
         }
@@ -208,6 +211,7 @@ namespace Imladris.Core {
                 case CHERRY_STUDIO: return "Cherry Studio / LocalAI (localhost:23333 / 8080)";
                 case ANTIGRAVITY: return "Antigravity CLI (agy Agent Harness)";
                 case CUSTOM: return "Custom Local Server";
+                case MANAGED_LLAMA: return "Imladris Managed llama.cpp";
                 default: return "Auto-Detect Local AI";
             }
         }
@@ -343,6 +347,7 @@ namespace Imladris.Core {
         private ElrondMode _elrond_mode = ElrondMode.AUTO_DETECT;
         private string _custom_local_endpoint = "http://127.0.0.1:8080/v1";
         private string _active_model_name = "Qwen2.5-Coder-3B";
+        private string _managed_model_path = "";
         private bool _inline_completion_enabled = true;
         private bool _code_intellisense_enabled = true;
         private bool _auto_close_brackets = true;
@@ -417,6 +422,17 @@ namespace Imladris.Core {
             set {
                 if (_active_model_name != value) {
                     _active_model_name = value;
+                    save_ini ();
+                    ai_settings_changed ();
+                }
+            }
+        }
+
+        public string managed_model_path {
+            get { return _managed_model_path; }
+            set {
+                if (_managed_model_path != value) {
+                    _managed_model_path = value;
                     save_ini ();
                     ai_settings_changed ();
                 }
@@ -677,6 +693,9 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("ElrondAI", "model_name")) {
                         _active_model_name = config_keyfile.get_string ("ElrondAI", "model_name");
                     }
+                    if (config_keyfile.has_key ("ElrondAI", "managed_model_path")) {
+                        _managed_model_path = config_keyfile.get_string ("ElrondAI", "managed_model_path");
+                    }
                     if (config_keyfile.has_key ("ElrondAI", "inline_completion")) {
                         _inline_completion_enabled = config_keyfile.get_boolean ("ElrondAI", "inline_completion");
                     }
@@ -731,6 +750,7 @@ namespace Imladris.Core {
                 config_keyfile.set_integer ("ElrondAI", "mode", (int) _elrond_mode);
                 config_keyfile.set_string ("ElrondAI", "custom_local_endpoint", _custom_local_endpoint);
                 config_keyfile.set_string ("ElrondAI", "model_name", _active_model_name);
+                config_keyfile.set_string ("ElrondAI", "managed_model_path", _managed_model_path);
                 config_keyfile.set_boolean ("ElrondAI", "inline_completion", _inline_completion_enabled);
                 config_keyfile.set_boolean ("Editor", "code_intellisense", _code_intellisense_enabled);
                 config_keyfile.set_boolean ("Editor", "auto_close_brackets", _auto_close_brackets);

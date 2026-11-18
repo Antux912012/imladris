@@ -18,7 +18,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
   <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
-  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.27.0"><img src="https://img.shields.io/badge/Release-v0.27.0-blue?style=flat-square" alt="Release v0.27.0"></a>
+  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.30.0"><img src="https://img.shields.io/badge/Release-v0.30.0-blue?style=flat-square" alt="Release v0.30.0"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-0.56%2B-green?style=flat-square" alt="Vala">
   <img src="https://img.shields.io/badge/Rust-1.75%2B-orange?style=flat-square" alt="Rust">
@@ -27,7 +27,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Official Landing Page</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.27.0">⬇️ Download v0.27.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.30.0">⬇️ Download v0.30.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Technical Wiki</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong>
@@ -43,7 +43,7 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ### Comparative Workflow Matrix
 
-| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.25.0 Approach |
+| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.30.0 Approach |
 | :--- | :--- | :--- |
 | **Idle Memory Overhead** | 1.2–2.5 GB RAM idle | **< 120 MB RAM** (native compiled Vala/GTK4 binary) |
 | **Cold Startup Latency** | 4.0–9.0 seconds | **< 0.6 seconds** instant launch |
@@ -72,16 +72,18 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 ### For Data Science Practitioners & Technical Authors
 * **Direct Editor Writing (`Ctrl+Shift+E`)**: Stream AI-generated code directly into active code chunks or document selections while strictly preserving Quarto cell options (`#|`) and enabling single-step `Ctrl+Z` undo.
 * **Zero-Cost AI Failover**: Built-in support for permanent free-tier API endpoints (Groq, Cerebras, OpenRouter `:free`, GitHub Models) with automatic HTTP 429 quota cascading.
+* **Gemini Model Selection & Answer Detail**: Discover models available to your API key, select them in the chat model menu, and tune concise/balanced/detailed responses and temperature.
+* **Imladris-Managed Local Models**: Download ten curated GGUFs directly from Hugging Face. Compact presets use bounded context and quantized KV caches; the 2 GB profiles retain mmap, force CPU inference, and limit concurrency. These reduce memory use but are not a hard RSS cap; keep swap/zram enabled.
+* **Optional Toolchains**: Choose the micromamba install folder and select only the R, Python, Quarto, Node/TypeScript, or TeX components you need.
 * **Lossless Jupyter Parity**: Round-trip `.ipynb` (`nbformat 4.5`) support that maintains cell IDs, execution counts, outputs, and metadata without conversion loss.
 
 ---
 
-## What’s New in v0.25.0
+## What’s New in v0.30.0
 
-* **Free-Tier AI Orchestration & Automatic Quota Failover**: Configure permanent free-tier providers (**Groq**, **Cerebras**, **OpenRouter `:free`**, **GitHub Models**, and **FreeLLMAPI Local Proxy**). When a primary provider encounters rate limits (`HTTP 429`) or quota exhaustion, `AiClient` cascades automatically to verified backups under explicit user privacy consent.
-* **GitHub Copilot OAuth Device Flow**: Authenticate directly from **AI Settings** using RFC 8628 GitHub Device Flow (`https://github.com/login/device`), with credentials secured in `libsecret` (`io.github.Antux912012.Imladris.Copilot`).
-* **Positron/RStudio-Style Direct Editor Writing**: Direct in-buffer transformations via Elrond AI: **Apply to Selection**, **Update Active Chunk** (preserving Quarto `#|` cell options and buffer undo history), and one-click actions (*Improve Writing*, *Refactor Code*, *Fix Syntax*).
-* **Security & Data-Integrity Hardening**: MCP `execute_code` disabled by default (`IMLADRIS_MCP_ALLOW_EXEC=1` opt-in with strict binary allowlist), `.mallorn` Zip Slip path traversal mitigation, shell-free `micromamba` bootstrap, `\uFFFC` anchor cleanup on file save, and dock panel lifecycle stability fixes.
+* **Additional Document Formats**: Plain text, CSV, TSV, RStudio `.Rproj`, and `.bibliography` files now receive format detection and editor profiles tailored to each format.
+* **Elrond Model Controls**: Select account-enabled Gemini models, tune answer detail and temperature, or download curated local GGUFs and run them with managed `llama-server`.
+* **Optional Runtime Setup**: Choose the micromamba installation folder and install only the R, Python, Quarto, Node/TypeScript, and TeX components you need.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, improvements, and bugs fixed.
 
@@ -130,11 +132,17 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, im
   * **Q4 (Bottom-Right)**: File browser, Cairo plot viewer, package manager, WebKitGTK 6.0 live preview, and embedded Shiny viewer.
 
 ### 2. Multi-Tier AI Copilot & Direct Writing
-* **Local Offline Models**: Zero-configuration `llama-server` (Vulkan/CUDA acceleration), Ollama, and LM Studio endpoints operating fully offline.
+* **Local Offline Models**: Imladris-managed Hugging Face GGUF downloads and `llama-server`, plus Ollama and LM Studio endpoints operating fully offline.
 * **Cloud & Free-Tier Engine**: Seamless support for Google Gemini, Anthropic Claude, OpenAI, DeepSeek, Kimi, Qwen, NVIDIA NIM, Groq, Cerebras, OpenRouter `:free`, and GitHub Models.
+* **Model and Response Controls**: Refresh account-enabled Gemini models, choose a provider model, and set shared temperature and response detail.
+* **Low-Memory Inference**: Compact model presets cap context and KV-cache use, keep mmap enabled, disable auto-fit and warmup, and restrict CPU execution to one sequence. The profile reduces peak memory but does not guarantee a 2 GB RSS limit; enable swap/zram.
 * **Direct Editor Writing (`Ctrl+Shift+E`)**: Update code blocks and text selections directly within the editor buffer with single-step `Ctrl+Z` undo.
 
-### 3. Integrated Domain Scientific Bridges
+### 3. Optional Scientific Toolchains
+* Choose a writable installation folder for micromamba and its environments.
+* Select only the R, Python/Jupyter, Quarto, Node/TypeScript, and TeX components needed; partial environments are recognized correctly.
+
+### 4. Integrated Domain Scientific Bridges
 * **Elbereth Biostatistics (`Imladris.Bridges.Elbereth`)**: ICH E9 sample size and power calculation module with Cairo visualization.
 * **Arekyer Galaxy Bridge (`Imladris.Bridges.Arekyer`)**: Cloud genomics dataset browser with automated `httr2` and `pandas` data loading scripts.
 * **Taniquetil AlphaFold Bridge (`Imladris.Bridges.Taniquetil`)**: Protein structure search, pLDDT plotting, and R/Python structural script generation.
@@ -142,7 +150,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, im
 * **Natural Math & Chemistry (`Ctrl+M`)**: Natural expression parsing to KaTeX/LaTeX (`$$...$$`, `\ce{...}`).
 * **Mermaid Flow Canvas (`Ctrl+Shift+D`)**: Bi-directional Cairo diagram editor synced with Quarto and Markdown code blocks.
 
-### 4. Reproducibility & Scientific Publishing
+### 5. Reproducibility & Scientific Publishing
 * **Bidirectional `.Rproj` & `.mallorn` Portability**: Native loading of RStudio project structures and single-file `.mallorn` (`tar.zst`/`zip`) packages.
 * **Sandboxed Dependency Management**: Project-isolated package environments powered by `renv` (R) and `.venv` (Python).
 * **Multi-Format Export Pipeline**: Headless compilation to PDF, HTML, OpenDocument Text (`.odt`), OpenDocument Presentation (`.odp`), and Rich Text Format (`.rtf`).
@@ -243,7 +251,7 @@ nix build .#default
 ./result/bin/imladris
 ```
 
-Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.27.0](https://github.com/Antux912012/imladris/releases/tag/v0.27.0).
+Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.30.0](https://github.com/Antux912012/imladris/releases/tag/v0.30.0).
 
 ### Scientific Toolchain Meta-Packages & Cross-Distro Dependencies
 To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
@@ -254,11 +262,11 @@ To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
   Mounts at `/app/toolchain` and is automatically added to `PATH` inside the Imladris sandbox.
 - **Debian / Ubuntu (`imladris-toolchain` meta-package with `postinst` verification):**
   ```bash
-  sudo apt install ./imladris_0.27.0_amd64.deb ./imladris-toolchain_0.27.0_all.deb
+  sudo apt install ./imladris_0.30.0_amd64.deb ./imladris-toolchain_0.30.0_all.deb
   ```
 - **Fedora / RHEL (`imladris-toolchain` RPM meta-package with `%post` verification):**
   ```bash
-  sudo dnf install ./imladris-0.27.0-1.fc41.x86_64.rpm ./imladris-toolchain-0.27.0-1.fc41.noarch.rpm
+  sudo dnf install ./imladris-0.30.0-1.fc41.x86_64.rpm ./imladris-toolchain-0.30.0-1.fc41.noarch.rpm
   ```
 - **Arch Linux:**
   ```bash

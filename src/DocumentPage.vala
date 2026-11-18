@@ -233,7 +233,9 @@ namespace Imladris {
             var lang_manager = GtkSource.LanguageManager.get_default ();
             var fmt = DocumentFormat.from_filename (title);
             string syntax_code = fmt.to_syntax_lang ();
-            var language = lang_manager.get_language (syntax_code);
+            GtkSource.Language? language = syntax_code.length > 0
+                ? lang_manager.get_language (syntax_code)
+                : null;
             if (language == null && lang_id.length > 0) {
                 language = lang_manager.get_language (lang_id);
             }

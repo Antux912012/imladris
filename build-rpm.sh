@@ -21,14 +21,17 @@ cp "${PROJECT_DIR}/packaging/imladris.spec" "${RPM_ROOT}/SPECS/imladris.spec"
 TAR_TMP=$(mktemp -d)
 mkdir -p "${TAR_TMP}/imladris-${VERSION}"
 
-tar --exclude-vcs \
+tar --exclude='./.git' \
+    --exclude='./.flatpak-builder' \
+    --exclude='./rust' \
     --exclude='./build*' \
+    --exclude='./*-flatpak-*.tar.gz' \
     --exclude='./rpmbuild' \
     --exclude='./deb-root' \
     --exclude='*.deb' \
     --exclude='*.rpm' \
     --exclude='*.flatpak' \
-    --exclude='repo' \
+    --exclude='./repo' \
     -cf - . | tar -xf - -C "${TAR_TMP}/imladris-${VERSION}"
 
 tar -czf "${RPM_ROOT}/SOURCES/imladris-${VERSION}.tar.gz" -C "${TAR_TMP}" "imladris-${VERSION}"

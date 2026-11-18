@@ -1,11 +1,8 @@
 {
     "id": "io.github.Antux912012.Imladris",
     "runtime": "org.gnome.Platform",
-    "runtime-version": "50",
+    "runtime-version": "51",
     "sdk": "org.gnome.Sdk",
-    "sdk-extensions": [
-        "org.freedesktop.Sdk.Extension.rust-stable"
-    ],
     "command": "imladris",
     "add-extensions": {
         "io.github.Antux912012.Imladris.Toolchain": {
@@ -27,13 +24,6 @@
         "--filesystem=xdg-cache/imladris:create",
         "--env=PATH=/app/bin:/app/toolchain/bin:/usr/bin"
     ],
-    "build-options": {
-        "append-path": "/usr/lib/sdk/rust-stable/bin",
-        "env": {
-            "CARGO_HOME": "/run/build/imladris/cargo",
-            "CARGO_NET_OFFLINE": "true"
-        }
-    },
     "cleanup": [
         "/include",
         "/lib/pkgconfig",

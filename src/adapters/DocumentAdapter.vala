@@ -5,6 +5,10 @@ namespace Imladris.Adapters {
 
     public class DocumentAdapter : GLib.Object {
 
+        private static GLib.Regex? chunk_regex = null;
+        private static GLib.Regex? plain_mermaid_regex = null;
+        private static GLib.Regex? video_regex = null;
+        private static GLib.Regex? img_regex = null;
         private static GLib.Regex? display_math_regex = null;
         private static GLib.Regex? equation_env_regex = null;
         private static GLib.Regex? latex_title_regex = null;
@@ -25,6 +29,16 @@ namespace Imladris.Adapters {
         private static GLib.Regex? latex_emph_regex = null;
         private static GLib.Regex? latex_texttt_regex = null;
         private static GLib.Regex? latex_cite_regex = null;
+        private static GLib.Regex? inline_code_regex = null;
+        private static GLib.Regex? inline_bold_regex = null;
+        private static GLib.Regex? inline_italic_regex = null;
+        private static GLib.Regex? inline_strike_regex = null;
+        private static GLib.Regex? inline_sub_regex = null;
+        private static GLib.Regex? inline_sup_regex = null;
+        private static GLib.Regex? inline_link_regex = null;
+        private static GLib.Regex? inline_math_regex = null;
+        private static GLib.Regex? inline_ce_regex = null;
+        private static GLib.Regex? ordered_list_regex = null;
 
         public static Imladris.DocumentFormat detect_format (string? filename) {
             if (filename == null || filename == "") return Imladris.DocumentFormat.MD;
@@ -48,7 +62,7 @@ namespace Imladris.Adapters {
             string clean_text = editor_text.replace ("\uFFFC", "");
             if (format == Imladris.DocumentFormat.IPYNB) {
                 try {
-                    return Core.NotebookSerializer.markdown_to_ipynb (clean_text, existing_raw_file ?? "");
+                    return Core.NotebookSerializer.markdown_to_ipynb (clean_text, "", existing_raw_file ?? "");
                 } catch (GLib.Error e) {
                     GLib.warning ("Failed to serialize editor buffer to .ipynb JSON: %s", e.message);
                     return clean_text;
@@ -78,73 +92,11 @@ namespace Imladris.Adapters {
                 builder.append (meta.to_html ());
             }
 
-            string rust_json = Core.NativeCore.render_markdown_html (body, "{}");
-            string rust_html = "";
-            try {
-                var parser = new Json.Parser ();
-                parser.load_from_data (rust_json, -1);
-                var root = parser.get_root ();
-                if (root != null && root.get_node_type () == Json.NodeType.OBJECT) {
-                    var obj = root.get_object ();
-                    if (obj.has_member ("html")) {
-                        rust_html = obj.get_string_member ("html");
-                    }
-                }
-            } catch (GLib.Error e) {
-                GLib.warning ("Failed to decode Rust markdown HTML JSON: %s", e.message);
-            }
-            string hydrated = hydrate_rust_placeholders (rust_html);
-            builder.append (hydrated);
-
+            string processed_body = transform_code_chunks (body);
+            processed_body = transform_display_math (processed_body);
+            processed_body = transform_media_tags (processed_body);
+            builder.append (basic_markdown_to_html (processed_body));
             return builder.str;
-        }
-
-        private static string unescape_html_attr (string attr) {
-            return attr
-                .replace ("&quot;", "\"")
-                .replace ("&#39;", "'")
-                .replace ("&lt;", "<")
-                .replace ("&gt;", ">")
-                .replace ("&amp;", "&");
-        }
-
-        private static GLib.Regex? rust_math_display_regex = null;
-        private static GLib.Regex? rust_math_inline_regex = null;
-        private static GLib.Regex? rust_mermaid_regex = null;
-
-        private static string hydrate_rust_placeholders (string html) {
-            string working = html;
-            try {
-                if (rust_math_display_regex == null) {
-                    rust_math_display_regex = new GLib.Regex ("<div class=\"imladris-math-display\" data-tex=\"([^\"]*)\"></div>");
-                }
-                working = rust_math_display_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
-                    string tex = unescape_html_attr (match_info.fetch (1));
-                    res.append (Core.MathChemEngine.render_latex_to_html (tex, true));
-                    return false;
-                });
-
-                if (rust_math_inline_regex == null) {
-                    rust_math_inline_regex = new GLib.Regex ("<span class=\"imladris-math-inline\" data-tex=\"([^\"]*)\"></span>");
-                }
-                working = rust_math_inline_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
-                    string tex = unescape_html_attr (match_info.fetch (1));
-                    res.append (Core.MathChemEngine.render_latex_to_html (tex, false));
-                    return false;
-                });
-
-                if (rust_mermaid_regex == null) {
-                    rust_mermaid_regex = new GLib.Regex ("<div class=\"imladris-mermaid-block\" data-mermaid=\"([^\"]*)\"></div>");
-                }
-                working = rust_mermaid_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
-                    string code = unescape_html_attr (match_info.fetch (1));
-                    res.append (render_mermaid_svg_inline (code));
-                    return false;
-                });
-            } catch (GLib.RegexError e) {
-                GLib.warning ("Failed to hydrate placeholders: %s", e.message);
-            }
-            return working;
         }
 
         private static string render_latex_document_html (string source) {
@@ -442,6 +394,297 @@ namespace Imladris.Adapters {
                 svg = svg.substring (svg_start);
             }
             return "<div class=\"mermaid-diagram-card\" style=\"margin: 1em 0; overflow-x: auto;\">" + svg + "</div>\n";
+        }
+
+        private static bool is_safe_link (string uri) {
+            string value = uri.strip ().down ();
+            return value.has_prefix ("https://") ||
+                   value.has_prefix ("http://") ||
+                   value.has_prefix ("mailto:") ||
+                   value.has_prefix ("#") ||
+                   (!value.has_prefix ("//") && !value.contains (":"));
+        }
+
+        private static string transform_media_tags (string text) {
+            string result = text;
+            try {
+                if (video_regex == null) {
+                    video_regex = new GLib.Regex ("\\{\\{<\\s*video\\s+([^\\s>]+)[^>]*>\\}\\}");
+                }
+                result = video_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
+                    string path = match_info.fetch (1);
+                    if (is_safe_link (path)) {
+                        res.append_printf (
+                            "<div class=\"media-video-container\"><video src=\"%s\" controls></video></div>",
+                            GLib.Markup.escape_text (path)
+                        );
+                    } else {
+                        res.append (GLib.Markup.escape_text (match_info.fetch (0)));
+                    }
+                    return false;
+                });
+                if (img_regex == null) {
+                    img_regex = new GLib.Regex ("!\\[([^\\]]*)\\]\\(([^\\)]+)\\)");
+                }
+                result = img_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
+                    string alt = match_info.fetch (1);
+                    string path = match_info.fetch (2);
+                    if (is_safe_link (path)) {
+                        res.append_printf (
+                            "<figure><img src=\"%s\" alt=\"%s\" style=\"max-width:100%%;height:auto\"/>",
+                            GLib.Markup.escape_text (path),
+                            GLib.Markup.escape_text (alt)
+                        );
+                        if (alt.strip () != "") {
+                            res.append_printf ("<figcaption>%s</figcaption>", GLib.Markup.escape_text (alt));
+                        }
+                        res.append ("</figure>");
+                    } else {
+                        res.append (GLib.Markup.escape_text (alt));
+                    }
+                    return false;
+                });
+            } catch (GLib.RegexError e) {
+                GLib.warning ("Failed to convert Markdown media: %s", e.message);
+            }
+            return result;
+        }
+
+        private static string transform_code_chunks (string text) {
+            string result = text;
+            try {
+                if (chunk_regex == null) {
+                    chunk_regex = new GLib.Regex ("```\\{([A-Za-z0-9_+-]+)([^\\}]*)\\}([\\s\\S]*?)```");
+                }
+                result = chunk_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
+                    string language = match_info.fetch (1).down ();
+                    string options = match_info.fetch (2).strip ();
+                    string code = match_info.fetch (3);
+                    if (language == "mermaid") {
+                        res.append (render_mermaid_svg_inline (code));
+                    } else {
+                        res.append ("<div class=\"code-chunk-card\">");
+                        res.append_printf (
+                            "<div class=\"code-chunk-header\"><span class=\"badge\">%s</span>%s</div>",
+                            GLib.Markup.escape_text (language.up ()),
+                            options != "" ? " <span class=\"chunk-opts\">" + GLib.Markup.escape_text (options) + "</span>" : ""
+                        );
+                        res.append_printf (
+                            "<pre><code class=\"language-%s\">%s</code></pre></div>",
+                            GLib.Markup.escape_text (language),
+                            GLib.Markup.escape_text (code)
+                        );
+                    }
+                    return false;
+                });
+                if (plain_mermaid_regex == null) {
+                    plain_mermaid_regex = new GLib.Regex ("```mermaid\\s*\\n([\\s\\S]*?)```");
+                }
+                result = plain_mermaid_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
+                    res.append (render_mermaid_svg_inline (match_info.fetch (1)));
+                    return false;
+                });
+            } catch (GLib.RegexError e) {
+                GLib.warning ("Failed to convert fenced code: %s", e.message);
+            }
+            return result;
+        }
+
+        private static string format_inline_markdown (string line) {
+            string escaped = GLib.Markup.escape_text (line);
+            try {
+                if (inline_code_regex == null) inline_code_regex = new GLib.Regex ("`([^`]+)`");
+                if (inline_bold_regex == null) inline_bold_regex = new GLib.Regex ("\\*\\*([^\\*]+)\\*\\*");
+                if (inline_italic_regex == null) inline_italic_regex = new GLib.Regex ("(?<!\\*)\\*([^\\*]+)\\*(?!\\*)");
+                if (inline_strike_regex == null) inline_strike_regex = new GLib.Regex ("~~([^~]+)~~");
+                if (inline_sub_regex == null) inline_sub_regex = new GLib.Regex ("(?<!~)~([^~\\s]+)~(?!~)");
+                if (inline_sup_regex == null) inline_sup_regex = new GLib.Regex ("\\^([^\\^\\s]+)\\^");
+                if (inline_link_regex == null) inline_link_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
+                if (inline_ce_regex == null) inline_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
+                if (inline_math_regex == null) inline_math_regex = new GLib.Regex ("(?<!\\$)\\$([^\\$\\n]+)\\$(?!\\$)");
+
+                escaped = inline_ce_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
+                    res.append (Core.MathChemEngine.render_latex_to_html ("\\ce{" + match_info.fetch (1) + "}", false));
+                    return false;
+                });
+                escaped = inline_math_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
+                    string expr = match_info.fetch (1);
+                    if (expr.strip () == "") {
+                        res.append (match_info.fetch (0));
+                    } else {
+                        res.append (Core.MathChemEngine.render_latex_to_html (expr, false));
+                    }
+                    return false;
+                });
+                escaped = inline_code_regex.replace (escaped, -1, 0, "<code>\\1</code>");
+                escaped = inline_bold_regex.replace (escaped, -1, 0, "<strong>\\1</strong>");
+                escaped = inline_italic_regex.replace (escaped, -1, 0, "<em>\\1</em>");
+                escaped = inline_strike_regex.replace (escaped, -1, 0, "<del>\\1</del>");
+                escaped = inline_sub_regex.replace (escaped, -1, 0, "<sub>\\1</sub>");
+                escaped = inline_sup_regex.replace (escaped, -1, 0, "<sup>\\1</sup>");
+                escaped = inline_link_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
+                    string href = match_info.fetch (2);
+                    if (is_safe_link (href)) {
+                        res.append_printf (
+                            "<a href=\"%s\">%s</a>",
+                            GLib.Markup.escape_text (href),
+                            match_info.fetch (1)
+                        );
+                    } else {
+                        res.append (match_info.fetch (1));
+                    }
+                    return false;
+                });
+            } catch (GLib.RegexError e) {
+                GLib.warning ("Failed to format inline Markdown: %s", e.message);
+            }
+            return escaped;
+        }
+
+        private static string basic_markdown_to_html (string text) {
+            var result = new StringBuilder ();
+            bool in_ul = false;
+            bool in_ol = false;
+            bool in_table = false;
+            bool in_pre = false;
+            bool in_html_pre = false;
+
+            foreach (string line in text.split ("\n")) {
+                string trimmed = line.strip ();
+                if (in_html_pre) {
+                    result.append (line + "\n");
+                    if (line.contains ("</pre>")) in_html_pre = false;
+                    continue;
+                }
+
+                if (trimmed.has_prefix ("<div") || trimmed.has_prefix ("</div") ||
+                    trimmed.has_prefix ("<pre") || trimmed.has_prefix ("</pre") ||
+                    trimmed.has_prefix ("<figure") || trimmed.has_prefix ("</figure") ||
+                    trimmed.has_prefix ("<video") || trimmed.has_prefix ("</video") ||
+                    trimmed.has_prefix ("<img") || trimmed.has_prefix ("<figcaption")) {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    if (in_table) {
+                        result.append ("</tbody></table>\n");
+                        in_table = false;
+                    }
+                    result.append (line + "\n");
+                    if (line.contains ("<pre") && !line.contains ("</pre>")) in_html_pre = true;
+                    continue;
+                }
+
+                if (line.has_prefix ("```")) {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    if (!in_pre) {
+                        string lang = GLib.Markup.escape_text (line.substring (3).strip ());
+                        result.append_printf ("<pre><code class=\"language-%s\">", lang != "" ? lang : "text");
+                        in_pre = true;
+                    } else {
+                        result.append ("</code></pre>\n");
+                        in_pre = false;
+                    }
+                    continue;
+                }
+                if (in_pre) {
+                    result.append (GLib.Markup.escape_text (line) + "\n");
+                    continue;
+                }
+
+                if (trimmed.has_prefix ("|") && trimmed.has_suffix ("|") && trimmed.length > 2) {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    string[] cells = trimmed.substring (1, trimmed.length - 2).split ("|");
+                    bool separator = true;
+                    foreach (string cell in cells) {
+                        if (cell.strip ().replace ("-", "").replace (":", "") != "") {
+                            separator = false;
+                            break;
+                        }
+                    }
+                    if (!separator) {
+                        if (!in_table) {
+                            result.append ("<table><thead><tr>");
+                            foreach (string cell in cells) {
+                                result.append_printf ("<th>%s</th>", format_inline_markdown (cell.strip ()));
+                            }
+                            result.append ("</tr></thead><tbody>\n");
+                            in_table = true;
+                        } else {
+                            result.append ("<tr>");
+                            foreach (string cell in cells) {
+                                result.append_printf ("<td>%s</td>", format_inline_markdown (cell.strip ()));
+                            }
+                            result.append ("</tr>\n");
+                        }
+                    }
+                    continue;
+                } else if (in_table) {
+                    result.append ("</tbody></table>\n");
+                    in_table = false;
+                }
+
+                if (trimmed == "") {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    result.append ("\n");
+                } else if (trimmed.has_prefix ("#### ")) {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    result.append_printf ("<h4>%s</h4>\n", format_inline_markdown (trimmed.substring (5)));
+                } else if (trimmed.has_prefix ("### ")) {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    result.append_printf ("<h3>%s</h3>\n", format_inline_markdown (trimmed.substring (4)));
+                } else if (trimmed.has_prefix ("## ")) {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    result.append_printf ("<h2>%s</h2>\n", format_inline_markdown (trimmed.substring (3)));
+                } else if (trimmed.has_prefix ("# ")) {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    result.append_printf ("<h1>%s</h1>\n", format_inline_markdown (trimmed.substring (2)));
+                } else if (trimmed == "---" || trimmed == "***") {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    result.append ("<hr/>\n");
+                } else if (trimmed.has_prefix ("> ")) {
+                    close_markdown_lists (result, ref in_ul, ref in_ol);
+                    result.append_printf ("<blockquote>%s</blockquote>\n", format_inline_markdown (trimmed.substring (2)));
+                } else if (trimmed.has_prefix ("- ") || trimmed.has_prefix ("* ")) {
+                    if (in_ol) { result.append ("</ol>\n"); in_ol = false; }
+                    if (!in_ul) { result.append ("<ul>\n"); in_ul = true; }
+                    result.append_printf ("<li>%s</li>\n", format_inline_markdown (trimmed.substring (2)));
+                } else {
+                    string list_item = "";
+                    if (is_ordered_list_item (trimmed, out list_item)) {
+                        if (in_ul) { result.append ("</ul>\n"); in_ul = false; }
+                        if (!in_ol) { result.append ("<ol>\n"); in_ol = true; }
+                        result.append_printf ("<li>%s</li>\n", format_inline_markdown (list_item));
+                    } else {
+                        close_markdown_lists (result, ref in_ul, ref in_ol);
+                        result.append_printf ("<p>%s</p>\n", format_inline_markdown (line));
+                    }
+                }
+            }
+
+            close_markdown_lists (result, ref in_ul, ref in_ol);
+            if (in_table) result.append ("</tbody></table>\n");
+            if (in_pre) result.append ("</code></pre>\n");
+            return result.str;
+        }
+
+        private static void close_markdown_lists (StringBuilder result, ref bool in_ul, ref bool in_ol) {
+            if (in_ul) { result.append ("</ul>\n"); in_ul = false; }
+            if (in_ol) { result.append ("</ol>\n"); in_ol = false; }
+        }
+
+        private static bool is_ordered_list_item (string line, out string item) {
+            item = "";
+            try {
+                if (ordered_list_regex == null) {
+                    ordered_list_regex = new GLib.Regex ("^[0-9]+\\.\\s+(.+)$");
+                }
+                GLib.MatchInfo match_info;
+                if (ordered_list_regex.match (line, 0, out match_info)) {
+                    item = match_info.fetch (1);
+                    return true;
+                }
+            } catch (GLib.RegexError e) {
+                GLib.warning ("Failed to parse ordered Markdown list: %s", e.message);
+            }
+            return false;
         }
     }
 }

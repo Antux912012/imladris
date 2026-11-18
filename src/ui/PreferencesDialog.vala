@@ -495,6 +495,7 @@ namespace Imladris.UI {
             mode_strings.append ("🍒 Cherry Studio / LocalAI (localhost:23333 / 8080)");
             mode_strings.append ("🚀 Antigravity CLI (agy Agent Harness)");
             mode_strings.append ("⚙️ Custom Local Server");
+            mode_strings.append ("📦 Imladris Managed llama.cpp (downloaded GGUF models)");
 
             var mode_row = new Adw.ComboRow () {
                 title = "Local AI Server and Harness Bridge",

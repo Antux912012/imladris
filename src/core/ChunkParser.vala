@@ -20,7 +20,15 @@ namespace Imladris.Core {
         public bool unclosed_eof { get; set; default = false; }
         public bool is_executable { get; set; default = true; }
 
-        public CodeChunk (int start_line, int end_line, string language, string code, string header = "", bool eval_enabled = true, string chunk_label = "") {
+        public CodeChunk (
+            int start_line,
+            int end_line,
+            string language,
+            string code,
+            string header = "",
+            bool eval_enabled = true,
+            string chunk_label = ""
+        ) {
             this.start_line = start_line;
             this.end_line = end_line;
             this.language = language;
@@ -28,72 +36,259 @@ namespace Imladris.Core {
             this.header = header;
             this.eval_enabled = eval_enabled;
             this.chunk_label = chunk_label;
+            this.is_executable = ChunkParser.is_executable_language (language);
         }
     }
 
-    /**
-     * Scans .Rmd, .Qmd, and .ipynb buffers using Rust imladris-core CommonMark
-     * fence scanner + YAML/attribute option parser.
-     */
     public class ChunkParser : GLib.Object {
 
-        public static Gee.ArrayList<CodeChunk> parse_all_fences (string buffer_text, string format_code = "qmd") {
-            var list = new Gee.ArrayList<CodeChunk> ();
-            string json_str = NativeCore.parse_chunks_json (buffer_text, format_code);
-            try {
-                var parser = new Json.Parser ();
-                parser.load_from_data (json_str, -1);
-                var root = parser.get_root ();
-                if (root == null || root.get_node_type () != Json.NodeType.ARRAY) {
-                    return list;
-                }
-                var arr = root.get_array ();
-                for (uint i = 0; i < arr.get_length (); i++) {
-                    var obj = arr.get_object_element (i);
-                    int start_line = (int) obj.get_int_member ("fence_start_line");
-                    int end_line = (int) obj.get_int_member ("fence_end_line");
-                    string lang = obj.get_string_member ("language");
-                    string code = obj.get_string_member ("code");
-                    string hdr = obj.get_string_member ("raw_header");
-                    bool eval_en = obj.get_boolean_member ("eval_enabled");
-                    string lbl = obj.get_string_member ("label");
+        public static Gee.ArrayList<CodeChunk> parse_all_fences (
+            string buffer_text,
+            string format_code = "qmd"
+        ) {
+            var chunks = new Gee.ArrayList<CodeChunk> ();
+            string[] lines = buffer_text.split ("\n");
+            bool inside_chunk = false;
+            char fence_char = '`';
+            int fence_length = 0;
+            int start_line = -1;
+            string header = "";
+            string language = "";
+            string chunk_label = "";
+            var code = new GLib.StringBuilder ();
+            CodeChunk? current = null;
 
-                    var ch = new CodeChunk (start_line, end_line, lang, code, hdr, eval_en, lbl);
-                    ch.echo = obj.get_boolean_member ("echo");
-                    ch.include = obj.get_boolean_member ("include");
-                    ch.warning_enabled = obj.get_boolean_member ("warning");
-                    ch.error_enabled = obj.get_boolean_member ("error");
-                    ch.output_mode = obj.get_string_member ("output_mode");
-                    ch.fig_cap = obj.get_string_member ("fig_cap");
-                    ch.unclosed_eof = obj.get_boolean_member ("unclosed_eof");
-                    ch.is_executable = obj.get_boolean_member ("is_executable");
-                    list.add (ch);
+            for (int i = 0; i < lines.length; i++) {
+                string raw = lines[i];
+                string trimmed = raw.strip ();
+
+                if (!inside_chunk) {
+                    int prefix_length = 0;
+                    while (prefix_length < raw.length &&
+                           (raw[prefix_length] == ' ' || raw[prefix_length] == '\t')) {
+                        prefix_length++;
+                    }
+                    if (prefix_length > 3 || prefix_length >= raw.length) {
+                        continue;
+                    }
+
+                    char candidate_fence = raw[prefix_length];
+                    if (candidate_fence != '`' && candidate_fence != '~') {
+                        continue;
+                    }
+                    int run_length = 0;
+                    while (prefix_length + run_length < raw.length &&
+                           raw[prefix_length + run_length] == candidate_fence) {
+                        run_length++;
+                    }
+                    if (run_length < 3) {
+                        continue;
+                    }
+
+                    string info = raw.substring (prefix_length + run_length).strip ();
+                    if (candidate_fence == '`' && info.contains ("`")) {
+                        continue;
+                    }
+                    parse_fence_info (info, out language, out chunk_label);
+                    if (language == "") {
+                        language = "text";
+                    }
+
+                    fence_char = candidate_fence;
+                    fence_length = run_length;
+                    start_line = i;
+                    header = raw.strip ();
+                    code.truncate (0);
+                    current = new CodeChunk (start_line, -1, language, "", header, true, chunk_label);
+                    parse_header_options (info, current);
+                    inside_chunk = true;
+                    continue;
                 }
-            } catch (GLib.Error e) {
-                GLib.warning ("ChunkParser JSON decode error: %s", e.message);
+
+                if (is_closing_fence (raw, fence_char, fence_length) && current != null) {
+                    current.end_line = i;
+                    current.code = code.str;
+                    chunks.add (current);
+                    current = null;
+                    inside_chunk = false;
+                    continue;
+                }
+
+                if (current != null && trimmed.has_prefix ("#|")) {
+                    parse_option (current, trimmed.substring (2).strip ());
+                    continue;
+                }
+                code.append (raw);
+                code.append_c ('\n');
             }
-            return list;
+
+            if (inside_chunk && current != null) {
+                current.end_line = lines.length - 1;
+                current.code = code.str;
+                current.unclosed_eof = true;
+                chunks.add (current);
+            }
+
+            return chunks;
         }
 
         public static Gee.ArrayList<CodeChunk> parse_chunks (string buffer_text) {
-            var all = parse_all_fences (buffer_text, "qmd");
-            var exec_only = new Gee.ArrayList<CodeChunk> ();
-            foreach (var ch in all) {
-                if (ch.is_executable) {
-                    exec_only.add (ch);
+            var executable = new Gee.ArrayList<CodeChunk> ();
+            foreach (var chunk in parse_all_fences (buffer_text)) {
+                if (chunk.is_executable) {
+                    executable.add (chunk);
                 }
             }
-            return exec_only;
+            return executable;
         }
 
         public static CodeChunk? find_chunk_at_line (string buffer_text, int line_num) {
-            var chunks = parse_chunks (buffer_text);
-            foreach (var ch in chunks) {
-                if (line_num >= ch.start_line && line_num <= ch.end_line) {
-                    return ch;
+            foreach (var chunk in parse_chunks (buffer_text)) {
+                if (line_num >= chunk.start_line && line_num <= chunk.end_line) {
+                    return chunk;
                 }
             }
             return null;
+        }
+
+        private static bool is_closing_fence (string raw, char fence_char, int minimum_length) {
+            string trimmed = raw.strip ();
+            int run_length = 0;
+            while (run_length < trimmed.length && trimmed[run_length] == fence_char) {
+                run_length++;
+            }
+            return run_length >= minimum_length && trimmed.substring (run_length).strip () == "";
+        }
+
+        public static bool is_executable_language (string language) {
+            switch (language.down ()) {
+            case "r":
+            case "python":
+            case "julia":
+            case "bash":
+            case "sh":
+            case "sql":
+            case "typescript":
+            case "ts":
+            case "javascript":
+            case "js":
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        private static void parse_fence_info (string info, out string language, out string label) {
+            string clean = info.strip ();
+            if (clean.has_prefix ("{")) {
+                int close = clean.index_of ("}");
+                clean = close > 0 ? clean.substring (1, close - 1) : clean.substring (1);
+            }
+
+            language = "";
+            label = "";
+            string[] parts = clean.split (",");
+            if (parts.length == 0) {
+                return;
+            }
+
+            string[] first_words = parts[0].strip ().split (" ");
+            foreach (string word in first_words) {
+                string token = word.strip ();
+                if (token == "") continue;
+                if (language == "") {
+                    language = normalize_language (token);
+                } else if (label == "" && !token.contains ("=")) {
+                    label = token;
+                }
+            }
+            for (int i = 1; i < parts.length && label == ""; i++) {
+                string token = parts[i].strip ();
+                if (token.has_prefix ("label=")) {
+                    label = token.substring (6).replace ("\"", "").replace ("'", "").strip ();
+                } else if (!token.contains ("=")) {
+                    label = token;
+                }
+            }
+        }
+
+        private static string normalize_language (string language) {
+            string normalized = language.down ();
+            if (normalized == "py" || normalized == "python3") return "python";
+            if (normalized == "shell" || normalized == "zsh") return "bash";
+            if (normalized == "ts") return "typescript";
+            if (normalized == "js") return "javascript";
+            return normalized;
+        }
+
+        private static void parse_option (CodeChunk chunk, string option) {
+            string[] pair = option.split (":", 2);
+            if (pair.length == 2) {
+                apply_option (chunk, pair[0].strip (), pair[1].strip ());
+                return;
+            }
+            pair = option.split ("=", 2);
+            if (pair.length == 2) {
+                apply_option (chunk, pair[0].strip (), pair[1].strip ());
+            }
+        }
+
+        private static void parse_header_options (string info, CodeChunk chunk) {
+            string clean = info.strip ();
+            if (clean.has_prefix ("{")) {
+                int close = clean.index_of ("}");
+                clean = close > 0 ? clean.substring (1, close - 1) : clean.substring (1);
+            }
+
+            string[] parts = clean.split (",");
+            for (int i = 0; i < parts.length; i++) {
+                string[] words = parts[i].strip ().split (" ");
+                for (int j = 0; j < words.length; j++) {
+                    string token = words[j].strip ();
+                    if (token == "") continue;
+                    if (i == 0 && j == 0) continue;
+                    if (i == 0 && j == 1 && !token.contains ("=")) continue;
+                    string[] pair = token.split ("=", 2);
+                    if (pair.length == 2) {
+                        apply_option (chunk, pair[0].strip (), pair[1].strip ());
+                    }
+                }
+            }
+        }
+
+        private static void apply_option (CodeChunk chunk, string key, string value) {
+            string normalized_key = key.down ();
+            string normalized_value = value.down ().replace ("\"", "").replace ("'", "");
+            bool enabled = normalized_value != "false" &&
+                           normalized_value != "f" &&
+                           normalized_value != "no" &&
+                           normalized_value != "0";
+            switch (normalized_key) {
+            case "eval":
+                chunk.eval_enabled = enabled;
+                break;
+            case "echo":
+                chunk.echo = enabled;
+                break;
+            case "include":
+                chunk.include = enabled;
+                break;
+            case "warning":
+                chunk.warning_enabled = enabled;
+                break;
+            case "error":
+                chunk.error_enabled = enabled;
+                break;
+            case "output":
+                chunk.output_mode = value.strip ().replace ("\"", "").replace ("'", "");
+                break;
+            case "fig-cap":
+                chunk.fig_cap = value.strip ().replace ("\"", "").replace ("'", "");
+                break;
+            case "label":
+                chunk.chunk_label = value.strip ().replace ("\"", "").replace ("'", "");
+                break;
+            }
         }
     }
 }

@@ -27,8 +27,8 @@ namespace Imladris.Runners {
 
         public static string? find_tex_engine (string? working_dir = null, string? preferred = null) {
             string[] candidates = (preferred != null && preferred != "")
-                ? new string[] { preferred, "latexmk", "xelatex", "lualatex", "pdflatex" }
-                : new string[] { "latexmk", "xelatex", "lualatex", "pdflatex" };
+                ? new string[] { preferred, "latexmk", "xelatex", "lualatex", "pdflatex", "tectonic" }
+                : new string[] { "latexmk", "xelatex", "lualatex", "pdflatex", "tectonic" };
 
             foreach (string cand in candidates) {
                 string? resolved = null;
@@ -103,7 +103,7 @@ namespace Imladris.Runners {
             string? engine = find_tex_engine (work_dir, preferred_engine);
             if (engine == null) {
                 result.success = false;
-                result.stdout_stderr = "No LaTeX toolchain found (latexmk, xelatex, lualatex, or pdflatex). Install TeX Live or TinyTeX first.";
+                result.stdout_stderr = "No LaTeX toolchain found (latexmk, xelatex, lualatex, pdflatex, or tectonic). Install a TeX engine first.";
                 var diag = new LatexDiagnostic ();
                 diag.file = base_name;
                 diag.line = 1;
@@ -121,6 +121,14 @@ namespace Imladris.Runners {
                 exit_code = yield run_tex_cmd (
                     "latexmk",
                     { "-pdf", "-interaction=nonstopmode", "-file-line-error", "-synctex=1", base_name },
+                    work_dir,
+                    cancellable,
+                    out out_log
+                );
+            } else if (engine == "tectonic") {
+                exit_code = yield run_tex_cmd (
+                    "tectonic",
+                    { "--keep-logs", "--synctex", base_name },
                     work_dir,
                     cancellable,
                     out out_log

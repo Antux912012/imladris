@@ -1,60 +1,184 @@
-/*
- * SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
+// SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 using GLib;
 
 namespace Imladris.Core {
 
-    /**
-     * Memory-safe Vala wrapper around the Rust imladris_core static library.
-     * Every raw C string returned by Rust is copied into a managed Vala string
-     * and freed immediately via imladris_free_string().
-     */
     public class NativeCore : GLib.Object {
 
-        private static string take_and_free (char* raw_ptr) {
-            if (raw_ptr == null) return "{}";
-            string copy = (string) raw_ptr;
-            RustFFI.free_string (raw_ptr);
-            return copy;
+        private static GLib.Regex compile_required_regex (string pattern) {
+            try {
+                return new GLib.Regex (pattern);
+            } catch (GLib.RegexError e) {
+                GLib.error ("Invalid built-in regular expression: %s", e.message);
+            }
         }
 
-        public static string parse_frontmatter_json (string source) {
-            return take_and_free (RustFFI.parse_frontmatter_json_raw (source));
+        private static string serialize_json (Json.Builder builder) {
+            var generator = new Json.Generator ();
+            generator.set_root (builder.get_root ());
+            return generator.to_data (null);
         }
 
-        public static string parse_chunks_json (string source, string format_code = "qmd") {
-            return take_and_free (RustFFI.parse_chunks_json_raw (source, format_code));
+        public static string analyze_typescript_symbols_json (string source) {
+            var builder = new Json.Builder ();
+            var seen = new Gee.HashSet<string> ();
+            var declaration = compile_required_regex (
+                "^\\s*(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:async\\s+)?(function|class|interface|type|enum|const|let|var)\\s+([A-Za-z_$][A-Za-z0-9_$]*)"
+            );
+
+            builder.begin_array ();
+            string[] lines = source.split ("\n");
+            for (int i = 0; i < lines.length; i++) {
+                GLib.MatchInfo match_info;
+                if (!declaration.match (lines[i], 0, out match_info)) {
+                    continue;
+                }
+
+                string kind = match_info.fetch (1);
+                string name = match_info.fetch (2);
+                if (seen.contains (name)) {
+                    continue;
+                }
+                seen.add (name);
+
+                if ((kind == "const" || kind == "let" || kind == "var") && lines[i].contains ("=>")) {
+                    kind = "function";
+                }
+
+                builder.begin_object ();
+                builder.set_member_name ("name");
+                builder.add_string_value (name);
+                builder.set_member_name ("kind");
+                builder.add_string_value (kind);
+                builder.set_member_name ("line");
+                builder.add_int_value (i + 1);
+                builder.end_object ();
+            }
+            builder.end_array ();
+            return serialize_json (builder);
         }
 
         public static string extract_outline_json (string source, string format_code = "qmd") {
-            return take_and_free (RustFFI.extract_outline_json_raw (source, format_code));
+            var builder = new Json.Builder ();
+            var heading_regex = compile_required_regex ("^\\s*(#{1,6})\\s+(.+?)\\s*#*\\s*$");
+            var chunk_regex = compile_required_regex ("^\\s*```\\s*\\{([A-Za-z0-9_+-]+)(?:\\s+([^,}]+))?");
+            bool in_fence = false;
+
+            builder.begin_array ();
+            string[] lines = source.split ("\n");
+            for (int i = 0; i < lines.length; i++) {
+                string line = lines[i];
+                string trimmed = line.strip ();
+                if (in_fence) {
+                    if (trimmed.has_prefix ("```") || trimmed.has_prefix ("~~~")) {
+                        in_fence = false;
+                    }
+                    continue;
+                }
+
+                GLib.MatchInfo chunk_match;
+                if (chunk_regex.match (line, 0, out chunk_match)) {
+                    string language = chunk_match.fetch (1).down ();
+                    string label = chunk_match.fetch (2).strip ();
+                    if (label != "" && !label.contains ("=")) {
+                        append_outline_item (builder, 2, @"$label ($language)", i + 1, "chunk");
+                    }
+                    in_fence = true;
+                    continue;
+                }
+
+                if (trimmed.has_prefix ("```") || trimmed.has_prefix ("~~~")) {
+                    in_fence = true;
+                    continue;
+                }
+
+                GLib.MatchInfo heading_match;
+                if (heading_regex.match (line, 0, out heading_match)) {
+                    append_outline_item (
+                        builder,
+                        heading_match.fetch (1).length,
+                        heading_match.fetch (2).strip (),
+                        i + 1,
+                        "heading"
+                    );
+                }
+            }
+            builder.end_array ();
+            return serialize_json (builder);
         }
 
-        public static string render_markdown_html (string body, string options_json = "{}") {
-            return take_and_free (RustFFI.render_markdown_html_raw (body, options_json));
-        }
-
-        public static string ipynb_to_editor_json (string ipynb_json) {
-            return take_and_free (RustFFI.ipynb_to_editor_json_raw (ipynb_json));
-        }
-
-        public static string editor_to_ipynb_json (string editor_text, string existing_ipynb = "", string outputs_map_json = "{}") {
-            return take_and_free (RustFFI.editor_to_ipynb_json_raw (editor_text, existing_ipynb, outputs_map_json));
+        private static void append_outline_item (
+            Json.Builder builder,
+            int level,
+            string title,
+            int line,
+            string kind
+        ) {
+            builder.begin_object ();
+            builder.set_member_name ("level");
+            builder.add_int_value (level);
+            builder.set_member_name ("title");
+            builder.add_string_value (title);
+            builder.set_member_name ("line");
+            builder.add_int_value (line);
+            builder.set_member_name ("kind");
+            builder.add_string_value (kind);
+            builder.end_object ();
         }
 
         public static string parse_latex_log_json (string log_text) {
-            return take_and_free (RustFFI.parse_latex_log_json_raw (log_text));
+            var builder = new Json.Builder ();
+            var error_line = compile_required_regex ("^l\\.(\\d+)\\s*(.*)$");
+            string? pending_error = null;
+            int pending_line = 1;
+
+            builder.begin_array ();
+            foreach (string line in log_text.split ("\n")) {
+                string trimmed = line.strip ();
+                if (trimmed.has_prefix ("!")) {
+                    pending_error = trimmed.substring (1).strip ();
+                    pending_line = 1;
+                    continue;
+                }
+
+                if (pending_error != null) {
+                    GLib.MatchInfo match_info;
+                    if (error_line.match (trimmed, 0, out match_info)) {
+                        pending_line = int.parse (match_info.fetch (1));
+                        string detail = match_info.fetch (2).strip ();
+                        if (detail != "") {
+                            pending_error = pending_error + " " + detail;
+                        }
+                        append_latex_diagnostic (builder, pending_error, pending_line, "error");
+                        pending_error = null;
+                    }
+                }
+            }
+            if (pending_error != null) {
+                append_latex_diagnostic (builder, pending_error, pending_line, "error");
+            }
+            builder.end_array ();
+            return serialize_json (builder);
         }
 
-        public static string analyze_typescript_symbols_json (string ts_source) {
-            return take_and_free (RustFFI.analyze_typescript_symbols_json_raw (ts_source));
-        }
-
-        public static string analyze_manuscript_json (string source) {
-            return take_and_free (RustFFI.analyze_manuscript_json_raw (source));
+        private static void append_latex_diagnostic (
+            Json.Builder builder,
+            string message,
+            int line,
+            string severity
+        ) {
+            builder.begin_object ();
+            builder.set_member_name ("file");
+            builder.add_string_value ("");
+            builder.set_member_name ("line");
+            builder.add_int_value (line);
+            builder.set_member_name ("severity");
+            builder.add_string_value (severity);
+            builder.set_member_name ("message");
+            builder.add_string_value (message);
+            builder.end_object ();
         }
     }
 }

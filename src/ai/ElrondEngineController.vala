@@ -55,6 +55,8 @@ namespace Imladris.AI {
 
         private Soup.Session soup_session;
         private Cancellable? probe_cancellable = null;
+        private Subprocess? managed_server_process = null;
+        private string managed_server_model_path = "";
 
         public signal void status_updated (string status_text, bool is_busy, double progress_fraction);
         public signal void statusbar_telemetry_updated (string statusbar_text, bool active);
@@ -74,6 +76,13 @@ namespace Imladris.AI {
             SettingsManager.get_default ().ai_settings_changed.connect (() => {
                 sync_with_preferences.begin ();
             });
+
+            var application = GLib.Application.get_default ();
+            if (application != null) {
+                application.shutdown.connect (() => {
+                    stop_daemon ();
+                });
+            }
 
             if (SettingsManager.get_default ().elrond_enabled) {
                 sync_with_preferences.begin ();
@@ -108,6 +117,11 @@ namespace Imladris.AI {
             if (probe_cancellable != null) {
                 probe_cancellable.cancel ();
                 probe_cancellable = null;
+            }
+            if (managed_server_process != null) {
+                managed_server_process.force_exit ();
+                managed_server_process = null;
+                managed_server_model_path = "";
             }
         }
 
@@ -151,6 +165,8 @@ namespace Imladris.AI {
                 connected = yield probe_antigravity_async ();
             } else if (mode == ElrondMode.CUSTOM) {
                 connected = yield probe_custom_async (settings.custom_local_endpoint);
+            } else if (mode == ElrondMode.MANAGED_LLAMA) {
+                connected = yield probe_managed_llama_async ();
             }
 
             if (connected) {
@@ -160,9 +176,194 @@ namespace Imladris.AI {
                 statusbar_telemetry_updated ("Elrond Bridge: %s (%s) • Ready".printf (active_display_name, active_model_name), true);
             } else {
                 is_ready = false;
-                status_updated ("No local AI server found. Start Ollama, LM Studio, Cherry Studio, or Antigravity (agy).", false, 0.0);
+                string message = mode == ElrondMode.MANAGED_LLAMA
+                    ? "Managed llama.cpp is not ready. Select a downloaded model and install the llama.cpp engine."
+                    : "No local AI server found. Start Ollama, LM Studio, Cherry Studio, or Antigravity (agy).";
+                status_updated (message, false, 0.0);
                 statusbar_telemetry_updated ("Elrond: Offline (No local AI server)", false);
             }
+        }
+
+        private async bool probe_managed_llama_async () {
+            var settings = SettingsManager.get_default ();
+            string model_path = settings.managed_model_path;
+            if (model_path.length == 0 || !FileUtils.test (model_path, FileTest.IS_REGULAR)) {
+                status_updated ("Choose and download a local GGUF model before starting managed llama.cpp.", false, 0.0);
+                return false;
+            }
+
+            if (managed_server_process != null && managed_server_model_path != model_path) {
+                managed_server_process.force_exit ();
+                managed_server_process = null;
+            }
+
+            if (managed_server_process == null) {
+                bool is_host_binary = false;
+                string? binary = find_llama_server_binary (ElrondBackend.VULKAN, out is_host_binary);
+                if (binary == null || is_host_binary) {
+                    status_updated ("llama-server is not installed. Use Download & Use in AI settings to install it.", false, 0.0);
+                    return false;
+                }
+
+                string[] argv = build_managed_server_argv (binary, model_path, find_preset_for_model_path (model_path));
+                try {
+                    managed_server_process = new Subprocess.newv (
+                        argv, SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE
+                    );
+                    managed_server_model_path = model_path;
+                    monitor_managed_output.begin (new DataInputStream (managed_server_process.get_stdout_pipe ()));
+                    monitor_managed_output.begin (new DataInputStream (managed_server_process.get_stderr_pipe ()));
+                    watch_managed_process.begin (managed_server_process);
+                } catch (GLib.Error e) {
+                    managed_server_process = null;
+                    status_updated ("Could not start llama-server: %s".printf (e.message), false, 0.0);
+                    return false;
+                }
+            }
+
+            status_updated ("Starting llama-server with the selected model...", true, 0.15);
+            for (int attempt = 0; attempt < 90; attempt++) {
+                string detected_model = "";
+                if (yield probe_http_endpoint_async ("http://127.0.0.1:8081/v1/models", out detected_model)) {
+                    active_mode = ElrondMode.MANAGED_LLAMA;
+                    active_display_name = "Imladris Managed llama.cpp";
+                    active_endpoint = "http://127.0.0.1:8081/v1";
+                    active_model_name = detected_model.length > 0
+                        ? detected_model : GLib.Path.get_basename (model_path);
+                    return true;
+                }
+                if (managed_server_process == null) {
+                    break;
+                }
+                yield delay_async (500);
+            }
+
+            status_updated ("llama-server did not become ready within 45 seconds. Check its startup logs and system memory.", false, 0.0);
+            return false;
+        }
+
+        private async void monitor_managed_output (DataInputStream stream) {
+            try {
+                while (true) {
+                    string? line = yield stream.read_line_async (Priority.DEFAULT, null);
+                    if (line == null) {
+                        break;
+                    }
+
+                    status_updated (line, true, 0.5);
+                }
+            } catch (GLib.Error e) {
+                warning ("Could not read llama-server output: %s", e.message);
+            }
+        }
+
+        private async void watch_managed_process (Subprocess process) {
+            try {
+                yield process.wait_async (null);
+            } catch (GLib.Error e) {
+                warning ("Could not monitor managed llama-server: %s", e.message);
+            }
+            if (managed_server_process == process) {
+                managed_server_process = null;
+                managed_server_model_path = "";
+                is_ready = false;
+                status_updated ("Managed llama-server exited. Check its startup logs and memory requirements.", false, 0.0);
+            }
+        }
+
+        private async void delay_async (uint milliseconds) {
+            Timeout.add (milliseconds, () => {
+                delay_async.callback ();
+                return Source.REMOVE;
+            });
+            yield;
+        }
+
+        public async void ensure_managed_server_async (Cancellable? cancellable = null) throws GLib.Error {
+            bool is_host_binary = false;
+            if (find_llama_server_binary (ElrondBackend.VULKAN, out is_host_binary) != null && !is_host_binary) {
+                return;
+            }
+
+            string? script_path = find_llama_installer_script ();
+            if (script_path == null) {
+                throw new GLib.IOError.NOT_FOUND ("The bundled llama.cpp installer script is not available.");
+            }
+
+            status_updated ("Installing llama.cpp server...", true, 0.1);
+            string[] argv = { "/bin/sh", script_path, "vulkan" };
+            var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE);
+            monitor_managed_output.begin (new DataInputStream (proc.get_stdout_pipe ()));
+            monitor_managed_output.begin (new DataInputStream (proc.get_stderr_pipe ()));
+            try {
+                yield proc.wait_check_async (cancellable);
+            } catch (GLib.Error e) {
+                proc.force_exit ();
+                throw e;
+            }
+            is_host_binary = false;
+            if (find_llama_server_binary (ElrondBackend.VULKAN, out is_host_binary) == null || is_host_binary) {
+                throw new GLib.IOError.FAILED ("The llama.cpp installer completed, but llama-server was not found.");
+            }
+        }
+
+        public static string[] build_managed_server_argv (
+            string binary,
+            string model_path,
+            LocalModelPreset? preset,
+            int port = 8081
+        ) {
+            bool compact = preset != null && preset.fits_2gb_profile;
+            bool ultra_tight = preset != null && preset.id == "qwen35-2b";
+            string context = compact && !ultra_tight ? "4096" : "2048";
+            string cache_type = ultra_tight ? "q4_0" : "q8_0";
+            string batch = ultra_tight ? "256" : "512";
+            string port_text = port.to_string ();
+            return {
+                binary, "-m", model_path,
+                "-c", context,
+                "-np", "1",
+                "-fa", "on",
+                "-ctk", cache_type,
+                "-ctv", cache_type,
+                "-b", batch,
+                "-ub", "128",
+                "-ngl", "0",
+                "-fit", "off",
+                "--no-warmup",
+                "--host", "127.0.0.1",
+                "--port", port_text
+            };
+        }
+
+        private static LocalModelPreset? find_preset_for_model_path (string model_path) {
+            string parent = GLib.Path.get_basename (GLib.Path.get_dirname (model_path));
+            foreach (var preset in LocalModelManager.get_catalog ()) {
+                if (preset.id == parent) {
+                    return preset;
+                }
+            }
+            return null;
+        }
+
+        private static string? find_llama_installer_script () {
+            foreach (string data_dir in Environment.get_system_data_dirs ()) {
+                string candidate = GLib.Path.build_filename (data_dir, "imladris", "scripts", "install-llama-server.sh");
+                if (FileUtils.test (candidate, FileTest.IS_REGULAR)) {
+                    return candidate;
+                }
+            }
+            string current_dir = Environment.get_current_dir ();
+            string[] source_candidates = {
+                GLib.Path.build_filename (current_dir, "scripts", "install-llama-server.sh"),
+                GLib.Path.build_filename (current_dir, "..", "scripts", "install-llama-server.sh")
+            };
+            foreach (string candidate in source_candidates) {
+                if (FileUtils.test (candidate, FileTest.IS_REGULAR)) {
+                    return candidate;
+                }
+            }
+            return null;
         }
 
         private async bool probe_ollama_async () {
@@ -449,7 +650,7 @@ You specialize in R (tidyverse, ggplot2, biostatistics), Python (pandas, numpy, 
             builder.set_member_name ("model");
             builder.add_string_value (active_model_name.length > 0 ? active_model_name : "default");
             builder.set_member_name ("temperature");
-            builder.add_double_value (0.15);
+            builder.add_double_value (AiConfigManager.get_default ().temperature);
             builder.set_member_name ("max_tokens");
             builder.add_int_value (max_tokens);
             builder.set_member_name ("stream");
@@ -528,7 +729,8 @@ You specialize in R (tidyverse, ggplot2, biostatistics), Python (pandas, numpy, 
 
             var level = SettingsManager.get_default ().elrond_level;
             var intent = classify_intent_fast (current_code);
-            string system_prompt = build_system_prompt_for_intent (intent);
+            string system_prompt = build_system_prompt_for_intent (intent) + "\n\n" +
+                AiConfigManager.get_default ().response_detail.get_instruction ();
 
             string user_context;
             if (level == AiAssistanceLevel.LOW) {
@@ -815,6 +1017,12 @@ You specialize in R (tidyverse, ggplot2, biostatistics), Python (pandas, numpy, 
 
         public static string? find_llama_server_binary (ElrondBackend backend = ElrondBackend.VULKAN, out bool is_host = null) {
             is_host = false;
+            string managed_binary = GLib.Path.build_filename (
+                Environment.get_user_data_dir (), "imladris", "bin", "llama-server"
+            );
+            if (is_binary_runnable (managed_binary, false)) {
+                return managed_binary;
+            }
             string? in_path = Environment.find_program_in_path ("llama-server");
             if (in_path != null && is_binary_runnable (in_path, false)) {
                 return in_path;

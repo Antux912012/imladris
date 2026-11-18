@@ -15,6 +15,9 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/ai/provider_metadata", test_ai_provider_metadata);
         GLib.Test.add_func ("/ai/url_normalization", test_url_normalization);
         GLib.Test.add_func ("/ai/bytes_to_string", test_bytes_to_string);
+        GLib.Test.add_func ("/ai/model_list_parsing", test_model_list_parsing);
+        GLib.Test.add_func ("/ai/local_model_catalog", test_local_model_catalog);
+        GLib.Test.add_func ("/ai/response_detail", test_response_detail);
         GLib.Test.add_func ("/ai/config_manager_defaults_and_persistence", test_config_manager);
         GLib.Test.add_func ("/ai/deepseek_reasoning_parsing", test_deepseek_reasoning_parsing);
         GLib.Test.add_func ("/ai/claude_messages_parsing", test_claude_messages_parsing);
@@ -23,6 +26,7 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/theming/app_theme_metadata", test_app_theme);
         GLib.Test.add_func ("/theming/gnome_accent_metadata", test_gnome_accent_metadata);
         GLib.Test.add_func ("/core/distro_detection", test_distro_detection);
+        GLib.Test.add_func ("/core/toolchain_path_validation", test_toolchain_path_validation);
         GLib.Test.add_func ("/ai/elrond_binary_discovery", test_elrond_binary_discovery);
         GLib.Test.add_func ("/ai/side_panel_position", test_side_panel_position);
         GLib.Test.add_func ("/ai/free_and_copilot_providers", test_free_and_copilot_providers);
@@ -40,7 +44,7 @@ namespace Imladris.Tests {
         assert (gemini.to_string_id () == "gemini");
         assert (AiProvider.from_string_id ("gemini") == AiProvider.GEMINI);
         assert (gemini.get_default_endpoint () == "https://generativelanguage.googleapis.com/v1beta/openai");
-        assert (gemini.get_default_model () == "gemini-2.0-flash");
+        assert (gemini.get_default_model () == "gemini-3.6-flash");
         assert (gemini.get_api_key_help_url () == "https://aistudio.google.com/app/apikey");
         assert (gemini.get_env_var_name () == "GEMINI_API_KEY");
         assert (gemini.requires_api_key () == true);
@@ -188,6 +192,111 @@ namespace Imladris.Tests {
         assert (AiConfigManager.bytes_to_string (empty_bytes) == "");
     }
 
+    private static void test_model_list_parsing () {
+        string gemini_response = """
+        {
+          "models": [
+            {"name": "models/gemini-3.6-flash", "supportedGenerationMethods": ["generateContent", "countTokens"]},
+            {"name": "models/text-embedding-004", "supportedGenerationMethods": ["embedContent"]},
+            {"name": "models/gemini-4-argon", "supportedGenerationMethods": ["generateContent"]}
+          ]
+        }
+        """;
+        try {
+            string[] gemini_models = AiClient.parse_model_ids (gemini_response, AiProvider.GEMINI);
+            assert (gemini_models.length == 2);
+            assert (gemini_models[0] == "gemini-3.6-flash");
+            assert (gemini_models[1] == "gemini-4-argon");
+
+            string openai_response = """{"data":[{"id":"model-a"},{"id":"model-b"},{"id":"model-a"}]}""";
+            string[] openai_models = AiClient.parse_model_ids (openai_response, AiProvider.OPENAI);
+            assert (openai_models.length == 2);
+            assert (openai_models[0] == "model-a");
+            assert (openai_models[1] == "model-b");
+        } catch (GLib.Error e) {
+            assert_not_reached ();
+        }
+    }
+
+    private static void test_response_detail () {
+        assert (AiResponseDetail.from_string_id ("concise") == AiResponseDetail.CONCISE);
+        assert (AiResponseDetail.from_string_id ("detailed").get_instruction ().contains ("thorough"));
+        assert (AiResponseDetail.from_string_id ("unknown") == AiResponseDetail.BALANCED);
+    }
+
+    private static void test_local_model_catalog () {
+        var catalog = Imladris.AI.LocalModelManager.get_catalog ();
+        assert (catalog.size == 10);
+        string tree_json = """
+        [
+          {"path": "model-Q4_K_M-00001-of-00002.gguf", "size": 600},
+          {"path": "model-Q4_K_M-00002-of-00002.gguf", "size": 400},
+          {"path": "model-Q4_K_M.gguf", "size": 1024},
+          {"path": "model-Q6_K.gguf", "size": 2048},
+          {"path": "README.md", "size": 10}
+        ]
+        """;
+        try {
+            string[] selected = Imladris.AI.LocalModelManager.select_gguf_files (
+                tree_json, { "UD-Q4_K_XL", "Q4_K_M" }
+            );
+            assert (selected.length == 1);
+            assert (selected[0] == "model-Q4_K_M.gguf");
+            string[] shard_selection = Imladris.AI.LocalModelManager.select_gguf_files (
+                """[{"path":"split-Q4_K_M-00001-of-00002.gguf"},{"path":"split-Q4_K_M-00002-of-00002.gguf"}]""",
+                { "Q4_K_M" }
+            );
+            assert (shard_selection.length == 2);
+            assert (shard_selection[0] == "split-Q4_K_M-00001-of-00002.gguf");
+            assert (shard_selection[1] == "split-Q4_K_M-00002-of-00002.gguf");
+            assert (catalog[7].repository == "bartowski/Qwen_Qwen3-1.7B-GGUF");
+
+            var compact_model = catalog[5];
+            string[] standard_args = Imladris.AI.ElrondEngineController.build_managed_server_argv (
+                "llama-server", "/tmp/model.gguf", compact_model
+            );
+            assert (contains_pair (standard_args, "-c", "4096"));
+            assert (contains_pair (standard_args, "-ctk", "q8_0"));
+            assert (contains_pair (standard_args, "-ctv", "q8_0"));
+            assert (contains_pair (standard_args, "-np", "1"));
+            assert (contains_pair (standard_args, "-ngl", "0"));
+            assert (contains_pair (standard_args, "-fit", "off"));
+            assert (contains_pair (standard_args, "-ub", "128"));
+            assert (contains_value (standard_args, "--no-warmup"));
+            assert (!contains_value (standard_args, "-lm"));
+            assert (!contains_value (standard_args, "--mlock"));
+
+            string[] tight_args = Imladris.AI.ElrondEngineController.build_managed_server_argv (
+                "llama-server", "/tmp/model.gguf", catalog[6]
+            );
+            assert (contains_pair (tight_args, "-c", "2048"));
+            assert (contains_pair (tight_args, "-ctk", "q4_0"));
+            assert (contains_pair (tight_args, "-ctv", "q4_0"));
+            assert (contains_pair (tight_args, "-b", "256"));
+            assert (ElrondMode.MANAGED_LLAMA.to_string_id () == "managed_llama");
+        } catch (GLib.Error e) {
+            assert_not_reached ();
+        }
+    }
+
+    private static bool contains_pair (string[] values, string key, string value) {
+        for (int i = 0; i + 1 < values.length; i++) {
+            if (values[i] == key && values[i + 1] == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool contains_value (string[] values, string value) {
+        foreach (string candidate in values) {
+            if (candidate == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static void test_config_manager () {
         var mgr = AiConfigManager.get_default ();
 
@@ -196,6 +305,11 @@ namespace Imladris.Tests {
         assert (mgr.get_api_key_for (AiProvider.GEMINI) == "test_gemini_key");
         assert (mgr.get_model_for (AiProvider.GEMINI) == "gemini-2.0-flash");
         assert (mgr.has_valid_key (AiProvider.GEMINI) == true);
+        mgr.set_model_for (AiProvider.GEMINI, "gemini-4-flash");
+        mgr.response_detail = AiResponseDetail.DETAILED;
+        mgr.load ();
+        assert (mgr.get_model_for (AiProvider.GEMINI) == "gemini-4-flash");
+        assert (mgr.response_detail == AiResponseDetail.DETAILED);
 
         // Test Claude settings
         mgr.set_provider_config (AiProvider.CLAUDE, "https://api.anthropic.com/v1", "test_claude_key", "claude-3-5-sonnet-20241022");
@@ -441,6 +555,13 @@ namespace Imladris.Tests {
         assert (distro.name.length > 0);
         assert (distro.install_cmd.length > 0);
         assert (distro.install_cmd.contains ("llama"));
+    }
+
+    private static void test_toolchain_path_validation () {
+        assert (!ToolchainManager.is_valid_base_dir_path (""));
+        assert (!ToolchainManager.is_valid_base_dir_path ("relative/toolchains"));
+        assert (!ToolchainManager.is_valid_base_dir_path ("/"));
+        assert (ToolchainManager.is_valid_base_dir_path ("/tmp/imladris-toolchains"));
     }
 
     private static void test_elrond_binary_discovery () {

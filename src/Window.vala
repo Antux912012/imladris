@@ -2560,7 +2560,7 @@ namespace Imladris {
             }
         }
 
-        public void show_toolchain_setup_dialog () {
+        public void show_toolchain_setup_dialog (bool start_installation = false) {
             var dlg = new UI.ToolchainSetupDialog ();
             dlg.installation_completed.connect (() => {
                 var doc = get_active_document ();
@@ -2569,6 +2569,12 @@ namespace Imladris {
                 }
             });
             dlg.present (this);
+            if (start_installation) {
+                GLib.Idle.add (() => {
+                    dlg.start_installation ();
+                    return GLib.Source.REMOVE;
+                });
+            }
         }
 
         public void show_about_dialog () {

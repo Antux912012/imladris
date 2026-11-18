@@ -2,6 +2,17 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.30.0] - 2026-11-18
+
+### Added
+- **Additional document formats**: Added format detection and editor profiles for plain text, CSV, TSV, `.Rproj`, and `.bibliography` files.
+- **Configurable AI generation**: Added Gemini account model discovery and selection, plus shared response-detail and temperature controls.
+- **Managed local GGUF models**: Added ten Hugging Face model presets, quantization fallback, streamed downloads, and Imladris-managed `llama-server` startup. Compact models use capped context/KV caches, single-sequence CPU inference, disabled auto-fit, and mmap defaults for low-memory systems.
+- **Selectable scientific toolchains**: Added a persistent install-folder chooser and component-aware completion so users can install only the R, Python, Quarto, Node/TypeScript, or TeX runtimes they need.
+
+### Fixed
+- **Elrond provider routing**: A ready local Elrond bridge no longer intercepts requests when the selected cloud provider (including Gemini) is configured.
+
 ## [0.27.1] - 2026-11-16
 
 ### Fixed

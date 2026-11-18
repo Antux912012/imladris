@@ -81,43 +81,101 @@ namespace Imladris.Core {
             data = null;
             markdown_body = content;
 
-            string json_str = NativeCore.parse_frontmatter_json (content);
-            try {
-                var parser = new Json.Parser ();
-                parser.load_from_data (json_str, -1);
-                var root = parser.get_root ();
-                if (root == null || root.get_node_type () != Json.NodeType.OBJECT) {
-                    return;
+            int first_delim = -1;
+            int len = content.length;
+            for (int i = 0; i < len; i++) {
+                char c = content[i];
+                if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+                if (c == '-' && i + 2 < len && content[i+1] == '-' && content[i+2] == '-') {
+                    first_delim = i;
                 }
-                var obj = root.get_object ();
-                if (!obj.get_boolean_member ("has_frontmatter")) {
-                    return;
-                }
-                markdown_body = obj.get_string_member ("body");
-                var meta = new FrontmatterData ();
-                string t = obj.get_string_member ("title");
-                if (t != "") meta.title = t;
-                string a = obj.get_string_member ("author");
-                if (a != "") meta.author = a;
-                string d = obj.get_string_member ("date");
-                if (d != "") meta.date = d;
-                string b = obj.get_string_member ("bibliography");
-                if (b != "") meta.bibliography = b;
-                string fmt = obj.get_string_member ("format_summary");
-                if (fmt != "") {
-                    meta.format_type = fmt;
-                    meta.output = fmt;
-                }
-                if (obj.has_member ("yaml") && obj.get_member ("yaml").get_node_type () == Json.NodeType.OBJECT) {
-                    var yobj = obj.get_object_member ("yaml");
-                    if (yobj.has_member ("abstract") && yobj.get_member ("abstract").get_node_type () == Json.NodeType.VALUE) {
-                        meta.abstract_text = yobj.get_string_member ("abstract");
-                    }
-                }
-                data = meta;
-            } catch (GLib.Error e) {
-                GLib.warning ("FrontmatterParser JSON decode error: %s", e.message);
+                break;
             }
+            if (first_delim == -1) {
+                return;
+            }
+
+            int search_start = first_delim + 3;
+
+            int second_delim = content.index_of ("\n---", search_start);
+            int delim_len = 4;
+            if (second_delim == -1) {
+                second_delim = content.index_of ("\r\n---", search_start);
+                delim_len = 5;
+            }
+            if (second_delim == -1) {
+                second_delim = content.index_of ("\n...", search_start);
+                delim_len = 4;
+            }
+
+            if (second_delim == -1) {
+                return;
+            }
+
+            string yaml_block = content.substring (search_start, second_delim - search_start);
+            int body_start = second_delim + delim_len;
+            if (body_start < content.length && content[body_start] == '\n') {
+                body_start++;
+            } else if (body_start < content.length && content[body_start] == '\r' && body_start + 1 < content.length && content[body_start + 1] == '\n') {
+                body_start += 2;
+            }
+
+            markdown_body = content.substring (body_start);
+            data = parse_yaml_block (yaml_block);
+        }
+
+        private static FrontmatterData parse_yaml_block (string yaml) {
+            var meta = new FrontmatterData ();
+            string[] lines = yaml.split ("\n");
+
+            foreach (var raw_line in lines) {
+                string line = raw_line.strip ();
+                if (line.has_prefix ("#") || line == "") {
+                    continue;
+                }
+
+                int colon_idx = line.index_of (":");
+                if (colon_idx == -1) {
+                    continue;
+                }
+
+                string key = line.substring (0, colon_idx).strip ().down ();
+                string val = clean_val (line.substring (colon_idx + 1).strip ());
+
+                switch (key) {
+                    case "title":
+                        meta.title = val;
+                        break;
+                    case "author":
+                        meta.author = val;
+                        break;
+                    case "date":
+                        meta.date = val;
+                        break;
+                    case "bibliography":
+                        meta.bibliography = val;
+                        break;
+                    case "format":
+                        meta.format_type = val;
+                        break;
+                    case "output":
+                        meta.output = val;
+                        break;
+                    case "abstract":
+                        meta.abstract_text = val;
+                        break;
+                }
+            }
+            return meta;
+        }
+
+        private static string clean_val (string val) {
+            string cleaned = val;
+            if ((cleaned.has_prefix ("\"") && cleaned.has_suffix ("\"")) ||
+                (cleaned.has_prefix ("'") && cleaned.has_suffix ("'"))) {
+                cleaned = cleaned.substring (1, cleaned.length - 2);
+            }
+            return cleaned.strip ();
         }
     }
 }
