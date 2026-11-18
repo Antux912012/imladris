@@ -146,6 +146,7 @@ namespace Imladris {
             new_submenu.append ("Simple Markdown (.md)", "app.new_md");
             new_submenu.append ("LaTeX Document (.tex)", "app.new_tex");
             new_submenu.append ("LaTeX Publisher Template...", "app.new_tex_template");
+            new_submenu.append ("Deck or Poster Template...", "app.new_presentation");
             new_submenu.append ("TypeScript File (.ts)", "app.new_ts");
             new_submenu.append ("HTML5 + CSS + LaTeX (.html)", "app.new_html");
             new_submenu.append ("R Script (.R)", "app.new_r");
@@ -180,6 +181,7 @@ namespace Imladris {
 
             var app_sec = new GLib.Menu ();
             app_sec.append ("Preferences", "app.preferences");
+            app_sec.append ("Keyboard Shortcuts", "app.shortcuts");
             app_sec.append ("Feature Tour...", "app.show_tour");
             app_sec.append ("About Imladris", "app.about");
             app_sec.append ("Quit", "app.quit");
@@ -340,15 +342,7 @@ namespace Imladris {
             row_deck.add_prefix (new Gtk.Image.from_icon_name ("x-office-presentation-symbolic"));
             row_deck.activated.connect (() => {
                 sci_popover.popdown ();
-                var dlg = new UI.PresentationTemplateDialog ();
-                dlg.template_selected.connect ((t_title, starter_content, suggested_fn) => {
-                    var fmt = DocumentFormat.from_filename (suggested_fn);
-                    string lang = fmt.to_syntax_lang ();
-                    if (lang == "") lang = "markdown";
-                    add_document_tab (suggested_fn, lang, starter_content);
-                    show_toast (@"Created $t_title ($suggested_fn)");
-                });
-                dlg.present (this);
+                show_presentation_template_dialog ();
             });
             sci_list.append (row_deck);
 
@@ -1156,6 +1150,18 @@ namespace Imladris {
             });
             quick_group.add (tex_tpl_row);
 
+            var deck_tpl_row = new Adw.ActionRow () {
+                title = "Decks &amp; Posters (Beamer, RevealJS, Typst)",
+                subtitle = "Create conference slides, Marp/RevealJS decks, or symposium posters",
+                activatable = true
+            };
+            deck_tpl_row.add_prefix (new Gtk.Image.from_icon_name ("x-office-presentation-symbolic"));
+            deck_tpl_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            deck_tpl_row.activated.connect (() => {
+                show_presentation_template_dialog ();
+            });
+            quick_group.add (deck_tpl_row);
+
             var shiny_row = new Adw.ActionRow () {
                 title = "New R Script or Shiny App (.R)",
                 subtitle = "Run statistical models or build an interactive web dashboard",
@@ -1275,11 +1281,82 @@ namespace Imladris {
 
         public void show_onboarding_tour_dialog (bool check_toolchain_after = false) {
             var dlg = new UI.OnboardingTourDialog ();
-            dlg.tour_finished.connect ((open_toolchain_setup) => {
-                if (open_toolchain_setup || (check_toolchain_after && !Core.ToolchainManager.get_default ().is_base_environment_installed ())) {
+            dlg.tour_finished.connect ((open_toolchain_setup, skipped) => {
+                if (open_toolchain_setup || (!skipped && check_toolchain_after && !Core.ToolchainManager.get_default ().is_base_environment_installed ())) {
                     show_toolchain_setup_dialog (false, true);
                 }
             });
+            dlg.present (this);
+        }
+
+        public void show_presentation_template_dialog () {
+            var dlg = new UI.PresentationTemplateDialog ();
+            dlg.template_selected.connect ((t_title, starter_content, suggested_fn) => {
+                var fmt = DocumentFormat.from_filename (suggested_fn);
+                string lang = fmt.to_syntax_lang ();
+                if (lang == "") lang = "markdown";
+                add_document_tab (suggested_fn, lang, starter_content);
+                show_toast (@"Created $t_title ($suggested_fn)");
+            });
+            dlg.present (this);
+        }
+
+        private void add_shortcut_row (Adw.PreferencesGroup grp, string title, string accel) {
+            var row = new Adw.ActionRow () {
+                title = title,
+                use_markup = false
+            };
+            row.add_suffix (new Gtk.ShortcutLabel (accel) {
+                valign = Gtk.Align.CENTER
+            });
+            grp.add (row);
+        }
+
+        public void show_shortcuts_window () {
+            var dlg = new Adw.Dialog () {
+                title = "Keyboard Shortcuts",
+                content_width = 560,
+                content_height = 620
+            };
+            var toolbar_view = new Adw.ToolbarView ();
+            toolbar_view.add_top_bar (new Adw.HeaderBar ());
+
+            var page = new Adw.PreferencesPage ();
+
+            var docs_group = new Adw.PreferencesGroup () { title = "Documents & Workspace" };
+            add_shortcut_row (docs_group, "New Project or Document", "<Control>n");
+            add_shortcut_row (docs_group, "Open File or Project", "<Control>o");
+            add_shortcut_row (docs_group, "Save Document", "<Control>s");
+            add_shortcut_row (docs_group, "Command Palette", "<Control>k");
+            add_shortcut_row (docs_group, "Focus Editor", "<Control>1");
+            add_shortcut_row (docs_group, "Focus Console", "<Control>2");
+            add_shortcut_row (docs_group, "Preferences", "<Control>comma");
+            add_shortcut_row (docs_group, "Keyboard Shortcuts", "<Control>question");
+            page.add (docs_group);
+
+            var exec_group = new Adw.PreferencesGroup () { title = "Execution & Console" };
+            add_shortcut_row (exec_group, "Run Active Code Chunk", "<Control><Shift>Return");
+            add_shortcut_row (exec_group, "Run Line or Selection", "<Control>Return");
+            add_shortcut_row (exec_group, "Run Cell (Notebook)", "<Shift>Return");
+            add_shortcut_row (exec_group, "Run All Chunks", "<Control><Alt>r");
+            add_shortcut_row (exec_group, "Clear Console", "<Control>l");
+            add_shortcut_row (exec_group, "Restart Execution Kernel", "<Control><Shift>F10");
+            page.add (exec_group);
+
+            var sci_group = new Adw.PreferencesGroup () { title = "Editing & Scientific Tools" };
+            add_shortcut_row (sci_group, "Insert R Assignment (<-)", "<Alt>minus");
+            add_shortcut_row (sci_group, "Insert R Pipe (|>)", "<Control><Shift>m");
+            add_shortcut_row (sci_group, "Toggle Line Comment", "<Control><Shift>c");
+            add_shortcut_row (sci_group, "Math & Chemical Reaction Studio", "<Control>m");
+            add_shortcut_row (sci_group, "Visual Flow & Mermaid Studio", "<Control><Shift>d");
+            add_shortcut_row (sci_group, "Insert Zotero Citation", "<Control><Shift>i");
+            add_shortcut_row (sci_group, "Bibliography & DOI Manager (.bib)", "<Control><Shift>b");
+            add_shortcut_row (sci_group, "Render / Compile Document", "<Control><Shift>k");
+            add_shortcut_row (sci_group, "Elrond AI Assistant", "<Control><Shift>e");
+            page.add (sci_group);
+
+            toolbar_view.set_content (page);
+            dlg.set_child (toolbar_view);
             dlg.present (this);
         }
 
@@ -1718,6 +1795,20 @@ namespace Imladris {
 
         public void trigger_selected_scientific_render () {
             uint sel = (export_format_selector != null) ? export_format_selector.selected : 0;
+            var doc = get_active_document ();
+            if (doc != null && doc.get_document_format () == DocumentFormat.TEX) {
+                // FormatProfile.TEX targets:
+                // 0: "PDF (latexmk)", 1: "PDF (xelatex)", 2: "PDF (pdflatex)", 3: "HTML (Pandoc)"
+                if (sel == 3) {
+                    compile_scientific_document_async.begin (Core.ScientificOutputFormat.HTML_MANUSCRIPT, null);
+                } else {
+                    string engine = "latexmk";
+                    if (sel == 1) engine = "xelatex";
+                    else if (sel == 2) engine = "pdflatex";
+                    compile_scientific_document_async.begin (Core.ScientificOutputFormat.PDF_MANUSCRIPT, engine);
+                }
+                return;
+            }
             var sc_fmt = Core.ScientificOutputFormat.HTML_MANUSCRIPT;
             if (sel == 1) sc_fmt = Core.ScientificOutputFormat.PDF_MANUSCRIPT;
             else if (sel == 2) sc_fmt = Core.ScientificOutputFormat.REVEALJS_SLIDES;
@@ -1726,7 +1817,7 @@ namespace Imladris {
             compile_scientific_document_async.begin (sc_fmt);
         }
 
-        public async void compile_scientific_document_async (Core.ScientificOutputFormat format) {
+        public async void compile_scientific_document_async (Core.ScientificOutputFormat format, string? preferred_tex_engine = null) {
             var doc = get_active_document ();
             if (doc == null) return;
 
@@ -1748,8 +1839,25 @@ namespace Imladris {
             }
 
             if (doc_fmt == DocumentFormat.TEX) {
+                if (format == Core.ScientificOutputFormat.HTML_MANUSCRIPT) {
+                    string stem_path = s_path.has_suffix (".tex")
+                        ? s_path.substring (0, s_path.length - 4)
+                        : s_path;
+                    string out_html = stem_path + ".html";
+                    doc.append_console_log (@"▶ Exporting LaTeX document $(GLib.Path.get_basename (s_path)) to HTML via Pandoc...");
+                    try {
+                        Services.ExportService.export_to_html (s_path, out_html, doc.get_clean_source_text ());
+                        show_toast (@"Exported $(GLib.Path.get_basename (out_html))");
+                        string uri = GLib.Filename.to_uri (out_html);
+                        doc.show_live_preview (uri);
+                    } catch (GLib.Error e) {
+                        doc.append_console_log (@"✖ HTML export failed: $(e.message)");
+                        show_toast (@"HTML export failed: $(e.message)");
+                    }
+                    return;
+                }
                 doc.append_console_log (@"▶ Building LaTeX document $(GLib.Path.get_basename (s_path))...");
-                var tex_res = yield Runners.LatexBuildRunner.build_async (s_path);
+                var tex_res = yield Runners.LatexBuildRunner.build_async (s_path, preferred_tex_engine);
                 if (tex_res.stdout_stderr.strip ().length > 0) {
                     doc.append_console_log (tex_res.stdout_stderr.strip ());
                 }
@@ -3109,7 +3217,7 @@ namespace Imladris {
                         var profile = Core.FormatProfile.for_format (fmt);
                         doc.source_buffer.begin_user_action ();
                         if (profile.citation_style == Core.CitationStyle.LATEX_CITE) {
-                            string clean_key = citation.replace ("[@", "").replace ("]", "").replace ("@", "");
+                            string clean_key = citation.replace ("[@", "").replace ("]", "").replace ("@", "").replace (";", ",");
                             doc.source_buffer.insert_at_cursor (@"\\cite{$clean_key}", -1);
                         } else {
                             doc.source_buffer.insert_at_cursor (citation, -1);
@@ -3154,7 +3262,8 @@ namespace Imladris {
                 bib_path = doc_path;
             }
 
-            var dlg = new UI.DoiBibDialog (bib_path);
+            bool is_latex = (doc != null && doc.get_document_format () == DocumentFormat.TEX);
+            var dlg = new UI.DoiBibDialog (bib_path, is_latex);
             dlg.insert_citation_requested.connect ((citekey, bib_filename) => {
                 var active = get_active_document ();
                 if (active != null) {

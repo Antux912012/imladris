@@ -538,6 +538,10 @@ namespace Imladris.UI {
                 inner = inner.substring (2, inner.length - 4).strip ();
             } else if (inner.has_prefix ("$") && inner.has_suffix ("$") && inner.length >= 2) {
                 inner = inner.substring (1, inner.length - 2).strip ();
+            } else if (inner.has_prefix ("\\begin{equation*}") && inner.has_suffix ("\\end{equation*}") && inner.length >= 32) {
+                inner = inner.substring (17, inner.length - 32).strip ();
+            } else if (inner.has_prefix ("\\begin{equation}") && inner.has_suffix ("\\end{equation}") && inner.length >= 30) {
+                inner = inner.substring (16, inner.length - 30).strip ();
             }
             load_preview_html (Core.MathChemEngine.render_latex_to_html (inner, true));
         }

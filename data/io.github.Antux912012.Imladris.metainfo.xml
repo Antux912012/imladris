@@ -75,6 +75,16 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.33.0" date="2026-11-18">
+      <description>
+        <p>Release v0.33.0 delivers researcher, data scientist, and first-time writer improvements:</p>
+        <ul>
+          <li>LaTeX &amp; Citation Fixes: 3-pass BibTeX/Biber builds, HeaderBar TeX engine selection, native .tex PDF export, arXiv ID lookup, and .tex-aware @ citation completion.</li>
+          <li>DataGridViewer &amp; Polyglot Notebooks: RFC-4180 CSV/TSV parsing, local-file pagination, R rownames, NA-safe sorting, polyglot environment preservation, and Alt+- / Ctrl+Shift+M shortcuts.</li>
+          <li>UI/UX Polish: Fixed Preferences AI provider mapping (all 19 providers), Command Palette tokenized search &amp; shortcuts, Libadwaita Keyboard Shortcuts dialog (Ctrl+?), and Skip-aware onboarding tour.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.32.0" date="2026-11-18">
       <description>
         <p>Release v0.32.0 adds publisher LaTeX templates, academic citation styles, a first-launch feature tour, open-source presentation decks, and security/stability hardening:</p>

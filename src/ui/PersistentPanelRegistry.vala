@@ -465,6 +465,15 @@ namespace Imladris.UI {
                 margin_end = 6
             };
             var kernel_drop = new Gtk.DropDown.from_strings ({ "Python 3", "Rscript", "Bash" });
+            var fmt_profile = Core.FormatProfile.for_format (doc_page.get_document_format ());
+            string def_k = fmt_profile.default_kernel.down ().strip ();
+            if (def_k == "r" || def_k == "rscript") {
+                kernel_drop.selected = 1;
+            } else if (def_k == "bash" || def_k == "sh") {
+                kernel_drop.selected = 2;
+            } else {
+                kernel_drop.selected = 0;
+            }
             repl_bar.append (kernel_drop);
 
             repl_entry = new Gtk.Entry () {
@@ -507,7 +516,6 @@ namespace Imladris.UI {
                 repl_entry.text = "";
                 uint sel = kernel_drop.selected;
                 string engine = sel == 1 ? "r" : (sel == 2 ? "bash" : "python");
-                Services.HistoryManager.get_default ().add_entry (cmd_text, engine);
                 run_code_snippet_in_console (engine, cmd_text);
             });
 
@@ -598,6 +606,9 @@ namespace Imladris.UI {
             // DATA VIEWER PANEL (Virtualized Matrix & Dataframe Inspector)
             data_grid_viewer = new DataGridViewer ();
             data_grid_viewer.session_key = get_session_key ();
+            data_grid_viewer.close_requested.connect (() => {
+                doc_page.rstudio_dock_grid.refresh_dock_layout ();
+            });
             panels.set (PanelId.DATA_VIEWER, data_grid_viewer);
 
             // ELROND AI CHAT PANEL (Local Copilot Tab)
@@ -1705,7 +1716,8 @@ namespace Imladris.UI {
                     open_dataframe_in_viewer (view_obj, "r");
                 }
                 refresh_environment_and_outline ();
-                environment_controller.active_engine = "r";
+                var doc_fmt_r = doc_page.get_document_format ();
+                environment_controller.active_engine = (doc_fmt_r == DocumentFormat.QMD || doc_fmt_r == DocumentFormat.IPYNB) ? "polyglot" : "r";
                 environment_controller.refresh_environment.begin ();
             } else if (norm_engine == "python" || norm_engine == "py") {
                 string? plot_file = null;
@@ -1743,7 +1755,8 @@ namespace Imladris.UI {
                     open_dataframe_in_viewer (view_obj, "python");
                 }
                 refresh_environment_and_outline ();
-                environment_controller.active_engine = "python";
+                var doc_fmt_py = doc_page.get_document_format ();
+                environment_controller.active_engine = (doc_fmt_py == DocumentFormat.QMD || doc_fmt_py == DocumentFormat.IPYNB) ? "polyglot" : "python";
                 environment_controller.refresh_environment.begin ();
             } else if (norm_engine == "ts" || norm_engine == "typescript") {
                 string? proj_dir = doc_page.current_project_dir != "" ? doc_page.current_project_dir : null;
@@ -2355,6 +2368,23 @@ namespace Imladris.UI {
             if (main_window != null) dialog.present (main_window);
         }
 
+        private static void delete_file_recursive (GLib.File file) throws GLib.Error {
+            var info = file.query_info (GLib.FileAttribute.STANDARD_TYPE, GLib.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
+            if (info.get_file_type () == GLib.FileType.DIRECTORY) {
+                var enumerator = file.enumerate_children (
+                    GLib.FileAttribute.STANDARD_NAME + "," + GLib.FileAttribute.STANDARD_TYPE,
+                    GLib.FileQueryInfoFlags.NOFOLLOW_SYMLINKS,
+                    null
+                );
+                GLib.FileInfo? child_info = null;
+                while ((child_info = enumerator.next_file (null)) != null) {
+                    delete_file_recursive (file.get_child (child_info.get_name ()));
+                }
+                enumerator.close (null);
+            }
+            file.delete (null);
+        }
+
         private void prompt_delete_selected_file () {
             if (selected_file_path == null) {
                 if (main_window != null) main_window.show_toast ("Select a file or folder first");
@@ -2370,7 +2400,7 @@ namespace Imladris.UI {
                 if (resp == "delete") {
                     try {
                         var f = GLib.File.new_for_path (selected_file_path);
-                        f.delete (null);
+                        delete_file_recursive (f);
                         selected_file_path = null;
                         populate_files_browser ();
                         if (main_window != null) main_window.show_toast (@"Deleted '$base_name'");

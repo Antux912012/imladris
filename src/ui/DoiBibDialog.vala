@@ -12,6 +12,7 @@ namespace Imladris.UI {
         public signal void insert_citation_requested (string citekey, string bib_filename);
 
         private string current_bib_path;
+        private bool is_latex_doc = false;
         private Gtk.Label bib_path_lbl;
         private Adw.EntryRow doi_entry;
         private Gtk.Button fetch_btn;
@@ -24,13 +25,14 @@ namespace Imladris.UI {
         private Gtk.ListBox entries_list;
         private GLib.Cancellable? list_cancellable = null;
 
-        public DoiBibDialog (string initial_bib_path) {
+        public DoiBibDialog (string initial_bib_path, bool is_latex = false) {
             Object (
                 title: "Bibliography & DOI Manager (.bib)",
                 content_width: 680,
                 content_height: 700
             );
             this.current_bib_path = initial_bib_path;
+            this.is_latex_doc = is_latex;
             build_ui ();
             refresh_entries_list_async.begin ();
         }
@@ -131,7 +133,7 @@ namespace Imladris.UI {
             add_only_btn.clicked.connect (() => save_entry_async.begin (false));
             action_bar.append (add_only_btn);
 
-            add_and_cite_btn = new Gtk.Button.with_label ("Add & Cite [@key]") {
+            add_and_cite_btn = new Gtk.Button.with_label (is_latex_doc ? "Add & Cite \\cite{key}" : "Add & Cite [@key]") {
                 sensitive = false
             };
             add_and_cite_btn.add_css_class ("suggested-action");

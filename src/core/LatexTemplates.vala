@@ -110,7 +110,7 @@ namespace Imladris.Core {
                 "Standard IEEEtran layout for IEEE journals, Transactions, and conference proceedings.",
                 "ieee",
                 "ieee_manuscript.tex",
-                "\\usepackage{amsmath,amssymb,amsfonts}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{algorithmic}\n\\usepackage{textcomp}",
+                "\\usepackage{amsmath,amssymb,amsfonts}\n\\usepackage[version=4]{mhchem}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{algorithm}\n\\usepackage{algorithmic}\n\\usepackage{textcomp}",
                 "\\title{%TITLE%}\n\\author{%AUTHOR%\n  \\thanks{Department of Research, Institution Name. Email: author@institution.edu}}\n\\maketitle",
                 "\\begin{abstract}\nConcise summary of the problem, methodology, key quantitative findings, and significance.\n\\end{abstract}\n\n\\begin{IEEEkeywords}\nScientific computing, reproducible research, statistical modeling.\n\\end{IEEEkeywords}\n\n\\section{Introduction}\n\\IEEEPARstart{S}{cientific} manuscripts in IEEE venues follow a structured two-column format. Prior work established the baseline methodology %CITE%.\n\n\\section{Methodology}\nWe formulate the objective function as:\n\\begin{equation}\n  \\mathcal{L}(\\theta) = \\frac{1}{N}\\sum_{i=1}^{N} \\ell(f_\\theta(x_i), y_i) + \\lambda \\|\\theta\\|_2^2\n\\end{equation}\n\n\\section{Experimental Results}\nTable~\\ref{tab:ieee_results} summarizes the benchmark comparison across cohorts.\n\\begin{table}[htbp]\n  \\caption{Benchmark Summary}\n  \\label{tab:ieee_results}\n  \\centering\n  \\begin{tabular}{lcc}\n    \\toprule\n    Model & Accuracy (\\%) & F1 Score \\\\\n    \\midrule\n    Baseline & 88.4 & 0.87 \\\\\n    Proposed & \\textbf{94.2} & \\textbf{0.93} \\\\\n    \\bottomrule\n  \\end{tabular}\n\\end{table}\n\n\\section{Conclusion}\nWe demonstrated consistent improvements over existing baselines and outlined future directions."
             ));
@@ -126,7 +126,7 @@ namespace Imladris.Core {
                 "Official ACM Master Article Template (acmart) with CCS concepts and ACM Reference Format.",
                 "acm",
                 "acm_manuscript.tex",
-                "\\usepackage{booktabs}\n\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}",
+                "\\usepackage{booktabs}\n\\usepackage{amsmath,amssymb}\n\\usepackage[version=4]{mhchem}\n\\usepackage{graphicx}",
                 "\\title{%TITLE%}\n\\author{%AUTHOR%}\n\\affiliation{%\n  \\institution{Research Institute}\n  \\city{City}\n  \\country{Country}\n}\n\\email{author@institution.edu}",
                 "\\begin{abstract}\nA clear and concise summary of the contribution, evaluation, and impact.\n\\end{abstract}\n\n\\begin{CCSXML}\n<ccs2012>\n  <concept>\n    <concept_id>10010147.10010257</concept_id>\n    <concept_desc>Computing methodologies~Machine learning</concept_desc>\n    <concept_significance>500</concept_significance>\n  </concept>\n</ccs2012>\n\\end{CCSXML}\n\\ccsdesc[500]{Computing methodologies~Machine learning}\n\\keywords{ACM, reproducible science, empirical evaluation}\n\n\\maketitle\n\n\\section{Introduction}\nModern computational research benefits from transparent, reproducible workflows %CITE%.\n\n\\section{System Design}\nDescribe architecture, formal guarantees, and implementation choices.\n\n\\section{Evaluation}\n\\begin{equation}\n  \\text{Speedup} = \\frac{T_{\\text{baseline}}}{T_{\\text{proposed}}}\n\\end{equation}\n\n\\section{Conclusion}\nSummarize the main findings and artifacts."
             ));
@@ -142,7 +142,7 @@ namespace Imladris.Core {
                 "Springer LNCS (llncs) format used across computer science conferences and workshops.",
                 "splncs04",
                 "lncs_manuscript.tex",
-                "\\usepackage[T1]{fontenc}\n\\usepackage{graphicx}\n\\usepackage{amsmath,amssymb}\n\\usepackage{booktabs}",
+                "\\usepackage[T1]{fontenc}\n\\usepackage{graphicx}\n\\usepackage{amsmath,amssymb}\n\\usepackage[version=4]{mhchem}\n\\usepackage{booktabs}",
                 "\\title{%TITLE%}\n\\author{%AUTHOR%\\orcidID{0000-0000-0000-0000}}\n\\authorrunning{%AUTHOR%}\n\\institute{Department of Computer Science, University Name \\\\\n\\email{author@university.edu}}\n\\maketitle",
                 "\\begin{abstract}\nThe abstract should briefly summarize the contents of the paper in 150--250 words.\n\\keywords{First keyword \\and Second keyword \\and Third keyword.}\n\\end{abstract}\n\n\\section{Introduction}\nSpringer LNCS manuscripts use a clean single-column layout with numbered citations %CITE%.\n\n\\section{Preliminaries and Method}\n\\begin{equation}\n  E = mc^2\n\\end{equation}\n\n\\section{Experiments and Discussion}\nPresent empirical validation, ablation studies, and error analysis.\n\n\\section{Conclusion}\nConcluding remarks and future work."
             ));
@@ -158,7 +158,7 @@ namespace Imladris.Core {
                 "Official Elsevier elsarticle template with frontmatter, highlights, and Elsevier bibliography support.",
                 "elsarticle-num",
                 "elsevier_manuscript.tex",
-                "\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{lineno}",
+                "\\usepackage{amsmath,amssymb}\n\\usepackage[version=4]{mhchem}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{lineno}",
                 "\\begin{frontmatter}\n\\title{%TITLE%}\n\\author[inst1]{%AUTHOR%}\n\\affiliation[inst1]{organization={Department of Sciences, University}, city={City}, country={Country}}\n\n\\begin{abstract}\nProvide a structured summary of background, methods, results, and conclusions.\n\\end{abstract}\n\n\\begin{keyword}\nElsevier \\sep Scientific article \\sep Empirical analysis\n\\end{keyword}\n\\end{frontmatter}",
                 "\\linenumbers\n\n\\section{Introduction}\nState the objectives of the work and provide an adequate background, citing relevant literature %CITE%.\n\n\\section{Material and Methods}\nProvide sufficient detail to allow the work to be reproduced by an independent researcher.\n\n\\section{Results}\nResults should be clear and concise.\n\\begin{equation}\n  y_i = \\beta_0 + \\beta_1 x_i + \\varepsilon_i, \\quad \\varepsilon_i \\sim \\mathcal{N}(0, \\sigma^2)\n\\end{equation}\n\n\\section{Discussion}\nExplore the significance of the results of the work, not repeat them.\n\n\\section{Conclusions}\nThe main conclusions of the study may be presented in a short Conclusions section."
             ));
@@ -174,7 +174,7 @@ namespace Imladris.Core {
                 "Manuscript layout tailored for Nature, Nature Methods, and Springer Nature submissions.",
                 "nature",
                 "nature_manuscript.tex",
-                "\\usepackage[utf8]{inputenc}\n\\usepackage[margin=2.2cm]{geometry}\n\\usepackage{amsmath,amssymb,mhchem}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{setspace}\n\\onehalfspacing",
+                "\\usepackage[margin=2.2cm]{geometry}\n\\usepackage{amsmath,amssymb,mhchem}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{setspace}\n\\onehalfspacing",
                 "\\title{\\textbf{%TITLE%}}\n\\author{%AUTHOR%$^{1,*}$ \\\\\n\\small $^{1}$Institute for Advanced Research \\\\\n\\small $^{*}$Correspondence: author@institute.org}\n\\date{}\n\\maketitle",
                 "\\begin{abstract}\nA concise, referenced summary (150--200 words) stating the biological or physical problem, principal findings, and broader implications.\n\\end{abstract}\n\n\\section*{Introduction}\nIntroduce the scientific question and context for a broad multidisciplinary readership %CITE%.\n\n\\section*{Results}\nPresent key experimental and computational findings with statistical rigor.\n\\begin{equation}\n  \\Delta G = \\Delta H - T\\Delta S\n\\end{equation}\n\n\\section*{Discussion}\nInterpret the results in the context of prior work and highlight limitations.\n\n\\section*{Methods}\nDetail protocols, datasets, software versions, and statistical tests."
             ));
@@ -190,7 +190,7 @@ namespace Imladris.Core {
                 "Open-access PLOS submission format with line numbering, Author Summary, and Vancouver-style references.",
                 "vancouver",
                 "plos_manuscript.tex",
-                "\\usepackage[utf8]{inputenc}\n\\usepackage[top=0.85in,left=1.25in,footskip=0.75in]{geometry}\n\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{lineno}\n\\usepackage{setspace}\n\\doublespacing",
+                "\\usepackage[top=0.85in,left=1.25in,footskip=0.75in]{geometry}\n\\usepackage{amsmath,amssymb}\n\\usepackage[version=4]{mhchem}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{lineno}\n\\usepackage{setspace}\n\\doublespacing",
                 "\\title{%TITLE%}\n\\author{%AUTHOR%$^{1*}$ \\\\\n\\small $^{1}$Department of Quantitative Biology, University \\\\\n\\small $^{*}$Corresponding author: author@university.edu}\n\\date{}\n\\maketitle\n\\linenumbers",
                 "\\section*{Abstract}\nSummarize the background, methodology, principal findings, and conclusions (up to 300 words).\n\n\\section*{Author Summary}\nWrite a brief non-technical summary explaining why this research matters.\n\n\\section*{Introduction}\nProvide context and hypotheses tested in this study %CITE%.\n\n\\section*{Materials and Methods}\nDescribe study design, ethics approvals, data availability, and statistical analysis.\n\n\\section*{Results}\n\\begin{equation}\n  p = \\frac{1}{1 + e^{-(\\beta_0 + \\beta_1 x)}}\n\\end{equation}\n\n\\section*{Discussion}\nDiscuss implications, limitations, and future directions."
             ));
@@ -206,7 +206,7 @@ namespace Imladris.Core {
                 "Official REVTeX 4.2 template for Physical Review Letters, Phys. Rev. A-E, and APS journals.",
                 "aps",
                 "aps_manuscript.tex",
-                "\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage{bm}\n\\usepackage{booktabs}",
+                "\\usepackage{amsmath,amssymb}\n\\usepackage[version=4]{mhchem}\n\\usepackage{graphicx}\n\\usepackage{bm}\n\\usepackage{booktabs}",
                 "\\title{%TITLE%}\n\\author{%AUTHOR%}\n\\email{author@physics.edu}\n\\affiliation{Department of Physics, Research University}\n\\date{\\today}",
                 "\\begin{abstract}\nConcise summary of the physical phenomenon, theoretical or experimental approach, and main result.\n\\end{abstract}\n\n\\maketitle\n\n\\section{Introduction}\nRecent advances in quantum and statistical physics motivate this investigation %CITE%.\n\n\\section{Theory and Experiment}\nThe Hamiltonian of the coupled system is given by\n\\begin{equation}\n  \\hat{H} = \\sum_i \\hbar \\omega_i \\hat{a}_i^\\dagger \\hat{a}_i + \\sum_{i<j} g_{ij}(\\hat{a}_i^\\dagger \\hat{a}_j + \\text{h.c.})\n\\end{equation}\n\n\\section{Results and Discussion}\nAnalyze scaling behavior, uncertainties, and agreement with theory.\n\n\\begin{acknowledgments}\nWe thank the funding agencies and computing facilities that supported this work.\n\\end{acknowledgments}"
             ));
@@ -222,7 +222,7 @@ namespace Imladris.Core {
                 "NeurIPS-style machine learning conference manuscript with 5.5in text block, microtype, and booktabs.",
                 "apa",
                 "neurips_manuscript.tex",
-                "\\usepackage[utf8]{inputenc}\n\\usepackage[T1]{fontenc}\n\\usepackage[letterpaper,textwidth=5.5in,textheight=9in]{geometry}\n\\usepackage{amsmath,amssymb,amsfonts}\n\\usepackage{microtype}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{hyperref}",
+                "\\usepackage[T1]{fontenc}\n\\usepackage[letterpaper,textwidth=5.5in,textheight=9in]{geometry}\n\\usepackage{amsmath,amssymb,amsfonts}\n\\usepackage[version=4]{mhchem}\n\\usepackage{microtype}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{hyperref}",
                 "\\title{%TITLE%}\n\\author{%AUTHOR% \\\\\n  Machine Learning Lab, University \\\\\n  \\texttt{author@university.edu}}\n\\date{}\n\\maketitle",
                 "\\begin{abstract}\nSummarize the learning problem, theoretical or algorithmic contribution, and empirical results in one paragraph.\n\\end{abstract}\n\n\\section{Introduction}\nState the problem, motivation, and contributions clearly %CITE%.\n\n\\section{Method}\n\\begin{equation}\n  \\theta_{t+1} = \\theta_t - \\eta_t \\nabla_\\theta \\mathcal{L}(\\theta_t)\n\\end{equation}\n\n\\section{Experiments}\nReport mean and standard deviation across multiple random seeds.\n\n\\section{Conclusion and Broader Impact}\nSummarize findings, limitations, and societal considerations."
             ));
@@ -238,7 +238,7 @@ namespace Imladris.Core {
                 "Two-column International Conference on Machine Learning (ICML) manuscript layout with algorithm support.",
                 "apa",
                 "icml_manuscript.tex",
-                "\\usepackage[utf8]{inputenc}\n\\usepackage[T1]{fontenc}\n\\usepackage[letterpaper,margin=0.75in]{geometry}\n\\usepackage{amsmath,amssymb,amsthm}\n\\usepackage{microtype}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{algorithm}\n\\usepackage{algorithmic}\n\\usepackage{hyperref}",
+                "\\usepackage[T1]{fontenc}\n\\usepackage[letterpaper,margin=0.75in]{geometry}\n\\usepackage{amsmath,amssymb,amsthm}\n\\usepackage[version=4]{mhchem}\n\\usepackage{microtype}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{algorithm}\n\\usepackage{algorithmic}\n\\usepackage{hyperref}",
                 "\\title{\\textbf{%TITLE%}}\n\\author{%AUTHOR% \\\\\n  AI Research Group \\\\\n  \\texttt{author@research.org}}\n\\date{}\n\\maketitle",
                 "\\begin{abstract}\nKeep abstracts to 4--6 sentences summarizing the core algorithmic advance and experimental validation.\n\\end{abstract}\n\n\\section{Introduction}\nIntroduce the learning setting and contrast with prior work %CITE%.\n\n\\section{Algorithm and Theoretical Analysis}\n\\begin{equation}\n  \\mathbb{E}[R(T)] \\le \\mathcal{O}(\\sqrt{T \\log K})\n\\end{equation}\n\n\\section{Empirical Evaluation}\nCompare against strong baselines on standard benchmarks.\n\n\\section{Conclusion}\nSummarize contributions and open questions."
             ));
@@ -254,7 +254,7 @@ namespace Imladris.Core {
                 "MDPI journal article template with structured sections, Author Contributions, and Conflicts of Interest.",
                 "ieee",
                 "mdpi_manuscript.tex",
-                "\\usepackage[utf8]{inputenc}\n\\usepackage[margin=2.0cm]{geometry}\n\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{hyperref}",
+                "\\usepackage[margin=2.0cm]{geometry}\n\\usepackage{amsmath,amssymb}\n\\usepackage[version=4]{mhchem}\n\\usepackage{graphicx}\n\\usepackage{booktabs}\n\\usepackage{hyperref}",
                 "\\title{%TITLE%}\n\\author{%AUTHOR% $^{1,*}$ \\\\\n$^{1}$Department of Research, University; author@university.edu}\n\\date{}\n\\maketitle",
                 "\\begin{abstract}\nA single paragraph of about 200 words maximum summarizing background, methods, results, and conclusions.\n\\end{abstract}\n\n\\noindent\\textbf{Keywords:} keyword 1; keyword 2; keyword 3\n\n\\section{Introduction}\nPlace the study in a broad context and highlight why it is important %CITE%.\n\n\\section{Materials and Methods}\nDescribe materials, protocols, and statistical analyses in sufficient detail for replication.\n\n\\section{Results and Discussion}\n\\begin{equation}\n  R^2 = 1 - \\frac{\\sum_i (y_i - \\hat{y}_i)^2}{\\sum_i (y_i - \\bar{y})^2}\n\\end{equation}\n\n\\section{Conclusions}\nSummarize the main takeaways.\n\n\\vspace{6pt}\n\\noindent\\textbf{Author Contributions:} Conceptualization, Methodology, Writing.\n\n\\noindent\\textbf{Conflicts of Interest:} The authors declare no conflicts of interest."
             ));

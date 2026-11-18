@@ -158,6 +158,38 @@ namespace Imladris.Runners {
                         out pass2
                     );
                     out_log += "\n" + pass2;
+                    if (exit_code == 0) {
+                        string pass3;
+                        exit_code = yield run_tex_cmd (
+                            engine,
+                            { "-interaction=nonstopmode", "-file-line-error", "-synctex=1", base_name },
+                            work_dir,
+                            cancellable,
+                            out pass3
+                        );
+                        out_log += "\n" + pass3;
+                    }
+                }
+
+                // Additional pass(es) if .log still indicates unresolved references/citations
+                string rerun_log_path = GLib.Path.build_filename (work_dir, @"$(stem).log");
+                int extra_passes = 0;
+                while (exit_code == 0 && extra_passes < 2 && GLib.FileUtils.test (rerun_log_path, GLib.FileTest.EXISTS)) {
+                    string log_tmp = "";
+                    try { GLib.FileUtils.get_contents (rerun_log_path, out log_tmp); } catch (GLib.Error e) {}
+                    if (!log_tmp.contains ("Rerun to get")) {
+                        break;
+                    }
+                    string rerun_out;
+                    exit_code = yield run_tex_cmd (
+                        engine,
+                        { "-interaction=nonstopmode", "-file-line-error", "-synctex=1", base_name },
+                        work_dir,
+                        cancellable,
+                        out rerun_out
+                    );
+                    out_log += "\n" + rerun_out;
+                    extra_passes++;
                 }
             }
 

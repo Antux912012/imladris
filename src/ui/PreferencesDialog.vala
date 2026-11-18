@@ -418,9 +418,25 @@ namespace Imladris.UI {
             });
             elrond_level_row.add_suffix (level_scale);
 
+            string initial_elrond_status;
+            if (!settings.elrond_enabled) {
+                initial_elrond_status = "Elrond Assistance Disabled";
+            } else if (elrond_engine.is_ready) {
+                if (elrond_engine.active_model_name != "") {
+                    initial_elrond_status = "Connected to %s (%s)".printf (
+                        elrond_engine.active_display_name,
+                        elrond_engine.active_model_name
+                    );
+                } else {
+                    initial_elrond_status = "Connected to %s".printf (elrond_engine.active_display_name);
+                }
+            } else {
+                initial_elrond_status = "Checking local AI servers… (click refresh to probe)";
+            }
+
             var elrond_status_row = new Adw.ActionRow () {
                 title = "Elrond Engine Status",
-                subtitle = settings.elrond_enabled ? "Starting..." : "Disabled"
+                subtitle = initial_elrond_status
             };
             var dl_progress = new Gtk.ProgressBar () {
                 valign = Gtk.Align.CENTER,
@@ -578,26 +594,47 @@ namespace Imladris.UI {
 
             var provider_dropdown_row = new Adw.ComboRow () {
                 title = "Active Provider",
-                subtitle = "Choose from Google Gemini, Claude, OpenAI, DeepSeek, Kimi, Qwen, Cursor, NVIDIA NIM, Ollama, LM Studio, or Custom"
+                subtitle = "Choose from 19 cloud, free-tier, local, and custom AI providers"
+            };
+
+            Core.AiProvider[] provider_order = {
+                Core.AiProvider.GEMINI,
+                Core.AiProvider.CLAUDE,
+                Core.AiProvider.OPENAI,
+                Core.AiProvider.DEEPSEEK,
+                Core.AiProvider.KIMI,
+                Core.AiProvider.QWEN,
+                Core.AiProvider.CURSOR,
+                Core.AiProvider.NVIDIA_NIM,
+                Core.AiProvider.GROQ,
+                Core.AiProvider.CEREBRAS,
+                Core.AiProvider.OPENROUTER_FREE,
+                Core.AiProvider.GITHUB_MODELS,
+                Core.AiProvider.GITHUB_COPILOT,
+                Core.AiProvider.FREELMAPI_LOCAL,
+                Core.AiProvider.OLLAMA,
+                Core.AiProvider.LM_STUDIO,
+                Core.AiProvider.CHERRY_STUDIO,
+                Core.AiProvider.ANTIGRAVITY,
+                Core.AiProvider.CUSTOM
             };
 
             var provider_list = new Gtk.StringList (null);
-            provider_list.append ("🌟 Google Gemini (Google AI Studio)");
-            provider_list.append ("🎭 Claude (Anthropic API)");
-            provider_list.append ("🟢 OpenAI (GPT-4o / o1 / o3)");
-            provider_list.append ("🧠 DeepSeek (Chat & R1 Reasoner)");
-            provider_list.append ("🌙 Kimi (Moonshot AI)");
-            provider_list.append ("⚡ Qwen (Alibaba DashScope)");
-            provider_list.append ("🖱️ Cursor API Compatibility");
-            provider_list.append ("🟩 NVIDIA NIM (integrate.api.nvidia.com)");
-            provider_list.append ("🦙 Ollama (localhost:11434)");
-            provider_list.append ("🔮 LM Studio (localhost:1234)");
-            provider_list.append ("⚙️ Custom OpenAI-Compatible");
+            uint selected_provider_idx = 0;
+            for (uint i = 0; i < provider_order.length; i++) {
+                provider_list.append (provider_order[i].get_display_name ());
+                if (provider_order[i] == ai_config_mgr.active_provider) {
+                    selected_provider_idx = i;
+                }
+            }
             provider_dropdown_row.model = provider_list;
-            provider_dropdown_row.selected = (uint) ai_config_mgr.active_provider;
+            provider_dropdown_row.selected = selected_provider_idx;
 
             provider_dropdown_row.notify["selected"].connect (() => {
-                ai_config_mgr.active_provider = (AiProvider) provider_dropdown_row.selected;
+                uint idx = provider_dropdown_row.selected;
+                if (idx < provider_order.length) {
+                    ai_config_mgr.active_provider = provider_order[idx];
+                }
             });
             ai_general_group.add (provider_dropdown_row);
 
@@ -605,7 +642,7 @@ namespace Imladris.UI {
                 title = "Temperature",
                 subtitle = "Higher values increase creativity; lower values yield deterministic code"
             };
-            var temp_spin = new Gtk.SpinButton.with_range (0.0, 1.0, 0.05) {
+            var temp_spin = new Gtk.SpinButton.with_range (0.0, 2.0, 0.05) {
                 valign = Gtk.Align.CENTER,
                 value = ai_config_mgr.temperature
             };

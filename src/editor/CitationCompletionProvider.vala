@@ -15,12 +15,16 @@ namespace Imladris.Editor {
         public string year { get; set; }
         public string insert_text { get; set; }
 
-        public CitationCompletionProposal (CitationItem item, bool inside_brackets = false) {
+        public CitationCompletionProposal (CitationItem item, bool inside_brackets = false, Core.CitationStyle citation_style = Core.CitationStyle.PANDOC_AT) {
             this.citekey = item.citekey;
             this.title = item.title;
             this.authors = item.authors;
             this.year = item.year;
-            this.insert_text = inside_brackets ? @"@$(item.citekey)" : @"[@$(item.citekey)]";
+            if (citation_style == Core.CitationStyle.LATEX_CITE) {
+                this.insert_text = @"\\cite{$(item.citekey)}";
+            } else {
+                this.insert_text = inside_brackets ? @"@$(item.citekey)" : @"[@$(item.citekey)]";
+            }
         }
     }
 
@@ -29,6 +33,13 @@ namespace Imladris.Editor {
 
         public CitationCompletionProvider (DocumentPage? doc_page = null) {
             this.doc_page = doc_page;
+        }
+
+        private Core.CitationStyle get_citation_style () {
+            if (doc_page != null) {
+                return Core.FormatProfile.for_format (doc_page.get_document_format ()).citation_style;
+            }
+            return Core.CitationStyle.PANDOC_AT;
         }
 
         public string? get_title () {
@@ -89,7 +100,9 @@ namespace Imladris.Editor {
                 // Auto-sync references.bib in background without resetting cursor/marks
                 if (doc_page != null) {
                     string project_dir = doc_page.current_project_dir;
-                    ensure_buffer_bibliography_line (buffer, "references.bib");
+                    if (get_citation_style () != Core.CitationStyle.LATEX_CITE) {
+                        ensure_buffer_bibliography_line (buffer, "references.bib");
+                    }
                     ZoteroService.get_default ().sync_citation_to_project_async.begin (p.citekey, project_dir);
                 }
             }
@@ -136,7 +149,9 @@ namespace Imladris.Editor {
             string query = line_prefix.substring (at_idx + 1).strip ();
             bool inside_brackets = (at_idx > 0 && line_prefix[at_idx - 1] == '[');
 
-            // Read local .bib content asynchronously if available (from frontmatter, file dir, or project dir)
+            var cite_style = get_citation_style ();
+
+            // Read local .bib content asynchronously if available (from frontmatter, LaTeX \bibliography/\addbibresource, file dir, or project dir)
             string? fallback_bib = null;
             if (doc_page != null) {
                 string base_dir = doc_page.current_project_dir;
@@ -148,11 +163,19 @@ namespace Imladris.Editor {
                     string bib_name = "references.bib";
                     Gtk.TextIter b_start, b_end;
                     buffer.get_bounds (out b_start, out b_end);
-                    Core.FrontmatterData? fm;
-                    string fm_body;
-                    Core.FrontmatterParser.split_frontmatter (buffer.get_text (b_start, b_end, false), out fm, out fm_body);
-                    if (fm != null && fm.bibliography != null && fm.bibliography.strip () != "") {
-                        bib_name = fm.bibliography.strip ();
+                    string full_text = buffer.get_text (b_start, b_end, false);
+                    if (cite_style == Core.CitationStyle.LATEX_CITE) {
+                        string? latex_bib = extract_latex_bib_filename (full_text);
+                        if (latex_bib != null && latex_bib != "") {
+                            bib_name = latex_bib;
+                        }
+                    } else {
+                        Core.FrontmatterData? fm;
+                        string fm_body;
+                        Core.FrontmatterParser.split_frontmatter (full_text, out fm, out fm_body);
+                        if (fm != null && fm.bibliography != null && fm.bibliography.strip () != "") {
+                            bib_name = fm.bibliography.strip ();
+                        }
                     }
                     string bib_path = GLib.Path.is_absolute (bib_name) ? bib_name : GLib.Path.build_filename (base_dir, bib_name);
                     var f = GLib.File.new_for_path (bib_path);
@@ -169,10 +192,24 @@ namespace Imladris.Editor {
 
             var citations = yield ZoteroService.get_default ().search_citations_async (query, fallback_bib);
             foreach (var item in citations) {
-                store.append (new CitationCompletionProposal (item, inside_brackets));
+                store.append (new CitationCompletionProposal (item, inside_brackets, cite_style));
             }
 
             return store;
+        }
+
+        private static string? extract_latex_bib_filename (string full_text) {
+            try {
+                var reg = new GLib.Regex ("\\\\(?:bibliography|addbibresource)\\s*\\{([^}]+)\\}");
+                GLib.MatchInfo mi;
+                if (reg.match (full_text, 0, out mi)) {
+                    string raw = mi.fetch (1).split (",")[0].strip ();
+                    if (raw.length > 0) {
+                        return raw.down ().has_suffix (".bib") ? raw : @"$raw.bib";
+                    }
+                }
+            } catch (GLib.RegexError e) {}
+            return null;
         }
 
         public static void ensure_buffer_bibliography_line (Gtk.TextBuffer buffer, string bib_filename = "references.bib") {

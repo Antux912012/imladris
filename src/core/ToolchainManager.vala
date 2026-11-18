@@ -444,6 +444,9 @@ namespace Imladris.Core {
                     pkgs.add ("ipykernel");
                     pkgs.add ("jupyter_client");
                     pkgs.add ("uv");
+                    pkgs.add ("numpy");
+                    pkgs.add ("pandas");
+                    pkgs.add ("matplotlib");
                     break;
                 case ToolchainComponent.R:
                     pkgs.add (for_update ? "r-base" : @"r-base=$r_ver");

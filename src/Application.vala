@@ -10,7 +10,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.32.0";
+        public const string APP_VERSION = "0.33.0";
         private bool first_launch_toolchain_checked = false;
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
@@ -22,6 +22,7 @@ namespace Imladris {
             { "new_ipynb", on_new_ipynb },
             { "new_tex", on_new_tex },
             { "new_tex_template", on_new_tex_template },
+            { "new_presentation", on_new_presentation },
             { "new_r", on_new_r },
             { "new_shiny", on_new_shiny },
             { "run_shiny_app", on_run_shiny_app },
@@ -53,6 +54,7 @@ namespace Imladris {
             { "interrupt_execution", on_interrupt_execution },
             { "command_palette", on_command_palette },
             { "preferences", on_preferences },
+            { "shortcuts", on_shortcuts },
             { "show_tour", on_show_tour },
             { "about", on_about },
             { "math_chem_editor", on_math_chem_editor },
@@ -142,6 +144,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.elrond_assist", { "<Control><Shift>e" });
             this.set_accels_for_action ("app.command_palette", { "<Control><Shift>p", "<Control>k" });
             this.set_accels_for_action ("app.preferences", { "<Control>comma" });
+            this.set_accels_for_action ("app.shortcuts", { "<Control>question" });
             this.set_accels_for_action ("app.math_chem_editor", { "<Control>m" });
             this.set_accels_for_action ("app.mermaid_studio", { "<Control><Shift>d", "<Control><Alt>m" });
             this.set_accels_for_action ("win.insert_chunk", { "<Control><Alt>i" });
@@ -270,6 +273,11 @@ namespace Imladris {
         private void on_new_tex_template () {
             var win = this.active_window as Window;
             if (win != null) win.show_latex_template_dialog ();
+        }
+
+        private void on_new_presentation () {
+            var win = this.active_window as Window;
+            if (win != null) win.show_presentation_template_dialog ();
         }
 
         private void on_new_r () {
@@ -478,6 +486,11 @@ namespace Imladris {
         private void on_preferences () {
             var win = this.active_window;
             if (win != null) new UI.PreferencesDialog ().present (win);
+        }
+
+        private void on_shortcuts () {
+            var win = this.active_window as Window;
+            if (win != null) win.show_shortcuts_window ();
         }
 
         private void on_about () {

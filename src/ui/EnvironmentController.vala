@@ -278,11 +278,12 @@ for _k in list(globals().keys()):
                         string safe_path = path.replace ("\\", "\\\\").replace ("\"", "\\\"");
                         bool is_tab = lower_base.has_suffix (".tsv") || lower_base.has_suffix (".tabular") || lower_base.has_suffix (".txt");
 
-                        if (active_engine == "r") {
+                        string norm_engine = active_engine.down ().strip ();
+                        if (norm_engine == "r" || norm_engine == "polyglot") {
                             string r_cmd = is_tab
                                 ? @"read.delim(\"$safe_path\", stringsAsFactors = FALSE)"
                                 : @"read.csv(\"$safe_path\")";
-                            string r_code = @"$var_name <- $r_cmd\nView($var_name)\n";
+                            string r_code = @"$var_name <- $r_cmd\n";
                             get_session_manager ().execute_r.begin (r_code, (o, r) => {
                                 string? unused_plot = null;
                                 get_session_manager ().execute_r.end (r, out unused_plot);
@@ -344,7 +345,7 @@ for k in list(globals().keys()):
             cls = type(v).__name__
             dim_str = str(getattr(v, 'shape', len(v) if hasattr(v, '__len__') else ''))
             sz = str(sys.getsizeof(v)) + " bytes"
-            is_df = "1" if hasattr(v, 'columns') or hasattr(v, 'shape') else "0"
+            is_df = "1" if hasattr(v, 'columns') or (hasattr(v, 'shape') and hasattr(v.shape, '__len__') and len(v.shape) == 2) else "0"
             res.append(f"{k}\t{cls}\t{dim_str}\t{sz}\t{is_df}")
         except Exception:
             pass
@@ -525,7 +526,7 @@ print("___IMLADRIS_ENV_END___")
 local({
   v <- get('%s', envir = .GlobalEnv)
   cat('--- str() ---\n')
-  str(v)
+  str(v, max.level = 2, list.len = 25)
   cat('\n--- summary() ---\n')
   print(summary(v))
 })

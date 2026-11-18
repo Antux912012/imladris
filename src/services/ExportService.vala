@@ -359,6 +359,67 @@ namespace Imladris.Services {
             string pandoc_from = resolve_pandoc_from (fmt);
 
             try {
+                if (fmt == DocumentFormat.TEX) {
+                    string? engine = null;
+                    string[] tex_engines = { "latexmk", "xelatex", "lualatex", "pdflatex", "tectonic" };
+                    foreach (var cand in tex_engines) {
+                        if (Core.PlatformUtils.is_program_available (cand, src_dir)) {
+                            engine = cand;
+                            break;
+                        }
+                    }
+                    if (engine == null) {
+                        throw new GLib.IOError.FAILED ("No LaTeX toolchain found (latexmk, xelatex, lualatex, pdflatex, or tectonic). Install a TeX engine to export .tex to PDF.");
+                    }
+
+                    string base_name = GLib.Path.get_basename (actual_input);
+                    string stem = base_name;
+                    int dot_pos = stem.last_index_of (".");
+                    if (dot_pos > 0) stem = stem.substring (0, dot_pos);
+
+                    string tex_log = "";
+                    bool tex_ok = false;
+                    if (engine == "latexmk") {
+                        tex_ok = run_tool_process_with_output ("latexmk", { "-pdf", "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                    } else if (engine == "tectonic") {
+                        tex_ok = run_tool_process_with_output ("tectonic", { "--keep-logs", base_name }, src_dir, out tex_log);
+                    } else {
+                        tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                        string tex_src = "";
+                        try { GLib.FileUtils.get_contents (actual_input, out tex_src); } catch (GLib.Error e) {}
+                        if (tex_ok && (tex_src.contains ("\\bibliography{") || tex_src.contains ("\\addbibresource{"))) {
+                            string bib_tool = tex_src.contains ("\\addbibresource{") ? "biber" : "bibtex";
+                            string bib_log = "";
+                            run_tool_process_with_output (bib_tool, { stem }, src_dir, out bib_log);
+                            tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                            if (tex_ok) {
+                                tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                            }
+                        }
+                        string log_file_path = GLib.Path.build_filename (src_dir, @"$(stem).log");
+                        int extra_passes = 0;
+                        while (tex_ok && extra_passes < 2 && GLib.FileUtils.test (log_file_path, GLib.FileTest.EXISTS)) {
+                            string log_tmp = "";
+                            try { GLib.FileUtils.get_contents (log_file_path, out log_tmp); } catch (GLib.Error e) {}
+                            if (!log_tmp.contains ("Rerun to get")) break;
+                            tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                            extra_passes++;
+                        }
+                    }
+
+                    string built_pdf = GLib.Path.build_filename (src_dir, @"$(stem).pdf");
+                    if (!tex_ok || !GLib.FileUtils.test (built_pdf, GLib.FileTest.EXISTS)) {
+                        throw new GLib.IOError.FAILED (@"LaTeX PDF build failed using $(engine).");
+                    }
+
+                    if (built_pdf != output_path) {
+                        var src_pdf = GLib.File.new_for_path (built_pdf);
+                        var dst_pdf = GLib.File.new_for_path (output_path);
+                        src_pdf.copy (dst_pdf, GLib.FileCopyFlags.OVERWRITE, null, null);
+                    }
+                    return;
+                }
+
                 // Stage 1: Try Quarto / RMarkdown direct PDF render if notebook
                 if ((fmt == DocumentFormat.QMD || fmt == DocumentFormat.IPYNB) &&
                     Core.PlatformUtils.is_program_available ("quarto", src_dir)) {

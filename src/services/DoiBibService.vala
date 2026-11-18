@@ -22,6 +22,7 @@ namespace Imladris.Services {
         private Soup.Session session;
         private static GLib.Regex? doi_regex = null;
         private static GLib.Regex? pmid_regex = null;
+        private static GLib.Regex? arxiv_regex = null;
         private static GLib.Regex? non_alnum_regex = null;
         private static GLib.Regex? doi_field_regex = null;
 
@@ -76,17 +77,127 @@ namespace Imladris.Services {
         }
 
         /**
-         * Resolves either a DOI/URL or a PubMed PMID into a BibTeX entry.
+         * Extracts an arXiv identifier (e.g. `arXiv:2301.07041`, `https://arxiv.org/abs/2301.07041`, or `2301.07041`).
+         */
+        public static string? extract_arxiv_id (string raw_input) {
+            string trimmed = raw_input.strip ();
+            if (trimmed.length == 0 || extract_doi (trimmed) != null) return null;
+
+            try {
+                if (arxiv_regex == null) {
+                    arxiv_regex = new GLib.Regex ("(?:arxiv\\s*:\\s*|arxiv\\.org/(?:abs|pdf)/)?(\\d{4}\\.\\d{4,5}(?:v\\d+)?)(?:\\.pdf)?(?:\\s|$)", GLib.RegexCompileFlags.CASELESS);
+                }
+                GLib.MatchInfo mi;
+                if (arxiv_regex.match (trimmed, 0, out mi)) {
+                    return mi.fetch (1);
+                }
+            } catch (GLib.RegexError e) {}
+            return null;
+        }
+
+        /**
+         * Resolves a DOI/URL, arXiv ID, or PubMed PMID into a BibTeX entry.
          */
         public async string fetch_bibtex_from_identifier_async (string raw_input) throws GLib.Error {
             if (extract_doi (raw_input) != null) {
                 return yield fetch_bibtex_from_doi_async (raw_input);
             }
+            string? arxiv_id = extract_arxiv_id (raw_input);
+            if (arxiv_id != null) {
+                return yield fetch_bibtex_from_arxiv_async (arxiv_id);
+            }
             string? pmid = extract_pmid (raw_input);
             if (pmid != null) {
                 return yield fetch_bibtex_from_pmid_async (pmid);
             }
-            throw new GLib.IOError.INVALID_ARGUMENT ("Invalid identifier. Enter a DOI (10.xxxx/yyyy), doi.org URL, or PubMed PMID.");
+            throw new GLib.IOError.INVALID_ARGUMENT ("Invalid identifier. Enter a DOI (10.xxxx/yyyy), doi.org URL, PubMed PMID, or arXiv ID (e.g. arXiv:2301.07041).");
+        }
+
+        public async string fetch_bibtex_from_arxiv_async (string arxiv_id) throws GLib.Error {
+            string escaped_id = GLib.Uri.escape_string (arxiv_id, "", false);
+            string url = @"https://export.arxiv.org/api/query?id_list=$escaped_id";
+            var msg = new Soup.Message ("GET", url);
+            msg.request_headers.append ("Accept", "application/atom+xml");
+            var bytes = yield session.send_and_read_async (msg, Priority.DEFAULT, null);
+            if (msg.status_code == 200 && bytes != null) {
+                string body = Core.PlatformUtils.bytes_to_string (bytes);
+                string? bib = arxiv_atom_to_bibtex (body, arxiv_id);
+                if (bib != null && bib.strip ().length > 0) {
+                    return bib;
+                }
+            }
+            throw new GLib.IOError.FAILED (@"Could not resolve arXiv ID '$arxiv_id' (HTTP $(msg.status_code)).");
+        }
+
+        public static string? arxiv_atom_to_bibtex (string atom_xml, string arxiv_id) {
+            try {
+                var entry_reg = new GLib.Regex ("<entry>([\\s\\S]*?)</entry>");
+                GLib.MatchInfo entry_mi;
+                if (!entry_reg.match (atom_xml, 0, out entry_mi)) return null;
+                string entry = entry_mi.fetch (1);
+
+                string title = "";
+                var title_reg = new GLib.Regex ("<title>([\\s\\S]*?)</title>");
+                GLib.MatchInfo title_mi;
+                if (title_reg.match (entry, 0, out title_mi)) {
+                    title = unescape_xml_entities (title_mi.fetch (1).replace ("\n", " ").replace ("\r", "")).strip ();
+                    var ws_reg = new GLib.Regex ("\\s+");
+                    title = ws_reg.replace (title, -1, 0, " ");
+                }
+                if (title == "") return null;
+
+                string year = "n.d.";
+                var pub_reg = new GLib.Regex ("<published>(\\d{4})");
+                GLib.MatchInfo pub_mi;
+                if (pub_reg.match (entry, 0, out pub_mi)) {
+                    year = pub_mi.fetch (1);
+                }
+
+                var authors = new GLib.GenericArray<string> ();
+                string first_family = "arxiv";
+                var auth_reg = new GLib.Regex ("<author>\\s*<name>([\\s\\S]*?)</name>");
+                GLib.MatchInfo auth_mi;
+                if (auth_reg.match (entry, 0, out auth_mi)) {
+                    do {
+                        string full_name = unescape_xml_entities (auth_mi.fetch (1)).strip ();
+                        if (full_name == "") continue;
+                        if (authors.length == 0) {
+                            string[] parts = full_name.split (" ");
+                            first_family = parts.length > 0 ? parts[parts.length - 1] : "arxiv";
+                        }
+                        authors.add (full_name);
+                    } while (auth_mi.next ());
+                }
+
+                string authors_bib = "";
+                if (authors.length > 0) {
+                    string[] arr = new string[authors.length];
+                    for (int i = 0; i < authors.length; i++) arr[i] = authors[i];
+                    authors_bib = string.joinv (" and ", arr);
+                }
+
+                string citekey = build_citekey (first_family, year, title);
+                var sb = new GLib.StringBuilder ();
+                sb.append_printf ("@misc{%s,\n", citekey);
+                if (authors_bib != "") sb.append_printf ("  author = {%s},\n", escape_bib_value (authors_bib));
+                sb.append_printf ("  title = {{%s}},\n", escape_bib_value (title));
+                sb.append_printf ("  year = {%s},\n", year);
+                sb.append_printf ("  eprint = {%s},\n", arxiv_id);
+                sb.append ("  archivePrefix = {arXiv},\n");
+                sb.append_printf ("  url = {https://arxiv.org/abs/%s}\n", arxiv_id);
+                sb.append ("}");
+                return sb.str;
+            } catch (GLib.RegexError e) {
+                return null;
+            }
+        }
+
+        private static string unescape_xml_entities (string s) {
+            return s.replace ("&amp;", "&")
+                    .replace ("&lt;", "<")
+                    .replace ("&gt;", ">")
+                    .replace ("&quot;", "\"")
+                    .replace ("&apos;", "'");
         }
 
         public async string fetch_bibtex_from_pmid_async (string pmid) throws GLib.Error {
@@ -504,14 +615,94 @@ namespace Imladris.Services {
             return @"$(clean_fam.down ())$(clean_yr)$(first_word.down ())";
         }
 
+        private static string transliterate_latin (string raw) {
+            var sb = new GLib.StringBuilder ();
+            int idx = 0;
+            unichar ch;
+            while (raw.get_next_char (ref idx, out ch)) {
+                switch (ch) {
+                    case 'à': case 'á': case 'â': case 'ã': case 'ä': case 'å': case 'ā': case 'ă': case 'ą':
+                        sb.append_c ('a'); break;
+                    case 'À': case 'Á': case 'Â': case 'Ã': case 'Ä': case 'Å': case 'Ā': case 'Ă': case 'Ą':
+                        sb.append_c ('A'); break;
+                    case 'è': case 'é': case 'ê': case 'ë': case 'ē': case 'ĕ': case 'ė': case 'ę': case 'ě':
+                        sb.append_c ('e'); break;
+                    case 'È': case 'É': case 'Ê': case 'Ë': case 'Ē': case 'Ĕ': case 'Ė': case 'Ę': case 'Ě':
+                        sb.append_c ('E'); break;
+                    case 'ì': case 'í': case 'î': case 'ï': case 'ĩ': case 'ī': case 'ĭ': case 'į': case 'ı':
+                        sb.append_c ('i'); break;
+                    case 'Ì': case 'Í': case 'Î': case 'Ï': case 'Ĩ': case 'Ī': case 'Ĭ': case 'Į': case 'İ':
+                        sb.append_c ('I'); break;
+                    case 'ò': case 'ó': case 'ô': case 'õ': case 'ö': case 'ø': case 'ō': case 'ŏ': case 'ő':
+                        sb.append_c ('o'); break;
+                    case 'Ò': case 'Ó': case 'Ô': case 'Õ': case 'Ö': case 'Ø': case 'Ō': case 'Ŏ': case 'Ő':
+                        sb.append_c ('O'); break;
+                    case 'ù': case 'ú': case 'û': case 'ü': case 'ũ': case 'ū': case 'ŭ': case 'ů': case 'ű': case 'ų':
+                        sb.append_c ('u'); break;
+                    case 'Ù': case 'Ú': case 'Û': case 'Ü': case 'Ũ': case 'Ū': case 'Ŭ': case 'Ů': case 'Ű': case 'Ų':
+                        sb.append_c ('U'); break;
+                    case 'ñ': case 'ń': case 'ņ': case 'ň':
+                        sb.append_c ('n'); break;
+                    case 'Ñ': case 'Ń': case 'Ņ': case 'Ň':
+                        sb.append_c ('N'); break;
+                    case 'ç': case 'ć': case 'ĉ': case 'ċ': case 'č':
+                        sb.append_c ('c'); break;
+                    case 'Ç': case 'Ć': case 'Ĉ': case 'Ċ': case 'Č':
+                        sb.append_c ('C'); break;
+                    case 'ý': case 'ÿ': case 'ŷ':
+                        sb.append_c ('y'); break;
+                    case 'Ý': case 'Ÿ': case 'Ŷ':
+                        sb.append_c ('Y'); break;
+                    case 'ž': case 'ź': case 'ż':
+                        sb.append_c ('z'); break;
+                    case 'Ž': case 'Ź': case 'Ż':
+                        sb.append_c ('Z'); break;
+                    case 'š': case 'ś': case 'ŝ': case 'ş':
+                        sb.append_c ('s'); break;
+                    case 'Š': case 'Ś': case 'Ŝ': case 'Ş':
+                        sb.append_c ('S'); break;
+                    case 'ř': case 'ŕ': case 'ŗ':
+                        sb.append_c ('r'); break;
+                    case 'Ř': case 'Ŕ': case 'Ŗ':
+                        sb.append_c ('R'); break;
+                    case 'ł': case 'ĺ': case 'ļ': case 'ľ':
+                        sb.append_c ('l'); break;
+                    case 'Ł': case 'Ĺ': case 'Ļ': case 'Ľ':
+                        sb.append_c ('L'); break;
+                    case 'ď': case 'đ':
+                        sb.append_c ('d'); break;
+                    case 'Ď': case 'Đ':
+                        sb.append_c ('D'); break;
+                    case 'ť': case 'ţ': case 'ŧ':
+                        sb.append_c ('t'); break;
+                    case 'Ť': case 'Ţ': case 'Ŧ':
+                        sb.append_c ('T'); break;
+                    case 'ß':
+                        sb.append ("ss"); break;
+                    case 'æ':
+                        sb.append ("ae"); break;
+                    case 'Æ':
+                        sb.append ("AE"); break;
+                    case 'œ':
+                        sb.append ("oe"); break;
+                    case 'Œ':
+                        sb.append ("OE"); break;
+                    default:
+                        sb.append_unichar (ch); break;
+                }
+            }
+            return sb.str;
+        }
+
         private static string sanitize_key_token (string raw) {
+            string ascii = transliterate_latin (raw);
             try {
                 if (non_alnum_regex == null) {
                     non_alnum_regex = new GLib.Regex ("[^A-Za-z0-9]");
                 }
-                return non_alnum_regex.replace (raw, -1, 0, "");
+                return non_alnum_regex.replace (ascii, -1, 0, "");
             } catch (GLib.RegexError e) {
-                return raw;
+                return ascii;
             }
         }
 
@@ -525,7 +716,27 @@ namespace Imladris.Services {
                 }
                 cleaned = jats_tag_regex.replace (cleaned, -1, 0, "");
             } catch (GLib.RegexError e) {}
-            return cleaned.strip ();
+
+            var sb = new GLib.StringBuilder ();
+            bool escaped = false;
+            for (int i = 0; i < cleaned.length; i++) {
+                char c = cleaned[i];
+                if (escaped) {
+                    sb.append_c (c);
+                    escaped = false;
+                    continue;
+                }
+                if (c == '\\') {
+                    sb.append_c (c);
+                    escaped = true;
+                    continue;
+                }
+                if (c == '&' || c == '%' || c == '$' || c == '#' || c == '_') {
+                    sb.append_c ('\\');
+                }
+                sb.append_c (c);
+            }
+            return sb.str.strip ();
         }
     }
 }

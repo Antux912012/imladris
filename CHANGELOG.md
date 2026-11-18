@@ -2,6 +2,18 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.33.0] - 2026-11-18
+
+### Added
+- **arXiv ID Citation Resolution**: `DoiBibService` now resolves `arXiv:XXXX.XXXXX` identifiers via `export.arxiv.org/api/query` alongside DOIs and PubMed PMIDs, with Latin diacritic transliteration for citekeys and LaTeX special-character escaping.
+- **Keyboard Shortcuts Dialog (`Ctrl+?`)**: Added a Libadwaita Keyboard Shortcuts dialog (`app.shortcuts`) and surfaced **New Deck or Poster Template...** directly on the Welcome Dashboard and File → New menu.
+- **R/Biostatistics Editor Shortcuts & Python Data Science Defaults**: Added `Alt+-` (` <- `) and `Ctrl+Shift+M` (` |> `) in `DocumentPage`, and included `numpy`, `pandas`, and `matplotlib` in `ToolchainComponent.PYTHON`.
+
+### Fixed
+- **LaTeX Build, Export & `@` Completion**: Added 3rd-pass BibTeX/Biber resolution (`Rerun to get` check) in `LatexBuildRunner`, routed `.tex` PDF exports in `ExportService` through LaTeX engines instead of Pandoc/Markdown, fixed HeaderBar TeX engine selection (`latexmk`/`xelatex`/`pdflatex`/`HTML`) and multi-citation Zotero `;` → `,` conversion, fixed `CitationCompletionProvider` to insert `\cite{...}` without injecting YAML frontmatter into `.tex` files, and added `mhchem`/`algorithm` while removing obsolete `inputenc` in `LatexTemplates`.
+- **DataGridViewer & Polyglot Environment**: Added RFC-4180 CSV/TSV parsing, local-file pagination, R `rownames()` support, `NA`/`NaN`/`Inf` numeric sort handling, 2D shape checks for Python matrices, capped R `str()` summaries, `polyglot` preservation in `.qmd`/`.ipynb`, `DataGridViewer` pop-in re-mounting, and recursive non-empty directory deletion.
+- **Preferences, Command Palette & Onboarding UX**: Fixed `PreferencesDialog` AI provider enum mapping across all 19 providers, aligned temperature range (`0.0..2.0`), initialized live Elrond status, fixed `CommandPaletteDialog` shortcuts/markup/24-item cap with tokenized search, and respected explicit **Skip** in `OnboardingTourDialog`.
+
 ## [0.32.0] - 2026-11-18
 
 ### Added

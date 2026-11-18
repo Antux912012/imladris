@@ -578,6 +578,23 @@ namespace Imladris {
                             return true;
                         }
                     }
+                } else if ((state & Gdk.ModifierType.ALT_MASK) != 0 &&
+                           (state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK)) == 0 &&
+                           (keyval == Gdk.Key.minus || keyval == Gdk.Key.KP_Subtract)) {
+                    source_buffer.begin_user_action ();
+                    source_buffer.delete_selection (true, true);
+                    source_buffer.insert_at_cursor (" <- ", -1);
+                    source_buffer.end_user_action ();
+                    return true;
+                } else if ((state & Gdk.ModifierType.CONTROL_MASK) != 0 &&
+                           (state & Gdk.ModifierType.SHIFT_MASK) != 0 &&
+                           (state & Gdk.ModifierType.ALT_MASK) == 0 &&
+                           (keyval == Gdk.Key.m || keyval == Gdk.Key.M)) {
+                    source_buffer.begin_user_action ();
+                    source_buffer.delete_selection (true, true);
+                    source_buffer.insert_at_cursor (" |> ", -1);
+                    source_buffer.end_user_action ();
+                    return true;
                 }
                 return false;
             });

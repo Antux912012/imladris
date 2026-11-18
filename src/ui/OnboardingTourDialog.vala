@@ -15,13 +15,14 @@ namespace Imladris.UI {
 
     public class OnboardingTourDialog : Adw.Dialog {
 
-        public signal void tour_finished (bool open_toolchain_setup);
+        public signal void tour_finished (bool open_toolchain_setup, bool skipped);
 
         private Adw.Carousel carousel;
         private Gtk.Button prev_btn;
         private Gtk.Button next_btn;
         private Gtk.Button skip_btn;
         private bool finished_emitted = false;
+        public bool skipped { get; private set; default = false; }
         private uint total_slides = 0;
 
         public OnboardingTourDialog () {
@@ -42,7 +43,7 @@ namespace Imladris.UI {
             skip_btn = new Gtk.Button.with_label ("Skip");
             skip_btn.add_css_class ("flat");
             skip_btn.clicked.connect (() => {
-                finish_tour (false);
+                finish_tour (false, true);
             });
             header.pack_start (skip_btn);
             toolbar_view.add_top_bar (header);
@@ -121,7 +122,7 @@ namespace Imladris.UI {
                 if (pos + 1 < (int) total_slides) {
                     carousel.scroll_to (carousel.get_nth_page ((uint) (pos + 1)), true);
                 } else {
-                    finish_tour (false);
+                    finish_tour (false, false);
                 }
             });
 
@@ -140,8 +141,9 @@ namespace Imladris.UI {
             this.closed.connect (() => {
                 if (!finished_emitted) {
                     finished_emitted = true;
+                    this.skipped = true;
                     Core.SettingsManager.get_default ().onboarding_tour_completed = true;
-                    tour_finished (false);
+                    tour_finished (false, true);
                 }
             });
 
@@ -175,7 +177,7 @@ namespace Imladris.UI {
                 };
                 setup_btn.add_css_class ("pill");
                 setup_btn.clicked.connect (() => {
-                    finish_tour (true);
+                    finish_tour (true, false);
                 });
                 status.set_child (setup_btn);
             }
@@ -183,12 +185,13 @@ namespace Imladris.UI {
             carousel.append (status);
         }
 
-        private void finish_tour (bool open_toolchain_setup) {
+        private void finish_tour (bool open_toolchain_setup, bool skipped) {
             if (finished_emitted) return;
             finished_emitted = true;
+            this.skipped = skipped;
             Core.SettingsManager.get_default ().onboarding_tour_completed = true;
             this.close ();
-            tour_finished (open_toolchain_setup);
+            tour_finished (open_toolchain_setup, skipped);
         }
     }
 }

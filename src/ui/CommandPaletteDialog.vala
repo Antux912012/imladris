@@ -44,9 +44,9 @@ namespace Imladris.UI {
 
         private void build_command_catalog () {
             // Document and Execution
-            all_items.add (new CommandPaletteItem ("Run Active Chunk", "Execute current code chunk (Ctrl+Enter)", "media-playback-start-symbolic", "win.run_chunk", "Execution"));
+            all_items.add (new CommandPaletteItem ("Run Active Chunk", "Execute current code chunk (Ctrl+Shift+Enter)", "media-playback-start-symbolic", "win.run_chunk", "Execution"));
             all_items.add (new CommandPaletteItem ("Run All Chunks", "Execute all notebook code cells sequentially", "media-seek-forward-symbolic", "win.run_all", "Execution"));
-            all_items.add (new CommandPaletteItem ("Run Line or Selection", "Execute active line in persistent REPL console", "go-next-symbolic", "win.run_line", "Execution"));
+            all_items.add (new CommandPaletteItem ("Run Line or Selection", "Execute active line in persistent REPL console (Ctrl+Enter)", "go-next-symbolic", "win.run_line", "Execution"));
             all_items.add (new CommandPaletteItem ("Restart Execution Kernel", "Clear persistent session states for R and Python", "view-refresh-symbolic", "win.restart_kernel", "Execution"));
             all_items.add (new CommandPaletteItem ("Interrupt Execution", "Send SIGINT to active background worker", "process-stop-symbolic", "win.interrupt_execution", "Execution"));
             all_items.add (new CommandPaletteItem ("Clear Console and Outputs", "Purge all cell outputs and terminal logs", "edit-clear-symbolic", "win.clear_console", "Execution"));
@@ -69,6 +69,9 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Visual Flow and Mermaid Studio", "Mindmaps, flowcharts, and sequence diagrams studio", "view-grid-symbolic", "app.mermaid_studio", "Scientific"));
             all_items.add (new CommandPaletteItem ("Insert Zotero Citation", "Pick references from local Zotero HTTP connector (Ctrl+Shift+I)", "accessories-dictionary-symbolic", "win.zotero_picker", "Scientific"));
             all_items.add (new CommandPaletteItem ("Bibliography & DOI Manager (.bib)", "Generate .bib entries from DOI links (Ctrl+Shift+B)", "document-edit-symbolic", "win.doi_bib_manager", "Scientific"));
+            all_items.add (new CommandPaletteItem ("New Markdown (.md)", "Create a new Markdown document", "document-edit-symbolic", "app.new_md", "File"));
+            all_items.add (new CommandPaletteItem ("New Quarto (.qmd)", "Create a new Quarto scientific notebook", "x-office-document-symbolic", "app.new_qmd", "File"));
+            all_items.add (new CommandPaletteItem ("New Deck or Poster...", "Create Beamer, Marp/RevealJS, TypeScript, or Typst poster", "x-office-presentation-symbolic", "app.new_presentation", "File"));
             all_items.add (new CommandPaletteItem ("New HTML5 + CSS + LaTeX Document", "Create HTML document with embedded CSS and LaTeX math", "text-html-symbolic", "app.new_html", "File"));
             all_items.add (new CommandPaletteItem ("New BibTeX Bibliography (.bib)", "Create a new .bib bibliography file", "x-office-document-symbolic", "app.new_bib", "File"));
             all_items.add (new CommandPaletteItem ("New CSS Stylesheet (.css)", "Create a new CSS stylesheet file", "preferences-desktop-theme-symbolic", "app.new_css", "File"));
@@ -80,6 +83,8 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Switch Physics: Libadwaita Smooth (180ms)", "Set standard GNOME Libadwaita smooth easing", "emblem-system-symbolic", "physics.adwaita", "Hardware"));
             all_items.add (new CommandPaletteItem ("Toggle Steady Cursor", "Toggle blinking versus non-blinking solid terminal caret", "edit-paste-symbolic", "physics.cursor", "Hardware"));
             all_items.add (new CommandPaletteItem ("Open Application Preferences", "Configure GPU backend, appearance, and AI credentials (Ctrl+,)", "preferences-system-symbolic", "app.preferences", "General"));
+            all_items.add (new CommandPaletteItem ("Feature Tour...", "Walk through Imladris scientific workbench capabilities", "help-about-symbolic", "app.show_tour", "General"));
+            all_items.add (new CommandPaletteItem ("Keyboard Shortcuts", "View all editor, execution, and scientific shortcuts (Ctrl+?)", "preferences-desktop-keyboard-shortcuts-symbolic", "app.shortcuts", "General"));
         }
 
         private Gtk.Stack results_stack;
@@ -164,19 +169,25 @@ namespace Imladris.UI {
             }
 
             string query = search_entry.text.strip ().down ();
+            string[] tokens = (query == "") ? new string[0] : query.split (" ");
             int count = 0;
 
             foreach (var item in all_items) {
-                bool match = (query == "");
-                if (!match) {
-                    string t = item.title.down ();
-                    string s = item.subtitle.down ();
-                    string c = item.category.down ();
-                    match = t.contains (query) || s.contains (query) || c.contains (query);
+                bool match = true;
+                if (tokens.length > 0) {
+                    string haystack = @"$(item.title) $(item.subtitle) $(item.category)".down ();
+                    foreach (var tok in tokens) {
+                        string clean_tok = tok.strip ();
+                        if (clean_tok != "" && !haystack.contains (clean_tok)) {
+                            match = false;
+                            break;
+                        }
+                    }
                 }
 
                 if (match) {
                     var row = new Adw.ActionRow () {
+                        use_markup = false,
                         title = item.title,
                         subtitle = item.subtitle,
                         activatable = true
@@ -192,7 +203,6 @@ namespace Imladris.UI {
                     list_box.append (row);
 
                     count++;
-                    if (count >= 24) break;
                 }
             }
 

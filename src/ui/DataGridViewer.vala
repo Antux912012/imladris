@@ -50,6 +50,7 @@ namespace Imladris.UI {
         public string active_object_name { get; private set; default = ""; }
         public string active_engine { get; private set; default = "r"; }
         public string session_key { get; set; default = "default"; }
+        private string? active_file_path = null;
 
         private Gtk.Label title_label;
         private Gtk.Label dim_badge;
@@ -192,7 +193,9 @@ namespace Imladris.UI {
             };
             btn_refresh.add_css_class ("flat");
             btn_refresh.clicked.connect (() => {
-                if (active_object_name != "") {
+                if (active_engine == "file" && active_file_path != null) {
+                    fetch_page_slice.begin ();
+                } else if (active_object_name != "") {
                     fetch_and_display.begin (active_object_name, active_engine);
                 }
             });
@@ -346,8 +349,13 @@ namespace Imladris.UI {
                     if (ra == null || rb == null) return 0;
                     string sa = ra.get_cell (col_index);
                     string sb = rb.get_cell (col_index);
+                    bool a_na = is_na_sentinel (sa);
+                    bool b_na = is_na_sentinel (sb);
+                    if (a_na && b_na) return GLib.strcmp (sa, sb);
+                    if (a_na) return 1;
+                    if (b_na) return -1;
                     double da = 0.0, db = 0.0;
-                    if (double.try_parse (sa, out da) && double.try_parse (sb, out db)) {
+                    if (double.try_parse (sa.strip (), out da) && double.try_parse (sb.strip (), out db) && !da.is_nan () && !db.is_nan ()) {
                         if (da < db) return -1;
                         if (da > db) return 1;
                         return 0;
@@ -397,7 +405,55 @@ namespace Imladris.UI {
             page_label.label = @"$page_idx / $total_pages";
         }
 
+        private static bool is_na_sentinel (string s) {
+            string t = s.strip ().down ();
+            return t == "" || t == "na" || t == "<na>" || t == "nan" ||
+                   t == "inf" || t == "-inf" || t == "+inf" ||
+                   t == "infinity" || t == "-infinity" || t == "+infinity" ||
+                   t == "null" || t == "none" || t == "n/a";
+        }
+
+        private static string[] parse_delimited_line (string line, char sep) {
+            var fields = new Gee.ArrayList<string> ();
+            var sb = new GLib.StringBuilder ();
+            bool in_quotes = false;
+            int len = line.length;
+
+            for (int i = 0; i < len; i++) {
+                char c = line[i];
+                if (in_quotes) {
+                    if (c == '"') {
+                        if (i + 1 < len && line[i + 1] == '"') {
+                            sb.append_c ('"');
+                            i++;
+                        } else {
+                            in_quotes = false;
+                        }
+                    } else {
+                        sb.append_c ((c == '\t' || c == '\r' || c == '\n') ? ' ' : c);
+                    }
+                } else {
+                    if (c == '"' && sb.len == 0) {
+                        in_quotes = true;
+                    } else if (c == sep) {
+                        fields.add (sb.str);
+                        sb.truncate (0);
+                    } else {
+                        sb.append_c ((c == '\t' || c == '\r' || c == '\n') ? ' ' : c);
+                    }
+                }
+            }
+            fields.add (sb.str);
+
+            string[] res = new string[fields.size];
+            for (int i = 0; i < fields.size; i++) {
+                res[i] = fields[i];
+            }
+            return res;
+        }
+
         public async void fetch_and_display (string object_name, string engine = "r") {
+            this.active_file_path = null;
             this.active_object_name = object_name;
             this.active_engine = engine;
             this.current_offset = 0;
@@ -405,6 +461,13 @@ namespace Imladris.UI {
         }
 
         public void load_delimited_file (string file_path) {
+            this.active_file_path = file_path;
+            this.active_engine = "file";
+            this.current_offset = 0;
+            load_delimited_file_slice (file_path);
+        }
+
+        private void load_delimited_file_slice (string file_path) {
             try {
                 string raw;
                 GLib.FileUtils.get_contents (file_path, out raw);
@@ -413,14 +476,16 @@ namespace Imladris.UI {
                 var sb = new GLib.StringBuilder ();
                 int row_num = 0;
                 int col_count = 0;
+                int start_row = current_offset + 1;
+                int end_row = current_offset + page_size;
                 foreach (string raw_line in lines) {
                     string line = raw_line.replace ("\r", "");
                     if (line.strip () == "") continue;
-                    string[] fields = line.split_set (sep == '\t' ? "\t" : ",");
+                    string[] fields = parse_delimited_line (line, sep);
                     if (row_num == 0) {
                         col_count = fields.length;
                         sb.append ("__COLS__\t").append (string.joinv ("\t", fields)).append ("\n");
-                    } else if (row_num <= page_size) {
+                    } else if (row_num >= start_row && row_num <= end_row) {
                         sb.append_printf ("__ROW__\t%d\t%s\n", row_num, string.joinv ("\t", fields));
                     }
                     row_num++;
@@ -437,6 +502,17 @@ namespace Imladris.UI {
         }
 
         private async void fetch_page_slice () {
+            if (active_engine == "file" && active_file_path != null) {
+                uint64 gen = ++request_gen;
+                loading_spinner.visible = true;
+                loading_spinner.spinning = true;
+                load_delimited_file_slice (active_file_path);
+                if (gen != request_gen) return;
+                loading_spinner.spinning = false;
+                loading_spinner.visible = false;
+                return;
+            }
+
             if (active_object_name == "") return;
 
             if (!is_safe_identifier (active_object_name)) {
@@ -514,6 +590,10 @@ local({
       if (is.null(cols)) cols <- paste0('V', seq_len(nc))
       types <- vapply(d, function(x) class(x)[1], character(1))
       headers <- paste0(cols, ' [', types, ']')
+      .has_rn <- if (exists('has_rownames', mode = 'function')) has_rownames(d) else (!is.null(rownames(d)) && .row_names_info(d, 1L) > 0L && !identical(rownames(d), as.character(seq_len(nr))))
+      if (.has_rn) {
+        headers <- c('rowname [character]', headers)
+      }
       cat('__COLS__\t', paste(headers, collapse = '\t'), '\n', sep='')
       if (nr > 0L) {
         idx <- seq.int(min(%dL, nr), min(%dL, nr))
@@ -523,10 +603,14 @@ local({
           v[is.na(v)] <- 'NA'
           gsub('[\t\r\n]', ' ', v)
         })
+        if (.has_rn) {
+          rn_vals <- gsub('[\t\r\n]', ' ', rownames(sub_d))
+          sub_chr <- c(list(rn_vals), sub_chr)
+        }
         lines <- do.call(paste, c(sub_chr, sep = '\t'))
         cat(paste0('__ROW__\t', idx, '\t', lines, collapse = '\n'), '\n', sep='')
       }
-      cat('__DONE__\t', nr, '\t', nc, '\n', sep='')
+      cat('__DONE__\t', nr, '\t', if (.has_rn) nc + 1L else nc, '\n', sep='')
     }
   }
 })
