@@ -103,13 +103,24 @@ namespace Imladris {
                 GLib.warning ("Could not stage bundled language-specs: %s", e.message);
             }
 
-            string[] existing = lm.get_search_path ();
-            var paths = new GLib.GenericArray<string> ();
-            paths.add (cache_specs_dir);
-            foreach (string p in existing) {
-                if (p != cache_specs_dir) paths.add (p);
+            string[]? existing = lm.get_search_path ();
+            int extra = 0;
+            if (existing != null) {
+                foreach (string p in existing) {
+                    if (p != cache_specs_dir) extra++;
+                }
             }
-            lm.set_search_path (paths.data);
+            string[] paths = new string[1 + extra];
+            paths[0] = cache_specs_dir;
+            int idx = 1;
+            if (existing != null) {
+                foreach (string p in existing) {
+                    if (p != cache_specs_dir) {
+                        paths[idx++] = p;
+                    }
+                }
+            }
+            lm.set_search_path (paths);
         }
 
         public DocumentFormat get_document_format () {

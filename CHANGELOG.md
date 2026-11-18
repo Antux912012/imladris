@@ -2,6 +2,11 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.31.1] - 2026-11-18
+
+### Fixed
+- **Crash on New Document Creation**: Fixed a `SIGSEGV` in `DocumentPage.ensure_bundled_language_specs()` caused by passing a non-null-terminated `GLib.GenericArray<string>.data` pointer array to `GtkSource.LanguageManager.set_search_path()` (`g_strdupv()`), replacing it with a null-terminated Vala `string[]` array.
+
 ## [0.31.0] - 2026-11-18
 
 ### Added

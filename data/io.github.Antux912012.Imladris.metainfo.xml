@@ -75,6 +75,14 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.31.1" date="2026-11-18">
+      <description>
+        <p>Release v0.31.1 fixes a crash when creating a new document:</p>
+        <ul>
+          <li>Fixed a segmentation fault in DocumentPage.ensure_bundled_language_specs() where a non-null-terminated GLib.GenericArray&lt;string&gt;.data pointer array was passed to GtkSource.LanguageManager.set_search_path(), replacing it with a null-terminated Vala string[] array.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.31.0" date="2026-11-18">
       <description>
         <p>Release v0.31.0 introduces interactive Micromamba toolchain setup on startup, multi-version Python switching, and out-of-the-box PDF/ODT/RTF export:</p>
