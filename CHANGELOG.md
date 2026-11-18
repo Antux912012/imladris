@@ -2,6 +2,16 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.31.0] - 2026-11-18
+
+### Added
+- **Interactive Micromamba Toolchain Setup**: Opens in selection mode on startup so users can pick Python, R, LaTeX, HTML/CSS, TypeScript, and Quarto, update installed components, and install/switch between Python versions (`3.12`, `3.11`, `3.10`, `3.9`).
+- **Native C GNU/Linux Toolchain Backend**: `toolchain_native.c` using `uname(2)`, `statvfs(2)`, `fts(3)` hardlink-deduplicated disk usage, and `conda-meta` version scanning.
+- **Out-of-the-Box PDF, ODT, and RTF Export**: Built-in Cairo + Pango A4 vector PDF renderer and zero-dependency zlib PKZIP OASIS ODT packager in `export_native.c` (`ExportService`), plus enhanced RTF formatting.
+
+### Fixed
+- **GTK4 Deprecations & Code Hygiene**: Replaced `Gtk.FileChooserNative` with `Gtk.FileDialog` in `ToolchainSetupDialog`, and removed dormant unused symbols.
+
 ## [0.30.0] - 2026-11-18
 
 ### Added

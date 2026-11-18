@@ -10,7 +10,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.30.0";
+        public const string APP_VERSION = "0.31.0";
         private bool first_launch_toolchain_checked = false;
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
@@ -214,7 +214,7 @@ namespace Imladris {
             }
             first_launch_toolchain_checked = true;
             if (!Core.ToolchainManager.get_default ().is_base_environment_installed ()) {
-                win.show_toolchain_setup_dialog (true);
+                win.show_toolchain_setup_dialog (false, true);
             }
         }
 

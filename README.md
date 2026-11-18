@@ -18,7 +18,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
   <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
-  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.30.0"><img src="https://img.shields.io/badge/Release-v0.30.0-blue?style=flat-square" alt="Release v0.30.0"></a>
+  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.31.0"><img src="https://img.shields.io/badge/Release-v0.31.0-blue?style=flat-square" alt="Release v0.31.0"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-0.56%2B-green?style=flat-square" alt="Vala">
   <img src="https://img.shields.io/badge/License-GPL--3.0--or--later-brightgreen?style=flat-square" alt="License">
@@ -26,7 +26,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Official Landing Page</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.30.0">⬇️ Download v0.30.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.31.0">⬇️ Download v0.31.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Technical Wiki</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong>
@@ -42,7 +42,7 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ### Comparative Workflow Matrix
 
-| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.30.0 Approach |
+| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.31.0 Approach |
 | :--- | :--- | :--- |
 | **Idle Memory Overhead** | 1.2–2.5 GB RAM idle | **< 120 MB RAM** (native compiled Vala/GTK4 binary) |
 | **Cold Startup Latency** | 4.0–9.0 seconds | **< 0.6 seconds** instant launch |
@@ -78,7 +78,7 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ---
 
-## What’s New in v0.30.0
+## What’s New in v0.31.0
 
 * **Pure Vala/C Native Core**: Replaced the Rust FFI layer with native `NativeCore` in Vala/GLib, eliminating Cargo build overhead and simplifying cross-distro packaging.
 * **Additional Document Formats**: Plain text, CSV, TSV, RStudio `.Rproj`, and `.bibliography` files now receive format detection and editor profiles tailored to each format.
@@ -251,7 +251,7 @@ nix build .#default
 ./result/bin/imladris
 ```
 
-Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.30.0](https://github.com/Antux912012/imladris/releases/tag/v0.30.0).
+Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.31.0](https://github.com/Antux912012/imladris/releases/tag/v0.31.0).
 
 ### Scientific Toolchain Meta-Packages & Cross-Distro Dependencies
 To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
@@ -262,11 +262,11 @@ To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
   Mounts at `/app/toolchain` and is automatically added to `PATH` inside the Imladris sandbox.
 - **Debian / Ubuntu (`imladris-toolchain` meta-package with `postinst` verification):**
   ```bash
-  sudo apt install ./imladris_0.30.0_amd64.deb ./imladris-toolchain_0.30.0_all.deb
+  sudo apt install ./imladris_0.31.0_amd64.deb ./imladris-toolchain_0.31.0_all.deb
   ```
 - **Fedora / RHEL (`imladris-toolchain` RPM meta-package with `%post` verification):**
   ```bash
-  sudo dnf install ./imladris-0.30.0-1.fc44.x86_64.rpm ./imladris-toolchain-0.30.0-1.fc44.noarch.rpm
+  sudo dnf install ./imladris-0.31.0-1.fc44.x86_64.rpm ./imladris-toolchain-0.31.0-1.fc44.noarch.rpm
   ```
 - **Arch Linux:**
   ```bash

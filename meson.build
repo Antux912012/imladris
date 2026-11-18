@@ -2,13 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.30.0',
+  version: '0.31.0',
   default_options: ['warning_level=1']
 )
 
 gnome = import('gnome')
 cc = meson.get_compiler('c')
 m_dep = cc.find_library('m', required: false)
+core_inc = include_directories('src/core')
 
 deps = [
   dependency('gtk4', version: '>= 4.14'),
@@ -22,6 +23,9 @@ deps = [
   dependency('gee-0.8'),
   dependency('gio-2.0', version: '>= 2.76'),
   dependency('glib-2.0', version: '>= 2.76'),
+  dependency('cairo'),
+  dependency('pangocairo'),
+  dependency('zlib'),
   m_dep,
 ]
 
@@ -76,6 +80,7 @@ sources = files(
   'src/services/ShinyService.vala',
   'src/editor/CitationCompletionProvider.vala',
   'src/services/ExportService.vala',
+  'src/core/export_native.c',
   'src/services/MediaHelper.vala',
   'src/services/PackageIndexCache.vala',
   'src/plugins/PluginManager.vala',
@@ -117,11 +122,13 @@ sources = files(
   'src/core/AiConfigManager.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
 )
 
 executable('imladris',
   sources,
   resources,
+  include_directories: core_inc,
   dependencies: deps,
   install: true
 )
@@ -174,6 +181,7 @@ test_sources = files(
   'src/services/PersistentSessionManager.vala',
   'src/services/HistoryManager.vala',
   'src/services/ExportService.vala',
+  'src/core/export_native.c',
   'src/services/MediaHelper.vala',
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
@@ -182,12 +190,14 @@ test_sources = files(
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
   'src/bridges/elbereth/ClinicalBiostatsPopover.vala',
 )
 
 test_exe = executable('test_mallorn_sandbox',
   test_sources,
   dependencies: deps,
+  include_directories: core_inc,
 )
 
 test('mallorn_sandbox_tests', test_exe, timeout: 120)
@@ -198,6 +208,7 @@ ai_test_sources = files(
   'src/core/SettingsManager.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
   'src/core/NativeCore.vala',
   'src/core/ChunkParser.vala',
   'src/AiClient.vala',
@@ -210,6 +221,7 @@ ai_test_sources = files(
 ai_test_exe = executable('test_ai_integration',
   ai_test_sources,
   dependencies: deps,
+  include_directories: core_inc,
 )
 
 test('ai_integration_tests', ai_test_exe, timeout: 30)
@@ -231,6 +243,7 @@ plugin_test_sources = files(
   'src/services/PersistentSessionManager.vala',
   'src/services/HistoryManager.vala',
   'src/services/ExportService.vala',
+  'src/core/export_native.c',
   'src/services/MediaHelper.vala',
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
@@ -239,11 +252,13 @@ plugin_test_sources = files(
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
 )
 
 plugin_test_exe = executable('test_plugin_engine',
   plugin_test_sources,
   dependencies: deps,
+  include_directories: core_inc,
 )
 
 test('plugin_engine_tests', plugin_test_exe, timeout: 30)
@@ -264,6 +279,7 @@ dock_test_sources = files(
   'src/services/PersistentSessionManager.vala',
   'src/services/HistoryManager.vala',
   'src/services/ExportService.vala',
+  'src/core/export_native.c',
   'src/services/MediaHelper.vala',
   'src/core/ChunkParser.vala',
   'src/console/ReplBridge.vala',
@@ -272,6 +288,7 @@ dock_test_sources = files(
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
   'src/core/layout/DockTypes.vala',
   'src/ui/LayoutSerializer.vala',
   'src/ui/DataGridViewer.vala',
@@ -281,6 +298,7 @@ dock_test_sources = files(
 dock_test_exe = executable('test_dock_environment',
   dock_test_sources,
   dependencies: deps,
+  include_directories: core_inc,
 )
 
 test('dock_environment_tests', dock_test_exe, timeout: 30)
@@ -291,11 +309,13 @@ zotero_test_sources = files(
   'src/services/DoiBibService.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
 )
 
 zotero_test_exe = executable('test_zotero_service',
   zotero_test_sources,
   dependencies: deps,
+  include_directories: core_inc,
   vala_args: ['--target-glib=2.76'],
 )
 
@@ -312,10 +332,12 @@ shiny_test_sources = files(
   'src/core/MallornManager.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
   'src/services/SandboxController.vala',
   'src/services/PersistentSessionManager.vala',
   'src/services/HistoryManager.vala',
   'src/services/ExportService.vala',
+  'src/core/export_native.c',
   'src/services/MediaHelper.vala',
   'src/core/MathChemEngine.vala',
   'src/core/MermaidFlowEngine.vala',
@@ -328,6 +350,7 @@ shiny_test_sources = files(
 shiny_test_exe = executable('test_shiny_service',
   shiny_test_sources,
   dependencies: deps,
+  include_directories: core_inc,
 )
 
 test('shiny_service_tests', shiny_test_exe, timeout: 30)
@@ -341,11 +364,13 @@ galaxy_test_sources = files(
   'src/core/ProvenanceAttestationService.vala',
   'src/core/PlatformUtils.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
 )
 
 galaxy_test_exe = executable('test_galaxy_bridge',
   galaxy_test_sources,
   dependencies: deps,
+  include_directories: core_inc,
   vala_args: ['--target-glib=2.76'],
 )
 
@@ -364,12 +389,14 @@ format_test_exe = executable('test_format_profile',
     'src/core/MermaidFlowEngine.vala',
     'src/core/PlatformUtils.vala',
     'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
     'src/adapters/DocumentAdapter.vala',
     'src/services/SandboxController.vala',
     'src/services/WorkspaceStateManager.vala',
     'src/core/ChunkParser.vala',
   ),
   dependencies: deps,
+  include_directories: core_inc,
 )
 
 test('format_profile_tests', format_test_exe, timeout: 30)
@@ -387,11 +414,13 @@ native_rendering_test_exe = executable('test_native_rendering',
     'src/core/MermaidFlowEngine.vala',
     'src/core/PlatformUtils.vala',
     'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
     'src/services/SandboxController.vala',
     'src/core/ChunkParser.vala',
     'src/adapters/DocumentAdapter.vala',
   ),
   dependencies: deps,
+  include_directories: core_inc,
 )
 
 test('native_rendering_tests', native_rendering_test_exe, timeout: 30)
@@ -401,6 +430,7 @@ exec_sec_test_exe = executable('test_execution_and_security',
     'tests/test_execution_and_security.vala',
     'src/core/PlatformUtils.vala',
     'src/core/ToolchainManager.vala',
+  'src/core/toolchain_native.c',
     'src/core/NativeCore.vala',
     'src/core/FormatProfile.vala',
     'src/core/ChunkParser.vala',
@@ -414,6 +444,7 @@ exec_sec_test_exe = executable('test_execution_and_security',
     'src/services/SandboxController.vala',
     'src/services/RecoveryService.vala',
     'src/services/ExportService.vala',
+  'src/core/export_native.c',
     'src/services/PersistentSessionManager.vala',
     'src/runners/LatexBuildRunner.vala',
     'src/runners/TypeScriptRunner.vala',
@@ -422,6 +453,7 @@ exec_sec_test_exe = executable('test_execution_and_security',
     'src/ui/PackagesRibbonBar.vala',
   ),
   dependencies: deps,
+  include_directories: core_inc,
 )
 
 test('execution_and_security_tests', exec_sec_test_exe, timeout: 30)

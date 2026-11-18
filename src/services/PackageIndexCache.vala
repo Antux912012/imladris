@@ -160,30 +160,6 @@ namespace Imladris.UI {
             pypi_packages.sort (strcmp);
         }
 
-        private async void check_and_refresh_indices () {
-            int64 now = get_real_time () / 1000000;
-            string last_sync_file = Path.build_filename (cache_dir, "last_sync.txt");
-            int64 last_sync = 0;
-            if (FileUtils.test (last_sync_file, FileTest.EXISTS)) {
-                try {
-                    string content;
-                    FileUtils.get_contents (last_sync_file, out content);
-                    last_sync = int64.parse (content.strip ());
-                } catch (Error e) {}
-            }
-
-            // Only perform conditional network sync if cache is older than 24 hours (86400 seconds)
-            if (now - last_sync > 86400) {
-                try {
-                    yield refresh_cran_index ();
-                    yield refresh_pypi_index ();
-                    FileUtils.set_contents (last_sync_file, now.to_string ());
-                } catch (Error e) {
-                    // Silently retain cached indices if offline
-                }
-            }
-        }
-
         public async int refresh_cran_index (string mirror_url = "https://cloud.r-project.org") throws Error {
             string url = mirror_url.has_suffix ("/")
                 ? mirror_url + "src/contrib/PACKAGES"

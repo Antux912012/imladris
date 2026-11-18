@@ -202,6 +202,62 @@ l.3 \usepackage{nonexistent}
         assert (svc.last_error_message != "");
     }
 
+    private static void test_builtin_pdf_odt_rtf_export () {
+        string report_md = """---
+title: "Clinical Trial Interim Report"
+author: "Imladris Test Suite"
+date: "2026-11-18"
+---
+
+# Executive Summary
+
+This report verifies **out-of-the-box** export with *inline formatting* and `inline_code()`.
+
+> Key finding: built-in export requires no external CLI tools.
+
+- Endpoint 1: Passed
+- Endpoint 2: Passed
+
+```python
+def summarize(n):
+    return n * 2
+```
+""";
+        string src_path = GLib.Path.build_filename (_test_tmp_root, "report.qmd");
+        string pdf_out = GLib.Path.build_filename (_test_tmp_root, "report.pdf");
+        string odt_out = GLib.Path.build_filename (_test_tmp_root, "report.odt");
+        string rtf_out = GLib.Path.build_filename (_test_tmp_root, "report.rtf");
+
+        try {
+            GLib.FileUtils.set_contents (src_path, report_md);
+
+            // Force built-in engines directly & via ExportService
+            ExportService.export_to_pdf (src_path, pdf_out, report_md);
+            assert (GLib.FileUtils.test (pdf_out, GLib.FileTest.EXISTS));
+            uint8[] pdf_bytes;
+            GLib.FileUtils.get_data (pdf_out, out pdf_bytes);
+            assert (pdf_bytes.length > 200);
+            assert (pdf_bytes[0] == '%' && pdf_bytes[1] == 'P' && pdf_bytes[2] == 'D' && pdf_bytes[3] == 'F');
+
+            ExportService.export_to_odt (src_path, odt_out, report_md);
+            assert (GLib.FileUtils.test (odt_out, GLib.FileTest.EXISTS));
+            uint8[] odt_bytes;
+            GLib.FileUtils.get_data (odt_out, out odt_bytes);
+            assert (odt_bytes.length > 200);
+            assert (odt_bytes[0] == 'P' && odt_bytes[1] == 'K');
+
+            ExportService.export_to_rtf (src_path, rtf_out, report_md);
+            assert (GLib.FileUtils.test (rtf_out, GLib.FileTest.EXISTS));
+            string rtf_text;
+            GLib.FileUtils.get_contents (rtf_out, out rtf_text);
+            assert (rtf_text.has_prefix ("{\\rtf1"));
+            assert (rtf_text.contains ("Clinical Trial Interim Report"));
+            assert (rtf_text.contains ("\\bullet"));
+        } catch (GLib.Error e) {
+            error ("Built-in export failed: %s", e.message);
+        }
+    }
+
     public static int main (string[] args) {
         setup_isolated_xdg ();
         Test.init (ref args);
@@ -213,6 +269,7 @@ l.3 \usepackage{nonexistent}
         Test.add_func ("/security/mallorn_rejects_symlinks", test_mallorn_rejects_symlinks);
         Test.add_func ("/security/platform_venv_and_package_validation", test_platform_venv_and_package_validation);
         Test.add_func ("/export/error_propagation", test_export_service_error_propagation);
+        Test.add_func ("/export/builtin_pdf_odt_rtf", test_builtin_pdf_odt_rtf_export);
 
         int rc = Test.run ();
         if (_test_tmp_root != "") {

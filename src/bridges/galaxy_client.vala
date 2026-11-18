@@ -60,7 +60,6 @@ namespace Imladris {
      */
     public class GalaxyClient : GLib.Object {
         private static GalaxyClient? instance = null;
-        private static Secret.Schema? secret_schema = null;
 
         private Soup.Session session;
         private string _server_url = "https://usegalaxy.eu";

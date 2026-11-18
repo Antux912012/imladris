@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Imladris v0.30.0 — Native Scientific Workbench</title>
+  <title>Imladris v0.31.0 — Native Scientific Workbench</title>
   <meta name="description" content="The Last Homely House East of the Sea for reproducible science. Native GTK4 &amp; Vala workbench for Quarto, R, Python, Jupyter, and LaTeX.">
   <meta name="author" content="Antonio De Gaetano">
   <link rel="canonical" href="https://antux912012.github.io/imladris/">
 
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://antux912012.github.io/imladris/">
-  <meta property="og:title" content="Imladris v0.30.0 — Native Scientific Workbench">
+  <meta property="og:title" content="Imladris v0.31.0 — Native Scientific Workbench">
   <meta property="og:description" content="Zero Electron overhead. Compiled Vala, C &amp; GTK4 core for Quarto, R, Python, Jupyter, and LaTeX.">
   <meta property="og:image" content="https://antux912012.github.io/imladris/assets/screenshots/imladris-screenshot.png">
 
@@ -608,7 +608,7 @@
       <a class="brand" href="#">
         <img src="assets/logo.svg" alt="Imladris">
         <span>Imladris</span>
-        <span class="ver">v0.30.0</span>
+        <span class="ver">v0.31.0</span>
       </a>
 
       <nav class="nav-links">
@@ -629,7 +629,7 @@
             <path d="M7.024 1.503a.75.75 0 0 1 .746.976A5.25 5.25 0 0 0 13.52 9.23a.75.75 0 0 1 .977.746A6.75 6.75 0 1 1 7.024 1.503z"/>
           </svg>
         </button>
-        <a class="btn primary" href="https://github.com/Antux912012/imladris/releases/tag/v0.30.0">Download</a>
+        <a class="btn primary" href="https://github.com/Antux912012/imladris/releases/tag/v0.31.0">Download</a>
       </div>
     </div>
   </header>
@@ -657,7 +657,7 @@
           </p>
 
           <div class="hero-cta">
-            <a class="btn primary" href="#install">Install v0.30.0</a>
+            <a class="btn primary" href="#install">Install v0.31.0</a>
             <a class="btn" href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">FlatPark</a>
             <a class="btn" href="https://github.com/Antux912012/imladris">Source on GitHub</a>
           </div>
@@ -726,7 +726,7 @@
           <div>
             <h2>Real Scientific Workflows</h2>
           </div>
-          <p>Practical Quarto, R, Python, and genomics snippets executed natively via Imladris’s Vala/C core and isolated runtimes. v0.30.0 also adds editor profiles for plain text, CSV, TSV, RStudio projects, and bibliography files.</p>
+          <p>Practical Quarto, R, Python, and genomics snippets executed natively via Imladris’s Vala/C core and isolated runtimes. v0.31.0 also adds editor profiles for plain text, CSV, TSV, RStudio projects, and bibliography files.</p>
         </div>
 
         <div class="install-shell">
@@ -841,7 +841,7 @@ As shown in @fig-km-cohort and @smith2024, median survival improved under treatm
       <div class="wrap">
         <div class="sec-head">
           <div>
-            <h2>Install v0.30.0</h2>
+            <h2>Install v0.31.0</h2>
           </div>
           <p>Includes <code>imladris-toolchain</code> meta-packages and the Flatpak Toolchain add-on. Choose the scientific runtimes and install folder that fit your workflow.</p>
         </div>
@@ -867,9 +867,9 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
 
   <footer>
     <div class="wrap footer-inner">
-      <span>Imladris v0.30.0 · GPL-3.0-or-later · Antonio De Gaetano</span>
+      <span>Imladris v0.31.0 · GPL-3.0-or-later · Antonio De Gaetano</span>
       <div class="footer-links">
-        <a href="https://github.com/Antux912012/imladris/releases/tag/v0.30.0">Releases</a>
+        <a href="https://github.com/Antux912012/imladris/releases/tag/v0.31.0">Releases</a>
         <a href="https://github.com/Antux912012/imladris/wiki">Wiki</a>
         <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">FlatPark</a>
         <a href="https://github.com/Antux912012/imladris">GitHub</a>
@@ -937,19 +937,19 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
           note: "Installs the current stable Imladris release from FlatPark."
         },
         debian: {
-          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.30.0/imladris_0.30.0_amd64.deb\nwget https://github.com/Antux912012/imladris/releases/download/v0.30.0/imladris-toolchain_0.30.0_all.deb\nsudo apt install ./imladris_0.30.0_amd64.deb ./imladris-toolchain_0.30.0_all.deb",
+          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.31.0/imladris_0.31.0_amd64.deb\nwget https://github.com/Antux912012/imladris/releases/download/v0.31.0/imladris-toolchain_0.31.0_all.deb\nsudo apt install ./imladris_0.31.0_amd64.deb ./imladris-toolchain_0.31.0_all.deb",
           note: "imladris-toolchain installs R, Python, pip/venv, Pandoc, and verifies PATH runtimes during dpkg configure."
         },
         fedora: {
-          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.30.0/imladris-0.30.0-1.fc44.x86_64.rpm\nwget https://github.com/Antux912012/imladris/releases/download/v0.30.0/imladris-toolchain-0.30.0-1.fc44.noarch.rpm\nsudo dnf install ./imladris-0.30.0-1.fc44.x86_64.rpm ./imladris-toolchain-0.30.0-1.fc44.noarch.rpm",
+          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.31.0/imladris-0.31.0-1.fc44.x86_64.rpm\nwget https://github.com/Antux912012/imladris/releases/download/v0.31.0/imladris-toolchain-0.31.0-1.fc44.noarch.rpm\nsudo dnf install ./imladris-0.31.0-1.fc44.x86_64.rpm ./imladris-toolchain-0.31.0-1.fc44.noarch.rpm",
           note: "imladris-toolchain pulls R-core, python3, pandoc, and verifies optional Quarto/LaTeX on install."
         },
         arch: {
-          cmd: "sudo pacman -S --needed gtk4 libadwaita gtksourceview5 webkitgtk-6.0 libsecret libsoup3 json-glib libgee r python python-pip pandoc\ncurl -LO https://github.com/Antux912012/imladris/releases/download/v0.30.0/PKGBUILD && makepkg -si",
-          note: "Builds natively from the v0.30.0 PKGBUILD with pure Vala/C NativeCore."
+          cmd: "sudo pacman -S --needed gtk4 libadwaita gtksourceview5 webkitgtk-6.0 libsecret libsoup3 json-glib libgee r python python-pip pandoc\ncurl -LO https://github.com/Antux912012/imladris/releases/download/v0.31.0/PKGBUILD && makepkg -si",
+          note: "Builds natively from the v0.31.0 PKGBUILD with pure Vala/C NativeCore."
         },
         nix: {
-          cmd: "nix profile install github:Antux912012/imladris/v0.30.0",
+          cmd: "nix profile install github:Antux912012/imladris/v0.31.0",
           note: "Reproducible Nix Flake package and devShell with GTK4, Libadwaita, and Vala."
         }
       };

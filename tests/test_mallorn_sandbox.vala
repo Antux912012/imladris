@@ -460,6 +460,74 @@ x <- 42
         } catch (GLib.Error e) {
             assert_not_reached ();
         }
+
+        // Test C statvfs free space probe
+        int64 free_bytes = tm.get_available_disk_space_for (dummy_env);
+        assert (free_bytes > 0);
+
+        // Test C fts directory usage with hardlink deduplication
+        string link_src = Path.build_filename (dummy_env, "file_a.bin");
+        string link_dst = Path.build_filename (dummy_env, "file_b.bin");
+        try {
+            FileUtils.set_contents (link_src, "0123456789");
+            GLib.Process.spawn_command_line_sync (@"ln \"$link_src\" \"$link_dst\"");
+            int64 usage = tm.get_toolchain_disk_usage_for (dummy_env);
+            // rprofile + 10 bytes (hardlinked file counted once)
+            assert (usage > 0 && usage < 2048);
+        } catch (GLib.Error e) {
+            assert_not_reached ();
+        }
+
+        // Test package list generation for all components and custom older Python version
+        var py_pkgs = new GLib.GenericArray<string> ();
+        Core.ToolchainManager.append_packages_for_component (py_pkgs, Core.ToolchainComponent.PYTHON, "3.10", "4.4", false);
+        assert (py_pkgs[0] == "python=3.10");
+
+        var py_upd = new GLib.GenericArray<string> ();
+        Core.ToolchainManager.append_packages_for_component (py_upd, Core.ToolchainComponent.PYTHON, "3.10", "4.4", true);
+        assert (py_upd[0] == "python");
+
+        var html_pkgs = new GLib.GenericArray<string> ();
+        Core.ToolchainManager.append_packages_for_component (html_pkgs, Core.ToolchainComponent.HTML_CSS);
+        assert (html_pkgs.length == 3);
+
+        // Test C conda-meta version detection & Python env switching
+        string orig_base = tm.base_dir;
+        string tc_root = Path.build_filename (Environment.get_tmp_dir (), @"test_tc_root_$(GLib.Random.next_int ())");
+        try {
+            tm.set_base_dir (tc_root);
+            string py310_env = Path.build_filename (tm.mamba_root, "envs", "py-3.10");
+            string py310_bin = Path.build_filename (py310_env, "bin");
+            string py310_meta = Path.build_filename (py310_env, "conda-meta");
+            DirUtils.create_with_parents (py310_bin, 0755);
+            DirUtils.create_with_parents (py310_meta, 0755);
+
+            string py_exe = Path.build_filename (py310_bin, "python3");
+            FileUtils.set_contents (py_exe, "#!/bin/sh\nexit 0\n");
+            FileUtils.chmod (py_exe, 0755);
+
+            string meta_json = Path.build_filename (py310_meta, "python-3.10.14-h123_0.json");
+            FileUtils.set_contents (meta_json, "{\"name\": \"python\", \"version\": \"3.10.14\"}");
+
+            var envs = tm.list_installed_python_envs ();
+            assert (envs.size == 1);
+            assert (envs[0].name == "py-3.10");
+            assert (envs[0].version == "3.10.14");
+
+            assert (tm.set_active_python_env (py310_env));
+            assert (tm.get_component_version (Core.ToolchainComponent.PYTHON) == "3.10.14");
+
+            string? resolved = null;
+            string? env_prefix = null;
+            var src = Core.PlatformUtils.resolve_runtime ("python3", null, out resolved, out env_prefix);
+            assert (src == Core.RuntimeSource.MANAGED_GLOBAL);
+            assert (resolved == py_exe);
+            assert (env_prefix == py310_env);
+        } catch (GLib.Error e) {
+            assert_not_reached ();
+        } finally {
+            try { tm.set_base_dir (orig_base); } catch (GLib.Error e) {}
+        }
     }
 
     private static void test_runtime_resolution_tiers () {

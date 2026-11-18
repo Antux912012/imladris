@@ -2560,8 +2560,8 @@ namespace Imladris {
             }
         }
 
-        public void show_toolchain_setup_dialog (bool start_installation = false) {
-            var dlg = new UI.ToolchainSetupDialog ();
+        public void show_toolchain_setup_dialog (bool start_installation = false, bool is_first_run = false) {
+            var dlg = new UI.ToolchainSetupDialog (is_first_run);
             dlg.installation_completed.connect (() => {
                 var doc = get_active_document ();
                 if (doc != null) {

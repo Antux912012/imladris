@@ -75,6 +75,16 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.31.0" date="2026-11-18">
+      <description>
+        <p>Release v0.31.0 introduces interactive Micromamba toolchain setup on startup, multi-version Python switching, and out-of-the-box PDF/ODT/RTF export:</p>
+        <ul>
+          <li>Interactive Micromamba Setup &amp; Updates: Select only Python, R, LaTeX, HTML/CSS, TypeScript, and Quarto on first launch, update installed components, or install/switch to older Python versions (3.12, 3.11, 3.10, 3.9).</li>
+          <li>Native C Linux Toolchain Backend: Fast uname(2), statvfs(2), fts(3) hardlink-deduplicated disk usage, and conda-meta version detection.</li>
+          <li>Built-in PDF, ODT, and RTF Export: Added a native Cairo/Pango A4 PDF report renderer and zero-dependency zlib OASIS ZIP packager so PDF, ODT, and RTF exports succeed out of the box without external CLI tools.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.30.0" date="2026-11-18">
       <description>
         <p>Release v0.30.0 expands format-aware editing, Elrond AI model control, local inference, and optional toolchain setup:</p>

@@ -105,6 +105,15 @@ namespace Imladris.Core {
 
             // Tier 2: Managed Global Toolchain
             var tm = ToolchainManager.get_default ();
+            if (tm.active_python_env != tm.default_env && is_python_ecosystem_binary (binary_name)) {
+                string active_py_bin = GLib.Path.build_filename (tm.active_python_env, "bin", binary_name);
+                if (GLib.FileUtils.test (active_py_bin, GLib.FileTest.IS_EXECUTABLE)) {
+                    resolved_path = active_py_bin;
+                    env_prefix = tm.active_python_env;
+                    return RuntimeSource.MANAGED_GLOBAL;
+                }
+            }
+
             string managed_bin = GLib.Path.build_filename (tm.default_env, "bin", binary_name);
             if (GLib.FileUtils.test (managed_bin, GLib.FileTest.IS_EXECUTABLE)) {
                 resolved_path = managed_bin;
@@ -159,6 +168,22 @@ namespace Imladris.Core {
 
             // Tier 4: Missing
             return RuntimeSource.MISSING;
+        }
+
+        private static bool is_python_ecosystem_binary (string binary_name) {
+            switch (binary_name) {
+                case "python":
+                case "python3":
+                case "pip":
+                case "pip3":
+                case "uv":
+                case "ipython":
+                case "jupyter":
+                case "pytest":
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         public static void clear_runtime_caches () {

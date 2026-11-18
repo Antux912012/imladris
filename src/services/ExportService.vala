@@ -3,6 +3,24 @@
 
 namespace Imladris.Services {
 
+    [CCode (cname = "imladris_export_write_oasis_zip", cheader_filename = "export_native.h")]
+    internal extern bool imladris_export_write_oasis_zip (
+        string output_path,
+        string mimetype,
+        string content_xml,
+        string styles_xml,
+        string manifest_xml
+    ) throws GLib.Error;
+
+    [CCode (cname = "imladris_export_render_pdf", cheader_filename = "export_native.h")]
+    internal extern bool imladris_export_render_pdf (
+        string output_path,
+        string? title,
+        string? author,
+        string? date,
+        string markdown_body
+    ) throws GLib.Error;
+
     public class ExportService : GLib.Object {
 
         private static bool run_tool_process (string tool_name, string[] sub_args, string working_dir) {
@@ -71,7 +89,7 @@ namespace Imladris.Services {
                 return input_path;
             }
             if (raw_buffer_fallback == null) {
-                return input_path;
+                throw new GLib.FileError.NOENT (@"Source document does not exist: $input_path");
             }
             string base_name = GLib.Path.get_basename (input_path);
             int dot_idx = base_name.last_index_of_char ('.');
@@ -422,9 +440,8 @@ namespace Imladris.Services {
             }
 
             if (!cli_succeeded || !GLib.FileUtils.test (output_path, GLib.FileTest.EXISTS)) {
-                throw new GLib.IOError.FAILED (
-                    "PDF export requires Quarto (with TinyTeX or Typst), Pandoc (with typst/weasyprint/pdflatex), or LibreOffice. Run Data Science Toolchain Manager or install pandoc/typst."
-                );
+                string source_text = read_source_or_fallback (input_path, raw_buffer_fallback);
+                build_native_pdf_document (source_text, output_path);
             }
         }
 
@@ -493,7 +510,9 @@ namespace Imladris.Services {
             string ext_label = format_target.up ();
             string src_path = input_path;
 
-            string raw_text = raw_buffer != null ? raw_buffer : read_source_or_fallback (input_path, null);
+            string? raw_text = raw_buffer != null
+                ? raw_buffer
+                : (GLib.FileUtils.test (input_path, GLib.FileTest.EXISTS) ? read_source_or_fallback (input_path, null) : null);
             bool ok = false;
             string err_msg = "";
             last_error_message = "";
@@ -557,6 +576,18 @@ namespace Imladris.Services {
             return fallback ?? "";
         }
 
+        private static void build_native_pdf_document (string markdown_source, string output_path) throws GLib.Error {
+            Core.FrontmatterData? meta;
+            string body;
+            Core.FrontmatterParser.split_frontmatter (markdown_source, out meta, out body);
+
+            string? title = (meta != null && meta.title != null && meta.title.strip () != "") ? meta.title.strip () : null;
+            string? author = (meta != null && meta.author != null && meta.author.strip () != "") ? meta.author.strip () : null;
+            string? date = (meta != null && meta.date != null && meta.date.strip () != "") ? meta.date.strip () : null;
+
+            imladris_export_render_pdf (output_path, title, author, date, body);
+        }
+
         /**
          * Standards-compliant OASIS OpenDocument Text (.odt) ZIP container generator.
          */
@@ -572,9 +603,27 @@ namespace Imladris.Services {
                     GLib.Markup.escape_text (meta.title.strip ())
                 );
             }
+            if (meta != null && meta.author != null && meta.author.strip () != "") {
+                body_xml.append_printf (
+                    "<text:p text:style-name=\"Quotations\">%s</text:p>\n",
+                    GLib.Markup.escape_text (meta.author.strip ())
+                );
+            }
 
+            bool in_code = false;
             foreach (string raw_line in body.split ("\n")) {
                 string line = raw_line.strip ();
+                if (line.has_prefix ("```")) {
+                    in_code = !in_code;
+                    continue;
+                }
+                if (in_code) {
+                    body_xml.append_printf (
+                        "<text:p text:style-name=\"Preformatted_20_Text\">%s</text:p>\n",
+                        GLib.Markup.escape_text (raw_line)
+                    );
+                    continue;
+                }
                 if (line == "") continue;
                 if (line.has_prefix ("### ")) {
                     body_xml.append_printf (
@@ -589,6 +638,16 @@ namespace Imladris.Services {
                 } else if (line.has_prefix ("# ")) {
                     body_xml.append_printf (
                         "<text:h text:style-name=\"Heading_20_1\" text:outline-level=\"1\">%s</text:h>\n",
+                        GLib.Markup.escape_text (line.substring (2))
+                    );
+                } else if (line.has_prefix ("> ")) {
+                    body_xml.append_printf (
+                        "<text:p text:style-name=\"Quotations\">%s</text:p>\n",
+                        GLib.Markup.escape_text (line.substring (2))
+                    );
+                } else if (line.has_prefix ("- ") || line.has_prefix ("* ")) {
+                    body_xml.append_printf (
+                        "<text:p text:style-name=\"Standard\">• %s</text:p>\n",
                         GLib.Markup.escape_text (line.substring (2))
                     );
                 } else {
@@ -742,8 +801,34 @@ namespace Imladris.Services {
             string styles_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
   xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
   office:version="1.2">
-  <office:styles/>
+  <office:styles>
+    <style:style style:name="Standard" style:family="paragraph" style:class="text">
+      <style:paragraph-properties fo:margin-top="0cm" fo:margin-bottom="0.212cm" fo:line-height="115%%"/>
+      <style:text-properties fo:font-size="11pt" style:font-name="Liberation Sans"/>
+    </style:style>
+    <style:style style:name="Heading_20_1" style:display-name="Heading 1" style:family="paragraph" style:parent-style-name="Standard">
+      <style:paragraph-properties fo:margin-top="0.423cm" fo:margin-bottom="0.212cm" fo:keep-with-next="always"/>
+      <style:text-properties fo:font-size="18pt" fo:font-weight="bold"/>
+    </style:style>
+    <style:style style:name="Heading_20_2" style:display-name="Heading 2" style:family="paragraph" style:parent-style-name="Standard">
+      <style:paragraph-properties fo:margin-top="0.353cm" fo:margin-bottom="0.176cm" fo:keep-with-next="always"/>
+      <style:text-properties fo:font-size="15pt" fo:font-weight="bold"/>
+    </style:style>
+    <style:style style:name="Heading_20_3" style:display-name="Heading 3" style:family="paragraph" style:parent-style-name="Standard">
+      <style:paragraph-properties fo:margin-top="0.282cm" fo:margin-bottom="0.141cm" fo:keep-with-next="always"/>
+      <style:text-properties fo:font-size="13pt" fo:font-weight="bold"/>
+    </style:style>
+    <style:style style:name="Preformatted_20_Text" style:display-name="Preformatted Text" style:family="paragraph" style:parent-style-name="Standard">
+      <style:paragraph-properties fo:margin-left="0.3cm" fo:margin-right="0.3cm" fo:background-color="#f8fafc" fo:padding="0.15cm"/>
+      <style:text-properties fo:font-size="9.5pt" style:font-name="Liberation Mono"/>
+    </style:style>
+    <style:style style:name="Quotations" style:family="paragraph" style:parent-style-name="Standard">
+      <style:paragraph-properties fo:margin-left="0.8cm" fo:margin-right="0.5cm"/>
+      <style:text-properties fo:font-style="italic" fo:color="#475569"/>
+    </style:style>
+  </office:styles>
   <office:master-styles>
     <style:master-page style:name="Default"/>
   </office:master-styles>
@@ -758,43 +843,7 @@ namespace Imladris.Services {
 </manifest:manifest>
 """.printf (mimetype);
 
-            string py_packer = """import json, sys, zipfile
-payload = json.load(sys.stdin)
-with zipfile.ZipFile(payload['out_path'], 'w') as zf:
-    zf.writestr('mimetype', payload['mime'], compress_type=zipfile.ZIP_STORED)
-    zf.writestr('content.xml', payload['content_xml'], compress_type=zipfile.ZIP_DEFLATED)
-    zf.writestr('styles.xml', payload['styles_xml'], compress_type=zipfile.ZIP_DEFLATED)
-    zf.writestr('META-INF/manifest.xml', payload['manifest_xml'], compress_type=zipfile.ZIP_DEFLATED)
-""";
-
-            var jb = new Json.Builder ();
-            jb.begin_object ();
-            jb.set_member_name ("out_path"); jb.add_string_value (output_path);
-            jb.set_member_name ("mime"); jb.add_string_value (mimetype);
-            jb.set_member_name ("content_xml"); jb.add_string_value (content_xml);
-            jb.set_member_name ("styles_xml"); jb.add_string_value (styles_xml);
-            jb.set_member_name ("manifest_xml"); jb.add_string_value (manifest_xml);
-            jb.end_object ();
-            var gen = new Json.Generator ();
-            gen.set_root (jb.get_root ());
-            string stdin_json = gen.to_data (null);
-
-            string? py_bin = null;
-            string? py_env = null;
-            var py_src = Core.PlatformUtils.resolve_runtime ("python3", null, out py_bin, out py_env);
-            var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDIN_PIPE | GLib.SubprocessFlags.STDOUT_SILENCE | GLib.SubprocessFlags.STDERR_SILENCE);
-            string[] argv;
-            if (py_src == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
-                argv = Core.PlatformUtils.build_host_command ({ "python3", "-c", py_packer }, null);
-            } else {
-                Core.PlatformUtils.configure_managed_env (launcher, py_env);
-                argv = { py_bin ?? "python3", "-c", py_packer };
-            }
-            var proc = launcher.spawnv (argv);
-            proc.communicate_utf8 (stdin_json, null, null, null);
-            if (!proc.get_successful ()) {
-                throw new IOError.FAILED ("Failed to package OASIS ZIP archive");
-            }
+            imladris_export_write_oasis_zip (output_path, mimetype, content_xml, styles_xml, manifest_xml);
         }
 
         /**
@@ -831,12 +880,18 @@ with zipfile.ZipFile(payload['out_path'], 'w') as zf:
                 if (trimmed == "") {
                     continue;
                 }
-                if (trimmed.has_prefix ("### ")) {
+                if (trimmed.has_prefix ("#### ")) {
+                    rtf.append_printf ("\\pard\\sa100\\b\\fs24 %s\\b0\\fs22\\par\n", escape_rtf_text (trimmed.substring (5)));
+                } else if (trimmed.has_prefix ("### ")) {
                     rtf.append_printf ("\\pard\\sa120\\b\\fs26 %s\\b0\\fs22\\par\n", escape_rtf_text (trimmed.substring (4)));
                 } else if (trimmed.has_prefix ("## ")) {
                     rtf.append_printf ("\\pard\\sa140\\b\\fs30 %s\\b0\\fs22\\par\n", escape_rtf_text (trimmed.substring (3)));
                 } else if (trimmed.has_prefix ("# ")) {
                     rtf.append_printf ("\\pard\\sa180\\b\\fs34 %s\\b0\\fs22\\par\n", escape_rtf_text (trimmed.substring (2)));
+                } else if (trimmed.has_prefix ("> ")) {
+                    rtf.append_printf ("\\pard\\li360\\sa120\\i %s\\i0\\par\n", escape_rtf_text (trimmed.substring (2)));
+                } else if (trimmed.has_prefix ("- ") || trimmed.has_prefix ("* ")) {
+                    rtf.append_printf ("\\pard\\li360\\sa80 \\bullet  %s\\par\n", escape_rtf_text (trimmed.substring (2)));
                 } else {
                     rtf.append_printf ("\\pard\\sa120 %s\\par\n", escape_rtf_text (raw_line));
                 }
