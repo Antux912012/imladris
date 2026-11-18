@@ -28,6 +28,7 @@ tar --exclude='./.git' \
     --exclude='./*-flatpak-*.tar.gz' \
     --exclude='./rpmbuild' \
     --exclude='./deb-root' \
+    --exclude='./deb-toolchain-root' \
     --exclude='*.deb' \
     --exclude='*.rpm' \
     --exclude='*.flatpak' \

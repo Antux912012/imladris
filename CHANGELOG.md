@@ -2,6 +2,18 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.32.0] - 2026-11-18
+
+### Added
+- **Top 10 LaTeX Publisher Templates & Top 10 Citation Styles**: Added `LatexTemplates` and `LatexTemplateDialog` supporting IEEE, ACM (`acmart`), Springer LNCS (`llncs`), Elsevier (`elsarticle`), Nature, PLOS ONE, APS (`revtex4-2`), NeurIPS, ICML, and MDPI templates paired with IEEE, APA 7th, Nature, Science, ACM, `splncs04`, `elsarticle-num`, Vancouver, Chicago (BibLaTeX), and APS citation styles.
+- **GNOME Tour–Style First-Launch Onboarding**: Added `OnboardingTourDialog` with an `Adw.Carousel` feature walkthrough shown automatically on first launch (`onboarding_tour_completed`) and accessible anytime via **Feature Tour...**.
+- **Open-Source Presentation & Beamer Templates**: Expanded `PresentationTemplateDialog` with LaTeX Beamer (Metropolis, Defense, Lightning Talk), Markdown (Marp, Academic Lecture, RevealJS, Quarto Beamer), TypeScript (Reveal.js & Slidev programmatic decks), and Typst templates.
+
+### Fixed
+- **FFI & Null-Safety Hardening**: Fixed `GenericArray<string>.data` non-null-terminated `strv` calls in `PackagesRibbonBar`/`Window`, null optional regex capture `SIGSEGV` in `NativeCore.extract_outline_json`, null JSON `"content"` handling in `ElrondEngineController`, and NULL guards in `export_native.c`.
+- **Security & Subprocess Hardening**: Escaped backslashes in `ExportService` `Rscript -e` expressions, fixed `MallornManager` `tar -tvf` member parsing for filenames with spaces, blocked path-qualified binaries in `McpServer.execute_code`, preserved symlinks safely in `SandboxController.copy_directory_tree`, and moved `ToolchainManager` micromamba downloads into private `0700` `mkdtemp` directories with `finally` cleanup.
+- **UI & Test Isolation**: Fixed unescaped Pango `&` markup warnings (`use_markup = false`), dialog parent/close handling in `AiSettingsDialog` and `PreferencesDialog`, `XDG_CACHE_HOME` respect in `PlatformUtils.get_shared_cache_dir`, and standalone test XDG isolation.
+
 ## [0.31.1] - 2026-11-18
 
 ### Fixed

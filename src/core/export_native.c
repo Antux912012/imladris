@@ -137,6 +137,13 @@ imladris_export_write_oasis_zip (const char  *output_path,
                                  const char  *manifest_xml,
                                  GError     **error)
 {
+    if (output_path == NULL || mimetype == NULL || content_xml == NULL ||
+        styles_xml == NULL || manifest_xml == NULL) {
+        g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
+                     "Invalid NULL argument passed to ODT ZIP writer");
+        return FALSE;
+    }
+
     FILE *fp = fopen (output_path, "wb");
     if (fp == NULL) {
         g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,

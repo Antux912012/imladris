@@ -411,7 +411,7 @@ def ignore_patterns(folder, contents):
         elif name.endswith('.pyc'):
             ignored.add(name)
     return ignored
-shutil.copytree(src, dst, dirs_exist_ok=True, ignore=ignore_patterns)
+shutil.copytree(src, dst, symlinks=True, dirs_exist_ok=True, ignore=ignore_patterns)
 """;
             string[] argv = { "python3", "-c", py_script, src, dst };
             var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);

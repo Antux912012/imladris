@@ -564,7 +564,7 @@ namespace Imladris.UI {
             if (count == 0) return;
 
             py_search_entry.text = "";
-            dispatch_python_install (args.data, project_root, is_sandboxed, raw);
+            dispatch_python_install (to_null_terminated_strv (args), project_root, is_sandboxed, raw);
         }
 
         private void install_from_github (bool is_r, string repo_spec) {
@@ -595,7 +595,7 @@ namespace Imladris.UI {
 
                 var args = build_base_pip_argv ();
                 args.add (git_url);
-                dispatch_python_install (args.data, project_root, is_sandboxed, repo_spec);
+                dispatch_python_install (to_null_terminated_strv (args), project_root, is_sandboxed, repo_spec);
             }
         }
 
@@ -637,7 +637,7 @@ namespace Imladris.UI {
                 } else {
                     var args = build_base_pip_argv ();
                     args.add (local_path);
-                    dispatch_python_install (args.data, project_root, is_sandboxed, Path.get_basename (local_path));
+                    dispatch_python_install (to_null_terminated_strv (args), project_root, is_sandboxed, Path.get_basename (local_path));
                 }
             } catch (Error e) {
                 // User cancelled dialog
@@ -676,6 +676,14 @@ namespace Imladris.UI {
                 argv.add ("--no-deps");
             }
             return argv;
+        }
+
+        private static string[] to_null_terminated_strv (GenericArray<string> arr) {
+            string[] out_arr = new string[arr.length];
+            for (int i = 0; i < arr.length; i++) {
+                out_arr[i] = arr[i];
+            }
+            return out_arr;
         }
     }
 }

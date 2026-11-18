@@ -443,7 +443,7 @@ namespace Imladris.Core {
          * Creates directories with secure 0700 permissions.
          */
         public static string get_shared_cache_dir (string subdir = "") {
-            string cache_dir = GLib.Path.build_filename (GLib.Environment.get_home_dir (), ".cache", "imladris");
+            string cache_dir = GLib.Path.build_filename (GLib.Environment.get_user_cache_dir (), "imladris");
             if (subdir != "") {
                 cache_dir = GLib.Path.build_filename (cache_dir, subdir);
             }

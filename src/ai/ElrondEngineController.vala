@@ -857,9 +857,9 @@ You specialize in R (tidyverse, ggplot2, biostatistics), Python (pandas, numpy, 
             if (!first_choice.has_member ("message")) return "";
 
             var message_obj = first_choice.get_object_member ("message");
-            if (!message_obj.has_member ("content")) return "";
+            if (!message_obj.has_member ("content") || message_obj.get_null_member ("content")) return "";
 
-            return message_obj.get_string_member ("content");
+            return message_obj.get_string_member ("content") ?? "";
         }
 
         private static string clean_completion_output (string raw) {

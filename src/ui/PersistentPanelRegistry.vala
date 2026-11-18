@@ -178,7 +178,8 @@ namespace Imladris.UI {
             if (items.size == 0) {
                 var empty_row = new Adw.ActionRow () {
                     title = "No citations found",
-                    subtitle = @"No matches for '$q' in Zotero or references.bib"
+                    subtitle = @"No matches for '$q' in Zotero or references.bib",
+                    use_markup = false
                 };
                 empty_row.add_prefix (new Gtk.Image.from_icon_name ("system-search-symbolic"));
                 citations_list.append (empty_row);
@@ -188,7 +189,8 @@ namespace Imladris.UI {
             foreach (var item in items) {
                 var row = new Adw.ActionRow () {
                     title = @"@$(item.citekey)",
-                    subtitle = @"$(item.authors) ($(item.year)) — $(item.title)"
+                    subtitle = @"$(item.authors) ($(item.year)) — $(item.title)",
+                    use_markup = false
                 };
                 row.add_prefix (new Gtk.Image.from_icon_name ("accessories-dictionary-symbolic"));
 

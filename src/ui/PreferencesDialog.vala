@@ -886,7 +886,7 @@ namespace Imladris.UI {
                     confirm_alert.add_response ("delete", "Uninstall");
                     confirm_alert.set_response_appearance ("delete", Adw.ResponseAppearance.DESTRUCTIVE);
                     confirm_alert.set_default_response ("cancel");
-                    confirm_alert.choose.begin (this.root as Gtk.Window, null, (o, r) => {
+                    confirm_alert.choose.begin (this, null, (o, r) => {
                         if (confirm_alert.choose.end (r) == "delete") {
                             pm.delete_plugin (p.manifest.id);
                         }

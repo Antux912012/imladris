@@ -10,7 +10,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.31.1";
+        public const string APP_VERSION = "0.32.0";
         private bool first_launch_toolchain_checked = false;
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
@@ -21,6 +21,7 @@ namespace Imladris {
             { "new_rmd", on_new_rmd },
             { "new_ipynb", on_new_ipynb },
             { "new_tex", on_new_tex },
+            { "new_tex_template", on_new_tex_template },
             { "new_r", on_new_r },
             { "new_shiny", on_new_shiny },
             { "run_shiny_app", on_run_shiny_app },
@@ -52,6 +53,7 @@ namespace Imladris {
             { "interrupt_execution", on_interrupt_execution },
             { "command_palette", on_command_palette },
             { "preferences", on_preferences },
+            { "show_tour", on_show_tour },
             { "about", on_about },
             { "math_chem_editor", on_math_chem_editor },
             { "mermaid_studio", on_mermaid_studio },
@@ -213,9 +215,18 @@ namespace Imladris {
                 return;
             }
             first_launch_toolchain_checked = true;
+            if (!Core.SettingsManager.get_default ().onboarding_tour_completed) {
+                win.show_onboarding_tour_dialog (true);
+                return;
+            }
             if (!Core.ToolchainManager.get_default ().is_base_environment_installed ()) {
                 win.show_toolchain_setup_dialog (false, true);
             }
+        }
+
+        private void on_show_tour () {
+            var win = this.active_window as Window;
+            if (win != null) win.show_onboarding_tour_dialog (false);
         }
 
         private void on_new_project_modal () {
@@ -254,6 +265,11 @@ namespace Imladris {
         private void on_new_tex () {
             var win = this.active_window as Window;
             if (win != null) win.add_document_tab ("document.tex", "latex");
+        }
+
+        private void on_new_tex_template () {
+            var win = this.active_window as Window;
+            if (win != null) win.show_latex_template_dialog ();
         }
 
         private void on_new_r () {

@@ -81,7 +81,8 @@ namespace Imladris.Core {
                 GLib.MatchInfo chunk_match;
                 if (chunk_regex.match (line, 0, out chunk_match)) {
                     string language = chunk_match.fetch (1).down ();
-                    string label = chunk_match.fetch (2).strip ();
+                    string? raw_label = chunk_match.fetch (2);
+                    string label = raw_label != null ? raw_label.strip () : "";
                     if (label != "" && !label.contains ("=")) {
                         append_outline_item (builder, 2, @"$label ($language)", i + 1, "chunk");
                     }

@@ -1107,7 +1107,9 @@ namespace Imladris.UI {
                 dlg.closed.connect (() => {
                     poll_cancellable.cancel ();
                 });
-                dlg.present (this);
+                if (this.get_mapped ()) {
+                    dlg.present (this);
+                }
 
                 yield auth.poll_device_token_async (info, poll_cancellable);
                 string uname = auth.get_username ();

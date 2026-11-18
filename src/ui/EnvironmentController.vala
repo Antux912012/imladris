@@ -466,7 +466,8 @@ print("___IMLADRIS_ENV_END___")
         private void append_variable_row (EnvVariableItem item) {
             var expander_row = new Adw.ExpanderRow () {
                 title = item.name,
-                subtitle = @"$(item.var_type)$(item.dimensions != "" ? @" • $(item.dimensions)" : "")$(item.memory_size != "" ? @" • $(item.memory_size)" : "")"
+                subtitle = @"$(item.var_type)$(item.dimensions != "" ? @" • $(item.dimensions)" : "")$(item.memory_size != "" ? @" • $(item.memory_size)" : "")",
+                use_markup = false
             };
 
             string icon_name = item.is_dataframe ? "view-grid-symbolic" : (item.dimensions.contains ("×") ? "view-list-symbolic" : "view-list-bullet-symbolic");

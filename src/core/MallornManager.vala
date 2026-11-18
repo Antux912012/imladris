@@ -410,9 +410,27 @@ author = "%s"
                     if (ftype == 'l' || ftype == 'h' || ftype == 'b' || ftype == 'c' || ftype == 'p') {
                         throw new GLib.IOError.PERMISSION_DENIED (@"Rejected unsafe link/device archive entry: $line");
                     }
-                    // Last space-separated field in `tar -tvf` is the member path
-                    int last_sp = line.last_index_of_char (' ');
-                    string entry = (last_sp >= 0 && last_sp + 1 < line.length) ? line.substring (last_sp + 1) : line;
+                    // Parse `tar -tvf` line: 5 whitespace-separated fields (perms, owner, size, date, time) then member path
+                    string trimmed_line = line.strip ();
+                    int field_count = 0;
+                    int idx = 0;
+                    bool in_ws = false;
+                    while (idx < trimmed_line.length && field_count < 5) {
+                        bool ws = (trimmed_line[idx] == ' ' || trimmed_line[idx] == '\t');
+                        if (!ws && !in_ws) {
+                            in_ws = false;
+                        } else if (ws && !in_ws) {
+                            field_count++;
+                            in_ws = true;
+                        } else if (!ws && in_ws) {
+                            in_ws = false;
+                        }
+                        idx++;
+                    }
+                    while (idx < trimmed_line.length && (trimmed_line[idx] == ' ' || trimmed_line[idx] == '\t')) {
+                        idx++;
+                    }
+                    string entry = (field_count == 5 && idx < trimmed_line.length) ? trimmed_line.substring (idx) : trimmed_line;
                     string norm = entry.strip ().replace ("\\", "/");
                     if (norm.has_prefix ("/") || norm.has_prefix ("~")) {
                         throw new GLib.IOError.PERMISSION_DENIED (@"Rejected unsafe absolute archive path: $entry");

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project('imladris', 'vala', 'c',
-  version: '0.31.1',
+  version: '0.32.0',
   default_options: ['warning_level=1']
 )
 
@@ -108,6 +108,9 @@ sources = files(
   'src/ui/MathChemEditorDialog.vala',
   'src/ui/MermaidFlowStudioDialog.vala',
   'src/ui/PresentationTemplateDialog.vala',
+  'src/ui/LatexTemplateDialog.vala',
+  'src/ui/OnboardingTourDialog.vala',
+  'src/core/LatexTemplates.vala',
   'src/ui/CommandPaletteDialog.vala',
   'src/ui/PackagesRibbonBar.vala',
   'src/ui/InlineChunkOutputWidget.vala',
@@ -417,6 +420,7 @@ native_rendering_test_exe = executable('test_native_rendering',
   'src/core/toolchain_native.c',
     'src/services/SandboxController.vala',
     'src/core/ChunkParser.vala',
+    'src/core/LatexTemplates.vala',
     'src/adapters/DocumentAdapter.vala',
   ),
   dependencies: deps,

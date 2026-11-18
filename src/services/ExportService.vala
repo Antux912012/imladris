@@ -23,6 +23,10 @@ namespace Imladris.Services {
 
     public class ExportService : GLib.Object {
 
+        private static string escape_r_single_quoted (string s) {
+            return s.replace ("\\", "\\\\").replace ("'", "\\'");
+        }
+
         private static bool run_tool_process (string tool_name, string[] sub_args, string working_dir) {
             string unused_log;
             return run_tool_process_with_output (tool_name, sub_args, working_dir, out unused_log);
@@ -150,8 +154,8 @@ namespace Imladris.Services {
                 } else if (fmt == DocumentFormat.RMD &&
                            Core.PlatformUtils.is_program_available ("Rscript", src_dir)) {
                     string r_expr = "if (requireNamespace('rmarkdown', quietly=TRUE)) rmarkdown::render('%s', output_format = 'odt_document', output_file = '%s', quiet = TRUE) else stop('no rmarkdown')".printf (
-                        actual_input.replace ("'", "\\'"),
-                        output_path.replace ("'", "\\'")
+                        escape_r_single_quoted (actual_input),
+                        escape_r_single_quoted (output_path)
                     );
                     cli_succeeded = run_tool_process ("Rscript", { "-e", r_expr }, src_dir);
                 }
@@ -265,8 +269,8 @@ namespace Imladris.Services {
                 } else if (fmt == DocumentFormat.RMD &&
                            Core.PlatformUtils.is_program_available ("Rscript", src_dir)) {
                     string r_expr = "if (requireNamespace('rmarkdown', quietly=TRUE)) rmarkdown::render('%s', output_format = 'html_document', output_file = '%s', quiet = TRUE) else stop('no rmarkdown')".printf (
-                        actual_input.replace ("'", "\\'"),
-                        output_path.replace ("'", "\\'")
+                        escape_r_single_quoted (actual_input),
+                        escape_r_single_quoted (output_path)
                     );
                     cli_succeeded = run_tool_process ("Rscript", { "-e", r_expr }, src_dir);
                 }
@@ -286,7 +290,7 @@ namespace Imladris.Services {
             if (!cli_succeeded || !GLib.FileUtils.test (output_path, GLib.FileTest.EXISTS)) {
                 string source_text = read_source_or_fallback (input_path, raw_buffer_fallback);
                 string body_html = Adapters.DocumentAdapter.render_html (source_text, fmt);
-                string doc_title = GLib.Path.get_basename (input_path);
+                string doc_title = GLib.Markup.escape_text (GLib.Path.get_basename (input_path));
                 string html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -392,8 +396,8 @@ namespace Imladris.Services {
                 } else if (fmt == DocumentFormat.RMD &&
                            Core.PlatformUtils.is_program_available ("Rscript", src_dir)) {
                     string r_expr = "if (requireNamespace('rmarkdown', quietly=TRUE)) rmarkdown::render('%s', output_format = 'pdf_document', output_file = '%s', quiet = TRUE) else stop('no rmarkdown')".printf (
-                        actual_input.replace ("'", "\\'"),
-                        output_path.replace ("'", "\\'")
+                        escape_r_single_quoted (actual_input),
+                        escape_r_single_quoted (output_path)
                     );
                     cli_succeeded = run_tool_process ("Rscript", { "-e", r_expr }, src_dir);
                 }

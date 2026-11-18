@@ -257,6 +257,7 @@ namespace Imladris.UI {
             tidy_switch = new Adw.SwitchRow () {
                 title = "R Tidyverse & RMarkdown Bundle",
                 subtitle = "Pre-compiled tidyverse, data.table, rmarkdown, and knitr.",
+                use_markup = false,
                 active = true
             };
             r_expander.add_row (r_version_combo);
@@ -423,6 +424,7 @@ namespace Imladris.UI {
             }
 
             string? r_ver = tm.get_component_version (Core.ToolchainComponent.R);
+            r_expander.use_markup = false;
             if (r_ver != null) {
                 r_expander.subtitle = @"Installed: R $r_ver + IRkernel & build tools";
             } else {

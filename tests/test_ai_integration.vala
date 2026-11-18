@@ -9,6 +9,13 @@ using Imladris.Core;
 namespace Imladris.Tests {
 
     public static int main (string[] args) {
+        try {
+            string tmp_xdg = GLib.DirUtils.make_tmp ("imladris-ai-test-XXXXXX");
+            GLib.Environment.set_variable ("HOME", tmp_xdg, true);
+            GLib.Environment.set_variable ("XDG_CONFIG_HOME", GLib.Path.build_filename (tmp_xdg, "config"), true);
+            GLib.Environment.set_variable ("XDG_DATA_HOME", GLib.Path.build_filename (tmp_xdg, "data"), true);
+            GLib.Environment.set_variable ("XDG_CACHE_HOME", GLib.Path.build_filename (tmp_xdg, "cache"), true);
+        } catch (GLib.Error e) {}
         GLib.Environment.set_variable ("GSETTINGS_BACKEND", "memory", true);
         GLib.Test.init (ref args);
 

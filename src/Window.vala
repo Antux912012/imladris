@@ -145,6 +145,7 @@ namespace Imladris {
             new_submenu.append ("Jupyter Notebook (.ipynb)", "app.new_ipynb");
             new_submenu.append ("Simple Markdown (.md)", "app.new_md");
             new_submenu.append ("LaTeX Document (.tex)", "app.new_tex");
+            new_submenu.append ("LaTeX Publisher Template...", "app.new_tex_template");
             new_submenu.append ("TypeScript File (.ts)", "app.new_ts");
             new_submenu.append ("HTML5 + CSS + LaTeX (.html)", "app.new_html");
             new_submenu.append ("R Script (.R)", "app.new_r");
@@ -179,6 +180,7 @@ namespace Imladris {
 
             var app_sec = new GLib.Menu ();
             app_sec.append ("Preferences", "app.preferences");
+            app_sec.append ("Feature Tour...", "app.show_tour");
             app_sec.append ("About Imladris", "app.about");
             app_sec.append ("Quit", "app.quit");
             brand_menu.append_section (null, app_sec);
@@ -332,7 +334,7 @@ namespace Imladris {
 
             var row_deck = new Adw.ActionRow () {
                 title = "New Deck or Poster Template...",
-                subtitle = "RevealJS, Beamer, or Typst",
+                subtitle = "Beamer (LaTeX), Marp/RevealJS (Markdown), TypeScript, or Typst",
                 activatable = true
             };
             row_deck.add_prefix (new Gtk.Image.from_icon_name ("x-office-presentation-symbolic"));
@@ -340,12 +342,28 @@ namespace Imladris {
                 sci_popover.popdown ();
                 var dlg = new UI.PresentationTemplateDialog ();
                 dlg.template_selected.connect ((t_title, starter_content, suggested_fn) => {
-                    add_document_tab (suggested_fn, "markdown", starter_content);
+                    var fmt = DocumentFormat.from_filename (suggested_fn);
+                    string lang = fmt.to_syntax_lang ();
+                    if (lang == "") lang = "markdown";
+                    add_document_tab (suggested_fn, lang, starter_content);
                     show_toast (@"Created $t_title ($suggested_fn)");
                 });
                 dlg.present (this);
             });
             sci_list.append (row_deck);
+
+            var row_latex_tpl = new Adw.ActionRow () {
+                title = "New LaTeX Publisher Template...",
+                subtitle = "10 journal templates (IEEE, ACM, Nature...) & 10 citation styles",
+                use_markup = false,
+                activatable = true
+            };
+            row_latex_tpl.add_prefix (new Gtk.Image.from_icon_name ("x-office-document-symbolic"));
+            row_latex_tpl.activated.connect (() => {
+                sci_popover.popdown ();
+                show_latex_template_dialog ();
+            });
+            sci_list.append (row_latex_tpl);
 
             var yavanna_popover = new Imladris.Bridges.Yavanna.BioEntityPopover ();
             yavanna_popover.insert_snippet_requested.connect ((snippet) => {
@@ -1126,6 +1144,18 @@ namespace Imladris {
             });
             quick_group.add (tex_row);
 
+            var tex_tpl_row = new Adw.ActionRow () {
+                title = "LaTeX Publisher Templates (IEEE, ACM, Nature...)",
+                subtitle = "Choose from 10 scientific journal templates and 10 citation styles",
+                activatable = true
+            };
+            tex_tpl_row.add_prefix (new Gtk.Image.from_icon_name ("document-properties-symbolic"));
+            tex_tpl_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            tex_tpl_row.activated.connect (() => {
+                show_latex_template_dialog ();
+            });
+            quick_group.add (tex_tpl_row);
+
             var shiny_row = new Adw.ActionRow () {
                 title = "New R Script or Shiny App (.R)",
                 subtitle = "Run statistical models or build an interactive web dashboard",
@@ -1241,6 +1271,25 @@ namespace Imladris {
             clamp.set_child (box);
             status.set_child (clamp);
             return status;
+        }
+
+        public void show_onboarding_tour_dialog (bool check_toolchain_after = false) {
+            var dlg = new UI.OnboardingTourDialog ();
+            dlg.tour_finished.connect ((open_toolchain_setup) => {
+                if (open_toolchain_setup || (check_toolchain_after && !Core.ToolchainManager.get_default ().is_base_environment_installed ())) {
+                    show_toolchain_setup_dialog (false, true);
+                }
+            });
+            dlg.present (this);
+        }
+
+        public void show_latex_template_dialog () {
+            var dlg = new UI.LatexTemplateDialog ();
+            dlg.template_selected.connect ((t_title, starter_content, suggested_fn) => {
+                add_document_tab (suggested_fn, "latex", starter_content);
+                show_toast (@"Created $t_title ($suggested_fn)");
+            });
+            dlg.present (this);
         }
 
         public void show_new_project_modal () {

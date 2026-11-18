@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.31.1
+Version:        0.32.0
 Release:        1%{?dist}
 Summary:        Native scientific notebook studio for Quarto, R, Python, and Jupyter
 
@@ -22,6 +22,10 @@ BuildRequires:  pkgconfig(gtk4) >= 4.14
 BuildRequires:  pkgconfig(libadwaita-1) >= 1.5
 BuildRequires:  pkgconfig(gtksourceview-5) >= 5.10
 BuildRequires:  pkgconfig(webkitgtk-6.0)
+BuildRequires:  pkgconfig(javascriptcoregtk-6.0)
+BuildRequires:  pkgconfig(cairo)
+BuildRequires:  pkgconfig(pangocairo)
+BuildRequires:  pkgconfig(zlib)
 BuildRequires:  pkgconfig(libsecret-1) >= 0.20
 BuildRequires:  pkgconfig(libsoup-3.0)
 BuildRequires:  pkgconfig(json-glib-1.0)

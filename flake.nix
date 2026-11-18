@@ -20,7 +20,7 @@
         {
           default = pkgs.stdenv.mkDerivation {
             pname = "imladris";
-            version = "0.31.1";
+            version = "0.32.0";
 
             src = self;
 

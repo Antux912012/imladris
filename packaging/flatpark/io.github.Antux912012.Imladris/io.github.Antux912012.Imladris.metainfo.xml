@@ -75,6 +75,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.32.0" date="2026-11-18">
+      <description>
+        <p>Release v0.32.0 adds publisher LaTeX templates, academic citation styles, a first-launch feature tour, open-source presentation decks, and security/stability hardening:</p>
+        <ul>
+          <li>Top 10 LaTeX Publisher Templates &amp; Citation Styles: IEEE, ACM, Springer LNCS, Elsevier, Nature, PLOS, APS, NeurIPS, ICML, and MDPI paired with 10 citation styles.</li>
+          <li>First-Launch Feature Tour: GNOME Tour-style onboarding carousel shown on first startup and via Feature Tour in the app menu.</li>
+          <li>Open-Source Presentation &amp; Beamer Decks: Added LaTeX Beamer, Marp/Lecture Markdown, and TypeScript Reveal.js/Slidev templates.</li>
+          <li>Security, FFI &amp; UI Hardening: Fixed FFI strv termination, outline regex null-dereference, subprocess escaping, archive traversal parsing, and Pango markup warnings.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.31.1" date="2026-11-18">
       <description>
         <p>Release v0.31.1 fixes a crash when creating a new document:</p>

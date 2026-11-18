@@ -359,6 +359,7 @@ namespace Imladris.Core {
         private bool _show_ribbon_toolbar = true;
         private bool _show_status_bar = true;
         private int _default_zoom_percent = 100;
+        private bool _onboarding_tour_completed = false;
         private KeyFile config_keyfile = new KeyFile ();
         private string config_ini_path = "";
 
@@ -522,6 +523,16 @@ namespace Imladris.Core {
                     _default_zoom_percent = clamped;
                     save_ini ();
                     ui_settings_changed ();
+                }
+            }
+        }
+
+        public bool onboarding_tour_completed {
+            get { return _onboarding_tour_completed; }
+            set {
+                if (_onboarding_tour_completed != value) {
+                    _onboarding_tour_completed = value;
+                    save_ini ();
                 }
             }
         }
@@ -730,6 +741,9 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("Workspace", "default_zoom_percent")) {
                         _default_zoom_percent = config_keyfile.get_integer ("Workspace", "default_zoom_percent").clamp (50, 200);
                     }
+                    if (config_keyfile.has_key ("Workspace", "onboarding_tour_completed")) {
+                        _onboarding_tour_completed = config_keyfile.get_boolean ("Workspace", "onboarding_tour_completed");
+                    }
                     if (config_keyfile.has_key ("Hardware", "steady_cursor")) {
                         _steady_cursor = config_keyfile.get_boolean ("Hardware", "steady_cursor");
                     }
@@ -763,6 +777,7 @@ namespace Imladris.Core {
                 config_keyfile.set_boolean ("Workspace", "show_ribbon_toolbar", _show_ribbon_toolbar);
                 config_keyfile.set_boolean ("Workspace", "show_status_bar", _show_status_bar);
                 config_keyfile.set_integer ("Workspace", "default_zoom_percent", _default_zoom_percent);
+                config_keyfile.set_boolean ("Workspace", "onboarding_tour_completed", _onboarding_tour_completed);
                 FileUtils.set_contents (config_ini_path, config_keyfile.to_data ());
             } catch (Error e) {}
         }

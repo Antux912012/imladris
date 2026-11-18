@@ -368,20 +368,23 @@ namespace Imladris.Core {
             log_output (@"▶ Downloading micromamba ($arch) from $url...");
             progress_changed ("Downloading micromamba...", 0.15, url);
 
-            string tmp_tar = Path.build_filename (Environment.get_tmp_dir (), @"imladris-micromamba-$(GLib.Random.next_int ()).tar.bz2");
+            string? tmp_dir = GLib.DirUtils.mkdtemp (Path.build_filename (Environment.get_tmp_dir (), "imladris-mamba-XXXXXX"));
+            if (tmp_dir == null) {
+                log_output ("✖ Failed to create temporary download directory.");
+                return false;
+            }
+            GLib.FileUtils.chmod (tmp_dir, 0700);
+            string tmp_tar = Path.build_filename (tmp_dir, "micromamba.tar.bz2");
+            ulong cancel_id = 0;
             try {
                 string[] dl_argv = { "curl", "-fsSL", "-o", tmp_tar, url };
                 var dl_proc = new GLib.Subprocess.newv (dl_argv, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_PIPE);
-                ulong cancel_id = 0;
                 if (cancellable != null) {
                     cancel_id = cancellable.cancelled.connect (() => { dl_proc.force_exit (); });
                 }
                 var dl_err = new GLib.DataInputStream (dl_proc.get_stderr_pipe ());
                 read_stream_to_log.begin (dl_err);
                 yield dl_proc.wait_check_async (cancellable);
-                if (cancellable != null && cancel_id != 0) {
-                    cancellable.disconnect (cancel_id);
-                }
 
                 uint8[] tar_bytes;
                 GLib.FileUtils.get_data (tmp_tar, out tar_bytes);
@@ -411,10 +414,19 @@ namespace Imladris.Core {
                     return false;
                 }
             } catch (GLib.Error e) {
-                log_output (@"✖ Failed to download or extract micromamba: $(e.message)");
+                log_output (@"✖ Micromamba setup failed: $(e.message)");
                 return false;
             } finally {
-                GLib.FileUtils.unlink (tmp_tar);
+                if (cancellable != null && cancel_id != 0) {
+                    cancellable.disconnect (cancel_id);
+                    cancel_id = 0;
+                }
+                if (GLib.FileUtils.test (tmp_tar, GLib.FileTest.EXISTS)) {
+                    GLib.FileUtils.remove (tmp_tar);
+                }
+                if (tmp_dir != "" && GLib.FileUtils.test (tmp_dir, GLib.FileTest.IS_DIR)) {
+                    GLib.DirUtils.remove (tmp_dir);
+                }
             }
         }
 

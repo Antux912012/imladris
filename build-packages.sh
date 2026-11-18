@@ -143,7 +143,9 @@ PYEOF
     --socket=fallback-x11 \
     --socket=wayland \
     --device=dri \
+    --talk-name=org.freedesktop.Flatpak \
     --filesystem=home \
+    --filesystem=xdg-cache/imladris:create \
     --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
 
   flatpak build-export --disable-sandbox repo build-flatpak-app master
@@ -201,14 +203,6 @@ if [ "$1" = "configure" ]; then
     if which glib-compile-schemas >/dev/null 2>&1; then
         glib-compile-schemas /usr/share/glib-2.0/schemas || true
     fi
-    echo "=== Imladris Runtime Check ==="
-    for cmd in Rscript python3 pandoc uv quarto pdflatex; do
-        if which "$cmd" >/dev/null 2>&1; then
-            echo "  [OK] $cmd -> $(which "$cmd")"
-        else
-            echo "  [OPTIONAL] $cmd not found (install imladris-toolchain or use Preferences -> Toolchains)"
-        fi
-    done
 fi
 exit 0
 EOF
@@ -226,14 +220,6 @@ if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
     if which glib-compile-schemas >/dev/null 2>&1; then
         glib-compile-schemas /usr/share/glib-2.0/schemas || true
     fi
-    echo "=== Imladris Runtime Check ==="
-    for cmd in Rscript python3 pandoc uv quarto pdflatex; do
-        if which "$cmd" >/dev/null 2>&1; then
-            echo "  [OK] $cmd -> $(which "$cmd")"
-        else
-            echo "  [OPTIONAL] $cmd not found (install imladris-toolchain or use Preferences -> Toolchains)"
-        fi
-    done
 fi
 exit 0
 EOF

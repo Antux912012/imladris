@@ -187,6 +187,39 @@ price = "$x + y$"
         assert (seq_svg.contains ("stroke-dasharray"));
     }
 
+    static void test_latex_templates_and_citations () {
+        var templates = Imladris.Core.LatexTemplates.get_top_templates ();
+        var citations = Imladris.Core.LatexTemplates.get_top_citation_styles ();
+        assert (templates.length == 10);
+        assert (citations.length == 10);
+
+        for (int i = 0; i < templates.length; i++) {
+            var tpl = templates[i];
+            var default_cite = Imladris.Core.LatexTemplates.find_citation_style (tpl.default_citation_id);
+            assert (default_cite != null);
+            string tex = Imladris.Core.LatexTemplates.generate_document (
+                tpl, default_cite, "Quantum Simulation", "Dr. Researcher", "myrefs.bib"
+            );
+            assert (tex.contains ("\\documentclass"));
+            assert (tex.contains (tpl.document_class));
+            assert (tex.contains ("\\begin{document}"));
+            assert (tex.contains ("\\end{document}"));
+            assert (tex.contains ("Quantum Simulation"));
+            assert (tex.contains ("Dr. Researcher"));
+            assert (tex.contains ("myrefs"));
+        }
+
+        // Verify BibLaTeX Chicago style & Natbib APA style
+        var chicago = Imladris.Core.LatexTemplates.find_citation_style ("chicago");
+        assert (chicago != null && chicago.uses_biblatex);
+        var ieee = Imladris.Core.LatexTemplates.find_template ("ieee");
+        assert (ieee != null);
+        string chicago_tex = Imladris.Core.LatexTemplates.generate_document (ieee, chicago, "Test", "Author");
+        assert (chicago_tex.contains ("\\addbibresource{references.bib}"));
+        assert (chicago_tex.contains ("\\printbibliography"));
+        assert (chicago_tex.contains ("\\parencite{example2026}"));
+    }
+
     public static int main (string[] args) {
         Test.init (ref args);
         Test.add_func ("/native_rendering/chunk_parser", test_chunk_parser_native);
@@ -197,6 +230,7 @@ price = "$x + y$"
         Test.add_func ("/native_rendering/mermaid_fixes", test_mermaid_engine_fixes);
         Test.add_func ("/native_rendering/outline_and_typescript", test_native_outline_and_typescript_symbols);
         Test.add_func ("/native_rendering/latex_diagnostics", test_native_latex_diagnostics);
+        Test.add_func ("/native_rendering/latex_templates_and_citations", test_latex_templates_and_citations);
         return Test.run ();
     }
 }

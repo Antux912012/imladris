@@ -278,7 +278,10 @@ namespace Imladris {
                     return @"Error: Invalid command syntax: $(e.message)";
                 }
                 if (parts.length == 0) return "Error: Empty command.";
-                string bin = GLib.Path.get_basename (parts[0]);
+                if (parts[0].contains ("/") || parts[0].contains ("\\")) {
+                    return @"Security Error: MCP execute_code does not allow path-qualified binaries (got '$(parts[0])').";
+                }
+                string bin = parts[0];
                 if (bin != "Rscript" && bin != "python3" && bin != "quarto" &&
                     bin != "latexmk" && bin != "pdflatex" && bin != "xelatex" && bin != "lualatex" &&
                     bin != "deno" && bin != "tsx" && bin != "bun" && bin != "tsc") {
