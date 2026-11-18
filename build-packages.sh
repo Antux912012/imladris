@@ -153,7 +153,8 @@ PYEOF
 
   FLATPAK_TAR_NAME="${APP_ID}-flatpak-x86_64.tar.gz"
   rm -f "${FLATPAK_TAR_NAME}"
-  tar -C build-flatpak-app/files -czf "${FLATPAK_TAR_NAME}" .
+  tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+    -C build-flatpak-app/files -cf - . | gzip -n > "${FLATPAK_TAR_NAME}"
   echo "✔ Flatpak /app tarball generated: ${FLATPAK_TAR_NAME} ($(du -h "${FLATPAK_TAR_NAME}" | cut -f1))"
 fi
 

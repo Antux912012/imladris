@@ -38,8 +38,8 @@ modules:
         only-arches:
           - x86_64
         url: https://github.com/Antux912012/imladris/releases/download/v0.30.0/io.github.Antux912012.Imladris-flatpak-x86_64.tar.gz
-        sha256: 3535524324cd2fb7af29b5698ec637d74a7a802d8d310ce60c6158932a72bb11
-        size: 33425418
+        sha256: 6d305f84eaceacc8aad344b57999c8e201941b77b24ac068536fcb5888fa3a52
+        size: 33411136
       # END MANAGED EXTRA-DATA
       - type: file
         path: apply_extra.sh
