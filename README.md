@@ -298,6 +298,20 @@ GSETTINGS_BACKEND=memory meson test -C build-release --print-errorlogs
 ./build-release/imladris
 ```
 
+### Build Automatically with Docker Compose (Recommended for Contributors)
+A [`docker-compose.yml`](docker-compose.yml) and multi-stage [`Dockerfile`](Dockerfile) automatically provision the full Fedora 41 / GTK4 / WebKitGTK 6.0 / Vala / Meson environment for any Linux/macOS/WSL host:
+
+```bash
+# 1. Compile from source and run all 10 Meson test suites automatically:
+docker compose run --rm imladris-build
+
+# 2. Build Fedora/RHEL/openSUSE RPM packages (.rpm & .src.rpm):
+docker compose run --rm imladris-rpm
+
+# 3. Open an interactive build shell with all dependencies pre-installed:
+docker compose run --rm imladris-dev
+```
+
 ### Build in a Clean Container (Podman / Docker)
 A reproducible multi-stage [`Dockerfile`](Dockerfile) is included for isolated compilation and unit testing:
 

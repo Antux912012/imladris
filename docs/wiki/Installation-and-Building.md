@@ -165,6 +165,20 @@ meson test -C build --print-errorlogs
 sudo meson install -C build
 ```
 
+### Automatic Environment Setup with Docker Compose
+To compile and test Imladris without installing host `-devel` packages, use the included [`docker-compose.yml`](https://github.com/Antux912012/imladris/blob/main/docker-compose.yml):
+
+```bash
+# Compile release binary and run all 10 Meson test suites
+docker compose run --rm imladris-build
+
+# Build Fedora/RHEL/openSUSE .rpm packages
+docker compose run --rm imladris-rpm
+
+# Launch an interactive build container
+docker compose run --rm imladris-dev
+```
+
 ---
 
 ## 4. Hardware & WebKit Rendering Settings

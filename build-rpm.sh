@@ -43,7 +43,7 @@ if command -v rpmbuild >/dev/null 2>&1; then
     rpmbuild --define "_topdir ${RPM_ROOT}" -ba "${RPM_ROOT}/SPECS/imladris.spec"
 elif command -v podman >/dev/null 2>&1 && podman image exists localhost/dev-fedora 2>/dev/null; then
     echo "--> Running rpmbuild inside container (localhost/dev-fedora)..."
-    podman run --rm -v "${PROJECT_DIR}:${PROJECT_DIR}:z" -w "${PROJECT_DIR}" localhost/dev-fedora \
+    podman run --rm --network=none -v "${PROJECT_DIR}:${PROJECT_DIR}:z" -w "${PROJECT_DIR}" localhost/dev-fedora \
         rpmbuild --define "_topdir ${RPM_ROOT}" -ba "${RPM_ROOT}/SPECS/imladris.spec"
 else
     echo "Error: rpmbuild command not found and podman localhost/dev-fedora image unavailable" >&2

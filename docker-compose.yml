@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Automatic Compile-from-Source & Packaging Environment for Imladris
+# Usage:
+#   docker compose run --rm imladris-build   # Compile & run all Meson tests
+#   docker compose run --rm imladris-rpm     # Build Fedora/RHEL/openSUSE RPM packages
+#   docker compose run --rm imladris-dev     # Open interactive build shell
+
+services:
+  imladris-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      GSETTINGS_BACKEND: memory
+    command: >
+      bash -c "
+        rm -rf build-docker &&
+        meson setup build-docker --buildtype=release --prefix=/usr &&
+        meson compile -C build-docker &&
+        meson test -C build-docker --print-errorlogs
+      "
+
+  imladris-rpm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: bash -c "./build-rpm.sh"
+
+  imladris-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: bash
