@@ -77,7 +77,14 @@
   <releases>
     <release version="0.33.1" date="2026-11-19">
       <description>
-        <p>Release v0.33.1 fixes deferred WebKitGTK 6.0 Live Preview rendering across dock tab switches, workbench mode transitions, and split/revealer toggles.</p>
+        <p>Release v0.33.1 introduces Apple TextEdit-style WYSIWYG .rtf editing, rock-solid WebKitGTK 6.0 live preview across Flatpak and host builds, unified single-package toolchains, and a comprehensive security and C/Vala memory audit:</p>
+        <ul>
+          <li>WYSIWYG Rich Text (.rtf) Editor: Added native RTF 1.x codec (RtfCodec) and TextEdit-style formatting bar (RtfEditorView) supporting font family/size, Bold/Italic/Underline/Strikethrough (Ctrl+B/I/U), text and highlight colors, paragraph alignment, bullet lists, and live WebKitGTK 6.0 preview.</li>
+          <li>WebKitGTK 6.0 Preview &amp; Flatpak Parity: Fixed GTK4 unrealize/map reparenting across Apostrophe and RStudio modes, zero-allocation deferral during revealer/paned transitions, cancelled-load filtering, proportional editor-to-preview scroll sync, and synchronized Flatpak finish-args.</li>
+          <li>Unified Single-Package Distribution: Merged scientific runtime dependencies (R, Python, pip/venv, Pandoc, curl, bzip2, git) directly into the main .deb, .rpm, AUR PKGBUILD, and Nix Flake packages.</li>
+          <li>Security &amp; Privacy Hardening: Defaulted AI configuration to local/offline (Ollama), removed process-wide GALAXY_API_KEY propagation, enforced 0600 permissions on recovery .shadow files, sanitized bioinformatics/Galaxy code generators, and hardened C export bounds and UTF-8 handling in export_native.c.</li>
+          <li>Scientific &amp; Citation Fixes: Fixed Zotero/DOI bibliography path resolution (bibliography/references.bib), CAYW locator conversion, PubMed BibTeX escaping, pre-2007 arXiv IDs, session refcount cleanup, and inline math/code rendering order.</li>
+        </ul>
       </description>
     </release>
     <release version="0.33.0" date="2026-11-18">

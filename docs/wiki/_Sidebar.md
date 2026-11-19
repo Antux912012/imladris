@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.githu
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-### 🌿 Imladris IDE (v0.19.0)
+### 🌿 Imladris IDE (v0.33.1)
 
 * [[Home|Home]]
 * 🌐 [Official Landing Page](https://antux912012.github.io/imladris/)

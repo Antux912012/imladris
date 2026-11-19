@@ -4,8 +4,15 @@ All notable changes to **Imladris** are documented in this file.
 
 ## [0.33.1] - 2026-11-19
 
+### Added
+- **Apple TextEdit-Style WYSIWYG `.rtf` Editor**: Added `RtfCodec` (RTF 1.x parser, serializer, and HTML renderer) and `RtfEditorView` (font family/size, Bold/Italic/Underline/Strikethrough with `Ctrl+B`/`I`/`U`, text & highlight colors, paragraph alignment, bullet lists, pending typing attributes, and WebKitGTK 6.0 live preview), plus `app.new_rtf` and `application/rtf;text/rtf;` desktop MIME registration.
+- **Unified Single-Package Toolchain**: Integrated `R`, `Python`, `pip`/`venv`, `Pandoc`, `curl`, `bzip2`, and `git` runtime dependencies directly into the main `.deb`, `.rpm`, AUR `PKGBUILD`, and Nix Flake packages (`Provides: imladris-toolchain`).
+- **Scientific Software Paper**: Added `docs/paper/imladris-scientific-paper.qmd` detailing architecture, `FormatProfile`, dual-mode docking, `nbformat` 4.5 notebooks, bioinformatics/clinical biostatistics case studies, security, and verification.
+
 ### Fixed
-- **WebKitGTK 6.0 Live Preview Visibility Sync**: Flushed deferred `pending_preview_refresh` updates when switching RStudio dock tabs, toggling Apostrophe `right_stack`/`console_revealer` visibility, or changing workbench/split modes in `DocumentPage`.
+- **WebKitGTK 6.0 Live Preview & Flatpak Parity**: Fixed `unrealize`/`map` reparenting reloads across Apostrophe ↔ RStudio transitions, zero-allocation deferral during `Gtk.Revealer`/`Gtk.Paned` animations, `load_failed` cancelled-load filtering, `preview_load_generation` async race guard, proportional editor-to-preview scroll sync, ribbon toggle sync (`btn_preview`, `chk_console`, mode buttons), and Flatpak manifest `WEBKIT_DISABLE_DMABUF_RENDERER=1` parity.
+- **Security, Privacy & C/Vala Memory Audit**: Defaulted `AiConfigManager` to local/offline (`AiProvider.OLLAMA`, `auto_failover_enabled = false`), preserved `detail_prompt` on failover, isolated `GALAXY_API_KEY` from child process environments, sanitized Galaxy/Elbereth/Yavanna/Taniquetil code generators, enforced `PluginManager` permissions, set `0600` on `.shadow` recovery files, added `G_MAXUINT32`/`G_MAXUINT16` bounds and UTF-8 validation in `export_native.c`, fixed session refcount leaks (`release_session`/`peek_for_key`), and cleaned up destructors/FDs/signal handlers.
+- **Citations, Export & Execution**: Resolved `bibliography/references.bib` in Zotero/DOI sync, fixed CAYW locator conversion (`\cite[loc]{key}`), escaped PubMed BibTeX values, added pre-2007 arXiv ID support, passed `TEXINPUTS`/`BIBINPUTS` for unsaved `.tex` PDF exports, fixed `ChunkExecutionEngine` error detection, and fixed inline Markdown code/math ordering in `DocumentAdapter`.
 
 ## [0.33.0] - 2026-11-18
 

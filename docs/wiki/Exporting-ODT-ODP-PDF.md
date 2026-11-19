@@ -12,6 +12,7 @@ Imladris includes a multi-format export pipeline accessible via the **Publish** 
 | `.qmd`, `.Rmd`, `.ipynb`, `.md` | **PDF (`.pdf`)** | Typst / XeLaTeX / WeasyPrint / Chrome Headless | Formal manuscripts, journal submissions |
 | `.qmd`, `.Rmd`, `.ipynb`, `.md` | **OpenDocument Text (`.odt`)** | Pandoc / Quarto / LibreOffice Writer | Collaborative editing in LibreOffice or Word |
 | `.qmd`, `.Rmd`, `.ipynb`, `.md` | **OpenDocument Presentation (`.odp`)** | Headless LibreOffice (`soffice --convert-to odp`) | Academic slide decks, conference talks |
+| `.rtf` (WYSIWYG Rich Text) | **RTF (`.rtf`) / HTML / PDF / ODT** | Native `RtfCodec` + `RtfEditorView`, WebKitGTK 6.0, `export_native.c` | Apple TextEdit-compatible rich text authoring |
 
 ---
 

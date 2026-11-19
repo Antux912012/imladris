@@ -29,6 +29,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.33.1">⬇️ Download v0.33.1 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Technical Wiki</a></strong> ·
+  <strong><a href="docs/paper/imladris-scientific-paper.qmd">📄 Scientific Paper</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong>
 </p>
 

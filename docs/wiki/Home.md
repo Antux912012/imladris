@@ -5,10 +5,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Welcome to the Imladris IDE Wiki
 
-**Imladris (`v0.25.0`)** is a native Linux scientific authoring, bioinformatics provenance, and polyglot notebook IDE built with **Vala**, **GTK4**, **Libadwaita**, **GtkSourceView 5**, and **WebKitGTK 6.0**. Designed for researchers, bioinformaticians, statisticians, and data scientists, Imladris combines the reproducibility of RStudio and Jupyter with a modern GNOME HIG-compliant interface, the **Arekyer Galaxy-to-Quarto Provenance Bridge**, the **Natural Math & Chemical Reaction Studio**, 100% local Vulkan-accelerated AI assistance (**Elrond**), Free-Tier AI orchestration, GitHub Copilot OAuth, and an Obsidian-style JavaScript extension ecosystem (`JSC.Context`).
+**Imladris (`v0.33.1`)** is a native Linux scientific authoring, bioinformatics provenance, and polyglot notebook IDE built with **Vala**, **GTK4**, **Libadwaita**, **GtkSourceView 5**, and **WebKitGTK 6.0**. Designed for researchers, bioinformaticians, statisticians, and data scientists, Imladris combines the reproducibility of RStudio and Jupyter with a modern GNOME HIG-compliant interface, an Apple TextEdit-style WYSIWYG **`.rtf` Rich Text Editor**, the **Arekyer Galaxy-to-Quarto Provenance Bridge**, the **Natural Math & Chemical Reaction Studio**, local Vulkan-accelerated AI assistance (**Elrond**), opt-in Free-Tier AI orchestration, GitHub Copilot OAuth, and an Obsidian-style JavaScript extension ecosystem (`JSC.Context`).
 
 > [!TIP]
 > 🌐 **Visit the Official Project Landing Page:** [https://antux912012.github.io/imladris/](https://antux912012.github.io/imladris/)  
+> 📄 **Read the Scientific Paper:** [Imladris Scientific Paper (Quarto)](https://github.com/Antux912012/imladris/blob/main/docs/paper/imladris-scientific-paper.qmd)  
 > **New to Imladris?** Start with the [[Installation and Building|Installation-and-Building]] guide or jump straight into [[Arekyer: Galaxy-to-Quarto Bridge|Galaxy-to-Quarto-Bridge]] and [[Projects and Sandboxing|Projects-and-Sandboxing]].
 
 ---
