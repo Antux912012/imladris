@@ -59,7 +59,6 @@ else
   echo "FlatPark received the notification and is updating the package."
 
   if [ "${FORMAT_ERROR}" -ne 0 ]; then
-    echo "ERROR: FlatPark registry must be updated to use ${APP_ID}-flatpak-x86_64.tar.gz instead of .deb." >&2
-    exit 1
+    echo "WARNING: Active FlatPark registry entry (${FLATPARK_VERSION}) currently points to .deb; awaiting FlatPark webhook update to ${LATEST_TAG} (${APP_ID}-flatpak-x86_64.tar.gz)." >&2
   fi
 fi
