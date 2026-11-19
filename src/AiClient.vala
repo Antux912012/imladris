@@ -69,6 +69,13 @@ namespace Imladris {
             };
         }
 
+        ~AiClient () {
+            cancel_current_request ();
+            if (session != null) {
+                session.abort ();
+            }
+        }
+
         public async string[] list_models_async (AiProvider provider, Cancellable? cancellable = null) throws GLib.Error {
             string endpoint = config_mgr.get_endpoint_for (provider);
             string models_url;
@@ -180,12 +187,13 @@ namespace Imladris {
             var attempted = new Gee.HashSet<AiProvider> ();
             attempted.add (provider);
 
+            string detail_prompt = system_prompt;
+            if (detail_prompt.length > 0) {
+                detail_prompt += "\n\n";
+            }
+            detail_prompt += config_mgr.response_detail.get_instruction ();
+
             try {
-                string detail_prompt = system_prompt;
-                if (detail_prompt.length > 0) {
-                    detail_prompt += "\n\n";
-                }
-                detail_prompt += config_mgr.response_detail.get_instruction ();
                 return yield dispatch_provider_request_async (provider, detail_prompt, user_prompt, req_cancellable);
             } catch (GLib.Error primary_err) {
                 if (!config_mgr.auto_failover_enabled || req_cancellable.is_cancelled () || !is_failover_eligible_error (primary_err)) {
@@ -206,7 +214,7 @@ namespace Imladris {
                     attempted.add (fallback_prov);
                     try {
                         provider_failover_triggered (provider, fallback_prov);
-                        return yield dispatch_provider_request_async (fallback_prov, system_prompt, user_prompt, req_cancellable);
+                        return yield dispatch_provider_request_async (fallback_prov, detail_prompt, user_prompt, req_cancellable);
                     } catch (GLib.Error fb_err) {
                         GLib.debug ("Failover provider %s failed: %s", fallback_prov.to_string_id (), fb_err.message);
                     }
@@ -539,10 +547,20 @@ namespace Imladris {
 
         private string extract_json_error_message (Json.Object err_obj) {
             if (err_obj.has_member ("message")) {
-                return err_obj.get_string_member ("message");
+                var msg_node = err_obj.get_member ("message");
+                if (msg_node != null && msg_node.get_node_type () == Json.NodeType.VALUE && msg_node.get_value_type () == typeof (string)) {
+                    return msg_node.get_string () ?? "Unknown error";
+                }
             }
             if (err_obj.has_member ("code")) {
-                return @"Code: $(err_obj.get_string_member ("code"))";
+                var code_node = err_obj.get_member ("code");
+                if (code_node != null && code_node.get_node_type () == Json.NodeType.VALUE) {
+                    if (code_node.get_value_type () == typeof (string)) {
+                        return @"Code: $(code_node.get_string () ?? "")";
+                    } else if (code_node.get_value_type () == typeof (int64)) {
+                        return @"Code: $(code_node.get_int ())";
+                    }
+                }
             }
             return "Unknown error";
         }

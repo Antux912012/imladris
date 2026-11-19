@@ -6,7 +6,7 @@ namespace Imladris.Core {
     public class DistroInfo : GLib.Object {
         public string id { owned get; set; default = "linux"; }
         public string name { owned get; set; default = "Linux"; }
-        public string install_cmd { owned get; set; default = "curl -fsSL https://llama.app/install.sh | sh"; }
+        public string install_cmd { owned get; set; default = "brew install llama.cpp  # or build from https://github.com/ggml-org/llama.cpp"; }
     }
 
     public enum RuntimeSource {
@@ -573,7 +573,7 @@ namespace Imladris.Core {
             } else {
                 info.id = "linux";
                 info.name = (raw_pretty_name.length > 0) ? raw_pretty_name : (raw_name.length > 0 ? raw_name : "Linux");
-                info.install_cmd = "curl -fsSL https://llama.app/install.sh | sh";
+                info.install_cmd = "brew install llama.cpp  # or build from https://github.com/ggml-org/llama.cpp";
             }
 
             return info;
@@ -643,6 +643,50 @@ namespace Imladris.Core {
                 return res.substring (1, res.length - 2);
             }
             return res;
+        }
+
+        /**
+         * Encodes raw bytes as lowercase hexadecimal.
+         */
+        public static string encode_hex (uint8[] data) {
+            var sb = new GLib.StringBuilder ();
+            for (int i = 0; i < data.length; i++) {
+                sb.append_printf ("%02x", data[i]);
+            }
+            return sb.str;
+        }
+
+        /**
+         * Escapes a string for safe inclusion inside a double-quoted string literal.
+         */
+        public static string escape_string_literal (string s) {
+            return s.replace ("\\", "\\\\")
+                    .replace ("\"", "\\\"")
+                    .replace ("\n", "\\n")
+                    .replace ("\r", "\\r");
+        }
+
+        /**
+         * Replaces CR/LF characters with spaces for single-line text contexts.
+         */
+        public static string strip_newlines (string s) {
+            return s.replace ("\r", " ").replace ("\n", " ");
+        }
+
+        /**
+         * Sanitizes an arbitrary identifier into a lowercase alphanumeric/hyphen chunk label.
+         */
+        public static string sanitize_chunk_label (string s, string fallback = "chunk") {
+            var sb = new GLib.StringBuilder ();
+            for (int i = 0; i < s.length; i++) {
+                char c = s[i];
+                if (c.isalnum () || c == '-') {
+                    sb.append_c (c.tolower ());
+                } else if (c == '_') {
+                    sb.append_c ('-');
+                }
+            }
+            return sb.str.length > 0 ? sb.str : fallback;
         }
     }
 }

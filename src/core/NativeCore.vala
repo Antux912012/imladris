@@ -7,6 +7,11 @@ namespace Imladris.Core {
 
     public class NativeCore : GLib.Object {
 
+        private static GLib.Regex? ts_decl_regex = null;
+        private static GLib.Regex? outline_heading_regex = null;
+        private static GLib.Regex? outline_chunk_regex = null;
+        private static GLib.Regex? latex_error_line_regex = null;
+
         private static GLib.Regex compile_required_regex (string pattern) {
             try {
                 return new GLib.Regex (pattern);
@@ -24,9 +29,12 @@ namespace Imladris.Core {
         public static string analyze_typescript_symbols_json (string source) {
             var builder = new Json.Builder ();
             var seen = new Gee.HashSet<string> ();
-            var declaration = compile_required_regex (
-                "^\\s*(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:async\\s+)?(function|class|interface|type|enum|const|let|var)\\s+([A-Za-z_$][A-Za-z0-9_$]*)"
-            );
+            if (ts_decl_regex == null) {
+                ts_decl_regex = compile_required_regex (
+                    "^\\s*(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:async\\s+)?(function|class|interface|type|enum|const|let|var)\\s+([A-Za-z_$][A-Za-z0-9_$]*)"
+                );
+            }
+            var declaration = ts_decl_regex;
 
             builder.begin_array ();
             string[] lines = source.split ("\n");
@@ -62,8 +70,14 @@ namespace Imladris.Core {
 
         public static string extract_outline_json (string source, string format_code = "qmd") {
             var builder = new Json.Builder ();
-            var heading_regex = compile_required_regex ("^\\s*(#{1,6})\\s+(.+?)\\s*#*\\s*$");
-            var chunk_regex = compile_required_regex ("^\\s*```\\s*\\{([A-Za-z0-9_+-]+)(?:\\s+([^,}]+))?");
+            if (outline_heading_regex == null) {
+                outline_heading_regex = compile_required_regex ("^\\s*(#{1,6})\\s+(.+?)\\s*#*\\s*$");
+            }
+            if (outline_chunk_regex == null) {
+                outline_chunk_regex = compile_required_regex ("^\\s*```\\s*\\{([A-Za-z0-9_+-]+)(?:\\s+([^,}]+))?");
+            }
+            var heading_regex = outline_heading_regex;
+            var chunk_regex = outline_chunk_regex;
             bool in_fence = false;
 
             builder.begin_array ();
@@ -131,7 +145,10 @@ namespace Imladris.Core {
 
         public static string parse_latex_log_json (string log_text) {
             var builder = new Json.Builder ();
-            var error_line = compile_required_regex ("^l\\.(\\d+)\\s*(.*)$");
+            if (latex_error_line_regex == null) {
+                latex_error_line_regex = compile_required_regex ("^l\\.(\\d+)\\s*(.*)$");
+            }
+            var error_line = latex_error_line_regex;
             string? pending_error = null;
             int pending_line = 1;
 

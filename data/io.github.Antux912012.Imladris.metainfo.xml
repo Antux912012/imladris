@@ -75,6 +75,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.33.1" date="2026-11-19">
+      <description>
+        <p>Release v0.33.1 fixes deferred WebKitGTK 6.0 Live Preview rendering across dock tab switches, workbench mode transitions, and split/revealer toggles.</p>
+      </description>
+    </release>
     <release version="0.33.0" date="2026-11-18">
       <description>
         <p>Release v0.33.0 delivers researcher, data scientist, and first-time writer improvements:</p>

@@ -32,7 +32,7 @@ namespace Imladris.Services {
             return run_tool_process_with_output (tool_name, sub_args, working_dir, out unused_log);
         }
 
-        private static bool run_tool_process_with_output (string tool_name, string[] sub_args, string working_dir, out string output_log) {
+        private static bool run_tool_process_with_output (string tool_name, string[] sub_args, string working_dir, out string output_log, Gee.HashMap<string, string>? extra_env = null) {
             output_log = "";
             string? resolved_path = null;
             string? env_prefix = null;
@@ -44,6 +44,11 @@ namespace Imladris.Services {
             try {
                 var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
                 Core.PlatformUtils.inject_galaxy_credentials (launcher);
+                if (extra_env != null) {
+                    foreach (var entry in extra_env.entries) {
+                        launcher.setenv (entry.key, entry.value, true);
+                    }
+                }
                 launcher.set_cwd (working_dir);
 
                 string[] full_raw = new string[1 + sub_args.length];
@@ -379,21 +384,36 @@ namespace Imladris.Services {
 
                     string tex_log = "";
                     bool tex_ok = false;
+                    Gee.HashMap<string, string>? tex_env = null;
+                    if (raw_buffer_fallback != null) {
+                        string orig_dir = GLib.Path.get_dirname (input_path);
+                        if (orig_dir != "" && orig_dir != "." && orig_dir != src_dir) {
+                            tex_env = new Gee.HashMap<string, string> ();
+                            string cur_texinputs = GLib.Environment.get_variable ("TEXINPUTS") ?? "";
+                            string cur_bibinputs = GLib.Environment.get_variable ("BIBINPUTS") ?? "";
+                            tex_env.set ("TEXINPUTS", @"$(orig_dir):$(cur_texinputs)");
+                            tex_env.set ("BIBINPUTS", @"$(orig_dir):$(cur_bibinputs)");
+                        }
+                    }
+
                     if (engine == "latexmk") {
-                        tex_ok = run_tool_process_with_output ("latexmk", { "-pdf", "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                        tex_ok = run_tool_process_with_output ("latexmk", { "-pdf", "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
                     } else if (engine == "tectonic") {
-                        tex_ok = run_tool_process_with_output ("tectonic", { "--keep-logs", base_name }, src_dir, out tex_log);
+                        tex_ok = run_tool_process_with_output ("tectonic", { "--keep-logs", base_name }, src_dir, out tex_log, tex_env);
                     } else {
-                        tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                        tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
                         string tex_src = "";
                         try { GLib.FileUtils.get_contents (actual_input, out tex_src); } catch (GLib.Error e) {}
-                        if (tex_ok && (tex_src.contains ("\\bibliography{") || tex_src.contains ("\\addbibresource{"))) {
-                            string bib_tool = tex_src.contains ("\\addbibresource{") ? "biber" : "bibtex";
+                        if (tex_ok && (tex_src.contains ("\\bibliography{") || tex_src.contains ("\\addbibresource"))) {
+                            string bib_tool = tex_src.contains ("\\addbibresource") ? "biber" : "bibtex";
                             string bib_log = "";
-                            run_tool_process_with_output (bib_tool, { stem }, src_dir, out bib_log);
-                            tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                            bool bib_ok = run_tool_process_with_output (bib_tool, { stem }, src_dir, out bib_log, tex_env);
+                            if (!bib_ok) {
+                                GLib.warning ("%s failed for '%s': %s", bib_tool, stem, bib_log.strip ());
+                            }
+                            tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
                             if (tex_ok) {
-                                tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                                tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
                             }
                         }
                         string log_file_path = GLib.Path.build_filename (src_dir, @"$(stem).log");
@@ -402,7 +422,7 @@ namespace Imladris.Services {
                             string log_tmp = "";
                             try { GLib.FileUtils.get_contents (log_file_path, out log_tmp); } catch (GLib.Error e) {}
                             if (!log_tmp.contains ("Rerun to get")) break;
-                            tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log);
+                            tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
                             extra_passes++;
                         }
                     }

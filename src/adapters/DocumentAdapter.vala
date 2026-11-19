@@ -491,7 +491,8 @@ namespace Imladris.Adapters {
         }
 
         private static string format_inline_markdown (string line) {
-            string escaped = GLib.Markup.escape_text (line);
+            string working = line;
+            var protected_spans = new Gee.ArrayList<string> ();
             try {
                 if (inline_code_regex == null) inline_code_regex = new GLib.Regex ("`([^`]+)`");
                 if (inline_bold_regex == null) inline_bold_regex = new GLib.Regex ("\\*\\*([^\\*]+)\\*\\*");
@@ -501,22 +502,37 @@ namespace Imladris.Adapters {
                 if (inline_sup_regex == null) inline_sup_regex = new GLib.Regex ("\\^([^\\^\\s]+)\\^");
                 if (inline_link_regex == null) inline_link_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
                 if (inline_ce_regex == null) inline_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
-                if (inline_math_regex == null) inline_math_regex = new GLib.Regex ("(?<!\\$)\\$([^\\$\\n]+)\\$(?!\\$)");
+                if (inline_math_regex == null) inline_math_regex = new GLib.Regex ("(?<!\\$)(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)(?!\\$)");
 
-                escaped = inline_ce_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
-                    res.append (Core.MathChemEngine.render_latex_to_html ("\\ce{" + match_info.fetch (1) + "}", false));
+                // 1. Protect inline code spans first so `$...$` or `\ce{...}` inside backticks are never mangled
+                working = inline_code_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
+                    int idx = protected_spans.size;
+                    protected_spans.add ("<code>" + GLib.Markup.escape_text (match_info.fetch (1)) + "</code>");
+                    res.append_printf ("@@IMLSPAN_%d@@", idx);
                     return false;
                 });
-                escaped = inline_math_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
+
+                // 2. Render raw \ce{...} and $...$ before Markup.escape_text so & and < are not corrupted
+                working = inline_ce_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
+                    int idx = protected_spans.size;
+                    protected_spans.add (Core.MathChemEngine.render_latex_to_html ("\\ce{" + match_info.fetch (1) + "}", false));
+                    res.append_printf ("@@IMLSPAN_%d@@", idx);
+                    return false;
+                });
+                working = inline_math_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
                     string expr = match_info.fetch (1);
                     if (expr.strip () == "") {
                         res.append (match_info.fetch (0));
                     } else {
-                        res.append (Core.MathChemEngine.render_latex_to_html (expr, false));
+                        int idx = protected_spans.size;
+                        protected_spans.add (Core.MathChemEngine.render_latex_to_html (expr, false));
+                        res.append_printf ("@@IMLSPAN_%d@@", idx);
                     }
                     return false;
                 });
-                escaped = inline_code_regex.replace (escaped, -1, 0, "<code>\\1</code>");
+
+                // 3. Escape remaining plain text and apply inline formatting
+                string escaped = GLib.Markup.escape_text (working);
                 escaped = inline_bold_regex.replace (escaped, -1, 0, "<strong>\\1</strong>");
                 escaped = inline_italic_regex.replace (escaped, -1, 0, "<em>\\1</em>");
                 escaped = inline_strike_regex.replace (escaped, -1, 0, "<del>\\1</del>");
@@ -535,10 +551,16 @@ namespace Imladris.Adapters {
                     }
                     return false;
                 });
+
+                // 4. Restore protected code/math/chem HTML spans
+                for (int i = 0; i < protected_spans.size; i++) {
+                    escaped = escaped.replace ("@@IMLSPAN_%d@@".printf (i), protected_spans.get (i));
+                }
+                return escaped;
             } catch (GLib.RegexError e) {
                 GLib.warning ("Failed to format inline Markdown: %s", e.message);
+                return GLib.Markup.escape_text (line);
             }
-            return escaped;
         }
 
         private static string basic_markdown_to_html (string text) {

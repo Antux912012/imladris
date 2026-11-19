@@ -15,13 +15,13 @@ namespace Imladris.Editor {
         public string year { get; set; }
         public string insert_text { get; set; }
 
-        public CitationCompletionProposal (CitationItem item, bool inside_brackets = false, Core.CitationStyle citation_style = Core.CitationStyle.PANDOC_AT) {
+        public CitationCompletionProposal (CitationItem item, bool inside_brackets = false, Core.CitationStyle citation_style = Core.CitationStyle.PANDOC_AT, bool inside_latex_cite = false) {
             this.citekey = item.citekey;
             this.title = item.title;
             this.authors = item.authors;
             this.year = item.year;
             if (citation_style == Core.CitationStyle.LATEX_CITE) {
-                this.insert_text = @"\\cite{$(item.citekey)}";
+                this.insert_text = inside_latex_cite ? item.citekey : @"\\cite{$(item.citekey)}";
             } else {
                 this.insert_text = inside_brackets ? @"@$(item.citekey)" : @"[@$(item.citekey)]";
             }
@@ -148,6 +148,11 @@ namespace Imladris.Editor {
 
             string query = line_prefix.substring (at_idx + 1).strip ();
             bool inside_brackets = (at_idx > 0 && line_prefix[at_idx - 1] == '[');
+            bool inside_latex_cite = false;
+            try {
+                var cite_ctx_rx = new GLib.Regex ("\\\\cite[a-zA-Z*]*\\s*(?:\\[[^\\]]*\\]\\s*)*\\{[^}]*$");
+                inside_latex_cite = cite_ctx_rx.match (line_prefix.substring (0, at_idx));
+            } catch (GLib.RegexError e) {}
 
             var cite_style = get_citation_style ();
 
@@ -160,56 +165,75 @@ namespace Imladris.Editor {
                     if (parent != null) base_dir = parent.get_path () ?? "";
                 }
                 if (base_dir != "") {
-                    string bib_name = "references.bib";
+                    var bib_names = new Gee.ArrayList<string> ();
                     Gtk.TextIter b_start, b_end;
                     buffer.get_bounds (out b_start, out b_end);
                     string full_text = buffer.get_text (b_start, b_end, false);
                     if (cite_style == Core.CitationStyle.LATEX_CITE) {
-                        string? latex_bib = extract_latex_bib_filename (full_text);
-                        if (latex_bib != null && latex_bib != "") {
-                            bib_name = latex_bib;
+                        var latex_bibs = extract_latex_bib_filenames (full_text);
+                        foreach (var lb in latex_bibs) {
+                            bib_names.add (lb);
                         }
                     } else {
                         Core.FrontmatterData? fm;
                         string fm_body;
                         Core.FrontmatterParser.split_frontmatter (full_text, out fm, out fm_body);
                         if (fm != null && fm.bibliography != null && fm.bibliography.strip () != "") {
-                            bib_name = fm.bibliography.strip ();
+                            foreach (var fb in fm.bibliography.split (",")) {
+                                string clean_fb = fb.strip ();
+                                if (clean_fb.length > 0) bib_names.add (clean_fb);
+                            }
                         }
                     }
-                    string bib_path = GLib.Path.is_absolute (bib_name) ? bib_name : GLib.Path.build_filename (base_dir, bib_name);
-                    var f = GLib.File.new_for_path (bib_path);
-                    try {
-                        uint8[] data;
-                        string? etag = null;
-                        yield f.load_contents_async (cancellable, out data, out etag);
-                        fallback_bib = Core.PlatformUtils.data_to_string (data);
-                    } catch (GLib.Error e) {
-                        // .bib missing or cancelled
+                    if (bib_names.size == 0) {
+                        bib_names.add ("references.bib");
+                    }
+                    var combined_bib = new GLib.StringBuilder ();
+                    foreach (var bib_name in bib_names) {
+                        string bib_path = GLib.Path.is_absolute (bib_name) ? bib_name : GLib.Path.build_filename (base_dir, bib_name);
+                        var f = GLib.File.new_for_path (bib_path);
+                        try {
+                            uint8[] data;
+                            string? etag = null;
+                            yield f.load_contents_async (cancellable, out data, out etag);
+                            combined_bib.append (Core.PlatformUtils.data_to_string (data));
+                            combined_bib.append ("\n");
+                        } catch (GLib.Error e) {
+                            // .bib missing or cancelled
+                        }
+                    }
+                    if (combined_bib.len > 0) {
+                        fallback_bib = combined_bib.str;
                     }
                 }
             }
 
             var citations = yield ZoteroService.get_default ().search_citations_async (query, fallback_bib);
             foreach (var item in citations) {
-                store.append (new CitationCompletionProposal (item, inside_brackets, cite_style));
+                store.append (new CitationCompletionProposal (item, inside_brackets, cite_style, inside_latex_cite));
             }
 
             return store;
         }
 
-        private static string? extract_latex_bib_filename (string full_text) {
+        private static string[] extract_latex_bib_filenames (string full_text) {
+            var results = new Gee.ArrayList<string> ();
             try {
-                var reg = new GLib.Regex ("\\\\(?:bibliography|addbibresource)\\s*\\{([^}]+)\\}");
+                var reg = new GLib.Regex ("\\\\(?:bibliography|addbibresource)\\s*(?:\\[[^\\]]*\\]\\s*)?\\{([^}]+)\\}");
                 GLib.MatchInfo mi;
                 if (reg.match (full_text, 0, out mi)) {
-                    string raw = mi.fetch (1).split (",")[0].strip ();
-                    if (raw.length > 0) {
-                        return raw.down ().has_suffix (".bib") ? raw : @"$raw.bib";
-                    }
+                    do {
+                        string group = mi.fetch (1);
+                        foreach (var part in group.split (",")) {
+                            string raw = part.strip ();
+                            if (raw.length > 0) {
+                                results.add (raw.down ().has_suffix (".bib") ? raw : @"$raw.bib");
+                            }
+                        }
+                    } while (mi.next ());
                 }
             } catch (GLib.RegexError e) {}
-            return null;
+            return results.to_array ();
         }
 
         public static void ensure_buffer_bibliography_line (Gtk.TextBuffer buffer, string bib_filename = "references.bib") {

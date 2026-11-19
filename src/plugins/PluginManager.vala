@@ -330,11 +330,17 @@ namespace Imladris.Plugins {
 
                 jsc_class.add_method ("getActiveFilePath", (instance, jsc_args) => {
                     unowned PluginInstance plugin = (PluginInstance) instance;
+                    if (!plugin.manifest.has_permission ("workspace") && !plugin.manifest.has_permission ("editor")) {
+                        return new JSC.Value.string (plugin.context, "");
+                    }
                     return new JSC.Value.string (plugin.context, plugin.manager.get_active_file_path ());
                 }, typeof (JSC.Value));
 
                 jsc_class.add_method ("showWebDialog", (instance, jsc_args) => {
                     unowned PluginInstance plugin = (PluginInstance) instance;
+                    if (!plugin.manifest.has_permission ("ui") && !plugin.manifest.has_permission ("editor")) {
+                        return new JSC.Value.@null (plugin.context);
+                    }
                     if (jsc_args != null && jsc_args.length >= 2) {
                         string title = jsc_args.get (0).to_string ();
                         string html = jsc_args.get (1).to_string ();

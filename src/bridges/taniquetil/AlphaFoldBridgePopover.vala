@@ -72,6 +72,7 @@ namespace Imladris.Bridges.Taniquetil {
         private string cif_url = "";
         private string pae_doc_url = "";
         private int64 latest_version = 4;
+        private uint fragment_count = 1;
 
         public AlphaFoldBridgePopover () {
             GLib.Object ();
@@ -310,7 +311,7 @@ namespace Imladris.Bridges.Taniquetil {
         private async void resolve_alphafold_model (string query, GLib.Cancellable cancellable) {
             try {
                 string clean_q = query.strip ().up ();
-                string url = @"https://alphafold.ebi.ac.uk/api/prediction/$clean_q";
+                string url = @"https://alphafold.ebi.ac.uk/api/prediction/$(GLib.Uri.escape_string (clean_q, null, false))";
                 var msg = new Soup.Message ("GET", url);
                 msg.request_headers.append ("Accept", "application/json");
 
@@ -321,7 +322,7 @@ namespace Imladris.Bridges.Taniquetil {
                     string resolved_acc = yield resolve_uniprot_primary_accession (clean_q, cancellable);
                     if (resolved_acc != clean_q) {
                         clean_q = resolved_acc;
-                        url = @"https://alphafold.ebi.ac.uk/api/prediction/$clean_q";
+                        url = @"https://alphafold.ebi.ac.uk/api/prediction/$(GLib.Uri.escape_string (clean_q, null, false))";
                         msg = new Soup.Message ("GET", url);
                         msg.request_headers.append ("Accept", "application/json");
                         bytes = yield http_session.send_and_read_async (msg, GLib.Priority.DEFAULT, cancellable);
@@ -349,6 +350,7 @@ namespace Imladris.Bridges.Taniquetil {
                 if (array.get_length () == 0) {
                     throw new TaniquetilError.STRUCTURE_NOT_FOUND ("No prediction records in array.");
                 }
+                this.fragment_count = array.get_length ();
 
                 var pred = array.get_object_element (0);
                 this.entry_id = pred.has_member ("entryId") ? pred.get_string_member ("entryId") : query;
@@ -368,7 +370,9 @@ namespace Imladris.Bridges.Taniquetil {
                 this.latest_version = pred.has_member ("latestVersion") ? pred.get_int_member ("latestVersion") : 4;
 
                 // Update UI Labels
-                row_entry_id.subtitle = this.entry_id;
+                row_entry_id.subtitle = this.fragment_count > 1
+                    ? @"$(this.entry_id) (v$(this.latest_version), fragment 1 of $(this.fragment_count))"
+                    : @"$(this.entry_id) (v$(this.latest_version))";
                 row_protein.subtitle = @"$(this.gene_symbol != "" ? this.gene_symbol : this.uniprot_id) ($(this.uniprot_acc))";
                 row_organism.subtitle = this.organism_name;
                 row_length.subtitle = @"$(this.seq_length) residues";
@@ -377,7 +381,9 @@ namespace Imladris.Bridges.Taniquetil {
                 plddt_bar.queue_draw ();
                 action_box.sensitive = true;
 
-                status_label.label = "✔ AlphaFold structure resolved successfully.";
+                status_label.label = this.fragment_count > 1
+                    ? @"✔ AlphaFold structure resolved (multi-fragment protein: showing fragment 1 of $(this.fragment_count))."
+                    : @"✔ AlphaFold structure resolved (AFDB v$(this.latest_version)).";
                 status_label.remove_css_class ("error");
                 status_label.visible = true;
 
@@ -396,24 +402,31 @@ namespace Imladris.Bridges.Taniquetil {
         private void inject_markdown_badge () {
             string today = new GLib.DateTime.now_local ().format ("%Y-%m-%d");
             double vh_pct = fraction_very_high * 100.0;
-            string snippet = "[**%s** (%s / UniProt:%s | %lld aa | Mean pLDDT: %.1f | Very High: %.1f%% | Verified: %s)](https://alphafold.ebi.ac.uk/entry/%s)\n".printf (
+            string frag_note = fragment_count > 1 ? @" | Fragment 1/$(fragment_count)" : "";
+            string snippet = "[**%s** (v%lld | %s / UniProt:%s | %lld aa | Mean pLDDT: %.1f | Very High: %.1f%%%s | Verified: %s)](https://alphafold.ebi.ac.uk/entry/%s)\n".printf (
                 entry_id,
+                latest_version,
                 gene_symbol != "" ? gene_symbol : uniprot_id,
                 uniprot_acc,
                 seq_length,
                 global_plddt,
                 vh_pct,
+                frag_note,
                 today,
-                uniprot_acc
+                GLib.Uri.escape_string (uniprot_acc, null, false)
             );
             insert_snippet_requested (snippet);
             this.popdown ();
         }
 
         private void inject_r_chunk () {
+            string label = Core.PlatformUtils.sanitize_chunk_label (entry_id, "structure");
+            string safe_entry = Core.PlatformUtils.strip_newlines (entry_id);
+            string safe_gene = Core.PlatformUtils.strip_newlines (gene_symbol);
             string chunk = """
 ```{r taniquetil-%s, message=FALSE}
-# TANIQUETIL ALPHAFOLD PROVENANCE: %s (%s | Mean pLDDT: %.1f)
+# TANIQUETIL ALPHAFOLD PROVENANCE: %s v%lld (%s | Mean pLDDT: %.1f)
+af_version <- %lldL
 af_pdb_url <- "%s"
 af_pae_url <- "%s"
 af_pdb_file <- tempfile(fileext = ".pdb")
@@ -423,26 +436,31 @@ pdb_model <- bio3d::read.pdb(af_pdb_file)
 plddt_scores <- pdb_model$atom[pdb_model$calpha, "b"]
 summary(plddt_scores)
 ```
-""".printf (entry_id.replace ("-", "_"), entry_id, gene_symbol, global_plddt, pdb_url, pae_doc_url);
+""".printf (label, safe_entry, latest_version, safe_gene, global_plddt, latest_version, Core.PlatformUtils.escape_string_literal (pdb_url), Core.PlatformUtils.escape_string_literal (pae_doc_url));
 
             insert_snippet_requested (chunk);
             this.popdown ();
         }
 
         private void inject_python_chunk () {
+            string label = Core.PlatformUtils.sanitize_chunk_label (entry_id, "structure");
+            string safe_entry = Core.PlatformUtils.strip_newlines (entry_id);
+            string safe_gene = Core.PlatformUtils.strip_newlines (gene_symbol);
+            string safe_entry_lit = Core.PlatformUtils.escape_string_literal (entry_id).replace ("{", "{{").replace ("}", "}}");
             string chunk = """
 ```{python}
 #| label: taniquetil-%s
-# TANIQUETIL ALPHAFOLD PROVENANCE: %s (%s | Mean pLDDT: %.1f)
+# TANIQUETIL ALPHAFOLD PROVENANCE: %s v%lld (%s | Mean pLDDT: %.1f)
 import requests
+af_version = %lld
 af_cif_url = "%s"
 af_pae_url = "%s"
 pae_resp = requests.get(af_pae_url, timeout=15)
 pae_resp.raise_for_status()
 pae_data = pae_resp.json()
-print(f"Loaded %s: mean pLDDT = %.1f (%lld residues)")
+print(f"Loaded %s (v{af_version}): mean pLDDT = %.1f (%lld residues)")
 ```
-""".printf (entry_id.down ().replace ("_", "-"), entry_id, gene_symbol, global_plddt, cif_url, pae_doc_url, entry_id, global_plddt, seq_length);
+""".printf (label, safe_entry, latest_version, safe_gene, global_plddt, latest_version, Core.PlatformUtils.escape_string_literal (cif_url), Core.PlatformUtils.escape_string_literal (pae_doc_url), safe_entry_lit, global_plddt, seq_length);
 
             insert_snippet_requested (chunk);
             this.popdown ();

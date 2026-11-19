@@ -85,6 +85,11 @@ namespace Imladris.UI {
         private ulong shiny_url_hid = 0;
         private uint cit_search_debounce_id = 0;
         private GLib.Cancellable? active_exec_cancellable = null;
+        private static GLib.Regex? view_call_regex = null;
+
+        ~PersistentPanelRegistry () {
+            cleanup ();
+        }
 
         public string get_session_key () {
             if (doc_page.current_project_dir != "") {
@@ -100,8 +105,23 @@ namespace Imladris.UI {
             return "default";
         }
 
+        private Services.PersistentSessionManager? cached_session_mgr = null;
+        private string? acquired_session_key = null;
+
         public Services.PersistentSessionManager get_session_manager () {
-            return Services.PersistentSessionManager.for_key (get_session_key ());
+            string key = get_session_key ();
+            if (cached_session_mgr == null || acquired_session_key != key) {
+                if (acquired_session_key != null) {
+                    if (cached_session_mgr != null) {
+                        if (sess_cwd_hid != 0) { cached_session_mgr.disconnect (sess_cwd_hid); sess_cwd_hid = 0; }
+                        if (sess_plot_hid != 0) { cached_session_mgr.disconnect (sess_plot_hid); sess_plot_hid = 0; }
+                    }
+                    Services.PersistentSessionManager.release_session (acquired_session_key);
+                }
+                acquired_session_key = key;
+                cached_session_mgr = Services.PersistentSessionManager.for_key (key);
+            }
+            return cached_session_mgr;
         }
 
         public PersistentPanelRegistry (DocumentPage page, Window? win) {
@@ -127,9 +147,15 @@ namespace Imladris.UI {
             if (hist_added_hid != 0) { hist.disconnect (hist_added_hid); hist_added_hid = 0; }
             if (hist_cleared_hid != 0) { hist.disconnect (hist_cleared_hid); hist_cleared_hid = 0; }
 
-            var sess = get_session_manager ();
-            if (sess_cwd_hid != 0) { sess.disconnect (sess_cwd_hid); sess_cwd_hid = 0; }
-            if (sess_plot_hid != 0) { sess.disconnect (sess_plot_hid); sess_plot_hid = 0; }
+            if (cached_session_mgr != null) {
+                if (sess_cwd_hid != 0) { cached_session_mgr.disconnect (sess_cwd_hid); sess_cwd_hid = 0; }
+                if (sess_plot_hid != 0) { cached_session_mgr.disconnect (sess_plot_hid); sess_plot_hid = 0; }
+                cached_session_mgr = null;
+            }
+            if (acquired_session_key != null) {
+                Services.PersistentSessionManager.release_session (acquired_session_key);
+                acquired_session_key = null;
+            }
 
             var shiny = Services.ShinyService.get_default ();
             if (shiny_status_hid != 0) { shiny.disconnect (shiny_status_hid); shiny_status_hid = 0; }
@@ -1614,9 +1640,11 @@ namespace Imladris.UI {
             }
 
             try {
-                var rx = new GLib.Regex ("\\bView\\s*\\(\\s*([A-Za-z_\\.][A-Za-z0-9_\\.]*)\\s*\\)");
+                if (view_call_regex == null) {
+                    view_call_regex = new GLib.Regex ("\\bView\\s*\\(\\s*([A-Za-z_\\.][A-Za-z0-9_\\.]*)\\s*\\)");
+                }
                 GLib.MatchInfo mi;
-                if (rx.match (sanitized.str, 0, out mi)) {
+                if (view_call_regex.match (sanitized.str, 0, out mi)) {
                     return mi.fetch (1);
                 }
             } catch (GLib.RegexError e) {}
@@ -1871,15 +1899,24 @@ namespace Imladris.UI {
             for (int i = 0; i < lines.length; i++) {
                 string trimmed = lines[i].strip ();
 
-                // 2. Citations detection (@key) excluding Quarto cross-refs (@fig-, @tbl-, @sec-, @eq-, @lst-, @thm-)
-                if (trimmed.contains ("@") && !trimmed.has_prefix ("mailto:")) {
-                    string[] words = trimmed.split_set (" [](),;.\t");
-                    foreach (string w in words) {
-                        if (w.has_prefix ("@") && w.length > 2) {
+                // 2. Citations detection (@key) excluding Quarto cross-refs, Roxygen/Python/CSS tags, and emails
+                if (trimmed.contains ("@") && !trimmed.has_prefix ("mailto:") && !trimmed.has_prefix ("#'")) {
+                    string[] words = trimmed.split_set (" [](),;\t\"'<>");
+                    foreach (string raw_w in words) {
+                        string w = raw_w;
+                        while (w.length > 0 && (w.has_suffix (".") || w.has_suffix (":"))) {
+                            w = w.substring (0, w.length - 1);
+                        }
+                        if (w.has_prefix ("@") && w.length > 2 && !w.substring (1).contains ("@")) {
                             string wl = w.down ();
                             if (wl.has_prefix ("@fig-") || wl.has_prefix ("@tbl-") ||
                                 wl.has_prefix ("@sec-") || wl.has_prefix ("@eq-") ||
-                                wl.has_prefix ("@lst-") || wl.has_prefix ("@thm-")) {
+                                wl.has_prefix ("@lst-") || wl.has_prefix ("@thm-") ||
+                                wl.has_prefix ("@cor-") || wl.has_prefix ("@prp-") ||
+                                wl.has_prefix ("@cnj-") || wl.has_prefix ("@def-") ||
+                                wl.has_prefix ("@exm-") || wl.has_prefix ("@exr-") ||
+                                wl.has_prefix ("@alg-") ||
+                                is_non_citation_at_tag (wl)) {
                                 continue;
                             }
                             var crow = new Adw.ActionRow () {
@@ -1901,6 +1938,25 @@ namespace Imladris.UI {
                     }
                 }
             }
+        }
+
+        private static bool is_non_citation_at_tag (string wl) {
+            const string[] IGNORED_TAGS = {
+                "@param", "@export", "@return", "@details", "@examples", "@import", "@importfrom",
+                "@rdname", "@title", "@description", "@author", "@seealso", "@family", "@keywords",
+                "@slot", "@field", "@section", "@note", "@references", "@aliases", "@usage",
+                "@format", "@source", "@name", "@doctype", "@nord", "@include", "@method",
+                "@s3method", "@inherit", "@inheritparams", "@inheritsection", "@inheritdotparams",
+                "@dataclass", "@property", "@staticmethod", "@classmethod", "@abstractmethod",
+                "@override", "@lru_cache", "@pytest", "@app", "@route", "@component", "@injectable",
+                "@media", "@keyframes", "@font-face", "@supports", "@charset", "@namespace",
+                "@page", "@layer", "@deprecated", "@todo", "@fixme", "@license", "@copyright",
+                "@version", "@since"
+            };
+            foreach (unowned string tag in IGNORED_TAGS) {
+                if (wl == tag) return true;
+            }
+            return false;
         }
 
         private void get_plot_theme_colors (out string bg, out string text, out string card_bg, out string card_border, out string title_col, out string sub_col) {
@@ -2764,10 +2820,11 @@ th { background: #f1f5f9; }
         }
 
         private void render_help_fallback (string topic) {
+            string safe_topic = GLib.Markup.escape_text (topic);
             string html = """<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px;color:#334155;text-align:center;">
 <h3 style="color:#64748b;">No documentation found for <code>%s</code></h3>
 <p style="font-size:12px;color:#94a3b8;">Ensure R is running and package is loaded via <code>library(...)</code>.</p>
-</body></html>""".printf (topic);
+</body></html>""".printf (safe_topic);
             help_view.load_html (html, "file:///");
         }
 

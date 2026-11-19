@@ -234,25 +234,30 @@ message("✔ RStudio project environment initialized for: %s")
 
             // 3. Write .mallorn.json (State, UI layout, metadata)
             string now_iso = new DateTime.now_utc ().format_iso8601 ();
-            string json_content = """{
-  "imladris_version": "%s",
-  "project_name": "%s",
-  "author": "%s",
-  "project_type": "%s",
-  "primary_format": "%s",
-  "sandboxed": %s,
-  "created_at": "%s",
-  "rstudio_compatible": true
-}
-""".printf (
-                config.imladris_version,
-                config.project_name,
-                config.author,
-                config.project_type.to_string (),
-                config.format.get_short_code (),
-                config.sandboxed ? "true" : "false",
-                now_iso
-            );
+            var json_builder = new Json.Builder ();
+            json_builder.begin_object ();
+            json_builder.set_member_name ("imladris_version");
+            json_builder.add_string_value (config.imladris_version);
+            json_builder.set_member_name ("project_name");
+            json_builder.add_string_value (config.project_name);
+            json_builder.set_member_name ("author");
+            json_builder.add_string_value (config.author);
+            json_builder.set_member_name ("project_type");
+            json_builder.add_string_value (config.project_type.to_string ());
+            json_builder.set_member_name ("primary_format");
+            json_builder.add_string_value (config.format.get_short_code ());
+            json_builder.set_member_name ("sandboxed");
+            json_builder.add_boolean_value (config.sandboxed);
+            json_builder.set_member_name ("created_at");
+            json_builder.add_string_value (now_iso);
+            json_builder.set_member_name ("rstudio_compatible");
+            json_builder.add_boolean_value (true);
+            json_builder.end_object ();
+
+            var json_gen = new Json.Generator ();
+            json_gen.set_root (json_builder.get_root ());
+            json_gen.pretty = true;
+            string json_content = json_gen.to_data (null);
             string json_file_path = Path.build_filename (project_dir, ".mallorn.json");
             FileUtils.set_contents (json_file_path, json_content);
 
@@ -264,14 +269,22 @@ sandboxed = %s
 format = "%s"
 author = "%s"
 """.printf (
-                config.project_name,
-                config.imladris_version,
+                escape_toml_string (config.project_name),
+                escape_toml_string (config.imladris_version),
                 config.sandboxed ? "true" : "false",
-                config.format.get_short_code (),
-                config.author
+                escape_toml_string (config.format.get_short_code ()),
+                escape_toml_string (config.author)
             );
             string toml_file_path = Path.build_filename (project_dir, "imladris.toml");
             FileUtils.set_contents (toml_file_path, toml_content);
+        }
+
+        private static string escape_toml_string (string val) {
+            return val.replace ("\\", "\\\\")
+                      .replace ("\"", "\\\"")
+                      .replace ("\n", "\\n")
+                      .replace ("\r", "\\r")
+                      .replace ("\t", "\\t");
         }
 
         /**

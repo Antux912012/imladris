@@ -21,7 +21,7 @@ namespace Imladris.Core {
 
     public class ProvenanceAttestationService : GLib.Object {
 
-        public const string VERSION = "0.24.2";
+        public const string VERSION = "0.33.1";
 
         public static string compute_sha256_string (string content) {
             return GLib.Checksum.compute_for_string (GLib.ChecksumType.SHA256, content);
@@ -76,7 +76,7 @@ namespace Imladris.Core {
             builder.set_member_name ("environmentLocks");
             builder.begin_array ();
 
-            string[] candidate_locks = { "renv.lock", "uv.lock", "environment.yml", "conda-lock.yml", "_quarto.yml" };
+            string[] candidate_locks = { "renv.lock", "uv.lock", "requirements.txt", "environment.yml", "conda-lock.yml", "_quarto.yml" };
             var lock_digests = new GLib.StringBuilder ();
             lock_digests.append (doc_hash);
 
@@ -92,6 +92,34 @@ namespace Imladris.Core {
                     builder.end_object ();
                     lock_digests.append (hash);
                 }
+            }
+
+            // Hash .bib files in project_dir and project_dir/bibliography
+            string[] bib_search_dirs = { project_dir, GLib.Path.build_filename (project_dir, "bibliography") };
+            foreach (var bdir in bib_search_dirs) {
+                try {
+                    var dir = GLib.File.new_for_path (bdir);
+                    if (!dir.query_exists ()) continue;
+                    var enumerator = dir.enumerate_children ("standard::name,standard::type", GLib.FileQueryInfoFlags.NONE, null);
+                    GLib.FileInfo? info;
+                    while ((info = enumerator.next_file (null)) != null) {
+                        if (info.get_file_type () != GLib.FileType.REGULAR) continue;
+                        string fname = info.get_name ();
+                        if (!fname.down ().has_suffix (".bib")) continue;
+                        string fpath = GLib.Path.build_filename (bdir, fname);
+                        string? hash = compute_sha256_file (fpath);
+                        if (hash != null) {
+                            string rel_name = (bdir == project_dir) ? fname : GLib.Path.build_filename ("bibliography", fname);
+                            builder.begin_object ();
+                            builder.set_member_name ("file");
+                            builder.add_string_value (rel_name);
+                            builder.set_member_name ("sha256");
+                            builder.add_string_value (hash);
+                            builder.end_object ();
+                            lock_digests.append (hash);
+                        }
+                    }
+                } catch (GLib.Error e) {}
             }
             builder.end_array ();
 

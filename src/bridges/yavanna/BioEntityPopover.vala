@@ -81,6 +81,7 @@ namespace Imladris.Bridges.Yavanna {
         private double oligo_gc_percent = 0.0;
         private double oligo_tm = 0.0;
         private double oligo_mw = 0.0;
+        private bool oligo_is_rna = false;
 
         public BioEntityPopover () {
             GLib.Object ();
@@ -270,7 +271,7 @@ namespace Imladris.Bridges.Yavanna {
 
         private async void resolve_uniprot_async (string accession, GLib.Cancellable cancellable) {
             string clean_acc = accession.strip ().up ();
-            string url = @"https://rest.uniprot.org/uniprotkb/$clean_acc.json";
+            string url = @"https://rest.uniprot.org/uniprotkb/$(GLib.Uri.escape_string (clean_acc, null, false)).json";
             var msg = new Soup.Message ("GET", url);
             msg.request_headers.append ("Accept", "application/json");
 
@@ -291,7 +292,7 @@ namespace Imladris.Bridges.Yavanna {
                                 var first_hit = sobj.get_array_member ("results").get_object_element (0);
                                 if (first_hit.has_member ("primaryAccession")) {
                                     clean_acc = first_hit.get_string_member ("primaryAccession");
-                                    url = @"https://rest.uniprot.org/uniprotkb/$clean_acc.json";
+                                    url = @"https://rest.uniprot.org/uniprotkb/$(GLib.Uri.escape_string (clean_acc, null, false)).json";
                                     msg = new Soup.Message ("GET", url);
                                     msg.request_headers.append ("Accept", "application/json");
                                     bytes = yield http_session.send_and_read_async (msg, GLib.Priority.DEFAULT, cancellable);
@@ -354,7 +355,7 @@ namespace Imladris.Bridges.Yavanna {
                 resolved_id = prim_acc;
                 resolved_name = full_name;
                 resolved_spec = @"Length: $(seq_len) aa | Mass: $(mol_wt) Da";
-                resolved_canonical_url = @"https://www.uniprot.org/uniprotkb/$prim_acc/entry";
+                resolved_canonical_url = @"https://www.uniprot.org/uniprotkb/$(GLib.Uri.escape_string (prim_acc, null, false))/entry";
                 resolved_api_url = url;
 
                 // Update UI rows
@@ -380,9 +381,10 @@ namespace Imladris.Bridges.Yavanna {
 
         private async void resolve_ensembl_async (string query, GLib.Cancellable cancellable) {
             string clean_q = query.strip ();
-            string url = @"https://rest.ensembl.org/lookup/symbol/homo_sapiens/$clean_q?content-type=application/json";
-            if (clean_q.up ().has_prefix ("ENSG")) {
-                url = @"https://rest.ensembl.org/lookup/id/$(clean_q.up ())?content-type=application/json";
+            string escaped_q = GLib.Uri.escape_string (clean_q, null, false);
+            string url = @"https://rest.ensembl.org/lookup/symbol/homo_sapiens/$escaped_q?content-type=application/json";
+            if (clean_q.up ().has_prefix ("ENS")) {
+                url = @"https://rest.ensembl.org/lookup/id/$(GLib.Uri.escape_string (clean_q.up (), null, false))?content-type=application/json";
             }
 
             var msg = new Soup.Message ("GET", url);
@@ -411,16 +413,21 @@ namespace Imladris.Bridges.Yavanna {
                 int64 end_pos = obj.has_member ("end") ? obj.get_int_member ("end") : 0;
                 int64 strand = obj.has_member ("strand") ? obj.get_int_member ("strand") : 1;
                 string strand_sym = (strand >= 0) ? "(+)" : "(-)";
+                string raw_species = obj.has_member ("species") ? obj.get_string_member ("species") : "homo_sapiens";
+                string species_display = format_ensembl_species (raw_species);
+                string species_url_seg = raw_species.length > 0
+                    ? (raw_species.substring (0, 1).up () + raw_species.substring (1))
+                    : "Homo_sapiens";
 
                 resolved_db = "Ensembl";
                 resolved_id = gene_id;
                 resolved_name = display_name;
                 resolved_spec = @"Chr $seq_region:$start_pos-$end_pos $strand_sym ($assembly)";
-                resolved_canonical_url = @"https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=$gene_id";
+                resolved_canonical_url = @"https://www.ensembl.org/$(GLib.Uri.escape_string (species_url_seg, null, false))/Gene/Summary?g=$(GLib.Uri.escape_string (gene_id, null, false))";
                 resolved_api_url = url;
 
                 row_title.subtitle = @"$display_name ($gene_id)";
-                row_organism.subtitle = "Homo sapiens (Taxon ID: 9606)";
+                row_organism.subtitle = (raw_species == "homo_sapiens") ? "Homo sapiens (Taxon ID: 9606)" : species_display;
                 row_spec.subtitle = resolved_spec;
 
                 resolve_status_label.label = "✔ Successfully resolved from Ensembl";
@@ -462,23 +469,29 @@ namespace Imladris.Bridges.Yavanna {
             this.popdown ();
         }
 
+        private static string format_ensembl_species (string raw_species) {
+            string cleaned = raw_species.strip ().replace ("_", " ");
+            if (cleaned.length == 0) return "Unknown";
+            return cleaned.substring (0, 1).up () + cleaned.substring (1);
+        }
+
         private void on_inject_r_clicked () {
             if (resolved_id.length == 0) return;
-            string clean_id = resolved_id.down ().replace ("_", "-");
+            string clean_id = Core.PlatformUtils.sanitize_chunk_label (resolved_id, "entity");
             string snippet =
 """```{r yavanna-%s, message=FALSE}
 # YAVANNA BIO-ENTITY PROVENANCE: %s:%s (%s)
 entity_url <- "%s"
 entity_json <- jsonlite::fromJSON(entity_url)
 ```
-""".printf (clean_id, resolved_db, resolved_id, resolved_name, resolved_api_url);
+""".printf (clean_id, Core.PlatformUtils.strip_newlines (resolved_db), Core.PlatformUtils.strip_newlines (resolved_id), Core.PlatformUtils.strip_newlines (resolved_name), Core.PlatformUtils.escape_string_literal (resolved_api_url));
             insert_snippet_requested (snippet);
             this.popdown ();
         }
 
         private void on_inject_py_clicked () {
             if (resolved_id.length == 0) return;
-            string clean_id = resolved_id.down ().replace ("_", "-");
+            string clean_id = Core.PlatformUtils.sanitize_chunk_label (resolved_id, "entity");
             string snippet =
 """```{python}
 #| label: yavanna-%s
@@ -488,7 +501,7 @@ resp = requests.get("%s", headers={"Accept": "application/json"}, timeout=10)
 resp.raise_for_status()
 entity_data = resp.json()
 ```
-""".printf (clean_id, resolved_db, resolved_id, resolved_name, resolved_api_url);
+""".printf (clean_id, Core.PlatformUtils.strip_newlines (resolved_db), Core.PlatformUtils.strip_newlines (resolved_id), Core.PlatformUtils.strip_newlines (resolved_name), Core.PlatformUtils.escape_string_literal (resolved_api_url));
             insert_snippet_requested (snippet);
             this.popdown ();
         }
@@ -634,18 +647,26 @@ entity_data = resp.json()
                 oligo_tm = 64.9 + 41.0 * (((double) (count_g + count_c) - 16.4) / (double) n);
             }
 
-            // 5. Approximate Single-Stranded DNA Molecular Weight
-            oligo_mw = ((double) count_a * 313.21) +
-                       ((double) count_t * 304.20) +
-                       ((double) count_g * 329.21) +
-                       ((double) count_c * 289.18) - 61.96;
+            // 5. Approximate Single-Stranded DNA or RNA Molecular Weight
+            oligo_is_rna = clean_sequence.contains ("U");
+            if (oligo_is_rna) {
+                oligo_mw = ((double) count_a * 329.21) +
+                           ((double) count_t * 306.17) +
+                           ((double) count_g * 345.21) +
+                           ((double) count_c * 305.18) - 61.96;
+            } else {
+                oligo_mw = ((double) count_a * 313.21) +
+                           ((double) count_t * 304.20) +
+                           ((double) count_g * 329.21) +
+                           ((double) count_c * 289.18) - 61.96;
+            }
             if (oligo_mw < 0.0) oligo_mw = 0.0;
 
-            // 6. 5' -> 3' Reverse Complement
+            // 6. 5' -> 3' Reverse Complement (A<->U for RNA, A<->T for DNA)
             var rev_comp_sb = new StringBuilder ();
             for (int i = n - 1; i >= 0; i--) {
                 char c = clean_sequence[i];
-                if (c == 'A') rev_comp_sb.append_c ('T');
+                if (c == 'A') rev_comp_sb.append_c (oligo_is_rna ? 'U' : 'T');
                 else if (c == 'T' || c == 'U') rev_comp_sb.append_c ('A');
                 else if (c == 'G') rev_comp_sb.append_c ('C');
                 else if (c == 'C') rev_comp_sb.append_c ('G');
@@ -681,13 +702,14 @@ entity_data = resp.json()
 | **Length ($N$)** | %d nt |
 | **GC Content** | %.1f%% |
 | **Estimated $T_m$ (50 mM Na⁺)** | %.1f °C |
-| **Molecular Weight (ssDNA)** | %.1f Da |
+| **Molecular Weight (%s)** | %.1f Da |
 """.printf (
                 clean_sequence,
                 reverse_complement,
                 oligo_length,
                 oligo_gc_percent,
                 oligo_tm,
+                oligo_is_rna ? "ssRNA" : "ssDNA",
                 oligo_mw
             );
 

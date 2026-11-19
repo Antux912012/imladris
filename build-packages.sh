@@ -23,6 +23,46 @@ ARCH="amd64"
 
 echo "=== Building ${APP_ID} v${VERSION} Packaging ==="
 
+has_native_build_deps() {
+    local tool
+    for tool in meson ninja valac pkg-config; do
+        if ! command -v "${tool}" >/dev/null 2>&1; then
+            echo "Native build tool missing: ${tool}" >&2
+            return 1
+        fi
+    done
+
+    local -a checks=(
+        "gtk4 >= 4.14"
+        "libadwaita-1 >= 1.5"
+        "gtksourceview-5 >= 5.10"
+        "webkitgtk-6.0"
+        "javascriptcoregtk-6.0"
+        "libsoup-3.0"
+        "json-glib-1.0"
+        "libsecret-1 >= 0.20"
+        "gee-0.8"
+        "gio-2.0 >= 2.76"
+        "glib-2.0 >= 2.76"
+        "cairo"
+        "pangocairo"
+        "zlib"
+    )
+    local missing=()
+    local spec
+    for spec in "${checks[@]}"; do
+        if ! pkg-config --exists "${spec}" 2>/dev/null; then
+            missing+=("${spec}")
+        fi
+    done
+
+    if [ "${#missing[@]}" -gt 0 ]; then
+        echo "Native pkg-config dependencies missing (${missing[*]}); falling back to org.gnome.Sdk..." >&2
+        return 1
+    fi
+    return 0
+}
+
 run_meson_build() {
     local build_dir="$1"
     local prefix_dir="$2"
@@ -31,14 +71,14 @@ run_meson_build() {
     if flatpak info org.gnome.Sdk//51 >/dev/null 2>&1; then
         sdk_ver="51"
     fi
-    if pkg-config --atleast-version=4.12 gtk4 && pkg-config --atleast-version=1.5 libadwaita-1 && pkg-config --exists gtksourceview-5 webkitgtk-6.0; then
+    if has_native_build_deps; then
         rm -rf "${build_dir}"
-        meson setup "${build_dir}" --prefix="${prefix_dir}"
+        meson setup "${build_dir}" --prefix="${prefix_dir}" --buildtype=release
         meson compile -C "${build_dir}"
         DESTDIR="${dest_dir}" meson install -C "${build_dir}"
     else
         flatpak run --system --command=bash --devel --filesystem=home --filesystem="${PROJECT_DIR}" org.gnome.Sdk//${sdk_ver} -c \
-            "cd '${PROJECT_DIR}' && rm -rf '${build_dir}' && meson setup '${build_dir}' --prefix='${prefix_dir}' && meson compile -C '${build_dir}' && DESTDIR='${dest_dir}' meson install -C '${build_dir}'"
+            "cd '${PROJECT_DIR}' && rm -rf '${build_dir}' && meson setup '${build_dir}' --prefix='${prefix_dir}' --buildtype=release && meson compile -C '${build_dir}' && DESTDIR='${dest_dir}' meson install -C '${build_dir}'"
     fi
 }
 
@@ -46,7 +86,7 @@ if [[ "${1:-}" != "--deb-only" ]]; then
   # 1. Build Flatpak Bundle (.flatpak)
   echo "--> 1. Building Flatpak (${BUNDLE_NAME})..."
   rm -rf build-flatpak-app repo Imladris.flatpak "${BUNDLE_NAME}"
-  mkdir -p build-flatpak-app/files build-flatpak-app/var
+  mkdir -p build-flatpak-app/files build-flatpak-app/files/toolchain build-flatpak-app/var
 
   PLATFORM_VER="51"
   if ! flatpak info org.gnome.Platform//51 >/dev/null 2>&1; then
@@ -144,8 +184,11 @@ PYEOF
     --socket=wayland \
     --device=dri \
     --talk-name=org.freedesktop.Flatpak \
-    --filesystem=home \
+    --filesystem=xdg-documents \
+    --filesystem=xdg-download \
     --filesystem=xdg-cache/imladris:create \
+    --filesystem=home \
+    --env=PATH=/app/bin:/app/toolchain/bin:/usr/bin \
     --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
 
   flatpak build-export --disable-sandbox repo build-flatpak-app master

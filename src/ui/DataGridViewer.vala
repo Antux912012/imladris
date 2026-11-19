@@ -617,7 +617,7 @@ local({
 """.printf (b64_name, start_row, end_row);
 
             string? plot_out = null;
-            string out_str = yield Services.PersistentSessionManager.for_key (session_key).execute_r_with_options (r_code, null, null, 15000, false, out plot_out);
+            string out_str = yield Services.PersistentSessionManager.peek_for_key (session_key).execute_r_with_options (r_code, null, null, 15000, false, out plot_out);
             parse_tsv_stream (obj_name, out_str);
         }
 
@@ -659,7 +659,7 @@ except Exception as e:
 """.printf (b64_name, start_idx, end_idx, start_idx + 1, start_idx, end_idx, start_idx + 1);
 
             string? plot_out = null;
-            string out_str = yield Services.PersistentSessionManager.for_key (session_key).execute_python_with_options (py_code, null, null, 15000, false, out plot_out);
+            string out_str = yield Services.PersistentSessionManager.peek_for_key (session_key).execute_python_with_options (py_code, null, null, 15000, false, out plot_out);
             parse_tsv_stream (obj_name, out_str);
         }
 

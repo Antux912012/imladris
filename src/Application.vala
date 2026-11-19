@@ -10,7 +10,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.33.0";
+        public const string APP_VERSION = "0.33.1";
         private bool first_launch_toolchain_checked = false;
 
         private const GLib.ActionEntry[] APP_ACTIONS = {

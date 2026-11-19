@@ -74,11 +74,11 @@ namespace Imladris.UI {
             // GROUP 2: DOI Lookup & BibTeX Generation
             var doi_group = new Adw.PreferencesGroup () {
                 title = "Generate Entry from DOI",
-                description = "Paste a DOI (e.g. 10.1038/s41586-020-2649-2) or https://doi.org/... link."
+                description = "Paste a DOI (e.g. 10.1038/s41586-020-2649-2), https://doi.org/... link, PubMed PMID, or arXiv ID."
             };
 
             doi_entry = new Adw.EntryRow () {
-                title = "DOI or DOI URL"
+                title = "DOI, PMID, arXiv ID, or URL"
             };
             doi_entry.entry_activated.connect (on_fetch_clicked);
 
@@ -217,7 +217,7 @@ namespace Imladris.UI {
         private async void fetch_doi_async () {
             string raw = doi_entry.text.strip ();
             if (raw.length == 0) {
-                status_lbl.label = "Enter a DOI, https://doi.org/... URL, or PubMed PMID.";
+                status_lbl.label = "Enter a DOI, https://doi.org/... URL, PubMed PMID, or arXiv ID.";
                 return;
             }
 

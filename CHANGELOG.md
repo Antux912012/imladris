@@ -2,6 +2,11 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.33.1] - 2026-11-19
+
+### Fixed
+- **WebKitGTK 6.0 Live Preview Visibility Sync**: Flushed deferred `pending_preview_refresh` updates when switching RStudio dock tabs, toggling Apostrophe `right_stack`/`console_revealer` visibility, or changing workbench/split modes in `DocumentPage`.
+
 ## [0.33.0] - 2026-11-18
 
 ### Added

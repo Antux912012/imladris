@@ -37,7 +37,14 @@ namespace Imladris.Execution {
             this.project_root = project_root;
         }
 
+        ~ReplBridge () {
+            stop ();
+        }
+
         public async void start () throws Error {
+            if (process != null) {
+                stop ();
+            }
             var launcher = new SubprocessLauncher (
                 SubprocessFlags.STDIN_PIPE |
                 SubprocessFlags.STDOUT_PIPE |
@@ -136,11 +143,9 @@ namespace Imladris.Execution {
 
         public void stop () {
             _is_running = false;
-            try {
-                if (stdin_stream != null) stdin_stream.close (null);
-                if (stdout_stream != null) stdout_stream.close (null);
-                if (stderr_stream != null) stderr_stream.close (null);
-            } catch (GLib.Error e) {}
+            try { if (stdin_stream != null) stdin_stream.close (null); } catch (GLib.Error e) {}
+            try { if (stdout_stream != null) stdout_stream.close (null); } catch (GLib.Error e) {}
+            try { if (stderr_stream != null) stderr_stream.close (null); } catch (GLib.Error e) {}
             stdin_stream = null;
             stdout_stream = null;
             stderr_stream = null;

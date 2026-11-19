@@ -54,6 +54,18 @@ namespace Imladris.Services {
             return _pool.get (norm);
         }
 
+        /**
+         * Returns an existing pooled session without incrementing its reference count,
+         * or falls back to the default session if not yet pooled.
+         */
+        public static PersistentSessionManager peek_for_key (string session_key) {
+            string norm = session_key.strip ();
+            if (norm == "" || _pool == null || !_pool.has_key (norm)) {
+                return get_default ();
+            }
+            return _pool.get (norm);
+        }
+
         public static void release_session (string session_key) {
             string norm = session_key.strip ();
             if (_pool == null || !_pool.has_key (norm)) return;
@@ -102,6 +114,10 @@ namespace Imladris.Services {
 
         public PersistentSessionManager () {
             this._current_working_dir = GLib.Environment.get_current_dir ();
+        }
+
+        ~PersistentSessionManager () {
+            shutdown_all ();
         }
 
         private async void lock_r () {
@@ -155,18 +171,20 @@ namespace Imladris.Services {
                 GLib.warning ("Failed to change process current dir to %s", dir_path);
             }
 
-            string escaped = dir_path.replace ("\\", "/").replace ("\"", "\\\"");
-
             // Route working directory updates through locked 4-field protocol calls
             if (r_initialized && r_process != null) {
-                execute_r_with_options.begin (@"setwd(\"$escaped\")", null, null, 10000, false, (obj, res) => {
+                string hex_dir = Core.PlatformUtils.encode_hex (dir_path.data);
+                string r_chdir = "local({ .h <- '%s'; .idx <- seq.int(1L, nchar(.h), by = 2L); .d <- rawToChar(as.raw(strtoi(substring(.h, .idx, .idx + 1L), 16L))); Encoding(.d) <- 'UTF-8'; setwd(.d) })".printf (hex_dir);
+                execute_r_with_options.begin (r_chdir, null, null, 10000, false, (obj, res) => {
                     string? p;
                     execute_r_with_options.end (res, out p);
                 });
             }
 
             if (py_initialized && py_process != null) {
-                execute_python_with_options.begin (@"import os; os.chdir(\"$escaped\")", null, null, 10000, false, (obj, res) => {
+                string b64_dir = GLib.Base64.encode (dir_path.data);
+                string py_chdir = "import os, base64; os.chdir(base64.b64decode('%s').decode('utf-8'))".printf (b64_dir);
+                execute_python_with_options.begin (py_chdir, null, null, 10000, false, (obj, res) => {
                     string? p;
                     execute_python_with_options.end (res, out p);
                 });
@@ -200,14 +218,6 @@ namespace Imladris.Services {
             }
         }
 
-        private static string encode_hex (uint8[] data) {
-            var sb = new GLib.StringBuilder ();
-            for (int i = 0; i < data.length; i++) {
-                sb.append_printf ("%02x", data[i]);
-            }
-            return sb.str;
-        }
-
         private async string execute_r_internal (
             string code,
             OutputLineFunc? on_output,
@@ -228,7 +238,7 @@ namespace Imladris.Services {
             string plot_file = GLib.Path.build_filename (plot_dir, @"plot_$(plot_id).png");
 
             string sentinel = @"__IMLADRIS_R_DONE_$(plot_id)__";
-            string hex_code = encode_hex (code.data);
+            string hex_code = Core.PlatformUtils.encode_hex (code.data);
             string payload = @"$(sentinel)|1|$(hex_code)|$(plot_file.replace ("\\", "/"))\n";
 
             var exec_cancel = new GLib.Cancellable ();
@@ -597,17 +607,16 @@ for _raw in sys.stdin:
         }
 
         private void terminate_r () {
-            if (r_process != null) {
-                try {
-                    if (r_stdin != null) {
-                        r_stdin.put_string ("q(save = 'no')\n", null);
-                        r_stdin.close (null);
-                    }
-                    if (r_stdout != null) {
-                        r_stdout.close (null);
-                    }
+            if (r_process != null || r_stdin != null || r_stdout != null) {
+                if (r_stdin != null) {
+                    try { r_stdin.close (null); } catch (GLib.Error e) {}
+                }
+                if (r_stdout != null) {
+                    try { r_stdout.close (null); } catch (GLib.Error e) {}
+                }
+                if (r_process != null) {
                     r_process.force_exit ();
-                } catch (GLib.Error e) {}
+                }
                 r_process = null;
                 r_stdin = null;
                 r_stdout = null;
@@ -616,17 +625,16 @@ for _raw in sys.stdin:
         }
 
         private void terminate_python () {
-            if (py_process != null) {
-                try {
-                    if (py_stdin != null) {
-                        py_stdin.put_string ("exit()\n", null);
-                        py_stdin.close (null);
-                    }
-                    if (py_stdout != null) {
-                        py_stdout.close (null);
-                    }
+            if (py_process != null || py_stdin != null || py_stdout != null) {
+                if (py_stdin != null) {
+                    try { py_stdin.close (null); } catch (GLib.Error e) {}
+                }
+                if (py_stdout != null) {
+                    try { py_stdout.close (null); } catch (GLib.Error e) {}
+                }
+                if (py_process != null) {
                     py_process.force_exit ();
-                } catch (GLib.Error e) {}
+                }
                 py_process = null;
                 py_stdin = null;
                 py_stdout = null;

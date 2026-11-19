@@ -20,9 +20,12 @@
         "--socket=wayland",
         "--device=dri",
         "--talk-name=org.freedesktop.Flatpak",
-        "--filesystem=home",
+        "--filesystem=xdg-documents",
+        "--filesystem=xdg-download",
         "--filesystem=xdg-cache/imladris:create",
-        "--env=PATH=/app/bin:/app/toolchain/bin:/usr/bin"
+        "--filesystem=home",
+        "--env=PATH=/app/bin:/app/toolchain/bin:/usr/bin",
+        "--env=WEBKIT_DISABLE_DMABUF_RENDERER=1"
     ],
     "cleanup": [
         "/include",

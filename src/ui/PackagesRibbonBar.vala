@@ -33,6 +33,18 @@ namespace Imladris.UI {
 
         private uint r_debounce_id = 0;
         private uint py_debounce_id = 0;
+        private static GLib.Regex? r_pkg_spec_regex = null;
+
+        ~PackagesRibbonBar () {
+            if (r_debounce_id != 0) {
+                Source.remove (r_debounce_id);
+                r_debounce_id = 0;
+            }
+            if (py_debounce_id != 0) {
+                Source.remove (py_debounce_id);
+                py_debounce_id = 0;
+            }
+        }
 
         public PackagesRibbonBar (PackageIndexCache cache) {
             Object (
@@ -495,8 +507,10 @@ namespace Imladris.UI {
             string s = spec.strip ();
             if (s.length == 0 || s.contains ("..")) return false;
             try {
-                var rx = new GLib.Regex ("^[A-Za-z0-9._/-]+$");
-                return rx.match (s);
+                if (r_pkg_spec_regex == null) {
+                    r_pkg_spec_regex = new GLib.Regex ("^[A-Za-z0-9._/-]+$");
+                }
+                return r_pkg_spec_regex.match (s);
             } catch (GLib.RegexError e) {
                 return false;
             }

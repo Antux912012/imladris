@@ -52,7 +52,7 @@ namespace Imladris.UI {
         public string session_key { get; set; default = "default"; }
 
         private PersistentSessionManager get_session_manager () {
-            return PersistentSessionManager.for_key (session_key);
+            return PersistentSessionManager.peek_for_key (session_key);
         }
 
         public Gee.ArrayList<EnvVariableItem> get_cached_variables () {
@@ -522,22 +522,30 @@ print("___IMLADRIS_ENV_END___")
         private async void fetch_variable_summary (string var_name, string var_engine, Gtk.Label target_label) {
             target_label.label = "Loading summary...";
             if (var_engine == "r") {
+                string hex_name = Core.PlatformUtils.encode_hex (var_name.data);
                 string r_cmd = """
 local({
-  v <- get('%s', envir = .GlobalEnv)
+  .hex <- '%s'
+  .vname <- if (nzchar(.hex)) { .idx <- seq.int(1L, nchar(.hex), by = 2L); .s <- rawToChar(as.raw(strtoi(substring(.hex, .idx, .idx + 1L), 16L))); Encoding(.s) <- 'UTF-8'; .s } else ''
+  v <- get(.vname, envir = .GlobalEnv)
   cat('--- str() ---\n')
   str(v, max.level = 2, list.len = 25)
   cat('\n--- summary() ---\n')
   print(summary(v))
 })
-""".printf (var_name);
+""".printf (hex_name);
                 string? plot_out = null;
                 string res = yield get_session_manager ().execute_r_with_options (r_cmd, null, null, 15000, false, out plot_out);
                 target_label.label = res.strip ().length > 0 ? res.strip () : "No summary available.";
             } else {
+                string b64_name = GLib.Base64.encode (var_name.data);
                 string py_cmd = """
+import base64
 try:
-    v = eval('%s')
+    _vname = base64.b64decode('%s').decode('utf-8')
+    if _vname not in globals():
+        raise KeyError(f"Variable '{_vname}' not found")
+    v = globals()[_vname]
     if hasattr(v, 'info'):
         import io
         buf = io.StringIO()
@@ -549,7 +557,7 @@ try:
         print(repr(v))
 except Exception as e:
     print(str(e))
-""".printf (var_name);
+""".printf (b64_name);
                 string? plot_out = null;
                 string res = yield get_session_manager ().execute_python_with_options (py_cmd, null, null, 15000, false, out plot_out);
                 target_label.label = res.strip ().length > 0 ? res.strip () : "No summary available.";

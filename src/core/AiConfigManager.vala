@@ -329,6 +329,18 @@ namespace Imladris.Core {
                     return false;
             }
         }
+
+        public bool is_local () {
+            switch (this) {
+                case OLLAMA:
+                case LM_STUDIO:
+                case CHERRY_STUDIO:
+                case FREELMAPI_LOCAL:
+                    return true;
+                default:
+                    return false;
+            }
+        }
     }
 
     public class ProviderSettings : GLib.Object {
@@ -391,7 +403,7 @@ namespace Imladris.Core {
     public class AiConfigManager : GLib.Object {
         private static AiConfigManager? _instance = null;
 
-        private AiProvider _active_provider = AiProvider.GEMINI;
+        private AiProvider _active_provider = AiProvider.OLLAMA;
         public AiProvider active_provider {
             get { return _active_provider; }
             set {
@@ -428,7 +440,7 @@ namespace Imladris.Core {
             }
         }
 
-        public bool auto_failover_enabled { get; set; default = true; }
+        public bool auto_failover_enabled { get; set; default = false; }
         public bool free_api_consent_accepted { get; set; default = false; }
 
         private Gee.HashMap<string, ProviderSettings> providers;
@@ -504,8 +516,6 @@ namespace Imladris.Core {
                 AiProvider.CUSTOM
             };
 
-            bool had_active_key = has_valid_key (active_provider);
-
             foreach (var prov in check_order) {
                 string? env_var = prov.get_env_var_name ();
                 string? env_val = null;
@@ -532,10 +542,6 @@ namespace Imladris.Core {
                     var s = get_settings_for (prov);
                     if (s.api_key == "") {
                         s.api_key = env_val.strip ();
-                    }
-                    if (!had_active_key) {
-                        _active_provider = prov;
-                        had_active_key = true;
                     }
                 }
             }

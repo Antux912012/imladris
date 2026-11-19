@@ -70,10 +70,12 @@ namespace Imladris.Execution {
   png(filename = .imladris.plot.file, width = 1200, height = 800, res = 150)
   .imladris.has.plot <- FALSE
   .imladris.plot.hook <- function(...) { .imladris.has.plot <<- TRUE }
+  .imladris.chunk.ok <- TRUE
   # Execute user code safely
   .imladris.res <- tryCatch({
 %s
   }, error = function(e) {
+    .imladris.chunk.ok <<- FALSE
     message(e)
     invisible(NULL)
   })
@@ -83,6 +85,7 @@ namespace Imladris.Execution {
   } else {
     unlink(.imladris.plot.file)
   }
+  if (!.imladris.chunk.ok) cat("\n[IMLADRIS_CHUNK_ERR]\n")
   cat(paste0("\n", "%s", "\n"))
 }
 """.printf (plot_filename.replace ("\\", "/"), raw_code, sentinel);
@@ -108,11 +111,13 @@ try:
 except ImportError:
     _imladris_has_mpl = False
 
+_imladris_chunk_ok = True
 with redirect_stdout(_imladris_stdout), redirect_stderr(_imladris_stderr):
     try:
         _imladris_raw = base64.b64decode("%s").decode('utf-8')
         exec(compile(_imladris_raw, '<chunk>', 'exec'), globals())
     except Exception as e:
+        _imladris_chunk_ok = False
         import traceback
         traceback.print_exc(file=sys.stderr)
 
@@ -124,6 +129,9 @@ if _imladris_has_mpl and plt.get_fignums():
 
 sys.stdout.write(_imladris_stdout.getvalue())
 sys.stderr.write(_imladris_stderr.getvalue())
+if not _imladris_chunk_ok:
+    print("\n[IMLADRIS_CHUNK_ERR]")
+
 print(f"\n%s")
 """.printf (plot_filename, b64_code, sentinel);
             }
@@ -136,6 +144,7 @@ print(f"\n%s")
             var error_buffer = new GLib.StringBuilder ();
 
             bool done = false;
+            bool timed_out = false;
             uint timeout_id = 0;
             GLib.SourceFunc? resume_cb = null;
 
@@ -157,6 +166,7 @@ print(f"\n%s")
             timeout_id = GLib.Timeout.add (30000, () => {
                 timeout_id = 0;
                 if (!done) {
+                    timed_out = true;
                     done = true;
                     if (resume_cb != null) {
                         GLib.Idle.add ((owned) resume_cb);
@@ -183,7 +193,11 @@ print(f"\n%s")
             string full_output = output_buffer.str;
             result.stderr = error_buffer.str;
 
-            // Strip sentinel
+            // Strip sentinel and explicit error marker
+            bool had_chunk_err = full_output.contains ("[IMLADRIS_CHUNK_ERR]");
+            if (had_chunk_err) {
+                full_output = full_output.replace ("[IMLADRIS_CHUNK_ERR]", "");
+            }
             if (full_output.contains (sentinel)) {
                 full_output = full_output.replace (sentinel, "").strip ();
             }
@@ -200,7 +214,7 @@ print(f"\n%s")
             }
 
             result.stdout = full_output.strip ();
-            result.success = (result.stderr.length == 0);
+            result.success = (!had_chunk_err && !timed_out && active_bridge.is_running);
             return result;
         }
     }

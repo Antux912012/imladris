@@ -62,6 +62,11 @@ namespace Imladris {
         private Gtk.Widget? btn_export_rstudio = null;
         private Gtk.Widget? btn_export_jupyter = null;
         private Gtk.Widget? btn_live_preview = null;
+        private Gtk.ToggleButton? btn_preview = null;
+        private Gtk.CheckButton? chk_console = null;
+        private Gtk.ToggleButton? btn_mode_apostrophe = null;
+        private Gtk.ToggleButton? btn_mode_rstudio = null;
+        private bool syncing_ui_toggles = false;
 
         // Plugin Extension Ribbon Tracking
         private Gtk.Box? extensions_ribbon_box = null;
@@ -72,6 +77,15 @@ namespace Imladris {
         private ulong theme_changed_hid = 0;
         private ulong physics_changed_hid = 0;
         private ulong ui_settings_hid = 0;
+        private ulong shiny_status_hid = 0;
+        private ulong elrond_telemetry_hid = 0;
+        private ulong ws_layout_hid = 0;
+        private ulong ws_split_hid = 0;
+        private ulong pm_btn_added_hid = 0;
+        private ulong pm_btn_removed_hid = 0;
+        private ulong pm_toast_hid = 0;
+        private static Regex? zotero_cite_regex = null;
+        private static Regex? pandoc_part_regex = null;
 
         public Window (Adw.Application app) {
             Object (
@@ -109,6 +123,35 @@ namespace Imladris {
                 if (ui_settings_hid != 0) {
                     Core.SettingsManager.get_default ().disconnect (ui_settings_hid);
                     ui_settings_hid = 0;
+                }
+                if (shiny_status_hid != 0) {
+                    Services.ShinyService.get_default ().disconnect (shiny_status_hid);
+                    shiny_status_hid = 0;
+                }
+                if (elrond_telemetry_hid != 0) {
+                    Imladris.AI.ElrondEngineController.get_default ().disconnect (elrond_telemetry_hid);
+                    elrond_telemetry_hid = 0;
+                }
+                if (ws_layout_hid != 0) {
+                    Services.WorkspaceStateManager.get_default ().disconnect (ws_layout_hid);
+                    ws_layout_hid = 0;
+                }
+                if (ws_split_hid != 0) {
+                    Services.WorkspaceStateManager.get_default ().disconnect (ws_split_hid);
+                    ws_split_hid = 0;
+                }
+                var pm_cleanup = Imladris.Plugins.PluginManager.get_default ();
+                if (pm_btn_added_hid != 0) {
+                    pm_cleanup.disconnect (pm_btn_added_hid);
+                    pm_btn_added_hid = 0;
+                }
+                if (pm_btn_removed_hid != 0) {
+                    pm_cleanup.disconnect (pm_btn_removed_hid);
+                    pm_btn_removed_hid = 0;
+                }
+                if (pm_toast_hid != 0) {
+                    pm_cleanup.disconnect (pm_toast_hid);
+                    pm_toast_hid = 0;
                 }
                 for (int i = 0; i < tab_view.n_pages; i++) {
                     var page = tab_view.get_nth_page (i);
@@ -287,7 +330,7 @@ namespace Imladris {
             });
 
             var shiny_svc = Services.ShinyService.get_default ();
-            shiny_svc.status_changed.connect ((st) => {
+            shiny_status_hid = shiny_svc.status_changed.connect ((st) => {
                 if (btn_shiny_app != null && shiny_app_content != null) {
                     if (st == Services.ShinyAppStatus.RUNNING || st == Services.ShinyAppStatus.STARTING) {
                         btn_shiny_app.remove_css_class ("suggested-action");
@@ -582,7 +625,7 @@ namespace Imladris {
             status_bar.append (elrond_telemetry_label);
 
             var elrond_ctrl = Imladris.AI.ElrondEngineController.get_default ();
-            elrond_ctrl.statusbar_telemetry_updated.connect ((telemetry_text, is_active) => {
+            elrond_telemetry_hid = elrond_ctrl.statusbar_telemetry_updated.connect ((telemetry_text, is_active) => {
                 elrond_telemetry_label.label = telemetry_text;
                 if (is_active) {
                     elrond_telemetry_label.remove_css_class ("dim-label");
@@ -653,11 +696,12 @@ namespace Imladris {
             toast_overlay.set_child (content_stack);
             toolbar_view.set_content (toast_overlay);
 
-            Services.WorkspaceStateManager.get_default ().layout_changed.connect ((mode) => {
+            ws_layout_hid = Services.WorkspaceStateManager.get_default ().layout_changed.connect ((mode) => {
                 apply_workspace_layout (mode);
+                sync_document_ui_toggles (get_active_document ());
             });
 
-            Services.WorkspaceStateManager.get_default ().split_changed.connect ((split) => {
+            ws_split_hid = Services.WorkspaceStateManager.get_default ().split_changed.connect ((split) => {
                 var d = get_active_document ();
                 if (d != null) {
                     d.set_split_orientation (split, false);
@@ -677,6 +721,7 @@ namespace Imladris {
                     d.set_split_orientation (doc_split, false);
                     var fmt = d.get_document_format ();
                     update_ribbon_state_machine (fmt, current_project_type);
+                    sync_document_ui_toggles (d);
                     if (d.file_location != null && d.file_location.get_parent () != null) {
                         Services.PersistentSessionManager.get_default ().set_working_directory (
                             d.file_location.get_parent ().get_path (), current_project_type
@@ -695,9 +740,9 @@ namespace Imladris {
 
             var pm = Imladris.Plugins.PluginManager.get_default ();
             pm.active_window = this;
-            pm.ribbon_button_added.connect (on_plugin_ribbon_button_added);
-            pm.ribbon_button_removed.connect (on_plugin_ribbon_button_removed);
-            pm.toast_requested.connect ((msg) => {
+            pm_btn_added_hid = pm.ribbon_button_added.connect (on_plugin_ribbon_button_added);
+            pm_btn_removed_hid = pm.ribbon_button_removed.connect (on_plugin_ribbon_button_removed);
+            pm_toast_hid = pm.toast_requested.connect ((msg) => {
                 this.show_toast (msg);
             });
 
@@ -2459,10 +2504,16 @@ namespace Imladris {
             });
             box.append (btn_live_preview);
 
-            var btn_preview = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-dual-symbolic", "Console", "Toggle Output Console Panel", true, true, true);
+            btn_preview = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-dual-symbolic", "Console", "Toggle Output Console Panel", true, true, true);
             btn_preview.toggled.connect (() => {
+                if (syncing_ui_toggles) return;
                 var d = get_active_document ();
-                if (d != null) d.console_revealer.reveal_child = btn_preview.active;
+                if (d != null) {
+                    if (btn_preview.active) {
+                        d.console_revealer.visible = true;
+                    }
+                    d.console_revealer.reveal_child = btn_preview.active;
+                }
             });
             box.append (btn_preview);
             box.append (RibbonFactory.create_vseparator ());
@@ -2747,7 +2798,7 @@ namespace Imladris {
                 website = "https://antux912012.github.io/imladris/",
                 issue_url = "https://github.com/Antux912012/imladris/issues",
                 support_url = "https://github.com/Antux912012/imladris/discussions",
-                comments = "Native Linux scientific notebook studio for Quarto, R, Python, and Jupyter.\n\nEngineered in compiled Vala and GTK4 with 4-quadrant workbench ergonomics, Positron-style Direct Editor Writing, multi-tier AI quota failover, and domain bridges for bioinformatics and biostatistics.\n\n✨ Proudly developed with Gemini Assistance."
+                comments = "Native Linux scientific notebook studio for Quarto, R, Python, and Jupyter.\n\nEngineered in compiled Vala and GTK4 with 4-quadrant workbench ergonomics, Positron-style Direct Editor Writing, multi-tier AI quota failover, and domain bridges for bioinformatics and biostatistics.\n\n✨ Developed with Google Gemini and Anthropic Claude AI pair-programming assistance."
             };
 
             dialog.add_link ("Architecture Blueprint", "https://github.com/Antux912012/imladris/blob/main/docs/ARCHITECTURE.md");
@@ -2758,7 +2809,8 @@ namespace Imladris {
             dialog.add_link ("Imladris Repository on GitHub", "https://github.com/Antux912012/imladris");
 
             dialog.add_credit_section ("AI Pair Programming", {
-                "Google Gemini Assistance (Advanced Agentic AI Pair Programmer)"
+                "Google Gemini (AI pair programming and source/documentation auditing)",
+                "Anthropic Claude (AI pair programming and source/documentation auditing)"
             });
 
             dialog.add_acknowledgement_section ("Inspiration & Ecosystem", {
@@ -2775,7 +2827,7 @@ namespace Imladris {
                 "Zotero & BetterBibTeX (Reference & CSL citation management)",
                 "KaTeX & Mermaid.js (Mathematical typesetting and flow diagrams)",
                 "GNOME & Libadwaita Teams (Modern design language and components)",
-                "Papirus Development Team (Icon design)"
+                "Papirus Development Team (Bundled Papirus symbolic icons — GPL-3.0-or-later)"
             });
 
             dialog.present (this);
@@ -3217,8 +3269,7 @@ namespace Imladris {
                         var profile = Core.FormatProfile.for_format (fmt);
                         doc.source_buffer.begin_user_action ();
                         if (profile.citation_style == Core.CitationStyle.LATEX_CITE) {
-                            string clean_key = citation.replace ("[@", "").replace ("]", "").replace ("@", "").replace (";", ",");
-                            doc.source_buffer.insert_at_cursor (@"\\cite{$clean_key}", -1);
+                            doc.source_buffer.insert_at_cursor (convert_pandoc_citation_to_latex (citation), -1);
                         } else {
                             doc.source_buffer.insert_at_cursor (citation, -1);
                         }
@@ -3228,9 +3279,11 @@ namespace Imladris {
                             Editor.CitationCompletionProvider.ensure_buffer_bibliography_line (doc.source_buffer, "references.bib");
                         }
                         try {
-                            var reg = new Regex ("@([a-zA-Z0-9_:-]+)");
+                            if (zotero_cite_regex == null) {
+                                zotero_cite_regex = new Regex ("@([a-zA-Z0-9_:-]+)");
+                            }
                             MatchInfo mi;
-                            if (reg.match (citation, 0, out mi)) {
+                            if (zotero_cite_regex.match (citation, 0, out mi)) {
                                 while (mi.matches ()) {
                                     string key = mi.fetch (1);
                                     zotero.sync_citation_to_project_async.begin (key, doc.current_project_dir);
@@ -3246,6 +3299,59 @@ namespace Imladris {
             });
         }
 
+        private static string convert_pandoc_citation_to_latex (string citation) {
+            string inner = citation.strip ();
+            if (inner.has_prefix ("[") && inner.has_suffix ("]") && inner.length >= 2) {
+                inner = inner.substring (1, inner.length - 2).strip ();
+            }
+
+            string[] parts = inner.split (";");
+            var keys_only = new GenericArray<string> ();
+            var formatted_parts = new GenericArray<string> ();
+            bool has_locator = false;
+
+            try {
+                if (pandoc_part_regex == null) {
+                    pandoc_part_regex = new Regex ("^[^@]*@([a-zA-Z0-9_:-]+)(?:\\s*,\\s*(.+))?$");
+                }
+                foreach (string raw_part in parts) {
+                    string p = raw_part.strip ();
+                    if (p.length == 0) continue;
+                    MatchInfo mi;
+                    if (pandoc_part_regex.match (p, 0, out mi)) {
+                        string key = mi.fetch (1);
+                        string? loc = mi.fetch (2);
+                        if (loc != null && loc.strip ().length > 0) {
+                            has_locator = true;
+                            formatted_parts.add (@"\\cite[$(loc.strip ())]{$key}");
+                        } else {
+                            keys_only.add (key);
+                            formatted_parts.add (@"\\cite{$key}");
+                        }
+                    }
+                }
+            } catch (RegexError e) {}
+
+            if (formatted_parts.length > 0) {
+                if (!has_locator && keys_only.length > 0) {
+                    var sb = new StringBuilder ();
+                    for (int i = 0; i < keys_only.length; i++) {
+                        if (i > 0) sb.append (", ");
+                        sb.append (keys_only[i]);
+                    }
+                    return @"\\cite{$(sb.str)}";
+                }
+                var sb = new StringBuilder ();
+                for (int i = 0; i < formatted_parts.length; i++) {
+                    sb.append (formatted_parts[i]);
+                }
+                return sb.str;
+            }
+
+            string fallback = citation.replace ("[@", "").replace ("]", "").replace ("@", "").replace (";", ",").strip ();
+            return @"\\cite{$fallback}";
+        }
+
         public void open_doi_bib_manager () {
             var doc = get_active_document ();
             string base_dir = current_project_dir;
@@ -3256,7 +3362,9 @@ namespace Imladris {
             if (base_dir == "") {
                 base_dir = GLib.Environment.get_home_dir ();
             }
-            string bib_path = GLib.Path.build_filename (base_dir, "references.bib");
+            string bib_subdir_path = GLib.Path.build_filename (base_dir, "bibliography", "references.bib");
+            string bib_root_path = GLib.Path.build_filename (base_dir, "references.bib");
+            string bib_path = GLib.FileUtils.test (bib_subdir_path, GLib.FileTest.EXISTS) ? bib_subdir_path : bib_root_path;
             string? doc_path = (doc != null && doc.file_location != null) ? doc.file_location.get_path () : null;
             if (doc_path != null && doc_path.down ().has_suffix (".bib")) {
                 bib_path = doc_path;
@@ -3335,16 +3443,18 @@ namespace Imladris {
             var box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
 
             // Group 1: Workspace Mode Toggle
-            var btn_mode_apostrophe = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("edit-find-symbolic", "Focus Mode", "Apostrophe Distraction-Free Layout", true, true, true);
-            var btn_mode_rstudio = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-grid-symbolic", "RStudio 4-Quad", "RStudio-Style 4-Quadrant Workbench Layout", true, false, true);
+            btn_mode_apostrophe = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("edit-find-symbolic", "Focus Mode", "Apostrophe Distraction-Free Layout", true, true, true);
+            btn_mode_rstudio = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-grid-symbolic", "RStudio 4-Quad", "RStudio-Style 4-Quadrant Workbench Layout", true, false, true);
             btn_mode_rstudio.set_group (btn_mode_apostrophe);
 
             btn_mode_apostrophe.toggled.connect (() => {
+                if (syncing_ui_toggles) return;
                 if (btn_mode_apostrophe.active) {
                     Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.APOSTROPHE, true);
                 }
             });
             btn_mode_rstudio.toggled.connect (() => {
+                if (syncing_ui_toggles) return;
                 if (btn_mode_rstudio.active) {
                     Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
                 }
@@ -3476,10 +3586,16 @@ namespace Imladris {
                 var d = get_active_document ();
                 if (d != null) d.source_view.wrap_mode = chk_wrap.active ? Gtk.WrapMode.WORD_CHAR : Gtk.WrapMode.NONE;
             });
-            var chk_console = new Gtk.CheckButton.with_label ("Console");
+            chk_console = new Gtk.CheckButton.with_label ("Console");
             chk_console.toggled.connect (() => {
+                if (syncing_ui_toggles) return;
                 var d = get_active_document ();
-                if (d != null) d.console_revealer.reveal_child = chk_console.active;
+                if (d != null) {
+                    if (chk_console.active) {
+                        d.console_revealer.visible = true;
+                    }
+                    d.console_revealer.reveal_child = chk_console.active;
+                }
             });
 
             chk_grid.attach (chk_line_no, 0, 0, 1, 1);
@@ -3489,6 +3605,32 @@ namespace Imladris {
             box.append (chk_grid);
 
             return box;
+        }
+
+        public void sync_document_ui_toggles (DocumentPage? d) {
+            if (d == null) return;
+            syncing_ui_toggles = true;
+            try {
+                bool panel_open = d.console_revealer.visible && d.console_revealer.reveal_child;
+                if (btn_preview != null && btn_preview.active != panel_open) {
+                    btn_preview.active = panel_open;
+                }
+                if (chk_console != null && chk_console.active != panel_open) {
+                    chk_console.active = panel_open;
+                }
+                var mode = d.get_workbench_mode ();
+                if (mode == Services.LayoutMode.RSTUDIO) {
+                    if (btn_mode_rstudio != null && !btn_mode_rstudio.active) {
+                        btn_mode_rstudio.active = true;
+                    }
+                } else {
+                    if (btn_mode_apostrophe != null && !btn_mode_apostrophe.active) {
+                        btn_mode_apostrophe.active = true;
+                    }
+                }
+            } finally {
+                syncing_ui_toggles = false;
+            }
         }
     }
 }

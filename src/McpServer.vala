@@ -244,6 +244,17 @@ namespace Imladris {
             return final_result;
         }
 
+        private static string get_opt_string (Json.Object? obj, string key, string fallback = "") {
+            if (obj == null || !obj.has_member (key)) {
+                return fallback;
+            }
+            var node = obj.get_member (key);
+            if (node != null && node.get_node_type () == Json.NodeType.VALUE && node.get_value_type () == typeof (string)) {
+                return node.get_string () ?? fallback;
+            }
+            return fallback;
+        }
+
         private static string execute_tool (string name, Json.Object? args, Window? window) {
             if (window == null) {
                 return "Error: No active Imladris window.";
@@ -255,13 +266,13 @@ namespace Imladris {
                 return @"Language: $(doc.doc_type)\nLines: $(doc.source_buffer.get_line_count ())\n\nContent:\n$(doc.get_clean_source_text ())";
             } else if (name == "insert_text") {
                 if (doc == null) return "No active document open.";
-                string txt = (args != null && args.has_member ("text") && !args.get_null_member ("text")) ? (args.get_string_member ("text") ?? "") : "";
+                string txt = get_opt_string (args, "text", "");
                 doc.source_buffer.insert_at_cursor (txt, -1);
                 return "✔ Text inserted successfully at cursor.";
             } else if (name == "insert_code_chunk") {
                 if (doc == null) return "No active document open.";
-                string engine = (args != null && args.has_member ("engine") && !args.get_null_member ("engine")) ? (args.get_string_member ("engine") ?? "python") : "python";
-                string opt = (args != null && args.has_member ("options") && !args.get_null_member ("options")) ? (args.get_string_member ("options") ?? "") : "";
+                string engine = get_opt_string (args, "engine", "python");
+                string opt = get_opt_string (args, "options", "");
                 doc.insert_code_chunk (engine, opt);
                 return @"✔ Code chunk {$engine} inserted successfully.";
             } else if (name == "execute_code") {
@@ -269,7 +280,7 @@ namespace Imladris {
                 if (Environment.get_variable ("IMLADRIS_MCP_ALLOW_EXEC") != "1") {
                     return "Security Error: MCP execute_code is disabled by default. Set IMLADRIS_MCP_ALLOW_EXEC=1 to opt in.";
                 }
-                string cmd = (args != null && args.has_member ("command") && !args.get_null_member ("command")) ? (args.get_string_member ("command") ?? "") : "";
+                string cmd = get_opt_string (args, "command", "");
                 if (cmd.length == 0) return "Error: No command provided.";
                 string[] parts;
                 try {
@@ -290,7 +301,7 @@ namespace Imladris {
                 ExecutionEngine.run_command_async.begin (parts, doc);
                 return @"▶ Executing command asynchronously: $cmd";
             } else if (name == "render_document") {
-                string fmt = (args != null && args.has_member ("format") && !args.get_null_member ("format")) ? (args.get_string_member ("format") ?? "html") : "html";
+                string fmt = get_opt_string (args, "format", "html");
                 window.trigger_render (fmt);
                 return @"▶ Render pipeline triggered for target: $fmt";
             } else if (name == "get_open_tabs") {

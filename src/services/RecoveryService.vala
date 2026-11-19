@@ -103,10 +103,12 @@ namespace Imladris.Services {
                         json_gen.set_root (builder.get_root ());
                         json_gen.to_file (doc_temp_file);
 
-                        // Atomic rename
+                        // Restrict permissions before and after atomic rename
+                        GLib.FileUtils.chmod (doc_temp_file, 0600);
                         var tmp = GLib.File.new_for_path (doc_temp_file);
                         var dest = GLib.File.new_for_path (doc_cache_file);
                         tmp.move (dest, GLib.FileCopyFlags.OVERWRITE, null, null);
+                        GLib.FileUtils.chmod (doc_cache_file, 0600);
                     }
                 } catch (GLib.Error e) {
                     GLib.warning ("Recovery snapshot error: %s", e.message);

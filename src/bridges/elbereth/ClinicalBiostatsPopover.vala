@@ -320,6 +320,30 @@ namespace Imladris.Bridges.Elbereth {
             }
         }
 
+        private double get_effective_hr () {
+            double hr = param1_spin.value;
+            if (GLib.Math.fabs (hr - 1.0) < 0.02) {
+                return 0.95;
+            }
+            return hr;
+        }
+
+        private static string sanitize_identifier (string raw, string fallback) {
+            string s = raw.strip ();
+            var sb = new StringBuilder ();
+            for (int i = 0; i < s.length; i++) {
+                char c = s[i];
+                if (c.isalnum () || c == '_' || c == '.') {
+                    sb.append_c (c);
+                }
+            }
+            string cleaned = sb.str;
+            if (cleaned.length == 0 || cleaned == "." || cleaned[0].isdigit ()) {
+                return fallback;
+            }
+            return cleaned;
+        }
+
         private void recalculate_sample_size () {
             double alpha = get_selected_alpha ();
             double power = power_spin.value;
@@ -355,8 +379,7 @@ namespace Imladris.Bridges.Elbereth {
                 calc_evaluable_n = calc_n1 + calc_n2;
                 arm_breakdown_row.subtitle = @"$(calc_n1) per arm (Δp = %.1f%%)".printf (diff * 100.0);
             } else {
-                double hr = p1;
-                if (GLib.Math.fabs (hr - 1.0) < 0.02) hr = 0.95;
+                double hr = get_effective_hr ();
                 double ev_prob = double.max (0.05, p2);
                 double log_hr = GLib.Math.log (hr);
                 double req_events = 4.0 * GLib.Math.pow (z_alpha + z_beta, 2.0) / (log_hr * log_hr);
@@ -389,14 +412,18 @@ namespace Imladris.Bridges.Elbereth {
                 double se = GLib.Math.sqrt ((1.0 + 1.0 / k) / double.max (1.0, n1));
                 return normal_cdf (d / se - z_alpha);
             } else if (mode == 1) {
-                double diff = GLib.Math.fabs (p2 - p1);
+                double diff = double.max (0.005, GLib.Math.fabs (p2 - p1));
                 double n_arm = double.max (2.0, total_n / 2.0);
-                double se = GLib.Math.sqrt ((p1 * (1.0 - p1) + p2 * (1.0 - p2)) / n_arm);
-                if (se <= 1e-9) return 1.0;
-                return normal_cdf (diff / se - z_alpha);
+                double p_bar = 0.5 * (p1 + p2);
+                double sd_null = GLib.Math.sqrt (2.0 * p_bar * (1.0 - p_bar));
+                double sd_alt = GLib.Math.sqrt (p1 * (1.0 - p1) + p2 * (1.0 - p2));
+                if (sd_alt <= 1e-9) return 1.0;
+                double u = GLib.Math.sqrt (n_arm);
+                double sqrt_n_eff = double.max (0.0, u - 1.0 / (u * diff));
+                double z_beta = (sqrt_n_eff * diff - z_alpha * sd_null) / sd_alt;
+                return normal_cdf (z_beta);
             } else {
-                double hr = p1;
-                if (GLib.Math.fabs (hr - 1.0) < 0.02) hr = 0.95;
+                double hr = get_effective_hr ();
                 double ev_prob = double.max (0.05, p2);
                 double events = total_n * ev_prob;
                 double z = 0.5 * GLib.Math.fabs (GLib.Math.log (hr)) * GLib.Math.sqrt (events) - z_alpha;
@@ -501,7 +528,7 @@ req_events <- ceiling(4 * (z_alpha + z_beta)^2 / (log(hr)^2))
 n_evaluable <- ceiling(req_events / p_event)
 cat(sprintf("Required Events: %%d | Evaluable Sample Size: %%d\n", req_events, n_evaluable))
 ```
-""".printf (alpha, power, param1_spin.value, param2_spin.value);
+""".printf (alpha, power, get_effective_hr (), param2_spin.value);
             }
         }
 
@@ -522,10 +549,10 @@ print(f"Evaluable N = %d | Attrition-Adjusted Enrolled N = %d")
         }
 
         private string build_clinical_r_template () {
-            string df = dataset_entry.text.strip ();
-            string arm = group_col_entry.text.strip ();
-            string aval = outcome_col_entry.text.strip ();
-            string ev = status_col_entry.text.strip ();
+            string df = sanitize_identifier (dataset_entry.text, "clinical_df");
+            string arm = sanitize_identifier (group_col_entry.text, "ARM");
+            string aval = sanitize_identifier (outcome_col_entry.text, "AVAL");
+            string ev = sanitize_identifier (status_col_entry.text, "EVENT");
 
             switch (template_selector.selected) {
                 case 0:
@@ -558,15 +585,16 @@ plot(km_fit, col = c("#2563eb", "#dc2626"), lwd = 2,
                 case 2:
                     return """```{r clinical-forest-plot, message=FALSE, warning=FALSE}
 # SUBGROUP HAZARD RATIO / ODDS RATIO FOREST PLOT (95%% CI)
+# Expects explicit CI bound columns: ci_lower, ci_upper
 library(ggplot2)
-ggplot(%s, aes(x = %s, y = %s)) +
+ggplot(%s, aes(x = .data[["%s"]], y = .data[["%s"]])) +
   geom_vline(xintercept = 1.0, linetype = "dashed", color = "#64748b") +
-  geom_errorbarh(aes(xmin = %s * 0.75, xmax = %s * 1.33), height = 0.2, color = "#475569") +
+  geom_errorbarh(aes(xmin = ci_lower, xmax = ci_upper), height = 0.2, color = "#475569") +
   geom_point(size = 3, color = "#2563eb") +
   theme_minimal() +
   labs(title = "Subgroup Forest Plot", x = "Hazard Ratio (95%% CI)", y = "Subgroup")
 ```
-""".printf (df, aval, arm, aval, aval);
+""".printf (df, aval, arm);
                 default:
                     return """```{r omics-volcano-plot, message=FALSE, warning=FALSE}
 # MULTI-OMICS DIFFERENTIAL EXPRESSION VOLCANO PLOT (FDR < 0.05, |log2FC| > 1.0)
@@ -586,10 +614,10 @@ ggplot(%s, aes(x = .data[["%s"]], y = neg_log10_padj, color = sig_status)) +
         }
 
         private string build_clinical_py_template () {
-            string df = dataset_entry.text.strip ();
-            string arm = group_col_entry.text.strip ();
-            string aval = outcome_col_entry.text.strip ();
-            string ev = status_col_entry.text.strip ();
+            string df = sanitize_identifier (dataset_entry.text, "clinical_df");
+            string arm = sanitize_identifier (group_col_entry.text, "ARM");
+            string aval = sanitize_identifier (outcome_col_entry.text, "AVAL");
+            string ev = sanitize_identifier (status_col_entry.text, "EVENT");
 
             if (template_selector.selected == 3) {
                 return """```{python omics-volcano-py}

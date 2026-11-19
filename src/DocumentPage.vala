@@ -59,6 +59,10 @@ namespace Imladris {
         private ulong physics_changed_handler_id = 0;
         private double last_preview_scroll_y = 0.0;
         private bool has_loaded_preview = false;
+        private uint64 preview_load_generation = 0;
+        private string? active_custom_uri = null;
+        private uint deferred_flush_id = 0;
+        private uint scroll_sync_debounce_id = 0;
 
         public Services.LayoutMode get_workbench_mode () {
             return current_layout_mode;
@@ -78,6 +82,11 @@ namespace Imladris {
             if (mark_unmodified) {
                 source_buffer.set_modified (false);
             }
+            if (update_debounce_id != 0) {
+                GLib.Source.remove (update_debounce_id);
+                update_debounce_id = 0;
+            }
+            refresh_live_preview (text);
         }
 
         private static void ensure_bundled_language_specs () {
@@ -303,6 +312,14 @@ namespace Imladris {
                 hexpand = true,
                 vexpand = true
             };
+            editor_scroller.vadjustment.value_changed.connect (() => {
+                schedule_preview_scroll_sync ();
+            });
+            source_buffer.notify["cursor-position"].connect (() => {
+                if (source_view.has_focus) {
+                    schedule_preview_scroll_sync ();
+                }
+            });
 
             // 2. Shared WebKitGTK 6.0 & Console Instances (Kept alive in PersistentPanelRegistry)
             web_view = UI.WebViewFactory.create ();
@@ -314,7 +331,7 @@ namespace Imladris {
                 if (load_event == WebKit.LoadEvent.FINISHED) {
                     has_loaded_preview = true;
                     if (last_preview_scroll_y > 0.0) {
-                        double target_y = last_preview_scroll_y;
+                        int target_y = (int) Math.round (last_preview_scroll_y);
                         web_view.evaluate_javascript.begin (@"window.scrollTo(0, $(target_y));", -1, null, null, null);
                     }
                 }
@@ -323,10 +340,13 @@ namespace Imladris {
             int web_process_crashes = 0;
             web_view.web_process_terminated.connect ((reason) => {
                 web_process_crashes++;
+                has_loaded_preview = false;
+                preview_load_generation++;
                 GLib.warning ("WebKit WebProcess terminated (reason: %d, count: %d)", (int) reason, web_process_crashes);
                 if (web_process_crashes <= 2) {
                     var s = web_view.get_settings ();
                     s.hardware_acceleration_policy = WebKit.HardwareAccelerationPolicy.NEVER;
+                    s.enable_webgl = false;
                     GLib.Idle.add (() => {
                         refresh_live_preview ();
                         return GLib.Source.REMOVE;
@@ -338,6 +358,9 @@ namespace Imladris {
             });
 
             web_view.load_failed.connect ((load_event, failing_uri, err) => {
+                if (err is WebKit.NetworkError.CANCELLED || err is GLib.IOError.CANCELLED) {
+                    return true;
+                }
                 GLib.warning ("WebKit load_failed (%s): %s", failing_uri, err.message);
                 string err_html = "<!DOCTYPE html><html><body style='font-family:system-ui,sans-serif;padding:24px;color:#991b1b;background:#fef2f2;'><h3>Preview Load Failed</h3><p><code>%s</code></p><p>%s</p></body></html>".printf (
                     GLib.Markup.escape_text (failing_uri),
@@ -347,22 +370,22 @@ namespace Imladris {
                 return true;
             });
 
+            // Reparenting (Apostrophe <-> RStudio or moving quadrants) unrealizes the WebView in GTK4,
+            // which can drop its backing surface; mark it for reload once re-mapped.
+            web_view.unrealize.connect (() => {
+                has_loaded_preview = false;
+                preview_load_generation++;
+                if (active_custom_uri != null && pending_preview_uri == null) {
+                    pending_preview_uri = active_custom_uri;
+                } else if (pending_preview_uri == null) {
+                    pending_preview_refresh = true;
+                }
+            });
+
             // Flush deferred preview loads once GTK4 realizes and maps the WebView with a valid allocation
             web_view.map.connect (() => {
                 if (pending_preview_uri != null || pending_preview_refresh) {
-                    GLib.Idle.add (() => {
-                        if (!web_view.get_mapped ()) return GLib.Source.REMOVE;
-                        if (pending_preview_uri != null) {
-                            string target_uri = pending_preview_uri;
-                            pending_preview_uri = null;
-                            pending_preview_refresh = false;
-                            web_view.load_uri (target_uri);
-                        } else if (pending_preview_refresh) {
-                            pending_preview_refresh = false;
-                            refresh_live_preview ();
-                        }
-                        return GLib.Source.REMOVE;
-                    });
+                    schedule_deferred_preview_flush ();
                 }
             });
 
@@ -382,6 +405,11 @@ namespace Imladris {
 
             panel_registry = new PersistentPanelRegistry (this, parent_window);
             rstudio_dock_grid = new RStudioDockGrid (dock_layout_state, panel_registry, parent_window);
+            dock_layout_state.state_updated.connect (() => {
+                if (current_layout_mode == Services.LayoutMode.RSTUDIO) {
+                    refresh_pending_preview_if_visible ();
+                }
+            });
 
             // 4. Build Apostrophe Shell (Single-Pane / Clean Split Writer View)
             paned = new Gtk.Paned (Gtk.Orientation.HORIZONTAL) {
@@ -462,6 +490,29 @@ namespace Imladris {
                 right_stack.add_titled (assistant_panel, "assistant", "Elrond Assistance");
             }
             right_stack.visible_child_name = "preview";
+            right_stack.notify["visible-child-name"].connect (() => {
+                if (right_stack.visible_child_name == "preview") {
+                    refresh_pending_preview_if_visible ();
+                }
+            });
+            console_revealer.notify["reveal-child"].connect (() => {
+                if (console_revealer.reveal_child) {
+                    refresh_pending_preview_if_visible ();
+                }
+                if (parent_window != null && parent_window.get_active_document () == this) {
+                    parent_window.sync_document_ui_toggles (this);
+                }
+            });
+            console_revealer.notify["visible"].connect (() => {
+                if (parent_window != null && parent_window.get_active_document () == this) {
+                    parent_window.sync_document_ui_toggles (this);
+                }
+            });
+            console_revealer.notify["child-revealed"].connect (() => {
+                if (console_revealer.child_revealed && (pending_preview_uri != null || pending_preview_refresh)) {
+                    schedule_deferred_preview_flush ();
+                }
+            });
 
             right_box.append (right_stack);
             console_revealer.set_child (right_box);
@@ -548,6 +599,14 @@ namespace Imladris {
                 GLib.Source.remove (update_debounce_id);
                 update_debounce_id = 0;
             }
+            if (deferred_flush_id != 0) {
+                GLib.Source.remove (deferred_flush_id);
+                deferred_flush_id = 0;
+            }
+            if (scroll_sync_debounce_id != 0) {
+                GLib.Source.remove (scroll_sync_debounce_id);
+                scroll_sync_debounce_id = 0;
+            }
             if (source_buffer != null && !source_buffer.get_modified ()) {
                 Services.RecoveryService.get_default ().purge_document_cache (doc_id);
             }
@@ -630,6 +689,7 @@ namespace Imladris {
 
                 rstudio_dock_grid.refresh_dock_layout ();
             }
+            refresh_pending_preview_if_visible ();
         }
 
         private void setup_text_tags () {
@@ -811,15 +871,21 @@ body {
         }
 
         public void refresh_live_preview (string? preloaded_text = null) {
-            bool is_preview_hidden = !web_view.get_mapped () ||
-                (current_layout_mode == Services.LayoutMode.APOSTROPHE &&
-                 (!console_revealer.reveal_child || right_stack.visible_child_name != "preview"));
-            if (is_preview_hidden) {
+            bool is_layout_hidden = (current_layout_mode == Services.LayoutMode.APOSTROPHE &&
+                (!console_revealer.reveal_child || right_stack.visible_child_name != "preview"));
+            bool is_unallocated = !web_view.get_mapped () ||
+                web_view.get_width () <= 0 ||
+                web_view.get_height () <= 0;
+            if (is_layout_hidden || is_unallocated) {
                 pending_preview_refresh = true;
+                if (!is_layout_hidden && web_view.get_mapped ()) {
+                    schedule_deferred_preview_flush ();
+                }
                 return;
             }
             pending_preview_refresh = false;
             pending_preview_uri = null;
+            active_custom_uri = null;
 
             string raw = preloaded_text != null ? preloaded_text : get_clean_source_text ();
             string? base_uri = null;
@@ -962,8 +1028,107 @@ body {
             load_html_preserving_scroll (html, base_uri);
         }
 
+        private void schedule_deferred_preview_flush () {
+            if (deferred_flush_id != 0) {
+                return;
+            }
+            int attempts = 0;
+            deferred_flush_id = GLib.Idle.add (() => {
+                if (!web_view.get_mapped ()) {
+                    deferred_flush_id = 0;
+                    return GLib.Source.REMOVE;
+                }
+                if (web_view.get_width () <= 0 || web_view.get_height () <= 0) {
+                    attempts++;
+                    if (attempts >= 12) {
+                        deferred_flush_id = 0;
+                        return GLib.Source.REMOVE;
+                    }
+                    deferred_flush_id = GLib.Timeout.add (40, () => {
+                        deferred_flush_id = 0;
+                        if (web_view.get_mapped () && (pending_preview_uri != null || pending_preview_refresh)) {
+                            refresh_pending_preview_if_visible ();
+                        }
+                        return GLib.Source.REMOVE;
+                    });
+                    return GLib.Source.REMOVE;
+                }
+                deferred_flush_id = 0;
+                refresh_pending_preview_if_visible ();
+                return GLib.Source.REMOVE;
+            });
+        }
+
+        private void refresh_pending_preview_if_visible () {
+            if ((!pending_preview_refresh && pending_preview_uri == null) || !web_view.get_mapped ()) {
+                return;
+            }
+            if (current_layout_mode == Services.LayoutMode.APOSTROPHE &&
+                (!console_revealer.reveal_child || right_stack.visible_child_name != "preview")) {
+                return;
+            }
+            if (web_view.get_width () <= 0 || web_view.get_height () <= 0) {
+                schedule_deferred_preview_flush ();
+                return;
+            }
+            if (pending_preview_uri != null) {
+                string target_uri = pending_preview_uri;
+                pending_preview_uri = null;
+                pending_preview_refresh = false;
+                active_custom_uri = target_uri;
+                preview_load_generation++;
+                web_view.load_uri (target_uri);
+                return;
+            }
+            refresh_live_preview ();
+        }
+
+        private void schedule_preview_scroll_sync () {
+            if (!is_live_preview_sync_active ()) {
+                return;
+            }
+            if (scroll_sync_debounce_id != 0) {
+                GLib.Source.remove (scroll_sync_debounce_id);
+            }
+            scroll_sync_debounce_id = GLib.Timeout.add (40, () => {
+                scroll_sync_debounce_id = 0;
+                sync_preview_scroll_proportional ();
+                return GLib.Source.REMOVE;
+            });
+        }
+
+        private bool is_live_preview_sync_active () {
+            if (active_custom_uri != null || !has_loaded_preview || web_view.is_loading || !web_view.get_mapped ()) {
+                return false;
+            }
+            if (web_view.get_width () <= 0 || web_view.get_height () <= 0) {
+                return false;
+            }
+            if (current_layout_mode == Services.LayoutMode.APOSTROPHE) {
+                return console_revealer.visible && console_revealer.reveal_child && right_stack.visible_child_name == "preview";
+            }
+            return true;
+        }
+
+        private void sync_preview_scroll_proportional () {
+            if (!is_live_preview_sync_active ()) {
+                return;
+            }
+            var vadj = editor_scroller.vadjustment;
+            double max_scroll = vadj.upper - vadj.page_size;
+            double ratio = 0.0;
+            if (max_scroll > 1.0) {
+                ratio = (vadj.value / max_scroll).clamp (0.0, 1.0);
+            }
+            char buf[double.DTOSTR_BUF_SIZE];
+            string ratio_str = ratio.format (buf, "%.6f");
+            string js = @"(function(){ var max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight); var target = Math.round(max * $ratio_str); window.scrollTo({ top: target, behavior: 'smooth' }); })();";
+            web_view.evaluate_javascript.begin (js, -1, null, null, null);
+        }
+
         private void load_html_preserving_scroll (string html, string base_uri) {
-            if (!has_loaded_preview) {
+            uint64 gen = ++preview_load_generation;
+            if (!has_loaded_preview || web_view.is_loading || !web_view.get_mapped ()) {
                 web_view.load_html (html, base_uri);
                 return;
             }
@@ -974,6 +1139,9 @@ body {
                         last_preview_scroll_y = js_val.to_double ();
                     }
                 } catch (GLib.Error e) {}
+                if (gen != preview_load_generation) {
+                    return;
+                }
                 web_view.load_html (html, base_uri);
             });
         }
@@ -1034,6 +1202,7 @@ body {
                     }
                     break;
             }
+            refresh_pending_preview_if_visible ();
         }
 
         public void show_live_preview (string? uri = null) {
@@ -1049,13 +1218,18 @@ body {
                 }
             }
             if (uri != null) {
-                if (web_view.get_mapped ()) {
+                active_custom_uri = uri;
+                if (web_view.get_mapped () && web_view.get_width () > 0 && web_view.get_height () > 0) {
                     pending_preview_uri = null;
                     pending_preview_refresh = false;
+                    preview_load_generation++;
                     web_view.load_uri (uri);
                 } else {
                     pending_preview_uri = uri;
                     pending_preview_refresh = false;
+                    if (web_view.get_mapped ()) {
+                        schedule_deferred_preview_flush ();
+                    }
                 }
             } else {
                 refresh_live_preview ();

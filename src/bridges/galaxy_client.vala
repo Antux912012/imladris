@@ -99,9 +99,6 @@ namespace Imladris {
             get { return _api_key; }
             set {
                 _api_key = value.strip ();
-                if (_api_key.length > 0) {
-                    GLib.Environment.set_variable ("GALAXY_API_KEY", _api_key, true);
-                }
             }
         }
 

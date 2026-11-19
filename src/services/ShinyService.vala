@@ -228,10 +228,8 @@ shiny::runApp('%s', port = %d, host = '127.0.0.1', launch.browser = FALSE)
                 cancellable = null;
             }
 
-            try {
-                if (stdout_stream != null) stdout_stream.close (null);
-                if (stderr_stream != null) stderr_stream.close (null);
-            } catch (GLib.Error e) {}
+            try { if (stdout_stream != null) stdout_stream.close (null); } catch (GLib.Error e) {}
+            try { if (stderr_stream != null) stderr_stream.close (null); } catch (GLib.Error e) {}
             stdout_stream = null;
             stderr_stream = null;
 

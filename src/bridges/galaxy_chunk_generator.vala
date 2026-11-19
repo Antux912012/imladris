@@ -124,6 +124,21 @@ namespace Imladris {
         }
 
         /**
+         * Sanitizes a dataset ID or filename component to prevent path traversal and string literal injection.
+         */
+        private static string sanitize_path_component (string raw) {
+            string cleaned = raw.replace ("..", "")
+                                .replace ("/", "_")
+                                .replace ("\\", "_")
+                                .replace ("\"", "")
+                                .replace ("'", "")
+                                .replace ("\n", "")
+                                .replace ("\r", "")
+                                .strip ();
+            return cleaned.length > 0 ? cleaned : "dataset";
+        }
+
+        /**
          * Synthesizes an R Quarto chunk using httr2 and readr with standardized Arekyer provenance.
          */
         private static string generate_r_quarto (
@@ -135,14 +150,18 @@ namespace Imladris {
             bool is_csv
         ) {
             var sb = new StringBuilder ();
+            string safe_id = sanitize_path_component (ds.id);
+            string safe_name = sanitize_path_component (ds.name);
+            string safe_hist = sanitize_path_component (ds.history_id);
+            string safe_url = server_url.replace ("\"", "").replace ("\\", "").replace ("\n", "").replace ("\r", "");
 
             sb.append_printf ("```{r arekyer-galaxy-%d, message=FALSE}\n", ds.hid);
             sb.append ("# AREKYER PROVENANCE RECORD\n");
-            sb.append_printf ("# Server: %s\n", server_url);
-            sb.append_printf ("# History ID: %s\n", ds.history_id);
-            sb.append_printf ("# Dataset ID: %s (HID: %d | Format: %s)\n\n", ds.id, ds.hid, ds.extension);
+            sb.append_printf ("# Server: %s\n", safe_url);
+            sb.append_printf ("# History ID: %s\n", safe_hist);
+            sb.append_printf ("# Dataset ID: %s (HID: %d | Format: %s)\n\n", safe_id, ds.hid, ds.extension);
 
-            sb.append_printf ("galaxy_url <- \"%s/api/histories/%s/contents/%s/display\"\n", server_url, ds.history_id, ds.id);
+            sb.append_printf ("galaxy_url <- \"%s/api/histories/%s/contents/%s/display\"\n", safe_url, safe_hist, safe_id);
             sb.append ("req <- httr2::request(galaxy_url) |>\n");
             sb.append ("  httr2::req_headers(\"x-api-key\" = Sys.getenv(\"GALAXY_API_KEY\"))\n");
             sb.append ("resp <- httr2::req_perform(req)\n");
@@ -153,7 +172,7 @@ namespace Imladris {
             } else {
                 // Large bioinformatics binary or non-tabular format (bam, vcf, fasta, h5ad)
                 sb.append ("dir.create(\"./data/galaxy\", recursive = TRUE, showWarnings = FALSE)\n");
-                sb.append_printf ("dest_path <- file.path(\"./data/galaxy\", \"%s_%s\")\n", ds.id, ds.name);
+                sb.append_printf ("dest_path <- file.path(\"./data/galaxy\", \"%s_%s\")\n", safe_id, safe_name);
                 sb.append ("if (!file.exists(dest_path)) {\n");
                 sb.append ("  httr2::req_perform(req, path = dest_path)\n");
                 sb.append ("}\n");
@@ -177,12 +196,16 @@ namespace Imladris {
             bool is_csv
         ) {
             var sb = new StringBuilder ();
+            string safe_id = sanitize_path_component (ds.id);
+            string safe_name = sanitize_path_component (ds.name);
+            string safe_hist = sanitize_path_component (ds.history_id);
+            string safe_url = server_url.replace ("\"", "").replace ("\\", "").replace ("\n", "").replace ("\r", "");
 
             sb.append_printf ("```{python arekyer-galaxy-%d}\n", ds.hid);
             sb.append ("# AREKYER PROVENANCE RECORD\n");
-            sb.append_printf ("# Server: %s\n", server_url);
-            sb.append_printf ("# History ID: %s\n", ds.history_id);
-            sb.append_printf ("# Dataset ID: %s (HID: %d | Format: %s)\n\n", ds.id, ds.hid, ds.extension);
+            sb.append_printf ("# Server: %s\n", safe_url);
+            sb.append_printf ("# History ID: %s\n", safe_hist);
+            sb.append_printf ("# Dataset ID: %s (HID: %d | Format: %s)\n\n", safe_id, ds.hid, ds.extension);
 
             sb.append ("import os\n");
             if (is_tsv || is_csv) {
@@ -194,7 +217,7 @@ namespace Imladris {
             }
             sb.append ("\n");
 
-            sb.append_printf ("galaxy_url = \"%s/api/histories/%s/contents/%s/display\"\n", server_url, ds.history_id, ds.id);
+            sb.append_printf ("galaxy_url = \"%s/api/histories/%s/contents/%s/display\"\n", safe_url, safe_hist, safe_id);
             sb.append ("galaxy_key = os.environ.get(\"GALAXY_API_KEY\")\n");
             sb.append ("if not galaxy_key:\n");
             sb.append ("    raise RuntimeError(\"Set GALAXY_API_KEY in your environment or Imladris workbench.\")\n\n");
@@ -212,7 +235,7 @@ namespace Imladris {
                 // Non-tabular file cache download
                 sb.append ("cache_dir = os.path.join(\".\", \"data\", \"galaxy\")\n");
                 sb.append ("os.makedirs(cache_dir, exist_ok=True)\n");
-                sb.append_printf ("dest_path = os.path.join(cache_dir, \"%s_%s\")\n\n", ds.id, ds.name);
+                sb.append_printf ("dest_path = os.path.join(cache_dir, \"%s_%s\")\n\n", safe_id, safe_name);
                 sb.append ("if not os.path.exists(dest_path):\n");
                 sb.append ("    resp = requests.get(galaxy_url, headers={\"x-api-key\": galaxy_key}, timeout=60)\n");
                 sb.append ("    resp.raise_for_status()\n");

@@ -513,7 +513,9 @@ namespace Imladris.Services {
         public async void sync_citation_to_project_async (string citekey, string project_dir) {
             if (project_dir == "") return;
 
-            string bib_path = GLib.Path.build_filename (project_dir, "references.bib");
+            string bib_dir_path = GLib.Path.build_filename (project_dir, "bibliography", "references.bib");
+            string root_bib_path = GLib.Path.build_filename (project_dir, "references.bib");
+            string bib_path = GLib.FileUtils.test (bib_dir_path, GLib.FileTest.EXISTS) ? bib_dir_path : root_bib_path;
             string existing_bib = "";
             var bib_file = GLib.File.new_for_path (bib_path);
             if (bib_file.query_exists ()) {

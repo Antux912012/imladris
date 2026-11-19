@@ -343,6 +343,14 @@ namespace Imladris.UI {
         private double drag_start_left_px = 0;
         private double drag_start_right_px = 0;
         private bool syncing_ratios = false;
+        private uint splitter_save_id = 0;
+
+        ~RStudioDockGrid () {
+            if (splitter_save_id != 0) {
+                GLib.Source.remove (splitter_save_id);
+                splitter_save_id = 0;
+            }
+        }
 
         public RStudioDockGrid (RStudioDockLayoutState state, PersistentPanelRegistry reg, Window? win = null) {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
@@ -419,7 +427,6 @@ namespace Imladris.UI {
             center_crosshair.add_css_class ("dock-center-crosshair");
             center_crosshair.set_cursor_from_name ("move");
 
-            uint splitter_save_id = 0;
             GLib.SourceFunc schedule_ratio_save = () => {
                 if (splitter_save_id != 0) {
                     GLib.Source.remove (splitter_save_id);

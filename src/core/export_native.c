@@ -46,6 +46,10 @@ raw_deflate_bytes (const guint8  *in_data,
                    guint8       **out_data,
                    gsize         *out_len)
 {
+    if (in_len > G_MAXUINT32) {
+        return FALSE;
+    }
+
     z_stream zs;
     memset (&zs, 0, sizeof (zs));
     if (deflateInit2 (&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -MAX_WBITS, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
@@ -53,6 +57,10 @@ raw_deflate_bytes (const guint8  *in_data,
     }
 
     uLong bound = deflateBound (&zs, (uLong) in_len);
+    if (bound > G_MAXUINT32) {
+        deflateEnd (&zs);
+        return FALSE;
+    }
     guint8 *buf = g_malloc (bound > 0 ? bound : 16);
 
     zs.next_in = (Bytef *) in_data;
@@ -82,6 +90,10 @@ write_zip_entry (FILE         *fp,
 {
     gsize name_len = strlen (name);
     gsize raw_len = strlen (data);
+    if (name_len > G_MAXUINT16 || raw_len > G_MAXUINT32) {
+        return FALSE;
+    }
+
     guint32 crc = (guint32) crc32 (0L, (const Bytef *) data, (uInt) raw_len);
 
     g_autofree guint8 *comp_buf = NULL;
@@ -98,8 +110,12 @@ write_zip_entry (FILE         *fp,
         }
     }
 
+    if (payload_len > G_MAXUINT32) {
+        return FALSE;
+    }
+
     long offset = ftell (fp);
-    if (offset < 0) {
+    if (offset < 0 || (guint64) offset > G_MAXUINT32) {
         return FALSE;
     }
 
@@ -187,7 +203,9 @@ imladris_export_write_oasis_zip (const char  *output_path,
     }
 
     long cd_end = ftell (fp);
-    if (ok && cd_end >= cd_offset) {
+    if (ok && cd_end >= cd_offset &&
+        (guint64) cd_offset <= G_MAXUINT32 &&
+        (guint64) (cd_end - cd_offset) <= G_MAXUINT32) {
         guint8 eocd[22];
         memset (eocd, 0, sizeof (eocd));
         write_le32 (eocd + 0, 0x06054B50U);
@@ -205,7 +223,9 @@ imladris_export_write_oasis_zip (const char  *output_path,
     for (int i = 0; i < 4; i++) {
         g_free (entries[i].name);
     }
-    fclose (fp);
+    if (fclose (fp) != 0) {
+        ok = FALSE;
+    }
 
     if (!ok) {
         g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
@@ -272,6 +292,13 @@ pdf_ensure_space (PdfRenderCtx *ctx, double needed_h)
     }
 }
 
+static void
+append_markup_escaped_span (GString *out, const char *start, gsize len)
+{
+    g_autofree char *esc = g_markup_escape_text (start, (gssize) len);
+    g_string_append (out, esc);
+}
+
 static char *
 markdown_inline_to_pango (const char *text)
 {
@@ -279,46 +306,62 @@ markdown_inline_to_pango (const char *text)
         return g_strdup ("");
     }
 
-    GString *out = g_string_new ("");
+    g_autofree char *owned_valid = NULL;
     const char *p = text;
+    if (!g_utf8_validate (text, -1, NULL)) {
+        owned_valid = g_utf8_make_valid (text, -1);
+        p = owned_valid;
+    }
+
+    GString *out = g_string_new ("");
+    const char *plain_start = p;
 
     while (*p != '\0') {
         if (p[0] == '*' && p[1] == '*') {
             const char *end = strstr (p + 2, "**");
             if (end != NULL && end > p + 2) {
-                g_autofree char *inner = g_strndup (p + 2, (gsize) (end - (p + 2)));
-                g_autofree char *esc = g_markup_escape_text (inner, -1);
+                if (p > plain_start) {
+                    append_markup_escaped_span (out, plain_start, (gsize) (p - plain_start));
+                }
+                g_autofree char *esc = g_markup_escape_text (p + 2, (gssize) (end - (p + 2)));
                 g_string_append_printf (out, "<b>%s</b>", esc);
                 p = end + 2;
+                plain_start = p;
                 continue;
             }
         }
         if (p[0] == '`') {
             const char *end = strchr (p + 1, '`');
             if (end != NULL && end > p + 1) {
-                g_autofree char *inner = g_strndup (p + 1, (gsize) (end - (p + 1)));
-                g_autofree char *esc = g_markup_escape_text (inner, -1);
+                if (p > plain_start) {
+                    append_markup_escaped_span (out, plain_start, (gsize) (p - plain_start));
+                }
+                g_autofree char *esc = g_markup_escape_text (p + 1, (gssize) (end - (p + 1)));
                 g_string_append_printf (out, "<tt>%s</tt>", esc);
                 p = end + 1;
+                plain_start = p;
                 continue;
             }
         }
         if (p[0] == '*' && p[1] != '*') {
             const char *end = strchr (p + 1, '*');
             if (end != NULL && end > p + 1) {
-                g_autofree char *inner = g_strndup (p + 1, (gsize) (end - (p + 1)));
-                g_autofree char *esc = g_markup_escape_text (inner, -1);
+                if (p > plain_start) {
+                    append_markup_escaped_span (out, plain_start, (gsize) (p - plain_start));
+                }
+                g_autofree char *esc = g_markup_escape_text (p + 1, (gssize) (end - (p + 1)));
                 g_string_append_printf (out, "<i>%s</i>", esc);
                 p = end + 1;
+                plain_start = p;
                 continue;
             }
         }
 
-        const char *next = g_utf8_next_char (p);
-        g_autofree char *ch = g_strndup (p, (gsize) (next - p));
-        g_autofree char *esc = g_markup_escape_text (ch, -1);
-        g_string_append (out, esc);
-        p = next;
+        p = g_utf8_next_char (p);
+    }
+
+    if (p > plain_start) {
+        append_markup_escaped_span (out, plain_start, (gsize) (p - plain_start));
     }
 
     return g_string_free (out, FALSE);
@@ -349,7 +392,7 @@ pdf_render_text_block (PdfRenderCtx *ctx,
         g_autofree char *markup = markdown_inline_to_pango (text);
         pango_layout_set_markup (layout, markup, -1);
     } else {
-        pango_layout_set_text (layout, text, -1);
+        pango_layout_set_text (layout, text != NULL ? text : "", -1);
     }
 
     int pw = 0, ph = 0;
@@ -441,6 +484,12 @@ imladris_export_render_pdf (const char  *output_path,
                             const char  *markdown_body,
                             GError     **error)
 {
+    if (output_path == NULL || output_path[0] == '\0') {
+        g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
+                     "Invalid NULL or empty output_path passed to PDF renderer");
+        return FALSE;
+    }
+
     cairo_surface_t *surface = cairo_pdf_surface_create (output_path, PDF_PAGE_W, PDF_PAGE_H);
     cairo_status_t st = cairo_surface_status (surface);
     if (st != CAIRO_STATUS_SUCCESS) {

@@ -5,6 +5,13 @@ runtime: org.gnome.Platform
 runtime-version: '51'
 sdk: org.gnome.Sdk
 command: imladris
+add-extensions:
+  io.github.Antux912012.Imladris.Toolchain:
+    directory: toolchain
+    version: '50'
+    add-ld-path: lib
+    autodelete: true
+    no-autodownload: true
 finish-args:
   - --share=ipc
   - --share=network
@@ -16,7 +23,8 @@ finish-args:
   - --filesystem=xdg-download
   - --filesystem=xdg-cache/imladris:create
   - --filesystem=home
-build-options:
+  - --env=PATH=/app/bin:/app/toolchain/bin:/usr/bin
+  - --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
 cleanup:
   - /include
   - /lib/pkgconfig
@@ -28,6 +36,8 @@ modules:
     buildsystem: meson
     config-opts:
       - --buildtype=release
+    post-install:
+      - mkdir -p /app/toolchain
     sources:
       - type: dir
         path: .

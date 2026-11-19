@@ -29,7 +29,7 @@ namespace Imladris.Services {
         public DoiBibService () {
             session = new Soup.Session () {
                 timeout = 10,
-                user_agent = "Imladris/0.24.2 (https://github.com/Antux912012/imladris)"
+                user_agent = "Imladris/0.33.1 (https://github.com/Antux912012/imladris)"
             };
         }
 
@@ -85,7 +85,7 @@ namespace Imladris.Services {
 
             try {
                 if (arxiv_regex == null) {
-                    arxiv_regex = new GLib.Regex ("(?:arxiv\\s*:\\s*|arxiv\\.org/(?:abs|pdf)/)?(\\d{4}\\.\\d{4,5}(?:v\\d+)?)(?:\\.pdf)?(?:\\s|$)", GLib.RegexCompileFlags.CASELESS);
+                    arxiv_regex = new GLib.Regex ("(?:arxiv\\s*:\\s*|arxiv\\.org/(?:abs|pdf)/)?((?:\\d{4}\\.\\d{4,5}|[a-z-]+(?:\\.[a-z-]+)?/\\d{7})(?:v\\d+)?)(?:\\.pdf)?(?:\\s|$)", GLib.RegexCompileFlags.CASELESS);
                 }
                 GLib.MatchInfo mi;
                 if (arxiv_regex.match (trimmed, 0, out mi)) {
@@ -232,7 +232,7 @@ namespace Imladris.Services {
                 string journal = art.has_member ("fulljournalname") ? (art.get_string_member ("fulljournalname") ?? "") :
                                  (art.has_member ("source") ? (art.get_string_member ("source") ?? "") : "");
                 string pubdate = art.has_member ("pubdate") ? (art.get_string_member ("pubdate") ?? "") : "";
-                string year = pubdate.length >= 4 ? pubdate.substring (0, 4) : "2026";
+                string year = pubdate.length >= 4 ? pubdate.substring (0, 4) : "n.d.";
                 string volume = art.has_member ("volume") ? (art.get_string_member ("volume") ?? "") : "";
                 string issue = art.has_member ("issue") ? (art.get_string_member ("issue") ?? "") : "";
                 string pages = art.has_member ("pages") ? (art.get_string_member ("pages") ?? "") : "";
@@ -270,9 +270,9 @@ namespace Imladris.Services {
                 string cite_key = @"$(first_author)$(year)_pmid$(pmid)";
                 var sb = new StringBuilder ();
                 sb.append_printf ("@article{%s,\n", cite_key);
-                if (authors_list.len > 0) sb.append_printf ("  author = {%s},\n", authors_list.str);
-                if (title.length > 0) sb.append_printf ("  title = {%s},\n", title);
-                if (journal.length > 0) sb.append_printf ("  journal = {%s},\n", journal);
+                if (authors_list.len > 0) sb.append_printf ("  author = {%s},\n", escape_bib_value (authors_list.str));
+                if (title.length > 0) sb.append_printf ("  title = {%s},\n", escape_bib_value (title));
+                if (journal.length > 0) sb.append_printf ("  journal = {%s},\n", escape_bib_value (journal));
                 sb.append_printf ("  year = {%s},\n", year);
                 if (volume.length > 0) sb.append_printf ("  volume = {%s},\n", volume);
                 if (issue.length > 0) sb.append_printf ("  number = {%s},\n", issue);
