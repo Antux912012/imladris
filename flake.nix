@@ -51,6 +51,18 @@
               "-Dbuildtype=release"
             ];
 
+            gappsWrapperArgs = [
+              "--prefix" "PATH" ":" (pkgs.lib.makeBinPath (with pkgs; [
+                R
+                python3
+                pandoc
+                curl
+                bzip2
+                gnutar
+                git
+              ]))
+            ];
+
             meta = with pkgs.lib; {
               description = "Native scientific notebook studio for Quarto, R, Python, and Jupyter";
               homepage = "https://antux912012.github.io/imladris/";

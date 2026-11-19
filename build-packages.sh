@@ -205,7 +205,7 @@ fi
 
 # 2. Build Debian Package (.deb)
 echo "--> 2. Building Debian package via staging & dpkg-deb..."
-rm -rf build-deb deb-root imladris_*.deb
+rm -rf build-deb deb-root deb-toolchain-root imladris_*.deb imladris-toolchain_*.deb
 run_meson_build "build-deb" "/usr" "${PROJECT_DIR}/deb-root"
 
 mkdir -p deb-root/DEBIAN
@@ -219,8 +219,11 @@ Priority: optional
 Architecture: ${ARCH}
 Installed-Size: ${INSTALLED_SIZE}
 Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
-Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.14), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3, curl, bzip2, tar
-Recommends: pandoc, libreoffice-writer | libreoffice, texlive-latex-base | typst, llama.cpp | llama-cpp
+Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.14), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3, python3-pip, python3-venv, r-base, pandoc, curl, bzip2, tar, git
+Recommends: texlive-latex-base | typst, libreoffice-writer | libreoffice, llama.cpp | llama-cpp
+Provides: imladris-toolchain
+Conflicts: imladris-toolchain
+Replaces: imladris-toolchain
 Homepage: https://antux912012.github.io/imladris/
 Description: Native Scientific Notebook Studio for Quarto, R, Python, and Jupyter
  Imladris is a native Linux polyglot document studio and scientific workbench
@@ -230,7 +233,7 @@ Description: Native Scientific Notebook Studio for Quarto, R, Python, and Jupyte
  GitHub Copilot OAuth, local llama.cpp inference, Model Context Protocol (MCP) server,
  sandboxed renv/venv environments, Mallorn bundles, and bioinformatics bridges.
  Supports Quarto (.qmd), R Markdown (.Rmd), Jupyter (.ipynb), R (.R), Python (.py),
- and Markdown (.md).
+ Rich Text (.rtf), LaTeX (.tex), and Markdown (.md).
 EOF
 
 cat <<'EOF' > deb-root/DEBIAN/postinst
@@ -246,6 +249,14 @@ if [ "$1" = "configure" ]; then
     if which glib-compile-schemas >/dev/null 2>&1; then
         glib-compile-schemas /usr/share/glib-2.0/schemas || true
     fi
+    echo "=== Imladris Toolchain Dependency Check ==="
+    for cmd in Rscript python3 pandoc uv quarto pdflatex; do
+        if which "$cmd" >/dev/null 2>&1; then
+            echo "  [OK] $cmd -> $(which "$cmd")"
+        else
+            echo "  [OPTIONAL] $cmd not found on PATH"
+        fi
+    done
 fi
 exit 0
 EOF
@@ -272,45 +283,4 @@ DEB_NAME="imladris_${VERSION}_${ARCH}.deb"
 dpkg-deb --build --root-owner-group deb-root "${DEB_NAME}"
 echo "✔ Debian package generated: ${DEB_NAME} ($(du -h "${DEB_NAME}" | cut -f1))"
 
-# 3. Build Debian Toolchain Meta-Package (.deb)
-echo "--> 3. Building Debian toolchain meta-package (imladris-toolchain_${VERSION}_all.deb)..."
-rm -rf deb-toolchain-root imladris-toolchain_*.deb
-mkdir -p deb-toolchain-root/DEBIAN deb-toolchain-root/usr/share/doc/imladris-toolchain
-cp LICENSE deb-toolchain-root/usr/share/doc/imladris-toolchain/copyright
-
-cat <<EOF > deb-toolchain-root/DEBIAN/control
-Package: imladris-toolchain
-Version: ${VERSION}
-Section: metapackages
-Priority: optional
-Architecture: all
-Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
-Depends: imladris (>= ${VERSION}), python3, python3-pip, python3-venv, r-base, pandoc, curl, bzip2, git
-Recommends: texlive-latex-base, libreoffice-writer
-Homepage: https://antux912012.github.io/imladris/
-Description: Complete scientific runtime toolchain meta-package for Imladris
- Meta-package that installs R, Python, venv/pip, Pandoc, and verifies
- optional LaTeX/Quarto/uv runtimes for Imladris.
-EOF
-
-cat <<'EOF' > deb-toolchain-root/DEBIAN/postinst
-#!/bin/sh
-set -e
-if [ "$1" = "configure" ]; then
-    echo "=== Imladris Toolchain Dependency Check ==="
-    for cmd in Rscript python3 pandoc uv quarto pdflatex; do
-        if which "$cmd" >/dev/null 2>&1; then
-            echo "  [OK] $cmd -> $(which "$cmd")"
-        else
-            echo "  [OPTIONAL] $cmd not found on PATH"
-        fi
-    done
-fi
-exit 0
-EOF
-chmod 0755 deb-toolchain-root/DEBIAN/postinst
-
-dpkg-deb --build --root-owner-group deb-toolchain-root "imladris-toolchain_${VERSION}_all.deb"
-echo "✔ Toolchain meta-package generated: imladris-toolchain_${VERSION}_all.deb ($(du -h "imladris-toolchain_${VERSION}_all.deb" | cut -f1))"
-
-echo "=== Packaging Complete (.deb, imladris-toolchain .deb, and Flatpak built; AppImage excluded) ==="
+echo "=== Packaging Complete (.deb with integrated toolchain and Flatpak built; AppImage excluded) ==="

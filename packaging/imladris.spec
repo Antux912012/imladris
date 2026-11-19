@@ -38,10 +38,16 @@ Requires:       python3
 Requires:       curl
 Requires:       bzip2
 Requires:       tar
-Recommends:     pandoc
+Requires:       R-core
+Requires:       python3
+Requires:       python3-pip
+Requires:       pandoc
+Requires:       git
 Recommends:     libreoffice-writer
 Recommends:     texlive-scheme-basic
 Recommends:     llama-cpp
+Provides:       imladris-toolchain = %{version}-%{release}
+Obsoletes:      imladris-toolchain < %{version}-%{release}
 
 %description
 Imladris is a native Linux polyglot document studio and scientific workbench
@@ -49,27 +55,10 @@ built with Vala, GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0.
 Featuring an adaptive ribbon interface and 4-quadrant RStudio-style docking,
 Imladris provides a sub-second, distraction-free environment for technical authors,
 biostatisticians, and data scientists. Includes Direct Editor Writing with local
-and free-tier AI quota failover, GitHub Copilot OAuth, and reproducible sandboxes.
+and free-tier AI quota failover, GitHub Copilot OAuth, reproducible sandboxes,
+and the integrated scientific runtime toolchain (R, Python, Pandoc, curl, bzip2, git).
 
-%package toolchain
-Summary:        Meta-package providing R, Python, Pandoc, and scientific runtime dependencies for Imladris
-BuildArch:      noarch
-Requires:       %{name} = %{version}-%{release}
-Requires:       R-core
-Requires:       python3
-Requires:       python3-pip
-Requires:       pandoc
-Requires:       curl
-Requires:       bzip2
-Requires:       git
-Recommends:     texlive-scheme-basic
-Recommends:     libreoffice-writer
-
-%description toolchain
-Meta-package that installs and verifies the scientific computing toolchain
-(R, Python, Pandoc, curl, bzip2, git) for Imladris.
-
-%post toolchain
+%post
 echo "=== Imladris Toolchain Dependency Check ==="
 for cmd in Rscript python3 pandoc uv quarto pdflatex; do
     if command -v "$cmd" >/dev/null 2>&1; then
@@ -78,9 +67,6 @@ for cmd in Rscript python3 pandoc uv quarto pdflatex; do
         echo "  [OPTIONAL] $cmd not found on PATH"
     fi
 done
-
-%files toolchain
-%license LICENSE
 
 %prep
 %autosetup -n %{name}-%{version}

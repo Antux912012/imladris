@@ -1,0 +1,261 @@
+---
+title: "Imladris: A Native GTK4 Scientific Authoring Studio Bridging RStudio Workflows, Quarto Publishing, Jupyter Notebooks, and Bioinformatics"
+subtitle: "Software Architecture, Reproducible Packaging, and Domain Case Studies (v0.33.1)"
+author:
+  - name: "Antonio De Gaetano"
+    affiliation: "Imladris Project"
+    email: "antux912012@users.noreply.github.com"
+date: "2026-11-19"
+license: "GPL-3.0-or-later"
+format:
+  html:
+    toc: true
+    number-sections: true
+  pdf:
+    toc: true
+    number-sections: true
+---
+
+## Abstract
+
+Reproducible scientific authoring increasingly spans heterogeneous formats—Quarto (`.qmd`), R Markdown (`.Rmd`), Jupyter notebooks (`.ipynb`), LaTeX (`.tex`), and rich-text manuscripts (`.rtf`)—yet researchers are routinely forced to choose between heavyweight Electron/Qt integrated development environments (IDEs) and lightweight, single-pane Markdown editors that lack computational execution, environment inspection, and bibliography tooling. We present **Imladris** (`v0.33.1`), a native Linux scientific authoring studio implemented in Vala and C on GTK4, Libadwaita, GtkSourceView 5, and WebKitGTK 6.0. Imladris unifies two complementary paradigms within a single process: a persistent 4-quadrant, 16-panel RStudio-style analytical dock (`RStudioDockGrid`) and an Apostrophe-inspired distraction-free writing mode, transitioning seamlessly between them by reparenting live GTK4 widgets without discarding editor undo history or WebKit preview state. A centralized capability descriptor (`FormatProfile`) dynamically adapts the Libadwaita ribbon, header actions, comment syntax, citation completion, and export targets across 17 document and project formats. Beyond delegating computational rendering to Quarto CLI (with automated TinyTeX self-healing) and Pandoc, Imladris embeds a zero-dependency C/Cairo/Pango PDF renderer, an OASIS OpenDocument (`ODT`/`ODP`) PKZIP+zlib packager (`export_native.c`), an Apple TextEdit-style WYSIWYG `.rtf` editor (`RtfCodec` and `RtfEditorView`), lossless `nbformat` 4.5 Jupyter round-tripping, persistent R/Python REPLs, domain-specific bioinformatics and clinical biostatistics bridges (Yavanna, Taniquetil, Elbereth, Arekyer), and SHA-256 provenance attestation.
+
+## 1. Introduction and Motivation {#sec-intro}
+
+Modern computational research requires fluid transitions between exploratory data analysis, literate programming, and formal manuscript preparation. In the R and Python ecosystems, **RStudio** established the canonical four-quadrant analytical workspace—co-locating source code, an interactive console, an environment/object inspector, and rendered outputs (plots, files, help, and HTML previews)—while **Quarto** generalized literate authoring across R, Python, Julia, and Observable JS with multi-target publishing to HTML, PDF, RevealJS, Beamer, and Typst [@allaire2024quarto]. Conversely, **Positron** and **Visual Studio Code** (via Quarto and R extensions) deliver polyglot extensibility on top of Electron, whereas native GNOME/GTK prose editors such as **Apostrophe** prioritize distraction-free, typographically focused Markdown composition.
+
+Each existing tool imposes structural trade-offs for Linux-based scientific authors:
+
+1. **Toolkit and Resource Overhead**: Browser-derived IDEs (RStudio Desktop, Positron, VS Code, JupyterLab) rely on Chromium/Electron or browser-hosted DOMs, resulting in substantial memory footprints and non-native desktop integration on Wayland/GNOME systems.
+2. **Mode Fragmentation**: Distraction-free prose editors lack inline chunk execution, R/Python environment browsers, plot galleries, and Shiny app viewers; conversely, full IDEs expose dense chrome that impedes long-form manuscript drafting.
+3. **Format and Dependency Silos**: Researchers collaborating across computational and non-computational teams frequently exchange `.qmd`, `.Rmd`, `.ipynb`, `.tex`, `.md`, and `.rtf` files. Lightweight editors rarely support native `.rtf` WYSIWYG editing or zero-dependency `.odt`/`.odp` export when external Pandoc/LaTeX toolchains are absent or incomplete.
+
+Imladris (`v0.33.1`, `GPL-3.0-or-later`) addresses these gaps by combining a compiled GTK4/Libadwaita/Vala/C architecture with RStudio-grade analytical ergonomics, Jupyter `nbformat` 4.5 parity, bioinformatics bridges, and Apostrophe-style focus mode in a single native application.
+
+## 2. System Architecture and Native UI {#sec-architecture}
+
+Imladris is built as a native Meson project (`meson.build`) in Vala and C, linking directly against `gtk4 (>= 4.14)`, `libadwaita-1 (>= 1.5)`, `gtksourceview-5 (>= 5.10)`, `webkitgtk-6.0`, `javascriptcoregtk-6.0`, `libsoup-3.0`, `json-glib-1.0`, `libsecret-1 (>= 0.20)`, `gee-0.8`, `cairo`, `pangocairo`, and `zlib`.
+
+### 2.1 Capability-Driven Document Lifecycle (`FormatProfile`)
+
+Rather than scattering file-extension conditionals across UI and execution modules, `src/core/FormatProfile.vala` defines `FormatProfile`, a central capability descriptor instantiated via `FormatProfile.for_format(DocumentFormat)` and `FormatProfile.for_filename(string)` across 17 `DocumentFormat` variants (`QMD`, `RMD`, `IPYNB`, `MD`, `TEX`, `TS`, `HTML`, `RSCRIPT`, `PYSCRIPT`, `CSS`, `BIB`, `BIBLIOGRAPHY`, `CSV`, `TSV`, `RTF`, `TXT`, `RPROJ`). Each profile declares:
+
+- **UI and Ribbon Modes**: `RibbonHomeMode` (`MARKDOWN_PROSE`, `LATEX_PROSE`, `HTML_TAGS`, `CODE_EDITING`), `RibbonRunMode` (`HIDDEN`, `NOTEBOOK_CHUNKS`, `LATEX_COMPILE`, `TYPESCRIPT_RUNNER`, `SCRIPT_RUNNER`), and `HeaderActionKind` (`QUARTO_RENDER`, `RMD_KNIT`, `IPYNB_EXPORT`, `MD_EXPORT`, `LATEX_BUILD`, `TS_RUN_CHECK`, `HTML_PREVIEW`, `SCRIPT_RUN`).
+- **Authoring Semantics**: `default_kernel` (`"r"`, `"python"`, `"latex"`, `"typescript"`, `"none"`), line/block comment delimiters, `CitationStyle` (`NONE`, `PANDOC_AT`, `LATEX_CITE`), and `default_rstudio_layout` (enabled by default for `QMD`, `RMD`, `IPYNB`, `TS`, `RSCRIPT`, and `PYSCRIPT`; disabled for prose-first `MD`, `TEX`, `HTML`, and `RTF`).
+- **Export Routing**: Per-format `export_targets` arrays (e.g., `HTML`, `PDF`, `RevealJS`, `Beamer PDF`, `Typst/PDF` for `.qmd`; `HTML`, `PDF`, `Word`, `ODT` for `.rmd`; `pdf`, `html`, `odt`, `md` for `.rtf`).
+
+`Window.vala` (`Imladris.Window : Adw.ApplicationWindow`) consumes the active tab's `FormatProfile` to dynamically configure the Libadwaita header action button, context-aware ribbon tabs (`Home`, `Run`, `Publish`, `Packages`), and status bar badges.
+
+### 2.2 Dual Workbench Architecture: 4-Quadrant RStudio Dock vs. Apostrophe Focus Mode
+
+Each open document tab is encapsulated in `DocumentPage` (`src/DocumentPage.vala`), which owns a `PersistentPanelRegistry` (`src/ui/PersistentPanelRegistry.vala`) and an `RStudioDockGrid` (`src/ui/RStudioDockGrid.vala`). The dock subsystem (`src/core/layout/DockTypes.vala`) models:
+
+- **4 Quadrants (`QuadrantId`)**: `Q1_TOP_LEFT` (Source Editor), `Q2_BOTTOM_LEFT` (Console/Terminal/Elrond AI), `Q3_TOP_RIGHT` (Environment/History/Outline/Citations), and `Q4_BOTTOM_RIGHT` (Preview/Plots/Files/Packages/Help/Shiny/Arekyer Bridge).
+- **3 Layout Topologies (`LayoutTopology`)**: `QUAD_4` (2×2 grid), `LEFT_TALL_3` (full-height left editor), and `RIGHT_TALL_3` (full-height right pane), with `QuadrantSizeState` (`NORMAL`, `MINIMIZED`, `MAXIMIZED`).
+- **16 Persistent Panels (`PanelId`)**: `SOURCE_EDITOR`, `DATA_VIEWER`, `LIVE_PREVIEW`, `CONSOLE`, `TERMINAL`, `ELROND_AI`, `ENVIRONMENT`, `HISTORY`, `OUTLINE`, `CITATIONS`, `PLOTS`, `FILES`, `PACKAGES`, `HELP`, `SHINY_VIEWER`, and `GALAXY`.
+
+`RStudioDockGrid` arranges four `DockQuadrant` containers inside nested `Gtk.Paned` widgets (`main_hpaned`, `left_vpaned`, `right_vpaned`) overlaid with a 14×14 px `center_crosshair` handle enabling simultaneous 2D quadrant resizing, drag-and-drop tab reordering across quadrant headers, and detached pop-out windows via `WorkspaceDockManager`.
+
+Crucially, `DocumentPage.set_workbench_mode(Services.LayoutMode)` switches between `LayoutMode.APOSTROPHE` (a distraction-free writer with 72 px horizontal margins and optional split preview) and `LayoutMode.RSTUDIO` (the 4-quadrant dock with 28 px margins and chunk toolbars) by reparenting the persistent widget instances via `panel_registry.mount_panel(...)`. Because GTK4 unrealizes a `WebKit.WebView` when reparented across container hierarchies, `DocumentPage` connects to `web_view.unrealize`, `web_view.map`, and `console_revealer.notify["child-revealed"]` to defer and flush preview reloads once re-mapped with a non-zero allocation, preserving the `GtkSource.Buffer` undo/redo stack and cursor position across mode transitions.
+
+### 2.3 Native Rich Text, Citation Resolution, and Multi-Format Export
+
+- **Apple TextEdit-Style WYSIWYG `.rtf` (`src/core/RtfCodec.vala`, `src/ui/RtfEditorView.vala`)**: When opening `.rtf` files, `DocumentPage` mounts `RtfEditorView`, a `Gtk.TextView`-backed rich-text editor with a formatting toolbar (font family, point size, bold/italic/underline/strikethrough, foreground/highlight colors, alignment, bullet lists, and pending typing attributes). `RtfCodec` implements an RTF 1.x parser, serializer, and HTML converter with Windows-1252 byte decoding and 12 pt (24 half-point) defaults.
+- **Zotero and Identifier-Based Citations (`src/services/ZoteroService.vala`, `src/services/DoiBibService.vala`)**: `ZoteroService` queries local Zotero (`127.0.0.1:23119`) via `/connector/ping` and Better BibTeX JSON-RPC (`/better-bibtex/json-rpc`), falling back to local `.bib` parsing. `DoiBibService` resolves DOIs (via Crossref), arXiv identifiers (both post-2007 numeric and pre-2007 category/number IDs via Atom XML), and PubMed PMIDs, appending deduplicated BibTeX entries to `bibliography/references.bib` (or `references.bib`).
+- **Quarto Orchestration and Native C Export (`src/core/QuartoExportEngine.vala`, `src/services/ExportService.vala`, `src/core/export_native.c`)**: `QuartoExportEngine` asynchronously invokes `quarto render` for `HTML_MANUSCRIPT`, `PDF_MANUSCRIPT`, `REVEALJS_SLIDES`, `BEAMER_PDF_SLIDES`, and `TYPST_POSTER_PDF`, and detects missing LaTeX/Beamer packages to trigger automated TinyTeX provisioning (`heal_tinytex_runtime`) before retrying. For standalone or fallback exports (`ExportService`), `src/core/export_native.c` provides a zero-dependency OASIS OpenDocument PKZIP+zlib packager (`imladris_export_write_oasis_zip` for `.odt`/`.odp`) and a native Cairo + Pango PDF renderer (`imladris_export_render_pdf`) with UTF-8-validated inline Markdown-to-Pango markup.
+
+## 3. RStudio and Quarto Workflow Comparison {#sec-rstudio-comparison}
+
+To situate Imladris (`v0.33.1`) within the scientific authoring landscape, Table 1 compares its architecture and workflows against **RStudio Desktop**, **Positron / VS Code (Quarto extension)**, and **Apostrophe**.
+
+| Capability / Workflow Dimension | Imladris (`v0.33.1`) | RStudio Desktop | Positron / VS Code + Quarto | Apostrophe |
+| :--- | :--- | :--- | :--- | :--- |
+| **UI Toolkit & Runtime** | Native GTK4, Libadwaita, GtkSourceView 5, WebKitGTK 6.0 (Vala/C) | Qt + embedded Chromium (Electron/CEF-style web UI) | Electron (Chromium + Node.js) | Native GTK4 + Libadwaita (Python) |
+| **Workspace Topology** | Dual-mode: 4-quadrant `RStudioDockGrid` (16 `PanelId`s, 3 topologies, 4-way crosshair) ↔ Apostrophe Focus Mode via widget reparenting | Fixed/customizable 4-pane layout (Source, Console, Env/History, Files/Plots/Viewer) | Activity bar + editor grid + bottom terminal/console + sidebars | Single-pane centered prose editor + optional split preview |
+| **Quarto (`.qmd`) & `.Rmd` Execution** | Chunk parsing (`ChunkParser`), persistent R/Python REPL (`ReplBridge`), inline output, `QuartoExportEngine` (`html`, `pdf`, `revealjs`, `beamer`, `typst`) + TinyTeX self-healing | Native R chunk execution, `rmarkdown::render`, `quarto render`, Visual/Source modes | Quarto extension preview, Jupyter/R/Python kernels, `quarto render` | Not supported (Markdown prose only) |
+| **LaTeX (`.tex`) Authoring** | `FormatProfile.TEX`: `LATEX_PROSE` ribbon, `latexmk`/`xelatex`/`pdflatex` runner (`LatexBuildRunner`), multi-pass BibTeX/Biber | Basic `.tex` / Sweave / `.Rnw` compilation | Via LaTeX Workshop extension | Not supported |
+| **WYSIWYG `.rtf` Editing** | Native `RtfEditorView` + `RtfCodec` (RTF 1.x parser/serializer, TextEdit-style toolbar) | Plain text only | Plain text / external extension | Not supported |
+| **Multi-Format Export** | Quarto CLI + Pandoc + native C `export_native.c` (zero-dependency Cairo/Pango PDF & OASIS PKZIP+zlib `ODT`/`ODP`) + `RTF`/`HTML` | Pandoc / `rmarkdown` / Quarto CLI | Quarto CLI / Pandoc extensions | Pandoc (HTML, PDF, ODT, DOCX) |
+| **Citation & Bibliography** | Local Zotero + Better BibTeX JSON-RPC (`ZoteroService`), DOI/arXiv/PMID-to-BibTeX (`DoiBibService`), `@` / `\cite` completion | Visual mode Zotero/DOI lookup + `.bib` insertion | Zotero/Citation extensions | Not built-in |
+| **Interactive Data & Apps** | `DataGridViewer`, `EnvironmentController`, `Plots` gallery, `ShinyService` / `ShinyWindow`, `GalaxyPanel` (Arekyer Bridge) | `View()` data viewer, Environment pane, Plots pane, built-in Shiny runner | Data Explorer, Plots viewer, Shiny extension | Not supported |
+
+From an RStudio and Quarto workflow perspective, Imladris's primary architectural contribution is **state-preserving modality**: researchers can draft narrative sections of a `.qmd` manuscript in Apostrophe Focus Mode (`72 px` margins, hidden chunk chrome) and toggle into the 4-quadrant `RStudioDockGrid` to execute R/Python chunks, inspect data frames in `DataGridViewer`, and debug Quarto/LaTeX builds without reopening files or losing `GtkSource.Buffer` undo history.
+
+## 4. Polyglot Notebooks, Execution Engine & Comparison with JupyterLab/VS Code {#sec-notebooks-execution}
+
+### 4.1 Lossless Jupyter `.ipynb` Round-Trip Serialization
+
+Rather than treating Jupyter notebooks as a write-only export target, Imladris implements bidirectional conversion between `nbformat` v4.5 JSON and editable Markdown in `Imladris.Core.NotebookSerializer` (`src/core/notebook_serializer.vala`). During import (`ipynb_to_markdown`), the serializer extracts `metadata.kernelspec` (`display_name`, `language`, `name`) into a YAML frontmatter header, normalizes kernel identifiers (`ir` to `r`, `python3`/`py` to `python`), and emits HTML comment cell anchors (`<!-- imladris:cell type=... id=... -->`) alongside Quarto-compatible `#|` chunk metadata headers (`#| cell_id:`, `#| execution_count:`, `#| tags:`) inside fenced ```` ```{lang} ```` blocks. Existing cell outputs (`stream`, `text/plain`, and error tracebacks) are rendered into non-destructive `::: {.ipynb-output}` preview blocks.
+
+During export (`markdown_to_ipynb`), `NotebookSerializer` accepts an optional `existing_ipynb_json` payload, indexes prior cells by `id` (`find_existing_cell`), strips `::: {.ipynb-output}` preview blocks so preview markup does not leak into Markdown prose, and preserves unedited cell outputs and metadata on round-trip.
+
+### 4.2 Persistent R and Python REPL Sessions & Inline Chunk Capture
+
+Interactive execution is backed by `Imladris.Services.PersistentSessionManager` (`src/services/PersistentSessionManager.vala`), which manages long-running `GLib.Subprocess` instances for R and Python (`r_process`, `py_process`) with workspace-keyed session pooling (`for_key`, `peek_for_key`, `release_session`). To prevent `G_IO_ERROR_PENDING` stream collisions when multiple UI subsystems (inline chunk runners, `DataGridViewer`, and environment inspectors) query the same kernel concurrently, `PersistentSessionManager` serializes evaluations through asynchronous FIFO wait queues (`lock_r`/`unlock_r`, `lock_py`/`unlock_py`). Payloads are encoded in Base64 (Python) or hex (R) and delimited by UUID-scoped completion sentinels (`__IMLADRIS_PY_DONE_<uuid>__`, `__IMLADRIS_R_DONE_<uuid>__`), with `GLib.Cancellable` forwarding `SIGINT` and configurable per-evaluation timeouts.
+
+At the document level, `Imladris.Execution.ChunkExecutionEngine` (`src/editor/ChunkExecutionEngine.vala`) wraps `{r}` and `{python}` chunks in graphics-capture harnesses: R redirects plotting to a 150 DPI PNG device (`png(..., width = 1200, height = 800, res = 150)`), while Python configures `matplotlib.use('Agg')` and captures figures via `plt.savefig(..., dpi=150, bbox_inches='tight')` inside `contextlib.redirect_stdout`/`redirect_stderr`, using explicit execution-status markers rather than treating diagnostic `stderr` warnings as chunk failures.
+
+### 4.3 Deterministic IntelliSense, Command Palette, Local-First AI & MCP
+
+1. **Deterministic Polyglot IntelliSense (`src/editor/CodeIntelliSenseEngine.vala`)**: Performs in-memory symbol indexing and fuzzy ranking across nine `IntelliSenseContext` modes (`MARKDOWN_PROSE`, `YAML_FRONTMATTER`, `CHUNK_FENCE_HEADER`, `QUARTO_HASH_PIPE`, `LATEX_MATH_CHEM`, `R_CODE`, `PYTHON_CODE`, `BASH_CODE`, `TYPESCRIPT_CODE`), shipping curated catalogs for R/biostatistics, Python, TypeScript, Quarto `#|` options, YAML, and LaTeX macros without requiring a language server or network connection.
+2. **Omni-Search Command Palette (`src/ui/CommandPaletteDialog.vala`)**: A native `Adw.Dialog` (`Ctrl+Shift+P` or `Ctrl+K`) dispatches execution, export, scientific studio bridges (Elbereth, Taniquetil, Yavanna), and GSK rendering/cursor-pacing actions.
+3. **Offline-First AI & Model Context Protocol (`src/core/AiConfigManager.vala`, `src/AiClient.vala`, `src/McpServer.vala`)**: `AiConfigManager` defaults to `AiProvider.OLLAMA` (`http://localhost:11434/v1`, `qwen2.5-coder:latest`) with `auto_failover_enabled = false`, while supporting 19 `AiProvider` targets over `libsoup-3.0`. External agent integration is exposed via `McpServer` (`--mcp-server`), a JSON-RPC 2.0 stdio server implementing MCP protocol `2024-11-05` that marshals GTK buffer mutations onto the GLib `MainContext`.
+
+### 4.4 Architectural Comparison with JupyterLab and VS Code
+
+| Dimension | Imladris (`v0.33.1`) | JupyterLab | VS Code |
+| :--- | :--- | :--- | :--- |
+| **UI & Rendering Stack** | Native Vala/C, GTK4 (`>= 4.14`), Libadwaita (`>= 1.5`), GtkSourceView 5, WebKitGTK 6.0, selectable GSK backend (`ngl`/`gl`, `vulkan`, `cairo`) | Python Tornado server + browser DOM (Lumino/React/CodeMirror) | Electron (Chromium + Node.js) + Monaco DOM |
+| **Compiled Package Footprint** | `3.6 MB` ELF binary (`build-deb/imladris`); `1.3 MB` `.deb`; `16 MB` `.flatpak` | Python environment + Node/webpack static bundle + browser process | Multi-hundred-MB Electron runtime + extension host |
+| **Notebook Format** | Native `.qmd`/`.md`/`.ipynb` with `NotebookSerializer` `nbformat` 4.5 round-trip | Native `.ipynb` JSON | `.ipynb` via Jupyter extension + Notebook API |
+| **Polyglot R/Python State** | `PersistentSessionManager` subprocesses with async FIFO queues & inline plot capture | Separate Jupyter kernels (ZeroMQ) per language | Kernel/REPL per extension (`ms-python`, `REditorSupport`) |
+| **Default AI Posture** | Offline-first (`AiProvider.OLLAMA`, `auto_failover_enabled = false`) | Extension-dependent (`jupyter-ai`) | Extension-dependent (cloud Copilot by default) |
+
+## 5. Bioinformatics & Clinical Biostatistics Case Study {#sec-case-study}
+
+To evaluate Imladris (`v0.33.1`) under realistic translational research conditions, we examined an end-to-end workflow spanning cloud RNA-Seq ingestion, target gene and protein structure annotation, primer design, clinical trial sample size justification, and cryptographic provenance attestation within a single Mallorn workspace.
+
+### 5.1 Cloud Genomics Ingestion and Tabular Inspection (Arekyer & DataGridViewer)
+
+Upstream differential expression analysis (e.g., `DESeq2` normalized counts) executed on a remote Galaxy instance (`https://usegalaxy.eu` by default) connects directly to the local Quarto manuscript through the **Arekyer** bridge (`src/bridges/galaxy_client.vala`, `src/bridges/galaxy_chunk_generator.vala`). `GalaxyClient` resolves the server URL and API key from environment variables, GSettings, or the OS Secret Service keyring via `libsecret-1` (`io.github.Antux912012.Imladris.GalaxyApiKey`) without leaking credentials into unrelated child subprocesses. `GalaxyChunkGenerator` sanitizes untrusted dataset names into safe `df_*` identifiers, strips path-traversal characters (`..`, `/`, `\`, quotes, and newlines), and synthesizes a self-contained R (`httr2` + `readr`) or Python (`requests` + `pandas`) Quarto chunk—or caches binary formats (BAM, VCF, FASTA, H5AD) under `./data/galaxy/`—prefixed with a `# AREKYER PROVENANCE RECORD` header.
+
+Once loaded into the active R or Python session, large count matrices and clinical datasets are inspected in **DataGridViewer** (`src/ui/DataGridViewer.vala`). Built on `Gtk.ColumnView`, `GLib.ListStore`, `Gtk.FilterListModel`, and `Gtk.SortListModel`, `DataGridViewer` paginates dataframes in 1,000-row slices using Base64-encoded object names validated against `^[A-Za-z_][A-Za-z0-9_.$\\[\\]]*$`, supports NA-sentinel-aware numeric and lexical column sorting, and exports the active page as TSV.
+
+### 5.2 Gene, Protein, and Structural Biology Annotation (Yavanna & Taniquetil)
+
+To annotate candidate biomarkers (e.g., *TP53* / `P04637` or *BRCA1* / `ENSG00000012048`), the **Yavanna** inspector (`src/bridges/yavanna/BioEntityPopover.vala`) queries the UniProtKB REST API (with `/uniprotkb/search` fallback) and the Ensembl REST API (`/lookup/symbol/homo_sapiens/` or species-aware `/lookup/id/`), injecting verified Markdown citation badges or executable R/Python chunks stamped with `# YAVANNA BIO-ENTITY PROVENANCE:`. For experimental validation, Yavanna's in-memory RT-qPCR Oligo/Primer Calculator computes sequence length $N$, GC percentage, melting temperature $T_m$ (Wallace rule for $N < 14$; salt-adjusted Marmur-Doty approximation at $50\text{ mM Na}^+$ for $N \ge 14$), uracil-aware single-stranded DNA or RNA molecular weight (Da), and the 5'→3' reverse complement.
+
+Structural context is retrieved via the **Taniquetil** AlphaFold bridge (`src/bridges/taniquetil/AlphaFoldBridgePopover.vala`), which queries `https://alphafold.ebi.ac.uk/api/prediction/` (with UniProtKB fallback), resolves AFDB model versions (`latestVersion`), tracks multi-fragment predictions (`fragment_count > 1`), renders a Cairo stacked pLDDT confidence track, and inserts R (`bio3d::read.pdb`) or Python (`paeDocUrl`) analysis chunks stamped with `# TANIQUETIL ALPHAFOLD PROVENANCE:`.
+
+### 5.3 Clinical Biostatistics and ICH E9 Power Justification (Elbereth)
+
+For translational trial design and biomarker-stratified survival analysis, **Elbereth** (`src/bridges/elbereth/ClinicalBiostatsPopover.vala`) provides an offline ICH E9 Sample Size & Power Calculator alongside a Clinical & Omics Code Studio. Using a native Vala implementation of the Beasley-Springer-Moro normal quantile approximation (`normal_quantile`) and `GLib.Math.erfc` (`normal_cdf`), Elbereth computes evaluable and attrition-adjusted sample sizes across two-sample continuous outcomes, two-sample binary proportions with **Fleiss continuity correction**, and time-to-event survival endpoints via the **Schoenfeld (1983)** log-rank formula [@schoenfeld1983sample; @fleiss2003statistical; @ich1998e9]. A live Cairo power curve plots statistical power against total $N$, and generates sanitized R/Python templates for CDISC ADSL Table 1 demographics (`gtsummary::tbl_summary`), CDISC ADTTE Kaplan-Meier and Cox models (`survival::Surv`, `survfit`, `coxph`), subgroup hazard-ratio forest plots, and multi-omics volcano plots.
+
+### 5.4 Reproducible Packaging and Provenance Attestation (Mallorn & ProvenanceAttestationService)
+
+The completed study is encapsulated as a **Mallorn** workspace (`src/core/MallornManager.vala`), maintaining 1:1 parity between `<project>.mallorn` and `<project>.Rproj` manifests alongside `.mallorn.json`, `imladris.toml`, and optional `renv`/Python sandboxing (`SandboxController`). Workspaces export as `.tar.zst` or `.zip` archives excluding ephemeral environments while rejecting symlinks and path traversal on unpack. `ProvenanceAttestationService` (`src/core/ProvenanceAttestationService.vala`) generates a deterministic `<document>.provenance.lock.json` sidecar containing SHA-256 digests of the manuscript, lockfiles (`renv.lock`, `uv.lock`, `requirements.txt`, `environment.yml`, `conda-lock.yml`, `_quarto.yml`), `.bib` files, and embedded provenance records.
+
+## 6. Security, Privacy & Reproducible Packaging {#sec-security-packaging}
+
+### 6.1 Capability-Based Plugin Isolation & Crash Recovery Hardening
+
+Extensions in Imladris execute inside isolated `JSC.Context` (JavaScriptCoreGTK 6.0) sandboxes (`src/plugins/PluginManager.vala`) governed by explicit manifest permissions (`editor`, `ui`, `repl_r`, `repl_python`, `elrond_ai`, `workspace`, `export`). `PluginManifest.is_valid_plugin_id` rejects path separators and traversal sequences, and archive installation skips symlinks. Crash recovery (`src/services/RecoveryService.vala`) creates `$XDG_CACHE_HOME/imladris/recovery` with mode `0700`, hashes document IDs with SHA-256, and writes `.shadow` files atomically with `0600` permissions.
+
+### 6.2 Process, Archive, Credential, and MCP Hardening
+
+- **Zip Slip & Code Injection Prevention**: `MallornManager` rejects absolute paths and `..` segments; `PersistentSessionManager`, `EnvironmentController`, and `DataGridViewer` encode R/Python identifiers using hex or Base64; and `export_native.c` enforces `G_MAXUINT32`/`G_MAXUINT16` bounds checks and UTF-8 validation.
+- **MCP Execution Guard (`src/McpServer.vala`)**: The `execute_code` MCP tool is disabled by default (`IMLADRIS_MCP_ALLOW_EXEC=1` opt-in required), rejects path-qualified binaries, and restricts invocation to an explicit runtime allowlist.
+- **Local-First Privacy**: Cloud AI is strictly opt-in (`AiProvider.OLLAMA` default), HTTP 429 public free-tier failover requires `free_api_consent_accepted`, and `imladris --purge-user-data` supports GDPR Art. 17 erasure.
+
+### 6.3 Reproducible Multi-Format Linux Packaging
+
+Imladris maintains unified single-package build definitions across five Linux distribution ecosystems from `meson.build`:
+
+| Target | Manifest / Recipe | Key Packaging & Integrated Toolchain Characteristics |
+| :--- | :--- | :--- |
+| **Flatpak** | `io.github.Antux912012.Imladris.yml` | Targets `org.gnome.Platform//51` with optional `Toolchain` extension, Wayland/fallback-X11, `WEBKIT_DISABLE_DMABUF_RENDERER=1`, and native Flatpak portal sandboxing. |
+| **Debian (`.deb`)** | `build-packages.sh` | Produces unified `imladris_0.33.1_amd64.deb` (`1.3 MB`) integrating `python3`, `python3-pip`, `python3-venv`, `r-base`, `pandoc`, `curl`, `bzip2`, `tar`, and `git` (`Provides: imladris-toolchain`). |
+| **Fedora / RPM** | `packaging/imladris.spec` | Unified RPM requiring `R-core`, `python3`, `python3-pip`, `pandoc`, `curl`, `bzip2`, `tar`, and `git` (`Provides: imladris-toolchain`). |
+| **Arch Linux (AUR)** | `packaging/PKGBUILD`, `packaging/.SRCINFO` | Unified `GPL-3.0-or-later` package depending on `r`, `python`, `python-pip`, `pandoc`, `curl`, `bzip2`, `git` (`provides=('imladris-toolchain')`). |
+| **Nix Flakes** | `flake.nix` | Supports `x86_64-linux` and `aarch64-linux`, wrapping the Meson release build with `wrapGAppsHook4` and `R`, `python3`, `pandoc`, `curl`, `bzip2`, `gnutar`, and `git` on `PATH`. |
+
+## 7. Verification, Limitations, and Availability {#sec-discussion}
+
+### 7.1 Automated Verification
+
+All 10 Meson test suites in `v0.33.1` passed (**10/10 suites, 97/97 assertions**, `Ok: 10, Fail: 0`) inside both the `org.gnome.Sdk//51` Flatpak build (`meson test -C build-flatpak`) and the native `build-deb` build (`meson test -C build-deb --no-rebuild`): `dock_environment_tests`, `plugin_engine_tests`, `ai_integration_tests`, `zotero_service_tests`, `shiny_service_tests`, `format_profile_tests`, `native_rendering_tests` (including `/native_rendering/rtf_codec_and_format`), `galaxy_bridge_tests`, `execution_and_security_tests`, and `mallorn_sandbox_tests`.
+
+### 7.2 Limitations
+
+1. **Oligo Thermodynamics and Species Lookup (Yavanna)**: `BioEntityPopover.vala` uses Wallace/Marmur-Doty approximations rather than SantaLucia nearest-neighbor thermodynamics, and Ensembl gene symbol lookups default to `homo_sapiens` unless an `ENS*` stable ID is provided.
+2. **Multi-Fragment AlphaFold Structures (Taniquetil)**: `AlphaFoldBridgePopover.vala` detects multi-fragment predictions (`fragment_count > 1`) but currently inspects only fragment 1.
+3. **In-Memory Delimited File Slicing (DataGridViewer)**: `load_delimited_file_slice` reads `.csv`/`.tsv` files via `GLib.FileUtils.get_contents` prior to 1,000-row pagination.
+4. **GxP Signature Scope (`ProvenanceAttestationService`)**: `.provenance.lock.json` provides SHA-256 tamper-evidence rather than X.509/PGP cryptographic signatures required for 21 CFR Part 11 electronic signatures.
+
+### 7.3 Software Availability
+
+- **Version**: Imladris `v0.33.1` (`GPL-3.0-or-later`)
+- **Repository & Releases**: [https://github.com/Antux912012/imladris](https://github.com/Antux912012/imladris)
+
+### References
+
+```bibtex
+@software{allaire2024quarto,
+  author = {Allaire, J. J. and Teague, Charles and Scheidegger, Carlos and Xie, Yihui and Dervieux, Christophe},
+  title  = {Quarto},
+  year   = {2024},
+  doi    = {10.5281/zenodo.5960048},
+  url    = {https://quarto.org}
+}
+
+@article{schoenfeld1983sample,
+  author  = {Schoenfeld, David A.},
+  title   = {Sample-Size Formula for the Proportional-Hazards Regression Model},
+  journal = {Biometrics},
+  year    = {1983},
+  volume  = {39},
+  number  = {2},
+  pages   = {499--503},
+  doi     = {10.2307/2531021}
+}
+
+@book{fleiss2003statistical,
+  author    = {Fleiss, Joseph L. and Levin, Bruce and Paik, Myunghee Cho},
+  title     = {Statistical Methods for Rates and Proportions},
+  edition   = {3rd},
+  publisher = {John Wiley \& Sons},
+  year      = {2003},
+  doi       = {10.1002/0471445428}
+}
+
+@techreport{ich1998e9,
+  author      = {{International Council for Harmonisation (ICH)}},
+  title       = {Statistical Principles for Clinical Trials E9},
+  institution = {ICH Harmonised Tripartite Guideline},
+  year        = {1998}
+}
+
+@article{uniprot2023uniprot,
+  author  = {{The UniProt Consortium}},
+  title   = {{UniProt}: the Universal Protein Knowledgebase in 2023},
+  journal = {Nucleic Acids Research},
+  year    = {2023},
+  volume  = {51},
+  number  = {D1},
+  pages   = {D523--D531},
+  doi     = {10.1093/nar/gkac1052}
+}
+
+@article{martin2023ensembl,
+  author  = {Martin, Fergal J. and Amode, M. Ridwan and Aneja, Alisha and others},
+  title   = {Ensembl 2023},
+  journal = {Nucleic Acids Research},
+  year    = {2023},
+  volume  = {51},
+  number  = {D1},
+  pages   = {D933--D941},
+  doi     = {10.1093/nar/gkac958}
+}
+
+@article{varadi2024alphafold,
+  author  = {Varadi, Mihaly and Bertoni, Damian and Magana, Paulyna and others},
+  title   = {{AlphaFold Protein Structure Database} in 2024: providing structure coverage for over 214 million protein sequences},
+  journal = {Nucleic Acids Research},
+  year    = {2024},
+  volume  = {52},
+  number  = {D1},
+  pages   = {D368--D375},
+  doi     = {10.1093/nar/gkad1011}
+}
+
+@article{galaxy2024community,
+  author  = {{The Galaxy Community}},
+  title   = {The {Galaxy} platform for accessible, reproducible, and collaborative data analyses: 2024 update},
+  journal = {Nucleic Acids Research},
+  year    = {2024},
+  volume  = {52},
+  number  = {W1},
+  pages   = {W83--W94},
+  doi     = {10.1093/nar/gkae410}
+}
+```

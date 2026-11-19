@@ -18,7 +18,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
   <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
-  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.33.0"><img src="https://img.shields.io/badge/Release-v0.33.0-blue?style=flat-square" alt="Release v0.33.0"></a>
+  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.33.1"><img src="https://img.shields.io/badge/Release-v0.33.1-blue?style=flat-square" alt="Release v0.33.1"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-0.56%2B-green?style=flat-square" alt="Vala">
   <img src="https://img.shields.io/badge/License-GPL--3.0--or--later-brightgreen?style=flat-square" alt="License">
@@ -26,7 +26,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Official Landing Page</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.33.0">⬇️ Download v0.33.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.33.1">⬇️ Download v0.33.1 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Technical Wiki</a></strong> ·
   <strong><a href="docs/IMLADRIS_PRODUCTION_ARCHITECTURE_BLUEPRINT.md">🏗️ Production Blueprint</a></strong>
@@ -42,7 +42,7 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ### Comparative Workflow Matrix
 
-| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.33.0 Approach |
+| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.33.1 Approach |
 | :--- | :--- | :--- |
 | **Idle Memory Overhead** | 1.2–2.5 GB RAM idle | **< 120 MB RAM** (native compiled Vala/GTK4 binary) |
 | **Cold Startup Latency** | 4.0–9.0 seconds | **< 0.6 seconds** instant launch |
@@ -78,12 +78,12 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ---
 
-## What’s New in v0.33.0
+## What’s New in v0.33.1
 
-* **Pure Vala/C Native Core**: Replaced the Rust FFI layer with native `NativeCore` in Vala/GLib, eliminating Cargo build overhead and simplifying cross-distro packaging.
-* **Additional Document Formats**: Plain text, CSV, TSV, RStudio `.Rproj`, and `.bibliography` files now receive format detection and editor profiles tailored to each format.
-* **Elrond Model Controls & Routing Fix**: Select account-enabled Gemini models, tune answer detail and temperature, or download curated local GGUFs and run them with managed `llama-server`. Configured cloud providers (including Gemini) are no longer intercepted by a ready local Elrond server.
-* **Optional Runtime Setup**: Choose the micromamba installation folder and install only the R, Python, Quarto, Node/TypeScript, and TeX components you need.
+* **Apple TextEdit-Style WYSIWYG `.rtf` Editor**: Open, edit, and save standards-compliant RTF 1.x documents natively (`RtfCodec` + `RtfEditorView`) with font family/size, Bold/Italic/Underline/Strikethrough (`Ctrl+B`/`I`/`U`), text & highlight colors, paragraph alignment, bullet lists, and live WebKitGTK 6.0 preview.
+* **WebKitGTK 6.0 Live Preview & Flatpak Parity**: Fixed `unrealize`/`map` reparenting across Apostrophe ↔ RStudio mode switches, zero-allocation deferral during `Gtk.Revealer`/`Gtk.Paned` transitions, cancelled-load filtering, and proportional editor-to-preview scroll synchronization.
+* **Unified Single-Package Toolchain**: Integrated scientific runtime dependencies (`R`, `Python`, `pip`/`venv`, `Pandoc`, `curl`, `bzip2`, `git`) directly into the main `.deb`, `.rpm`, AUR `PKGBUILD`, and Nix Flake packages (no separate `imladris-toolchain` package required).
+* **Security, Citation & C/Vala Audit**: Offline-first AI defaults (`OLLAMA`), `GALAXY_API_KEY` subprocess isolation, `0600` `.shadow` recovery files, `bibliography/references.bib` Zotero/DOI resolution, `export_native.c` bounds/UTF-8 safety, and deterministic FD/signal cleanup.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, improvements, and bugs fixed.
 
@@ -251,7 +251,7 @@ nix build .#default
 ./result/bin/imladris
 ```
 
-Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.33.0](https://github.com/Antux912012/imladris/releases/tag/v0.33.0).
+Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.33.1](https://github.com/Antux912012/imladris/releases/tag/v0.33.1).
 
 ### Scientific Toolchain Meta-Packages & Cross-Distro Dependencies
 To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
@@ -260,13 +260,13 @@ To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
   flatpak install io.github.Antux912012.Imladris.Toolchain.flatpak
   ```
   Mounts at `/app/toolchain` and is automatically added to `PATH` inside the Imladris sandbox.
-- **Debian / Ubuntu (`imladris-toolchain` meta-package with `postinst` verification):**
+- **Debian / Ubuntu (`.deb` with integrated scientific toolchain & `postinst` verification):**
   ```bash
-  sudo apt install ./imladris_0.33.0_amd64.deb ./imladris-toolchain_0.33.0_all.deb
+  sudo apt install ./imladris_0.33.1_amd64.deb
   ```
-- **Fedora / RHEL (`imladris-toolchain` RPM meta-package with `%post` verification):**
+- **Fedora / RHEL (`.rpm` with integrated scientific toolchain & `%post` verification):**
   ```bash
-  sudo dnf install ./imladris-0.33.0-1.fc44.x86_64.rpm ./imladris-toolchain-0.33.0-1.fc44.noarch.rpm
+  sudo dnf install ./imladris-0.33.1-1.fc44.x86_64.rpm
   ```
 - **Arch Linux:**
   ```bash

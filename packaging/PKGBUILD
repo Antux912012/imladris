@@ -19,16 +19,21 @@ depends=(
     'hicolor-icon-theme'
     'curl'
     'bzip2'
+    'r'
+    'python'
+    'python-pip'
+    'pandoc'
+    'git'
 )
+provides=('imladris-toolchain')
+conflicts=('imladris-toolchain')
+replaces=('imladris-toolchain')
 optdepends=(
-    'r: R language execution and package management'
-    'python: Python execution and pip integration'
     'python-uv: Ultra-fast Python package installer'
     'llama.cpp: Zero-config local LLM inference engine for Elrond Assistance'
     'llama-cpp: Alternative package name for local LLM inference'
     'vulkan-icd-loader: Vulkan GPU acceleration for Elrond local AI and GSK rendering'
     'quarto-cli-bin: Quarto document, slide deck, and poster rendering'
-    'pandoc: Document export to PDF, HTML, ODT, and RTF'
     'texlive-basic: LaTeX PDF compilation for Quarto and R Markdown'
     'libreoffice: Presentation and spreadsheet export'
 )
