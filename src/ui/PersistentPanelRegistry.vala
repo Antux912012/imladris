@@ -439,7 +439,7 @@ namespace Imladris.UI {
                 child = notebook_cell_toolbar
             };
             source_editor_panel.append (cell_toolbar_scroll);
-            source_editor_panel.append (doc_page.editor_scroller);
+            source_editor_panel.append ((doc_page.rtf_editor != null) ? (Gtk.Widget) doc_page.rtf_editor : (Gtk.Widget) doc_page.editor_scroller);
             panels.set (PanelId.SOURCE_EDITOR, source_editor_panel);
 
             // 2. LIVE PREVIEW PANEL

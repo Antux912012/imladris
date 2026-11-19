@@ -82,6 +82,9 @@ namespace Imladris.Adapters {
             if (format == Imladris.DocumentFormat.TS) {
                 return render_typescript_document_html (clean_text);
             }
+            if (format == Imladris.DocumentFormat.RTF) {
+                return Core.RtfCodec.rtf_to_html (clean_text);
+            }
 
             Core.FrontmatterData? meta;
             string body;

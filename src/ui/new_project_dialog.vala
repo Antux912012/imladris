@@ -241,6 +241,13 @@ namespace Imladris.UI {
                 "book-open-symbolic",
                 DocumentFormat.BIB
             );
+            add_standalone_target_row (
+                standalone_group,
+                "Create a Rich Text document (.rtf)",
+                "WYSIWYG rich text editor with fonts, styles, colors, alignment, and live preview.",
+                "x-office-document-symbolic",
+                DocumentFormat.RTF
+            );
 
             page.add (standalone_group);
 

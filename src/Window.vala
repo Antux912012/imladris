@@ -1572,6 +1572,9 @@ namespace Imladris {
                         out etag
                     );
                     doc.source_buffer.set_modified (false);
+                    if (doc.rtf_editor != null) {
+                        doc.rtf_editor.buffer.set_modified (false);
+                    }
                     Services.RecoveryService.get_default ().purge_document_cache (doc.doc_id);
                     doc.append_console_log (@"✔ Saved $(doc.file_location.get_basename ())");
                 } catch (GLib.Error e) {
@@ -1604,6 +1607,9 @@ namespace Imladris {
                             out etag
                         );
                         doc.source_buffer.set_modified (false);
+                    if (doc.rtf_editor != null) {
+                        doc.rtf_editor.buffer.set_modified (false);
+                    }
                         Services.RecoveryService.get_default ().purge_document_cache (doc.doc_id);
                         if (tab_view.selected_page != null) {
                             tab_view.selected_page.title = file.get_basename ();

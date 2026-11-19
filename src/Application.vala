@@ -31,6 +31,7 @@ namespace Imladris {
             { "new_html", on_new_html },
             { "new_css", on_new_css },
             { "new_bib", on_new_bib },
+            { "new_rtf", on_new_rtf },
             { "open", on_open_document },
             { "save", on_save_document },
             { "export_pdf", on_export_pdf },
@@ -368,6 +369,11 @@ namespace Imladris {
         private void on_new_bib () {
             var win = this.active_window as Window;
             if (win != null) win.add_document_tab ("references.bib", "bibtex", "% BibTeX Bibliography managed by Imladris\n% Use Ctrl+Shift+B (DOI / .bib Manager) to generate entries from a DOI link.\n\n");
+        }
+
+        private void on_new_rtf () {
+            var win = this.active_window as Window;
+            if (win != null) win.add_document_tab ("untitled.rtf", "rtf");
         }
 
         private void on_open_document () {

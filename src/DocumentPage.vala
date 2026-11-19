@@ -10,6 +10,7 @@ namespace Imladris {
 
         public GtkSource.View source_view { get; private set; }
         public GtkSource.Buffer source_buffer { get; private set; }
+        public RtfEditorView? rtf_editor { get; private set; default = null; }
         public Gtk.TextView console_view { get; private set; }
         public WebKit.WebView web_view { get; private set; }
         public Gtk.Stack right_stack { get; private set; }
@@ -69,18 +70,29 @@ namespace Imladris {
         }
 
         public string get_clean_source_text () {
+            if (rtf_editor != null) {
+                return rtf_editor.serialize_rtf ();
+            }
             return source_buffer.text.replace ("\xef\xbf\xbc", "");
         }
 
         public void set_initial_content (string text, bool mark_unmodified = true) {
-            source_buffer.begin_irreversible_action ();
-            try {
-                source_buffer.text = text;
-            } finally {
-                source_buffer.end_irreversible_action ();
-            }
-            if (mark_unmodified) {
-                source_buffer.set_modified (false);
+            if (rtf_editor != null) {
+                rtf_editor.load_rtf (text);
+                if (mark_unmodified) {
+                    rtf_editor.buffer.set_modified (false);
+                    source_buffer.set_modified (false);
+                }
+            } else {
+                source_buffer.begin_irreversible_action ();
+                try {
+                    source_buffer.text = text;
+                } finally {
+                    source_buffer.end_irreversible_action ();
+                }
+                if (mark_unmodified) {
+                    source_buffer.set_modified (false);
+                }
             }
             if (update_debounce_id != 0) {
                 GLib.Source.remove (update_debounce_id);
@@ -312,6 +324,26 @@ namespace Imladris {
                 hexpand = true,
                 vexpand = true
             };
+            if (get_document_format () == DocumentFormat.RTF) {
+                rtf_editor = new RtfEditorView ();
+                rtf_editor.scroller.vadjustment.value_changed.connect (() => {
+                    schedule_preview_scroll_sync ();
+                });
+                rtf_editor.content_changed.connect (() => {
+                    source_buffer.set_modified (true);
+                    if (update_debounce_id != 0) {
+                        GLib.Source.remove (update_debounce_id);
+                        update_debounce_id = 0;
+                    }
+                    update_debounce_id = GLib.Timeout.add (250, () => {
+                        update_debounce_id = 0;
+                        string doc_text = get_clean_source_text ();
+                        emit_buffer_stats (doc_text);
+                        refresh_live_preview (doc_text);
+                        return GLib.Source.REMOVE;
+                    });
+                });
+            }
             editor_scroller.vadjustment.value_changed.connect (() => {
                 schedule_preview_scroll_sync ();
             });
@@ -828,6 +860,14 @@ body {
   pages   = {1--10}
 }
 """;
+            } else if (fmt == DocumentFormat.RTF || lang_id == "rtf") {
+                content = """{\rtf1\ansi\ansicpg1252\deff0\nouicompat
+{\fonttbl{\f0\fnil\fcharset0 Sans;}}
+\viewkind4\uc1\pard\ql\sa120\sl276\slmult1\f0\fs24
+\b\fs32 Untitled Rich Text Document\b0\fs24\par
+Start writing formatted text here.\par
+}
+""";
             } else if (fmt == DocumentFormat.HTML || lang_id == "html") {
                 content = """<!DOCTYPE html>
 <html lang="en">
@@ -1114,7 +1154,7 @@ body {
             if (!is_live_preview_sync_active ()) {
                 return;
             }
-            var vadj = editor_scroller.vadjustment;
+            var vadj = (rtf_editor != null) ? rtf_editor.scroller.vadjustment : editor_scroller.vadjustment;
             double max_scroll = vadj.upper - vadj.page_size;
             double ratio = 0.0;
             if (max_scroll > 1.0) {
@@ -1345,6 +1385,10 @@ body {
         }
 
         public void apply_tag_or_syntax (string tag_name, string md_wrapper) {
+            if (rtf_editor != null) {
+                rtf_editor.toggle_named_style (tag_name);
+                return;
+            }
             Gtk.TextIter start, end;
             source_buffer.begin_user_action ();
             if (source_buffer.get_selection_bounds (out start, out end)) {
@@ -1410,7 +1454,9 @@ body {
         }
 
         public void emit_buffer_stats (string? preloaded_text = null) {
-            string txt = preloaded_text != null ? preloaded_text : get_clean_source_text ();
+            string txt = (rtf_editor != null)
+                ? rtf_editor.get_plain_text ()
+                : (preloaded_text != null ? preloaded_text : get_clean_source_text ());
             int words = 0;
             bool in_word = false;
             for (int i = 0; i < txt.length; i++) {
@@ -1422,7 +1468,7 @@ body {
                     words++;
                 }
             }
-            int lines = source_buffer.get_line_count ();
+            int lines = (rtf_editor != null) ? rtf_editor.buffer.get_line_count () : source_buffer.get_line_count ();
             stats_changed (words, lines, doc_type.up ());
         }
 

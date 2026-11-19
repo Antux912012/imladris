@@ -220,6 +220,33 @@ price = "$x + y$"
         assert (chicago_tex.contains ("\\parencite{example2026}"));
     }
 
+    private static void test_rtf_codec_and_format () {
+        assert (Imladris.DocumentFormat.from_filename ("notes.rtf") == Imladris.DocumentFormat.RTF);
+        assert (Imladris.DocumentFormat.RTF.get_extension () == ".rtf");
+
+        string sample_rtf = """{\rtf1\ansi\ansicpg1252\deff0
+{\fonttbl{\f0\fswiss Sans;}{\f1\froman Georgia;}}
+{\colortbl ;\red220\green38\blue38;\red254\green240\blue138;}
+\pard\qc\f1\fs32\b Title \u945?\b0\fs24\par
+\pard\ql\cf1\highlight2\i Body \{escaped\} & text\i0\par
+}""";
+        string plain = Imladris.Core.RtfCodec.rtf_to_plain_text (sample_rtf);
+        assert (plain.contains ("Title α"));
+        assert (plain.contains ("Body {escaped} & text"));
+
+        string html = Imladris.Core.RtfCodec.rtf_to_html (sample_rtf);
+        assert (html.contains ("text-align:center"));
+        assert (html.contains ("font-weight: 700"));
+        assert (html.contains ("font-style: italic"));
+        assert (html.contains ("color: #dc2626"));
+        assert (html.contains ("background-color: #fef08a"));
+        assert (html.contains ("Body {escaped} &amp; text"));
+
+        var profile = Imladris.Core.FormatProfile.for_format (Imladris.DocumentFormat.RTF);
+        assert (profile.supports_live_preview);
+        assert (!profile.default_rstudio_layout);
+    }
+
     public static int main (string[] args) {
         Test.init (ref args);
         Test.add_func ("/native_rendering/chunk_parser", test_chunk_parser_native);
@@ -231,6 +258,7 @@ price = "$x + y$"
         Test.add_func ("/native_rendering/outline_and_typescript", test_native_outline_and_typescript_symbols);
         Test.add_func ("/native_rendering/latex_diagnostics", test_native_latex_diagnostics);
         Test.add_func ("/native_rendering/latex_templates_and_citations", test_latex_templates_and_citations);
+        Test.add_func ("/native_rendering/rtf_codec_and_format", test_rtf_codec_and_format);
         return Test.run ();
     }
 }

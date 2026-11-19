@@ -59,6 +59,7 @@ namespace Imladris {
         TEX,
         TS,
         TXT,
+        RTF,
         CSV,
         TSV,
         RPROJ,
@@ -78,6 +79,7 @@ namespace Imladris {
                 case TEX:      return ".tex";
                 case TS:       return ".ts";
                 case TXT:      return ".txt";
+                case RTF:      return ".rtf";
                 case CSV:      return ".csv";
                 case TSV:      return ".tsv";
                 case RPROJ:    return ".Rproj";
@@ -100,6 +102,7 @@ namespace Imladris {
                 case TEX:      return "LaTeX Document (.tex)";
                 case TS:       return "TypeScript (.ts)";
                 case TXT:      return "Plain Text (.txt)";
+                case RTF:      return "Rich Text Format (.rtf)";
                 case CSV:      return "Comma-Separated Values (.csv)";
                 case TSV:      return "Tab-Separated Values (.tsv)";
                 case RPROJ:    return "RStudio Project File (.Rproj)";
@@ -126,6 +129,7 @@ namespace Imladris {
                 case TS:       return "typescript";
                 case CSV:
                 case TSV:
+                case RTF:
                 case TXT:      return "";
                 case RPROJ:    return "ini";
                 case BIBLIOGRAPHY: return "bibtex";
@@ -148,6 +152,7 @@ namespace Imladris {
                 case TEX:      return "Tex";
                 case TS:       return "Ts";
                 case TXT:      return "Txt";
+                case RTF:      return "Rtf";
                 case CSV:      return "Csv";
                 case TSV:      return "Tsv";
                 case RPROJ:    return "Rproj";
@@ -170,6 +175,7 @@ namespace Imladris {
             if (c == "tex" || c == "ltx" || c == "latex") return TEX;
             if (c == "ts" || c == "tsx" || c == "mts" || c == "cts" || c == "typescript") return TS;
             if (c == "txt" || c == "text") return TXT;
+            if (c == "rtf" || c == "richtext") return RTF;
             if (c == "csv") return CSV;
             if (c == "tsv") return TSV;
             if (c == "rproj") return RPROJ;
@@ -189,6 +195,7 @@ namespace Imladris {
             if (lower.has_suffix (".rproj")) return RPROJ;
             if (lower.has_suffix (".csv")) return CSV;
             if (lower.has_suffix (".tsv")) return TSV;
+            if (lower.has_suffix (".rtf")) return RTF;
             if (lower.has_suffix (".txt")) return TXT;
             if (lower.has_suffix (".r")) return RSCRIPT;
             if (lower.has_suffix (".py")) return PYSCRIPT;

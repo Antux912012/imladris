@@ -326,6 +326,21 @@ namespace Imladris.Core {
                         "TSV",
                         new string[] {}
                     );
+                case DocumentFormat.RTF:
+                    return new FormatProfile (
+                        DocumentFormat.RTF,
+                        false, true, false, false, false, false, false, true, true, false, false, false,
+                        "none", "", "", "",
+                        CitationStyle.NONE,
+                        RibbonRunMode.HIDDEN,
+                        RibbonHomeMode.MARKDOWN_PROSE,
+                        HeaderActionKind.MD_EXPORT,
+                        "Export",
+                        "Export Rich Text Document to PDF/HTML/ODT",
+                        "document-save-as-symbolic",
+                        "RTF",
+                        new string[] { "pdf", "html", "odt", "md" }
+                    );
                 case DocumentFormat.TXT:
                     return new FormatProfile (
                         DocumentFormat.TXT,
