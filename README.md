@@ -86,7 +86,7 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 * **Quick Table Picker Popover (`Ctrl+Alt+T`)**: Cursor-anchored 8×8 hover grid and custom Rows/Cols dialog with format-aware Markdown, HTML, LaTeX, and RTF table insertion from the toolbar, editor context menu, and Command Palette.
 * **Flatpak WebKitGTK 6.0 Live Preview Fix**: Resolved `WebKit.WebContext.get_default()` vs. `JSC.Context` initialization ordering so live HTML/Quarto/Markdown preview renders reliably inside Flatpak sandboxes.
 
-### Previous Highlights (v0.33.1)
+### Previous Highlights (v0.40.0)
 
 * **Apple TextEdit-Style WYSIWYG `.rtf` Editor**: Open, edit, and save standards-compliant RTF 1.x documents natively (`RtfCodec` + `RtfEditorView`).
 * **Unified Single-Package Toolchain**: Integrated scientific runtime dependencies directly into `.deb`, `.rpm`, AUR `PKGBUILD`, and Nix Flake packages.
