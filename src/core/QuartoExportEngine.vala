@@ -158,9 +158,6 @@ namespace Imladris.Core {
                                     string candidate = GLib.Path.is_absolute (out_dir)
                                         ? GLib.Path.build_filename (out_dir, root_name + ext)
                                         : GLib.Path.build_filename (dir, out_dir, root_name + ext);
-                                    if (GLib.FileUtils.test (candidate, GLib.FileTest.EXISTS)) {
-                                        return candidate;
-                                    }
                                     return candidate;
                                 }
                             }

@@ -344,12 +344,18 @@ namespace Imladris.UI {
         private double drag_start_right_px = 0;
         private bool syncing_ratios = false;
         private uint splitter_save_id = 0;
+        private uint initial_ratios_idle_id = 0;
 
-        ~RStudioDockGrid () {
+        public override void dispose () {
             if (splitter_save_id != 0) {
                 GLib.Source.remove (splitter_save_id);
                 splitter_save_id = 0;
             }
+            if (initial_ratios_idle_id != 0) {
+                GLib.Source.remove (initial_ratios_idle_id);
+                initial_ratios_idle_id = 0;
+            }
+            base.dispose ();
         }
 
         public RStudioDockGrid (RStudioDockLayoutState state, PersistentPanelRegistry reg, Window? win = null) {
@@ -495,9 +501,11 @@ namespace Imladris.UI {
 
                 dock_state.ratios.set_clamped (new_col_ratio, new_left_ratio, new_right_ratio);
                 syncing_ratios = false;
+                update_crosshair_position ();
             });
 
             drag_gesture.drag_end.connect ((offset_x, offset_y) => {
+                update_crosshair_position ();
                 dock_state.save_to_disk ();
             });
             center_crosshair.add_controller (drag_gesture);
@@ -509,7 +517,8 @@ namespace Imladris.UI {
             });
 
             // Apply initial ratios once widget is allocated
-            GLib.Idle.add (() => {
+            initial_ratios_idle_id = GLib.Idle.add (() => {
+                initial_ratios_idle_id = 0;
                 apply_splitter_ratios ();
                 return GLib.Source.REMOVE;
             });

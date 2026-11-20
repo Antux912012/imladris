@@ -186,13 +186,6 @@ namespace Imladris.Core {
             }
         }
 
-        public static void clear_runtime_caches () {
-            _cache_mutex.lock ();
-            if (_availability_cache != null) _availability_cache.remove_all ();
-            if (_path_cache != null) _path_cache.remove_all ();
-            _cache_mutex.unlock ();
-        }
-
         /**
          * Injects environment variables for a micromamba / conda-managed prefix.
          * Sets PATH, CONDA_PREFIX, PKG_CONFIG_PATH, R_HOME, QUARTO_PYTHON, and QUARTO_R.

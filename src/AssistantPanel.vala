@@ -25,9 +25,30 @@ namespace Imladris {
         private AiProvider discovered_models_provider = AiProvider.GEMINI;
         private Adw.Banner api_key_banner;
         private Gtk.Label status_lbl;
-        private Window parent_window;
+        private unowned Window? parent_window;
         private bool is_generating = false;
         private bool updating_model_list = false;
+        private ulong config_changed_hid = 0;
+        private ulong provider_changed_hid = 0;
+
+        public void cleanup () {
+            if (config_changed_hid != 0) {
+                config_mgr.disconnect (config_changed_hid);
+                config_changed_hid = 0;
+            }
+            if (provider_changed_hid != 0) {
+                config_mgr.disconnect (provider_changed_hid);
+                provider_changed_hid = 0;
+            }
+            if (ai_client != null) {
+                ai_client.cancel_current_request ();
+            }
+        }
+
+        public override void dispose () {
+            cleanup ();
+            base.dispose ();
+        }
 
         public AssistantPanel (Window window) {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 6);
@@ -270,12 +291,12 @@ namespace Imladris {
                 }
             });
 
-            config_mgr.config_changed.connect (() => {
+            config_changed_hid = config_mgr.config_changed.connect (() => {
                 check_key_status ();
                 update_model_dropdown_for_provider (config_mgr.active_provider);
             });
 
-            config_mgr.provider_changed.connect ((prov) => {
+            provider_changed_hid = config_mgr.provider_changed.connect ((prov) => {
                 sync_with_config ();
             });
         }

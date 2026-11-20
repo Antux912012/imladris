@@ -79,6 +79,17 @@ namespace Imladris.Services {
             }
         }
 
+        public static void shutdown_all_pooled () {
+            if (_pool == null) return;
+            foreach (var mgr in _pool.values) {
+                mgr.shutdown_all ();
+            }
+            _pool.clear ();
+            if (_pool_refs != null) {
+                _pool_refs.clear ();
+            }
+        }
+
         private string _current_working_dir = "";
         public string current_working_dir { get { return _current_working_dir; } }
         public ProjectType active_project_type { get; private set; default = ProjectType.STANDARD; }

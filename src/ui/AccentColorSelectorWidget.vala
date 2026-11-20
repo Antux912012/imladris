@@ -15,10 +15,19 @@ namespace Imladris.UI {
     public class AccentColorSelectorWidget : Gtk.Box {
 
         private SettingsManager settings;
+        private ulong accent_changed_hid = 0;
         private Gee.HashMap<GnomeAccent, Gtk.Button> buttons;
         private Gee.HashMap<GnomeAccent, Gtk.Image> check_icons;
 
         public signal void accent_selected (GnomeAccent accent);
+
+        public override void dispose () {
+            if (accent_changed_hid != 0) {
+                settings.disconnect (accent_changed_hid);
+                accent_changed_hid = 0;
+            }
+            base.dispose ();
+        }
 
         public AccentColorSelectorWidget () {
             Object (orientation: Gtk.Orientation.HORIZONTAL, spacing: 6);
@@ -50,7 +59,7 @@ namespace Imladris.UI {
 
             update_selection (settings.accent_color);
 
-            settings.accent_color_changed.connect ((accent) => {
+            accent_changed_hid = settings.accent_color_changed.connect ((accent) => {
                 update_selection (accent);
             });
         }
@@ -80,9 +89,12 @@ namespace Imladris.UI {
 
             btn.set_child (overlay);
 
-            btn.clicked.connect (() => {
-                settings.accent_color = accent;
-                accent_selected (accent);
+            btn.set_data<int> ("accent-val", (int) accent);
+            unowned AccentColorSelectorWidget self_ref = this;
+            btn.clicked.connect ((b) => {
+                GnomeAccent chosen = (GnomeAccent) b.get_data<int> ("accent-val");
+                self_ref.settings.accent_color = chosen;
+                self_ref.accent_selected (chosen);
             });
 
             return btn;

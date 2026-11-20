@@ -16,6 +16,7 @@ namespace Imladris.UI {
     public class ThemeSelectorWidget : Gtk.Box {
 
         private SettingsManager settings;
+        private ulong theme_changed_hid = 0;
 
         private Gtk.Button btn_system;
         private Gtk.Button btn_light;
@@ -28,6 +29,14 @@ namespace Imladris.UI {
         private Gtk.Image check_dark;
 
         public signal void theme_selected (AppTheme theme);
+
+        public override void dispose () {
+            if (theme_changed_hid != 0) {
+                settings.disconnect (theme_changed_hid);
+                theme_changed_hid = 0;
+            }
+            base.dispose ();
+        }
 
         public ThemeSelectorWidget () {
             Object (orientation: Gtk.Orientation.HORIZONTAL, spacing: 12);
@@ -46,7 +55,7 @@ namespace Imladris.UI {
 
             update_selection (settings.app_theme);
 
-            settings.theme_changed.connect ((theme) => {
+            theme_changed_hid = settings.theme_changed.connect ((theme) => {
                 update_selection (theme);
             });
         }
@@ -76,9 +85,12 @@ namespace Imladris.UI {
 
             btn.set_child (overlay);
 
-            btn.clicked.connect (() => {
-                settings.app_theme = theme;
-                theme_selected (theme);
+            btn.set_data<int> ("theme-val", (int) theme);
+            unowned ThemeSelectorWidget self_ref = this;
+            btn.clicked.connect ((b) => {
+                AppTheme chosen = (AppTheme) b.get_data<int> ("theme-val");
+                self_ref.settings.app_theme = chosen;
+                self_ref.theme_selected (chosen);
             });
 
             return btn;

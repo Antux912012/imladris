@@ -277,7 +277,13 @@ namespace Imladris.UI {
             text_view.add_controller (key_ctrl);
         }
 
+        private bool in_text_insert = false;
+
         private void setup_buffer_signals () {
+            buffer.insert_text.connect ((ref location, text, len) => {
+                in_text_insert = true;
+            });
+
             buffer.insert_text.connect_after ((ref location, text, len) => {
                 if (pending_attrs_active && text.length > 0) {
                     int end_off = location.get_offset ();
@@ -288,6 +294,7 @@ namespace Imladris.UI {
                     buffer.get_iter_at_offset (out e_it, end_off);
                     apply_pending_to_range (s_it, e_it);
                 }
+                in_text_insert = false;
             });
 
             buffer.changed.connect (() => {
@@ -295,9 +302,31 @@ namespace Imladris.UI {
             });
 
             buffer.notify["cursor-position"].connect (() => {
-                pending_attrs_active = false;
+                if (!in_text_insert) {
+                    pending_attrs_active = false;
+                }
                 sync_toolbar_from_cursor ();
             });
+        }
+
+        public void apply_foreground_color (string hex) {
+            apply_color_tag ("rtf-fg:", hex);
+        }
+
+        public void apply_heading_style (int pt) {
+            Gtk.TextIter s, e;
+            if (!buffer.get_selection_bounds (out s, out e)) {
+                buffer.get_iter_at_mark (out s, buffer.get_insert ());
+                e = s;
+                s.set_line_offset (0);
+                if (!e.ends_line ()) e.forward_to_line_end ();
+            }
+            buffer.begin_user_action ();
+            remove_prefixed_tags ("rtf-fs:", s, e);
+            buffer.apply_tag (ensure_tag (@"rtf-fs:$(pt)"), s, e);
+            buffer.apply_tag (ensure_tag ("rtf-bold"), s, e);
+            buffer.end_user_action ();
+            content_changed ();
         }
 
         private Gtk.TextTag ensure_tag (string name) {

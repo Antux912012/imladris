@@ -71,8 +71,11 @@ namespace Imladris {
                 css_classes = { "heading" }
             });
 
-            var zotero_btn = new Gtk.Button.with_label ("Pick in Zotero (Ctrl+Shift+I)") {
-                icon_name = "accessories-dictionary-symbolic"
+            var zotero_btn = new Gtk.Button () {
+                child = new Adw.ButtonContent () {
+                    icon_name = "accessories-dictionary-symbolic",
+                    label = "Pick in Zotero (Ctrl+Shift+I)"
+                }
             };
             zotero_btn.clicked.connect (() => {
                 popover.popdown ();

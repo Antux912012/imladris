@@ -119,6 +119,11 @@ namespace Imladris.Editor {
         private static ArrayList<string>? py_modules = null;
         private static HashMap<string, string>? builtin_df_columns = null;
         private static HashMap<string, string>? r_function_args = null;
+        private static GLib.Regex? cached_hp_rx = null;
+        private static GLib.Regex? cached_id_rx = null;
+        private static GLib.Regex? cached_r_dollar_rx = null;
+        private static GLib.Regex? cached_py_col_rx = null;
+        private static GLib.Regex? cached_html_tag_rx = null;
 
         private static void ensure_catalogs_initialized () {
             if (r_catalog != null) {
@@ -1060,9 +1065,11 @@ namespace Imladris.Editor {
             var seen = new HashSet<string> ();
             try {
                 // 1. Quarto hash-pipe labels: #| label: fig-volcano
-                var rx_hp = new GLib.Regex ("^\\s*#\\|\\s*label:\\s*([a-zA-Z0-9_-]+)", GLib.RegexCompileFlags.MULTILINE);
+                if (cached_hp_rx == null) {
+                    cached_hp_rx = new GLib.Regex ("^\\s*#\\|\\s*label:\\s*([a-zA-Z0-9_-]+)", GLib.RegexCompileFlags.MULTILINE);
+                }
                 GLib.MatchInfo mi;
-                if (rx_hp.match (document_text, 0, out mi)) {
+                if (cached_hp_rx.match (document_text, 0, out mi)) {
                     do {
                         string lbl = mi.fetch (1).strip ();
                         if (lbl.length > 0 && !seen.contains (lbl)) {
@@ -1080,9 +1087,11 @@ namespace Imladris.Editor {
                 }
 
                 // 2. Pandoc/Quarto explicit IDs: {#fig-foo}, {#tbl-bar}, {#sec-intro}, {#eq-model}
-                var rx_id = new GLib.Regex ("\\{#((?:fig|tbl|sec|eq|lst|thm|lem|cor|prp|cnj|def|exm|exr)-[a-zA-Z0-9_-]+)");
+                if (cached_id_rx == null) {
+                    cached_id_rx = new GLib.Regex ("\\{#((?:fig|tbl|sec|eq|lst|thm|lem|cor|prp|cnj|def|exm|exr)-[a-zA-Z0-9_-]+)");
+                }
                 GLib.MatchInfo mi2;
-                if (rx_id.match (document_text, 0, out mi2)) {
+                if (cached_id_rx.match (document_text, 0, out mi2)) {
                     do {
                         string lbl = mi2.fetch (1).strip ();
                         if (lbl.length > 0 && !seen.contains (lbl)) {
@@ -1271,10 +1280,13 @@ namespace Imladris.Editor {
         }
 
         private static void scan_r_dollar_columns (string line, HashMap<string, ArrayList<string>> map) {
+            if (!line.contains ("$")) return;
             try {
-                var rx = new GLib.Regex ("\\b([a-zA-Z_][a-zA-Z0-9_.]*)\\$([a-zA-Z_][a-zA-Z0-9_.]*)");
+                if (cached_r_dollar_rx == null) {
+                    cached_r_dollar_rx = new GLib.Regex ("\\b([a-zA-Z_][a-zA-Z0-9_.]*)\\$([a-zA-Z_][a-zA-Z0-9_.]*)");
+                }
                 GLib.MatchInfo mi;
-                if (rx.match (line, 0, out mi)) {
+                if (cached_r_dollar_rx.match (line, 0, out mi)) {
                     do {
                         string df_name = mi.fetch (1);
                         string col_name = mi.fetch (2);
@@ -1287,10 +1299,13 @@ namespace Imladris.Editor {
         }
 
         private static void scan_python_df_columns (string line, HashMap<string, ArrayList<string>> map) {
+            if (!line.contains ("[")) return;
             try {
-                var rx = new GLib.Regex ("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\[['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]\\]");
+                if (cached_py_col_rx == null) {
+                    cached_py_col_rx = new GLib.Regex ("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\[['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]\\]");
+                }
                 GLib.MatchInfo mi;
-                if (rx.match (line, 0, out mi)) {
+                if (cached_py_col_rx.match (line, 0, out mi)) {
                     do {
                         string df_name = mi.fetch (1);
                         string col_name = mi.fetch (2);
@@ -1381,9 +1396,11 @@ namespace Imladris.Editor {
 
             var stack = new ArrayList<string> ();
             try {
-                var rx = new GLib.Regex ("<(/?)([a-zA-Z][a-zA-Z0-9-]*)\\b[^>]*?(/?)>");
+                if (cached_html_tag_rx == null) {
+                    cached_html_tag_rx = new GLib.Regex ("<(/?)([a-zA-Z][a-zA-Z0-9-]*)\\b[^>]*?(/?)>");
+                }
                 GLib.MatchInfo mi;
-                if (rx.match (sb.str, 0, out mi)) {
+                if (cached_html_tag_rx.match (sb.str, 0, out mi)) {
                     do {
                         bool is_close = (mi.fetch (1) == "/");
                         string tag = mi.fetch (2).down ();

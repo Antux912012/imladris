@@ -55,6 +55,21 @@ namespace Imladris.UI {
         private Cancellable? cancellable = null;
         private Gee.ArrayList<ElrondChatTurn> conversation_history = new Gee.ArrayList<ElrondChatTurn> ();
         private bool is_busy = false;
+        private uint scroll_idle_id = 0;
+        private static GLib.Regex? cached_bold_rx = null;
+        private static GLib.Regex? cached_code_rx = null;
+
+        public override void dispose () {
+            if (scroll_idle_id != 0) {
+                GLib.Source.remove (scroll_idle_id);
+                scroll_idle_id = 0;
+            }
+            if (cancellable != null) {
+                cancellable.cancel ();
+                cancellable = null;
+            }
+            base.dispose ();
+        }
 
         public ElrondChatPanel (DocumentPage page, PersistentPanelRegistry reg, Window? win) {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
@@ -710,12 +725,25 @@ namespace Imladris.UI {
         private string format_inline_markdown_to_pango (string raw) {
             string escaped = GLib.Markup.escape_text (raw);
             try {
-                var bold_rx = new GLib.Regex ("\\*\\*(.+?)\\*\\*");
-                escaped = bold_rx.replace (escaped, -1, 0, "<b>\\1</b>");
-                var code_rx = new GLib.Regex ("`([^`]+?)`");
-                escaped = code_rx.replace (escaped, -1, 0, "<tt>\\1</tt>");
+                if (cached_code_rx == null) cached_code_rx = new GLib.Regex ("`([^`]+?)`");
+                if (cached_bold_rx == null) cached_bold_rx = new GLib.Regex ("\\*\\*(.+?)\\*\\*");
+
+                var code_spans = new Gee.ArrayList<string> ();
+                string protected_str = cached_code_rx.replace_eval (escaped, -1, 0, 0, (mi, res) => {
+                    string placeholder = @"\x01CODE$(code_spans.size)\x02";
+                    code_spans.add ("<tt>" + mi.fetch (1) + "</tt>");
+                    res.append (placeholder);
+                    return false;
+                });
+                protected_str = cached_bold_rx.replace (protected_str, -1, 0, "<b>\\1</b>");
+                for (int i = 0; i < code_spans.size; i++) {
+                    protected_str = protected_str.replace (@"\x01CODE$i\x02", code_spans.get (i));
+                }
+                if (Pango.parse_markup (protected_str, -1, 0, null, null, null)) {
+                    return protected_str;
+                }
             } catch (GLib.Error e) {
-                return GLib.Markup.escape_text (raw);
+                return escaped;
             }
             return escaped;
         }
@@ -908,7 +936,11 @@ namespace Imladris.UI {
         }
 
         private void scroll_to_bottom () {
-            GLib.Idle.add (() => {
+            if (scroll_idle_id != 0) {
+                return;
+            }
+            scroll_idle_id = GLib.Idle.add (() => {
+                scroll_idle_id = 0;
                 var vadj = scroller.get_vadjustment ();
                 if (vadj != null) {
                     vadj.set_value (vadj.get_upper () - vadj.get_page_size ());

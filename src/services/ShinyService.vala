@@ -106,10 +106,19 @@ namespace Imladris.Services {
                    (GLib.FileUtils.test (server_r, GLib.FileTest.EXISTS) && GLib.FileUtils.test (ui_r, GLib.FileTest.EXISTS));
         }
 
+        private static async void nap_ms (uint ms) {
+            GLib.SourceFunc resume = nap_ms.callback;
+            GLib.Timeout.add (ms, () => {
+                resume ();
+                return GLib.Source.REMOVE;
+            });
+            yield;
+        }
+
         public async void launch_app_async (string file_or_dir_path, ShinyViewerTarget target = ShinyViewerTarget.VIEWER_PANE) {
             if (status == ShinyAppStatus.RUNNING || status == ShinyAppStatus.STARTING) {
                 stop_app ();
-                yield Imladris.Execution.Nap.sleep (250);
+                yield nap_ms (250);
             }
 
             this.current_target = target;
@@ -181,9 +190,17 @@ shiny::runApp('%s', port = %d, host = '127.0.0.1', launch.browser = FALSE)
 
                 var spawned_proc = app_process;
                 app_process.wait_async.begin (cancellable, (obj, res) => {
+                    try {
+                        spawned_proc.wait_async.end (res);
+                    } catch (GLib.Error e) {}
                     if (spawned_proc != this.app_process) {
                         return;
                     }
+                    try { if (stdout_stream != null) stdout_stream.close (null); } catch (GLib.Error e) {}
+                    try { if (stderr_stream != null) stderr_stream.close (null); } catch (GLib.Error e) {}
+                    stdout_stream = null;
+                    stderr_stream = null;
+                    app_process = null;
                     this.status = ShinyAppStatus.STOPPED;
                     this.active_url = null;
                     status_changed (this.status);

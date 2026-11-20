@@ -107,6 +107,8 @@ namespace Imladris.UI {
 
         private Services.PersistentSessionManager? cached_session_mgr = null;
         private string? acquired_session_key = null;
+        private ulong preview_backend_hid = 0;
+        private bool syncing_preview_selector = false;
 
         public Services.PersistentSessionManager get_session_manager () {
             string key = get_session_key ();
@@ -160,6 +162,16 @@ namespace Imladris.UI {
             var shiny = Services.ShinyService.get_default ();
             if (shiny_status_hid != 0) { shiny.disconnect (shiny_status_hid); shiny_status_hid = 0; }
             if (shiny_url_hid != 0) { shiny.disconnect (shiny_url_hid); shiny_url_hid = 0; }
+            if (preview_backend_hid != 0) {
+                Core.SettingsManager.get_default ().disconnect (preview_backend_hid);
+                preview_backend_hid = 0;
+            }
+            if (active_shiny_window != null) {
+                active_shiny_window.destroy ();
+                active_shiny_window = null;
+            }
+            detach_all ();
+            panels.clear ();
         }
 
         private async void run_citation_search_async (string q, Services.ZoteroService zotero_svc) {
@@ -469,14 +481,14 @@ namespace Imladris.UI {
                 selected = (uint) Core.SettingsManager.get_default ().preview_backend
             };
             preview_selector.add_css_class ("flat");
-            bool syncing_preview_selector = false;
             preview_selector.notify["selected"].connect (() => {
                 if (syncing_preview_selector) return;
                 Core.SettingsManager.get_default ().preview_backend = (Core.PreviewBackend) preview_selector.selected;
             });
-            Core.SettingsManager.get_default ().preview_backend_changed.connect ((pb) => {
+            unowned Gtk.DropDown preview_sel_ref = preview_selector;
+            preview_backend_hid = Core.SettingsManager.get_default ().preview_backend_changed.connect ((pb) => {
                 syncing_preview_selector = true;
-                preview_selector.selected = (uint) pb;
+                preview_sel_ref.selected = (uint) pb;
                 syncing_preview_selector = false;
             });
             preview_bar.append (preview_selector);
@@ -1706,6 +1718,15 @@ namespace Imladris.UI {
             });
         }
 
+        private int resolve_target_line (Gtk.TextMark? end_mark) {
+            if (end_mark != null && !end_mark.get_deleted ()) {
+                Gtk.TextIter iter;
+                doc_page.source_buffer.get_iter_at_mark (out iter, end_mark);
+                return iter.get_line ();
+            }
+            return -1;
+        }
+
         public async void run_code_snippet_in_console_async (
             string engine,
             string code,
@@ -1734,15 +1755,6 @@ namespace Imladris.UI {
                 if (topic.length > 0) {
                     show_help_for_topic.begin (topic);
                 }
-            }
-
-            int resolve_target_line () {
-                if (end_mark != null && !end_mark.get_deleted ()) {
-                    Gtk.TextIter iter;
-                    doc_page.source_buffer.get_iter_at_mark (out iter, end_mark);
-                    return iter.get_line ();
-                }
-                return -1;
             }
 
             int64 start_us = GLib.get_monotonic_time ();
@@ -1777,7 +1789,7 @@ namespace Imladris.UI {
                     string base_plot = GLib.Path.get_basename (plot_file);
                     doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
                 }
-                int target_line = resolve_target_line ();
+                int target_line = resolve_target_line (end_mark);
                 if (target_line >= 0) {
                     doc_page.display_inline_chunk_output (target_line, output, plot_file, count, elapsed_ms);
                 }
@@ -1816,7 +1828,7 @@ namespace Imladris.UI {
                     string base_plot = GLib.Path.get_basename (plot_file);
                     doc_page.append_console_log (@"📊 [Plot rendered in Quadrant 4: $base_plot]");
                 }
-                int target_line = resolve_target_line ();
+                int target_line = resolve_target_line (end_mark);
                 if (target_line >= 0) {
                     doc_page.display_inline_chunk_output (target_line, output, plot_file, count, elapsed_ms);
                 }
@@ -1843,7 +1855,7 @@ namespace Imladris.UI {
                 if (output.length > 0) {
                     doc_page.append_console_log (@"Out [$count] ($(ts_res.runtime_used)):\n$output");
                 }
-                int target_line = resolve_target_line ();
+                int target_line = resolve_target_line (end_mark);
                 if (target_line >= 0) {
                     doc_page.display_inline_chunk_output (target_line, output, null, count, elapsed_ms);
                 }
@@ -1854,7 +1866,7 @@ namespace Imladris.UI {
                 if (output.length > 0) {
                     doc_page.append_console_log (@"Out [$count]:\n$output");
                 }
-                int target_line = resolve_target_line ();
+                int target_line = resolve_target_line (end_mark);
                 if (target_line >= 0) {
                     doc_page.display_inline_chunk_output (target_line, output, null, count, elapsed_ms);
                 }
@@ -1862,7 +1874,7 @@ namespace Imladris.UI {
             } else {
                 string msg = @"✖ Unsupported chunk engine '$engine'. Supported interactive engines: r, python, ts/typescript, bash/sh.";
                 doc_page.append_console_log (msg);
-                int target_line = resolve_target_line ();
+                int target_line = resolve_target_line (end_mark);
                 if (target_line >= 0) {
                     doc_page.display_inline_chunk_output (target_line, msg, null, count, 0.0);
                 }
@@ -1962,7 +1974,8 @@ namespace Imladris.UI {
                             }
                             var crow = new Adw.ActionRow () {
                                 title = w,
-                                subtitle = @"Referenced on line $(i + 1)"
+                                subtitle = @"Referenced on line $(i + 1)",
+                                use_markup = false
                             };
                             var ins_btn = new Gtk.Button.from_icon_name ("insert-text-symbolic") {
                                 valign = Gtk.Align.CENTER,
@@ -2731,7 +2744,8 @@ local({
 
                 var row = new Adw.ActionRow () {
                     title = pkg.name,
-                    subtitle = pkg.description.length > 0 ? pkg.description : "Installed R Package"
+                    subtitle = pkg.description.length > 0 ? pkg.description : "Installed R Package",
+                    use_markup = false
                 };
 
                 var check = new Gtk.CheckButton () {

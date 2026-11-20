@@ -914,7 +914,7 @@ namespace Imladris.Core {
                     accent_css_provider = new Gtk.CssProvider ();
                     var display = Gdk.Display.get_default ();
                     if (display != null) {
-                        Gtk.StyleContext.add_provider_for_display (
+                        add_css_provider_for_display (
                             display,
                             accent_css_provider,
                             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 10
@@ -926,6 +926,9 @@ namespace Imladris.Core {
             }
             accent_color_changed (accent);
         }
+
+        [CCode (cname = "gtk_style_context_add_provider_for_display", cheader_filename = "gtk/gtk.h")]
+        public static extern void add_css_provider_for_display (Gdk.Display display, Gtk.StyleProvider provider, uint priority);
 
         public static SettingsManager get_default () {
             if (_instance == null) {

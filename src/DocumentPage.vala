@@ -33,8 +33,11 @@ namespace Imladris {
                 return "";
             }
         }
-        private Window? parent_window;
+        private unowned Window? parent_window;
         private uint update_debounce_id = 0;
+        private int web_process_crashes = 0;
+        private int deferred_flush_attempts = 0;
+        private uint layout_idle_id = 0;
 
         // Apostrophe Shell Containers
         public Gtk.Paned paned { get; private set; }
@@ -303,7 +306,6 @@ namespace Imladris {
             });
 
             setup_text_tags ();
-            populate_starter_template (title, lang_id);
 
             source_view = new GtkSource.View.with_buffer (source_buffer) {
                 show_line_numbers = true,
@@ -352,6 +354,7 @@ namespace Imladris {
                     });
                 });
             }
+            populate_starter_template (title, lang_id);
             editor_scroller.vadjustment.value_changed.connect (() => {
                 schedule_preview_scroll_sync ();
             });
@@ -442,7 +445,6 @@ namespace Imladris {
                 }
             });
 
-            int web_process_crashes = 0;
             web_view.web_process_terminated.connect ((reason) => {
                 web_process_crashes++;
                 has_loaded_preview = false;
@@ -721,9 +723,17 @@ namespace Imladris {
                 GLib.Source.remove (deferred_flush_id);
                 deferred_flush_id = 0;
             }
+            deferred_flush_attempts = 0;
+            if (layout_idle_id != 0) {
+                GLib.Source.remove (layout_idle_id);
+                layout_idle_id = 0;
+            }
             if (scroll_sync_debounce_id != 0) {
                 GLib.Source.remove (scroll_sync_debounce_id);
                 scroll_sync_debounce_id = 0;
+            }
+            if (assistant_panel != null) {
+                assistant_panel.cleanup ();
             }
             if (source_buffer != null && !source_buffer.get_modified ()) {
                 Services.RecoveryService.get_default ().purge_document_cache (doc_id);
@@ -1177,16 +1187,17 @@ Start writing formatted text here.\par
             if (deferred_flush_id != 0) {
                 return;
             }
-            int attempts = 0;
             deferred_flush_id = GLib.Idle.add (() => {
                 if (!web_view.get_mapped ()) {
                     deferred_flush_id = 0;
+                    deferred_flush_attempts = 0;
                     return GLib.Source.REMOVE;
                 }
                 if (web_view.get_width () <= 0 || web_view.get_height () <= 0) {
-                    attempts++;
-                    if (attempts >= 12) {
+                    deferred_flush_attempts++;
+                    if (deferred_flush_attempts >= 12) {
                         deferred_flush_id = 0;
+                        deferred_flush_attempts = 0;
                         return GLib.Source.REMOVE;
                     }
                     deferred_flush_id = GLib.Timeout.add (40, () => {
@@ -1199,23 +1210,38 @@ Start writing formatted text here.\par
                     return GLib.Source.REMOVE;
                 }
                 deferred_flush_id = 0;
+                deferred_flush_attempts = 0;
                 refresh_pending_preview_if_visible ();
                 return GLib.Source.REMOVE;
             });
         }
 
         private void refresh_pending_preview_if_visible () {
-            if ((!pending_preview_refresh && pending_preview_uri == null) || !web_view.get_mapped ()) {
+            if (!pending_preview_refresh && pending_preview_uri == null) {
                 return;
             }
             if (current_layout_mode == Services.LayoutMode.APOSTROPHE &&
                 (!console_revealer.reveal_child || right_stack.visible_child_name != "preview")) {
                 return;
             }
+            var pb = Core.SettingsManager.get_default ().preview_backend;
+            if (pb != Core.PreviewBackend.WEBKIT_HTML) {
+                if (!native_preview.get_mapped ()) {
+                    return;
+                }
+                pending_preview_refresh = false;
+                pending_preview_uri = null;
+                refresh_live_preview ();
+                return;
+            }
+            if (!web_view.get_mapped ()) {
+                return;
+            }
             if (web_view.get_width () <= 0 || web_view.get_height () <= 0) {
                 schedule_deferred_preview_flush ();
                 return;
             }
+            deferred_flush_attempts = 0;
             if (pending_preview_uri != null) {
                 string target_uri = pending_preview_uri;
                 pending_preview_uri = null;
@@ -1348,7 +1374,9 @@ Start writing formatted text here.\par
                     if (h > 100) {
                         paned.set_position (h / 2);
                     } else {
-                        GLib.Idle.add (() => {
+                        if (layout_idle_id != 0) GLib.Source.remove (layout_idle_id);
+                        layout_idle_id = GLib.Idle.add (() => {
+                            layout_idle_id = 0;
                             int cur_h = paned.get_height ();
                             if (cur_h > 100) paned.set_position (cur_h / 2);
                             return GLib.Source.REMOVE;
@@ -1366,7 +1394,9 @@ Start writing formatted text here.\par
                     if (w > 100) {
                         paned.set_position (w / 2);
                     } else {
-                        GLib.Idle.add (() => {
+                        if (layout_idle_id != 0) GLib.Source.remove (layout_idle_id);
+                        layout_idle_id = GLib.Idle.add (() => {
+                            layout_idle_id = 0;
                             int cur_w = paned.get_width ();
                             if (cur_w > 100) paned.set_position (cur_w / 2);
                             return GLib.Source.REMOVE;
@@ -1495,9 +1525,10 @@ Start writing formatted text here.\par
         }
 
         public string get_selected_text () {
+            Gtk.TextBuffer buf = (rtf_editor != null) ? rtf_editor.buffer : (Gtk.TextBuffer) source_buffer;
             Gtk.TextIter start, end;
-            if (source_buffer.get_selection_bounds (out start, out end)) {
-                return source_buffer.get_text (start, end, false);
+            if (buf.get_selection_bounds (out start, out end)) {
+                return buf.get_text (start, end, false);
             }
             return "";
         }
@@ -1599,9 +1630,10 @@ Start writing formatted text here.\par
                 popover.set_pointing_to (anchor);
             }
 
-            popover.closed.connect (() => {
-                popover.unparent ();
-                target_view.grab_focus ();
+            unowned Gtk.TextView unowned_target = target_view;
+            popover.closed.connect ((p) => {
+                p.unparent ();
+                unowned_target.grab_focus ();
             });
             popover.popup ();
         }
@@ -1729,14 +1761,16 @@ Start writing formatted text here.\par
         }
 
         public void undo () {
-            if (source_buffer.can_undo) {
-                source_buffer.undo ();
+            Gtk.TextBuffer buf = (rtf_editor != null) ? rtf_editor.buffer : (Gtk.TextBuffer) source_buffer;
+            if (buf.can_undo) {
+                buf.undo ();
             }
         }
 
         public void redo () {
-            if (source_buffer.can_redo) {
-                source_buffer.redo ();
+            Gtk.TextBuffer buf = (rtf_editor != null) ? rtf_editor.buffer : (Gtk.TextBuffer) source_buffer;
+            if (buf.can_redo) {
+                buf.redo ();
             }
         }
 
@@ -1750,6 +1784,11 @@ Start writing formatted text here.\par
 
         public void apply_heading (int level) {
             if (level <= 0) return;
+            if (rtf_editor != null) {
+                int pt = (level == 1) ? 20 : ((level == 2) ? 16 : 14);
+                rtf_editor.apply_heading_style (pt);
+                return;
+            }
             string prefix = string.nfill (level, '#') + " ";
             Gtk.TextIter insert_iter;
             source_buffer.get_iter_at_mark (out insert_iter, source_buffer.get_insert ());
@@ -1758,6 +1797,14 @@ Start writing formatted text here.\par
         }
 
         public void insert_list_item (string prefix) {
+            if (rtf_editor != null) {
+                Gtk.TextIter it;
+                rtf_editor.buffer.get_iter_at_mark (out it, rtf_editor.buffer.get_insert ());
+                it.set_line_offset (0);
+                string rtf_prefix = prefix.has_prefix ("- ") ? "• " : prefix;
+                rtf_editor.buffer.insert (ref it, rtf_prefix, -1);
+                return;
+            }
             Gtk.TextIter insert_iter;
             source_buffer.get_iter_at_mark (out insert_iter, source_buffer.get_insert ());
             insert_iter.set_line_offset (0);

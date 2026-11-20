@@ -213,6 +213,14 @@ namespace Imladris.UI {
             return blocks;
         }
 
+        private static GLib.Regex? cached_style_re = null;
+        private static GLib.Regex? cached_script_re = null;
+        private static GLib.Regex? cached_block_re = null;
+        private static GLib.Regex? cached_tag_re = null;
+        private static GLib.Regex? cached_bold_re = null;
+        private static GLib.Regex? cached_italic_re = null;
+        private static GLib.Regex? cached_code_re = null;
+
         private string normalize_to_markdown (string source_text, DocumentFormat fmt) {
             string trimmed = source_text.strip ();
             if (fmt == DocumentFormat.RTF || trimmed.has_prefix ("{\\rtf")) {
@@ -221,14 +229,14 @@ namespace Imladris.UI {
             if (fmt == DocumentFormat.HTML || trimmed.down ().has_prefix ("<!doctype html") || trimmed.down ().has_prefix ("<html")) {
                 string cleaned = source_text;
                 try {
-                    var style_re = new GLib.Regex ("<style[^>]*>.*?</style>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
-                    cleaned = style_re.replace (cleaned, -1, 0, "");
-                    var script_re = new GLib.Regex ("<script[^>]*>.*?</script>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
-                    cleaned = script_re.replace (cleaned, -1, 0, "");
-                    var block_re = new GLib.Regex ("</?(p|div|br|li|h[1-6]|tr)[^>]*>", GLib.RegexCompileFlags.CASELESS);
-                    cleaned = block_re.replace (cleaned, -1, 0, "\n");
-                    var tag_re = new GLib.Regex ("<[^>]+>");
-                    cleaned = tag_re.replace (cleaned, -1, 0, "");
+                    if (cached_style_re == null) cached_style_re = new GLib.Regex ("<style[^>]*>.*?</style>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
+                    if (cached_script_re == null) cached_script_re = new GLib.Regex ("<script[^>]*>.*?</script>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
+                    if (cached_block_re == null) cached_block_re = new GLib.Regex ("</?(p|div|br|li|h[1-6]|tr)[^>]*>", GLib.RegexCompileFlags.CASELESS);
+                    if (cached_tag_re == null) cached_tag_re = new GLib.Regex ("<[^>]+>");
+                    cleaned = cached_style_re.replace (cleaned, -1, 0, "");
+                    cleaned = cached_script_re.replace (cleaned, -1, 0, "");
+                    cleaned = cached_block_re.replace (cleaned, -1, 0, "\n");
+                    cleaned = cached_tag_re.replace (cleaned, -1, 0, "");
                 } catch (GLib.RegexError e) {}
                 return cleaned
                     .replace ("&nbsp;", " ")
@@ -278,13 +286,29 @@ namespace Imladris.UI {
         private string to_pango_inline (string text) {
             string escaped = GLib.Markup.escape_text (text);
             try {
-                var bold_re = new GLib.Regex ("\\*\\*([^*]+)\\*\\*");
-                escaped = bold_re.replace (escaped, -1, 0, "<b>\\1</b>");
-                var italic_re = new GLib.Regex ("\\*([^*]+)\\*");
-                escaped = italic_re.replace (escaped, -1, 0, "<i>\\1</i>");
-                var code_re = new GLib.Regex ("`([^`]+)`");
-                escaped = code_re.replace (escaped, -1, 0, "<tt>\\1</tt>");
-            } catch (GLib.RegexError e) {}
+                if (cached_code_re == null) cached_code_re = new GLib.Regex ("`([^`]+)`");
+                if (cached_bold_re == null) cached_bold_re = new GLib.Regex ("\\*\\*([^*]+)\\*\\*");
+                if (cached_italic_re == null) cached_italic_re = new GLib.Regex ("\\*([^*]+)\\*");
+
+                // Protect inline code spans first so '*' inside `code` never crosses <b>/<i> tags
+                var code_spans = new Gee.ArrayList<string> ();
+                string protected_str = cached_code_re.replace_eval (escaped, -1, 0, 0, (mi, res) => {
+                    string placeholder = @"\x01CODE$(code_spans.size)\x02";
+                    code_spans.add ("<tt>" + mi.fetch (1) + "</tt>");
+                    res.append (placeholder);
+                    return false;
+                });
+
+                protected_str = cached_bold_re.replace (protected_str, -1, 0, "<b>\\1</b>");
+                protected_str = cached_italic_re.replace (protected_str, -1, 0, "<i>\\1</i>");
+
+                for (int i = 0; i < code_spans.size; i++) {
+                    protected_str = protected_str.replace (@"\x01CODE$i\x02", code_spans.get (i));
+                }
+                if (Pango.parse_markup (protected_str, -1, 0, null, null, null)) {
+                    return protected_str;
+                }
+            } catch (GLib.Error e) {}
             return escaped;
         }
 

@@ -21,7 +21,7 @@ namespace Imladris.Services {
                     needs_py,
                     needs_quarto
                 );
-                Core.PlatformUtils.clear_runtime_caches ();
+                Core.PlatformUtils.clear_caches ();
             }
 
             if (needs_r) {

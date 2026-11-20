@@ -77,9 +77,22 @@ namespace Imladris.UI {
         private int current_offset = 0;
         private int page_size = 1000;
         private int total_df_rows = 0;
-        private int total_df_cols = 0;
 
         public signal void close_requested ();
+
+        public override void dispose () {
+            if (search_filter != null) {
+                search_filter.set_filter_func (null);
+            }
+            if (column_view != null) {
+                column_view.set_model (null);
+            }
+            if (popout_win != null) {
+                popout_win.destroy ();
+                popout_win = null;
+            }
+            base.dispose ();
+        }
 
         public DataGridViewer () {
             Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
@@ -688,7 +701,6 @@ except Exception as e:
                     string[] dim_parts = trimmed.substring ("__DONE__\t".length).split ("\t");
                     if (dim_parts.length >= 2) {
                         this.total_df_rows = int.parse (dim_parts[0]);
-                        this.total_df_cols = int.parse (dim_parts[1]);
                     }
                 }
             }
@@ -697,7 +709,6 @@ except Exception as e:
                 cols = { "Status", "Details" };
                 rows.add (new DataRow (1, new string[] { "No Data", @"Object '$obj_name' is empty or not loaded in active session." }));
                 this.total_df_rows = 0;
-                this.total_df_cols = 0;
             }
 
             populate_grid_data (obj_name, cols, rows);

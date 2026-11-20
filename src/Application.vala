@@ -176,7 +176,7 @@ namespace Imladris {
             provider.load_from_resource ("/org/imladris/app/style.css");
             var display = Gdk.Display.get_default ();
             if (display != null) {
-                Gtk.StyleContext.add_provider_for_display (
+                Core.SettingsManager.add_css_provider_for_display (
                     display,
                     provider,
                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
@@ -205,6 +205,8 @@ namespace Imladris {
 
         protected override void shutdown () {
             Services.PersistentSessionManager.get_default ().shutdown_all ();
+            Services.PersistentSessionManager.shutdown_all_pooled ();
+            Services.ShinyService.get_default ().stop_app ();
             base.shutdown ();
         }
 

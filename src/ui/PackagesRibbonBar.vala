@@ -35,7 +35,7 @@ namespace Imladris.UI {
         private uint py_debounce_id = 0;
         private static GLib.Regex? r_pkg_spec_regex = null;
 
-        ~PackagesRibbonBar () {
+        public override void dispose () {
             if (r_debounce_id != 0) {
                 Source.remove (r_debounce_id);
                 r_debounce_id = 0;
@@ -44,6 +44,21 @@ namespace Imladris.UI {
                 Source.remove (py_debounce_id);
                 py_debounce_id = 0;
             }
+            if (r_autocomplete_popover != null) {
+                r_autocomplete_popover.unparent ();
+                r_autocomplete_popover = null;
+            }
+            if (py_autocomplete_popover != null) {
+                py_autocomplete_popover.unparent ();
+                py_autocomplete_popover = null;
+            }
+            if (r_more_btn != null) {
+                r_more_btn.popover = null;
+            }
+            if (py_more_btn != null) {
+                py_more_btn.popover = null;
+            }
+            base.dispose ();
         }
 
         public PackagesRibbonBar (PackageIndexCache cache) {
@@ -244,11 +259,20 @@ namespace Imladris.UI {
         private void setup_autocomplete () {
             // R Autocomplete Popover
             r_autocomplete_popover = new Gtk.Popover () {
-                autohide = true,
+                autohide = false,
+                can_focus = false,
                 has_arrow = true,
                 position = Gtk.PositionType.BOTTOM
             };
             r_autocomplete_popover.set_parent (r_search_entry);
+
+            var r_focus = new Gtk.EventControllerFocus ();
+            r_focus.leave.connect (() => {
+                if (r_autocomplete_popover != null && r_autocomplete_popover.visible) {
+                    r_autocomplete_popover.popdown ();
+                }
+            });
+            r_search_entry.add_controller (r_focus);
 
             r_autocomplete_list = new Gtk.ListBox () {
                 selection_mode = Gtk.SelectionMode.SINGLE
@@ -279,11 +303,20 @@ namespace Imladris.UI {
 
             // Python Autocomplete Popover
             py_autocomplete_popover = new Gtk.Popover () {
-                autohide = true,
+                autohide = false,
+                can_focus = false,
                 has_arrow = true,
                 position = Gtk.PositionType.BOTTOM
             };
             py_autocomplete_popover.set_parent (py_search_entry);
+
+            var py_focus = new Gtk.EventControllerFocus ();
+            py_focus.leave.connect (() => {
+                if (py_autocomplete_popover != null && py_autocomplete_popover.visible) {
+                    py_autocomplete_popover.popdown ();
+                }
+            });
+            py_search_entry.add_controller (py_focus);
 
             py_autocomplete_list = new Gtk.ListBox () {
                 selection_mode = Gtk.SelectionMode.SINGLE

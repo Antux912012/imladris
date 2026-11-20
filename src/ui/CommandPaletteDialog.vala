@@ -44,11 +44,11 @@ namespace Imladris.UI {
 
         private void build_command_catalog () {
             // Document and Execution
-            all_items.add (new CommandPaletteItem ("Run Active Chunk", "Execute current code chunk (Ctrl+Shift+Enter)", "media-playback-start-symbolic", "win.run_chunk", "Execution"));
-            all_items.add (new CommandPaletteItem ("Run All Chunks", "Execute all notebook code cells sequentially", "media-seek-forward-symbolic", "win.run_all", "Execution"));
-            all_items.add (new CommandPaletteItem ("Run Line or Selection", "Execute active line in persistent REPL console (Ctrl+Enter)", "go-next-symbolic", "win.run_line", "Execution"));
-            all_items.add (new CommandPaletteItem ("Restart Execution Kernel", "Clear persistent session states for R and Python", "view-refresh-symbolic", "win.restart_kernel", "Execution"));
-            all_items.add (new CommandPaletteItem ("Interrupt Execution", "Send SIGINT to active background worker", "process-stop-symbolic", "win.interrupt_execution", "Execution"));
+            all_items.add (new CommandPaletteItem ("Run Active Chunk", "Execute current code chunk (Ctrl+Shift+Enter)", "media-playback-start-symbolic", "app.run_cell", "Execution"));
+            all_items.add (new CommandPaletteItem ("Run All Chunks", "Execute all notebook code cells sequentially", "media-seek-forward-symbolic", "app.run_all_cells", "Execution"));
+            all_items.add (new CommandPaletteItem ("Run Line or Selection", "Execute active line in persistent REPL console (Ctrl+Enter)", "go-next-symbolic", "app.run_line_selection", "Execution"));
+            all_items.add (new CommandPaletteItem ("Restart Execution Kernel", "Clear persistent session states for R and Python", "view-refresh-symbolic", "app.restart_kernel", "Execution"));
+            all_items.add (new CommandPaletteItem ("Interrupt Execution", "Send SIGINT to active background worker", "process-stop-symbolic", "app.interrupt_execution", "Execution"));
             all_items.add (new CommandPaletteItem ("Clear Console and Outputs", "Purge all cell outputs and terminal logs", "edit-clear-symbolic", "win.clear_console", "Execution"));
 
             // Publishing & Export
@@ -250,35 +250,11 @@ namespace Imladris.UI {
                 if (parent_window != null) parent_window.show_toast (sm.steady_cursor ? "Steady Cursor Enabled" : "Blinking Cursor Enabled");
             } else if (action_id.has_prefix ("win.")) {
                 if (parent_window != null) {
-                    string act = action_id.substring (4);
-                    if (act == "run_chunk") parent_window.run_active_chunk ();
-                    else if (act == "run_all") parent_window.run_all_chunks ();
-                    else if (act == "run_line") parent_window.run_line_or_selection ();
-                    else if (act == "restart_kernel") parent_window.restart_active_kernel ();
-                    else if (act == "interrupt_execution") parent_window.interrupt_active_execution ();
-                    else if (act == "clear_console") parent_window.clear_console ();
-                    else if (act == "open_zotero" || act == "zotero_picker") parent_window.open_zotero_picker ();
-                    else if (act == "doi_bib_manager") parent_window.open_doi_bib_manager ();
+                    parent_window.activate_action (action_id.substring (4), null);
                 }
             } else if (action_id.has_prefix ("bridge.")) {
                 if (parent_window != null) {
-                    string b = action_id.substring (7);
-                    if (b == "elbereth") {
-                        var p = new Bridges.Elbereth.ClinicalBiostatsPopover ();
-                        p.set_parent (parent_window);
-                        p.closed.connect (() => { p.unparent (); });
-                        p.popup ();
-                    } else if (b == "yavanna") {
-                        var p = new Bridges.Yavanna.BioEntityPopover ();
-                        p.set_parent (parent_window);
-                        p.closed.connect (() => { p.unparent (); });
-                        p.popup ();
-                    } else if (b == "taniquetil") {
-                        var p = new Bridges.Taniquetil.AlphaFoldBridgePopover ();
-                        p.set_parent (parent_window);
-                        p.closed.connect (() => { p.unparent (); });
-                        p.popup ();
-                    }
+                    open_bridge_popover (action_id.substring (7));
                 }
             } else if (action_id.has_prefix ("app.")) {
                 var app = GLib.Application.get_default () as Gtk.Application;
@@ -287,6 +263,40 @@ namespace Imladris.UI {
                     app.activate_action (act, null);
                 }
             }
+        }
+
+        private void open_bridge_popover (string bridge_id) {
+            Gtk.Popover? p = null;
+            string toast_msg = "Inserted record into document";
+            if (bridge_id == "elbereth") {
+                var e = new Bridges.Elbereth.ClinicalBiostatsPopover ();
+                e.insert_snippet_requested.connect (on_bridge_snippet);
+                p = e;
+                toast_msg = "Inserted clinical biostatistics record into document";
+            } else if (bridge_id == "yavanna") {
+                var y = new Bridges.Yavanna.BioEntityPopover ();
+                y.insert_snippet_requested.connect (on_bridge_snippet);
+                p = y;
+                toast_msg = "Inserted biological provenance record into document";
+            } else if (bridge_id == "taniquetil") {
+                var t = new Bridges.Taniquetil.AlphaFoldBridgePopover ();
+                t.insert_snippet_requested.connect (on_bridge_snippet);
+                p = t;
+                toast_msg = "Inserted AlphaFold structural provenance record";
+            }
+            if (p == null) return;
+            bridge_toast_msg = toast_msg;
+            p.set_parent (parent_window);
+            p.closed.connect ((pop) => { pop.unparent (); });
+            p.popup ();
+        }
+
+        private string bridge_toast_msg = "";
+
+        private void on_bridge_snippet (string snippet) {
+            if (parent_window == null) return;
+            parent_window.insert_in_active_editor (snippet);
+            parent_window.show_toast (bridge_toast_msg);
         }
     }
 }

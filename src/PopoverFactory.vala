@@ -85,8 +85,9 @@ namespace Imladris {
                     });
                     cell_btn.add_controller (motion);
 
-                    cell_btn.clicked.connect (() => {
-                        popover.popdown ();
+                    cell_btn.clicked.connect ((btn) => {
+                        var pop = btn.get_ancestor (typeof (Gtk.Popover)) as Gtk.Popover;
+                        if (pop != null) pop.popdown ();
                         cb (row_val, col_val);
                     });
                     cells[r - 1, c - 1] = cell_btn;
@@ -111,10 +112,11 @@ namespace Imladris {
             };
             insert_btn.add_css_class ("suggested-action");
 
-            insert_btn.clicked.connect (() => {
+            insert_btn.clicked.connect ((btn) => {
                 int r_count = rows_spin.get_value_as_int ();
                 int c_count = cols_spin.get_value_as_int ();
-                popover.popdown ();
+                var pop = btn.get_ancestor (typeof (Gtk.Popover)) as Gtk.Popover;
+                if (pop != null) pop.popdown ();
                 cb (r_count, c_count);
             });
             rows_spin.activate.connect (() => {
@@ -154,12 +156,25 @@ namespace Imladris {
             var flow = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
             foreach (string hex in colors) {
                 string target_hex = hex;
+                var swatch = new Gtk.DrawingArea () {
+                    content_width = 18,
+                    content_height = 18
+                };
+                swatch.set_draw_func ((area, cr, width, height) => {
+                    var rgba = Gdk.RGBA ();
+                    rgba.parse (target_hex);
+                    cr.set_source_rgba (rgba.red, rgba.green, rgba.blue, rgba.alpha);
+                    cr.rectangle (0, 0, width, height);
+                    cr.fill ();
+                });
                 var btn = new Gtk.Button () {
+                    child = swatch,
                     tooltip_text = target_hex
                 };
                 btn.add_css_class ("color-swatch-btn");
-                btn.clicked.connect (() => {
-                    popover.popdown ();
+                btn.clicked.connect ((b) => {
+                    var pop = b.get_ancestor (typeof (Gtk.Popover)) as Gtk.Popover;
+                    if (pop != null) pop.popdown ();
                     cb (target_hex);
                 });
                 flow.append (btn);

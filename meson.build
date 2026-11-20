@@ -54,8 +54,6 @@ sources = files(
   'src/McpServer.vala',
   'src/AssistantPanel.vala',
   'src/Window.vala',
-  'src/console/ReplBridge.vala',
-  'src/editor/ChunkExecutionEngine.vala',
   'src/editor/AiBufferEditHelper.vala',
   'src/editor/CodeIntelliSenseEngine.vala',
   'src/editor/CodeIntelliSenseProvider.vala',

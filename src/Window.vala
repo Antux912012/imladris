@@ -409,8 +409,10 @@ namespace Imladris {
                 show_toast ("Inserted biological provenance record into document");
             });
             var btn_yavanna_inline = new Gtk.MenuButton () {
-                icon_name = "applications-science-symbolic",
-                label = "Gene & Primer Lookup (Yavanna)",
+                child = new Adw.ButtonContent () {
+                    icon_name = "applications-science-symbolic",
+                    label = "Gene & Primer Lookup (Yavanna)"
+                },
                 popover = yavanna_popover,
                 hexpand = true
             };
@@ -422,8 +424,10 @@ namespace Imladris {
                 show_toast ("Inserted AlphaFold structural provenance record");
             });
             var btn_taniquetil_inline = new Gtk.MenuButton () {
-                icon_name = "network-cellular-symbolic",
-                label = "Protein 3D Structure (AlphaFold)",
+                child = new Adw.ButtonContent () {
+                    icon_name = "network-cellular-symbolic",
+                    label = "Protein 3D Structure (AlphaFold)"
+                },
                 popover = taniquetil_popover,
                 hexpand = true
             };
@@ -435,8 +439,10 @@ namespace Imladris {
                 show_toast ("Inserted clinical biostatistics record into document");
             });
             var btn_elbereth_inline = new Gtk.MenuButton () {
-                icon_name = "view-statistics-symbolic",
-                label = "Biostats & Power Calc (Elbereth)",
+                child = new Adw.ButtonContent () {
+                    icon_name = "view-statistics-symbolic",
+                    label = "Biostats & Power Calc (Elbereth)"
+                },
                 popover = elbereth_popover,
                 hexpand = true
             };
@@ -1114,8 +1120,10 @@ namespace Imladris {
             }
             doc_page.project_type = current_project_type;
             doc_page.stats_changed.connect ((words, lines, badge) => {
-                status_badge_lbl.label = badge;
-                status_words_lbl.label = @"Words: $words | Lines: $lines";
+                if (get_active_document () == doc_page) {
+                    status_badge_lbl.label = badge;
+                    status_words_lbl.label = @"Words: $words | Lines: $lines";
+                }
             });
 
             var page = tab_view.append (doc_page);
@@ -1364,9 +1372,17 @@ namespace Imladris {
                 title = title,
                 use_markup = false
             };
-            row.add_suffix (new Gtk.ShortcutLabel (accel) {
-                valign = Gtk.Align.CENTER
-            });
+            uint key = 0;
+            Gdk.ModifierType mods = 0;
+            string display_accel = accel;
+            if (Gtk.accelerator_parse (accel, out key, out mods) && key != 0) {
+                display_accel = Gtk.accelerator_get_label (key, mods);
+            }
+            var badge = new Gtk.Label (display_accel) {
+                valign = Gtk.Align.CENTER,
+                css_classes = { "dim-label", "caption", "monospace" }
+            };
+            row.add_suffix (badge);
             grp.add (row);
         }
 
@@ -1939,7 +1955,7 @@ namespace Imladris {
             doc.append_console_log (@"✔ Rendered $(GLib.Path.get_basename (out_path))");
             show_toast (@"Rendered $(GLib.Path.get_basename (out_path))");
             if (target_ext == "html") {
-                string uri = GLib.Filename.to_uri (out_path);
+                string uri = GLib.File.new_for_path (out_path).get_uri ();
                 doc.show_live_preview (uri);
             } else {
                 var file = GLib.File.new_for_path (out_path);
@@ -2212,8 +2228,9 @@ namespace Imladris {
             var action_focus_editor = new GLib.SimpleAction ("focus_editor", null);
             action_focus_editor.activate.connect (() => {
                 var d = get_active_document ();
-                if (d != null && d.source_view != null) {
-                    d.source_view.grab_focus ();
+                if (d != null) {
+                    if (d.rtf_editor != null) d.rtf_editor.text_view.grab_focus ();
+                    else if (d.source_view != null) d.source_view.grab_focus ();
                 }
             });
             this.add_action (action_focus_editor);
@@ -2238,12 +2255,6 @@ namespace Imladris {
                 open_doi_bib_manager ();
             });
             this.add_action (action_doi_bib);
-
-            var action_toolchain = new GLib.SimpleAction ("toolchain_setup", null);
-            action_toolchain.activate.connect (() => {
-                show_toolchain_setup_dialog ();
-            });
-            this.add_action (action_toolchain);
         }
 
         public void toggle_ribbon_visibility () {
@@ -2279,17 +2290,26 @@ namespace Imladris {
             var btn_cut = RibbonFactory.create_tool_button ("edit-cut-symbolic", null, "Cut");
             ((Gtk.Button) btn_cut).clicked.connect (() => {
                 var d = get_active_document ();
-                if (d != null) d.source_buffer.cut_clipboard (d.get_clipboard (), true);
+                if (d != null) {
+                    Gtk.TextBuffer buf = (d.rtf_editor != null) ? d.rtf_editor.buffer : (Gtk.TextBuffer) d.source_buffer;
+                    buf.cut_clipboard (d.get_clipboard (), true);
+                }
             });
             var btn_copy = RibbonFactory.create_tool_button ("edit-copy-symbolic", null, "Copy");
             ((Gtk.Button) btn_copy).clicked.connect (() => {
                 var d = get_active_document ();
-                if (d != null) d.source_buffer.copy_clipboard (d.get_clipboard ());
+                if (d != null) {
+                    Gtk.TextBuffer buf = (d.rtf_editor != null) ? d.rtf_editor.buffer : (Gtk.TextBuffer) d.source_buffer;
+                    buf.copy_clipboard (d.get_clipboard ());
+                }
             });
             var btn_paste = RibbonFactory.create_tool_button ("edit-paste-symbolic", null, "Paste");
             ((Gtk.Button) btn_paste).clicked.connect (() => {
                 var d = get_active_document ();
-                if (d != null) d.source_buffer.paste_clipboard (d.get_clipboard (), null, true);
+                if (d != null) {
+                    Gtk.TextBuffer buf = (d.rtf_editor != null) ? d.rtf_editor.buffer : (Gtk.TextBuffer) d.source_buffer;
+                    buf.paste_clipboard (d.get_clipboard (), null, true);
+                }
             });
             box.append (RibbonFactory.create_linked_group ({ btn_cut, btn_copy, btn_paste }));
             box.append (RibbonFactory.create_vseparator ());
@@ -2327,7 +2347,12 @@ namespace Imladris {
 
             var color_pop = PopoverFactory.create_color_palette_popover ((hex) => {
                 var d = get_active_document ();
-                if (d != null) d.source_buffer.insert_at_cursor (@"<span style=\"color:$hex;\">text</span>", -1);
+                if (d == null) return;
+                if (d.rtf_editor != null) {
+                    d.rtf_editor.apply_foreground_color (hex);
+                } else {
+                    d.source_buffer.insert_at_cursor (@"<span style=\"color:$hex;\">text</span>", -1);
+                }
             });
             var btn_color = RibbonFactory.create_tool_button ("applications-graphics-symbolic", null, "Text Color", false, false, true, null, null, color_pop);
 
@@ -2570,7 +2595,7 @@ namespace Imladris {
                 restart_active_kernel ();
             });
 
-            btn_package_installer = RibbonFactory.create_tool_button ("software-properties-symbolic", "Packages", "Package Manager (CRAN / Bioconductor / PyPI - Ctrl+Shift+P)");
+            btn_package_installer = RibbonFactory.create_tool_button ("software-properties-symbolic", "Packages", "Package Manager (CRAN / Bioconductor / PyPI - Ctrl+Alt+K)");
             ((Gtk.Button) btn_package_installer).clicked.connect (() => {
                 show_package_installer_dialog ();
             });
