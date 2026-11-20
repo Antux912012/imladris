@@ -1,9 +1,9 @@
 <!--
 SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-License-Identifier: Apache-2.0
 -->
 
-### 🌿 Imladris IDE (v0.33.1)
+### 🌿 Imladris IDE (v0.40.0)
 
 * [[Home|Home]]
 * 🌐 [Official Landing Page](https://antux912012.github.io/imladris/)
@@ -29,4 +29,4 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 #### 🛠️ Architecture & Legal
 * [[GTK4, HIG & Papirus Icons|Architecture-and-HIG]]
-* [[License & GPLv3 Policy|License-and-GPLv3]]
+* [[License & Enterprise Policy|License-and-Enterprise-Policy]]

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 namespace Imladris.UI {
 
@@ -38,8 +38,9 @@ namespace Imladris.UI {
         }
 
         private static void apply_policy (WebKit.Settings settings, bool hw_accel) {
-            // Avoid forcing HardwareAccelerationPolicy.ALWAYS when DMA-BUF is disabled,
-            // as WebKitGTK 6.0 on Wayland/Flatpak can stall frame presentation in that mode.
+            // Match Apostrophe's WebKitGTK 6.0 Flatpak default (ALWAYS = 0) when GPU
+            // acceleration is enabled and DMABUF is not explicitly disabled, falling back
+            // to NEVER only when software rendering or WEBKIT_DISABLE_DMABUF_RENDERER=1 is set.
             bool dmabuf_disabled = GLib.Environment.get_variable ("WEBKIT_DISABLE_DMABUF_RENDERER") == "1";
             bool enable_hw = hw_accel && !dmabuf_disabled;
             settings.hardware_acceleration_policy = enable_hw
@@ -47,7 +48,7 @@ namespace Imladris.UI {
                 : WebKit.HardwareAccelerationPolicy.NEVER;
             settings.enable_webgl = enable_hw;
             settings.allow_file_access_from_file_urls = true;
-            settings.allow_universal_access_from_file_urls = false;
+            settings.allow_universal_access_from_file_urls = true;
             settings.enable_write_console_messages_to_stdout = false;
             settings.enable_developer_extras = false;
         }

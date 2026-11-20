@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 {
   description = "Imladris — Native Linux Scientific Workbench & Polyglot Notebook Studio";
 
@@ -20,7 +20,7 @@
         {
           default = pkgs.stdenv.mkDerivation {
             pname = "imladris";
-            version = "0.33.1";
+            version = "0.40.0";
 
             src = self;
 

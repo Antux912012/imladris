@@ -1,14 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 namespace Imladris {
     public static int main (string[] args) {
         // Inside Flatpak, WebKitGTK 6.0 uses the Flatpak sandbox portal natively.
         // Only disable bwrap sandbox on host builds where unprivileged userns may be restricted.
+        // Like Apostrophe, leave DMABUF enabled by default when GPU acceleration is on,
+        // only disabling it when the user selects software rendering or overrides via env.
         if (!GLib.FileUtils.test ("/.flatpak-info", GLib.FileTest.EXISTS)) {
             GLib.Environment.set_variable ("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1", false);
         }
-        GLib.Environment.set_variable ("WEBKIT_DISABLE_DMABUF_RENDERER", "1", false);
 
         if ("--mcp-server" in args) {
             var loop = new GLib.MainLoop ();

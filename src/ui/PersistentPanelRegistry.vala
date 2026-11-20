@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using Imladris.Core.Layout;
 
@@ -453,10 +453,33 @@ namespace Imladris.UI {
                 margin_start = 8,
                 margin_end = 8
             };
-            var preview_lbl = new Gtk.Label ("Rendered Output (WebKitGTK 6.0)") {
+            var preview_lbl = new Gtk.Label ("Preview") {
                 css_classes = { "dim-label", "caption" }
             };
             preview_bar.append (preview_lbl);
+
+            var preview_modes = new Gtk.StringList ({
+                "WebKitGTK 6.0 (HTML5)",
+                "Native GTK4 / Pango",
+                "Native PDF Pages (Cairo)"
+            });
+            var preview_selector = new Gtk.DropDown (preview_modes, null) {
+                valign = Gtk.Align.CENTER,
+                tooltip_text = "Choose Live Preview Engine",
+                selected = (uint) Core.SettingsManager.get_default ().preview_backend
+            };
+            preview_selector.add_css_class ("flat");
+            bool syncing_preview_selector = false;
+            preview_selector.notify["selected"].connect (() => {
+                if (syncing_preview_selector) return;
+                Core.SettingsManager.get_default ().preview_backend = (Core.PreviewBackend) preview_selector.selected;
+            });
+            Core.SettingsManager.get_default ().preview_backend_changed.connect ((pb) => {
+                syncing_preview_selector = true;
+                preview_selector.selected = (uint) pb;
+                syncing_preview_selector = false;
+            });
+            preview_bar.append (preview_selector);
             preview_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
 
             var refresh_btn = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
@@ -469,7 +492,7 @@ namespace Imladris.UI {
             preview_bar.append (refresh_btn);
 
             live_preview_panel.append (preview_bar);
-            live_preview_panel.append (doc_page.web_view);
+            live_preview_panel.append (doc_page.preview_stack);
             panels.set (PanelId.LIVE_PREVIEW, live_preview_panel);
 
             // 3. CONSOLE PANEL (REPL & Cell Execution Stream with In [n]: / Out [n]:)
@@ -972,7 +995,13 @@ namespace Imladris.UI {
 
             plots_webview = WebViewFactory.create ();
             plots_box.append (plots_webview);
-            update_plot_view ();
+            bool plots_initialized = false;
+            plots_webview.map.connect (() => {
+                if (!plots_initialized) {
+                    plots_initialized = true;
+                    update_plot_view ();
+                }
+            });
             panels.set (PanelId.PLOTS, plots_box);
 
             // 10. FILES PANEL (Project Directory Browser with RStudio Actions)
@@ -1228,7 +1257,13 @@ namespace Imladris.UI {
 
             help_view = WebViewFactory.create ();
             help_box.append (help_view);
-            load_default_help_home ();
+            bool help_initialized = false;
+            help_view.map.connect (() => {
+                if (!help_initialized) {
+                    help_initialized = true;
+                    load_default_help_home ();
+                }
+            });
             panels.set (PanelId.HELP, help_box);
 
             // 15. SHINY VIEWER PANEL (Interactive R Shiny Application Viewer)
@@ -1290,7 +1325,13 @@ namespace Imladris.UI {
 
             shiny_webview = WebViewFactory.create ();
             shiny_box.append (shiny_webview);
-            load_empty_shiny_placeholder ();
+            bool shiny_placeholder_loaded = false;
+            shiny_webview.map.connect (() => {
+                if (!shiny_placeholder_loaded && Services.ShinyService.get_default ().active_url == null) {
+                    shiny_placeholder_loaded = true;
+                    load_empty_shiny_placeholder ();
+                }
+            });
 
             panels.set (PanelId.SHINY_VIEWER, shiny_box);
 

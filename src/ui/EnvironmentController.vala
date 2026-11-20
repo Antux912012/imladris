@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using GLib;
 using Gtk;
@@ -16,8 +16,9 @@ namespace Imladris.UI {
         public bool is_dataframe { get; set; }
         public string initial_preview { get; set; }
         public string var_engine { get; set; default = "r"; }
+        public string columns_csv { get; set; default = ""; }
 
-        public EnvVariableItem (string name, string var_type, string dims, string mem, bool is_df, string prev = "", string engine = "r") {
+        public EnvVariableItem (string name, string var_type, string dims, string mem, bool is_df, string prev = "", string engine = "r", string cols = "") {
             this.name = name;
             this.var_type = var_type;
             this.dimensions = dims;
@@ -25,6 +26,7 @@ namespace Imladris.UI {
             this.is_dataframe = is_df;
             this.initial_preview = prev;
             this.var_engine = engine;
+            this.columns_csv = cols;
         }
     }
 
@@ -321,7 +323,8 @@ local({
       dim_str <- if(!is.null(dim(val))) paste0(nrow(val), " × ", ncol(val)) else if(length(val) > 0) as.character(length(val)) else ""
       sz <- format(object.size(val), units = "auto")
       is_df <- is.data.frame(val) || is.matrix(val)
-      paste(x, cls, dim_str, sz, if(is_df) "1" else "0", sep="\t")
+      cols <- if(is.data.frame(val) || is.matrix(val)) paste(utils::head(colnames(val), 80), collapse=",") else if(is.list(val) && !is.null(names(val))) paste(utils::head(names(val), 80), collapse=",") else ""
+      paste(x, cls, dim_str, sz, if(is_df) "1" else "0", cols, sep="\t")
     }, error = function(e) "")
   })
   cat("___IMLADRIS_ENV_START___\n")
@@ -346,7 +349,8 @@ for k in list(globals().keys()):
             dim_str = str(getattr(v, 'shape', len(v) if hasattr(v, '__len__') else ''))
             sz = str(sys.getsizeof(v)) + " bytes"
             is_df = "1" if hasattr(v, 'columns') or (hasattr(v, 'shape') and hasattr(v.shape, '__len__') and len(v.shape) == 2) else "0"
-            res.append(f"{k}\t{cls}\t{dim_str}\t{sz}\t{is_df}")
+            cols = ",".join([str(c) for c in list(v.columns)[:80]]) if hasattr(v, 'columns') else ""
+            res.append(f"{k}\t{cls}\t{dim_str}\t{sz}\t{is_df}\t{cols}")
         except Exception:
             pass
 print("___IMLADRIS_ENV_START___")
@@ -376,7 +380,8 @@ print("___IMLADRIS_ENV_END___")
                     string dims = parts[2].strip ();
                     string sz = parts[3].strip ();
                     bool is_df = (parts[4].strip () == "1");
-                    items.add (new EnvVariableItem (name, cls, dims, sz, is_df, "", engine));
+                    string cols = parts.length >= 6 ? parts[5].strip () : "";
+                    items.add (new EnvVariableItem (name, cls, dims, sz, is_df, "", engine, cols));
                 }
             }
         }

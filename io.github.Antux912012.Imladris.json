@@ -20,12 +20,14 @@
         "--socket=wayland",
         "--device=dri",
         "--talk-name=org.freedesktop.Flatpak",
+        "--talk-name=org.gtk.vfs.*",
+        "--filesystem=xdg-run/gvfs",
+        "--filesystem=xdg-run/gvfsd",
         "--filesystem=xdg-documents",
         "--filesystem=xdg-download",
         "--filesystem=xdg-cache/imladris:create",
         "--filesystem=home",
-        "--env=PATH=/app/bin:/app/toolchain/bin:/usr/bin",
-        "--env=WEBKIT_DISABLE_DMABUF_RENDERER=1"
+        "--env=PATH=/app/bin:/app/toolchain/bin:/usr/bin"
     ],
     "cleanup": [
         "/include",

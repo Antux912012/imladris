@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 #
 # Imladris Package Builder: .deb & Flatpak only (AppImage is strictly excluded)
 set -euo pipefail
@@ -184,12 +184,14 @@ PYEOF
     --socket=wayland \
     --device=dri \
     --talk-name=org.freedesktop.Flatpak \
+    --talk-name=org.gtk.vfs.* \
+    --filesystem=xdg-run/gvfs \
+    --filesystem=xdg-run/gvfsd \
     --filesystem=xdg-documents \
     --filesystem=xdg-download \
     --filesystem=xdg-cache/imladris:create \
     --filesystem=home \
-    --env=PATH=/app/bin:/app/toolchain/bin:/usr/bin \
-    --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
+    --env=PATH=/app/bin:/app/toolchain/bin:/usr/bin
 
   flatpak build-export --disable-sandbox repo build-flatpak-app master
   flatpak build-update-repo repo || true

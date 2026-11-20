@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-License-Identifier: Apache-2.0
 -->
 
 # Flathub Compliance, Generative AI Disclosure & Submission Guide (`io.github.Antux912012.Imladris`)

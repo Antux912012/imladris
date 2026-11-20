@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * Single Responsibility: Scientific omni-search command palette dialog.
@@ -66,10 +66,12 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Taniquetil AlphaFold Structural Bridge", "Macromolecular structures, pLDDT metrics, and Bio3D coordinates", "network-cellular-symbolic", "bridge.taniquetil", "Scientific"));
             all_items.add (new CommandPaletteItem ("Yavanna Bio-Entity Inspector", "NCBI Taxonomy, Ensembl genes, and RT-qPCR oligo melting curves", "applications-science-symbolic", "bridge.yavanna", "Scientific"));
             all_items.add (new CommandPaletteItem ("Math and Chemical Reaction Studio", "Natural scientific notation to LaTeX and Markdown formulas (Ctrl+M)", "accessories-text-editor-symbolic", "app.math_chem_editor", "Scientific"));
+            all_items.add (new CommandPaletteItem ("Insert Table...", "Quickly insert a table by choosing rows and columns (Ctrl+Alt+T)", "view-grid-symbolic", "win.insert_table", "Editing"));
             all_items.add (new CommandPaletteItem ("Visual Flow and Mermaid Studio", "Mindmaps, flowcharts, and sequence diagrams studio", "view-grid-symbolic", "app.mermaid_studio", "Scientific"));
             all_items.add (new CommandPaletteItem ("Insert Zotero Citation", "Pick references from local Zotero HTTP connector (Ctrl+Shift+I)", "accessories-dictionary-symbolic", "win.zotero_picker", "Scientific"));
             all_items.add (new CommandPaletteItem ("Bibliography & DOI Manager (.bib)", "Generate .bib entries from DOI links (Ctrl+Shift+B)", "document-edit-symbolic", "win.doi_bib_manager", "Scientific"));
             all_items.add (new CommandPaletteItem ("New Markdown (.md)", "Create a new Markdown document", "document-edit-symbolic", "app.new_md", "File"));
+            all_items.add (new CommandPaletteItem ("New Rich Text Document (.rtf)", "Create a new WYSIWYG Rich Text (.rtf) document", "x-office-document-symbolic", "app.new_rtf", "File"));
             all_items.add (new CommandPaletteItem ("New Quarto (.qmd)", "Create a new Quarto scientific notebook", "x-office-document-symbolic", "app.new_qmd", "File"));
             all_items.add (new CommandPaletteItem ("New Deck or Poster...", "Create Beamer, Marp/RevealJS, TypeScript, or Typst poster", "x-office-presentation-symbolic", "app.new_presentation", "File"));
             all_items.add (new CommandPaletteItem ("New HTML5 + CSS + LaTeX Document", "Create HTML document with embedded CSS and LaTeX math", "text-html-symbolic", "app.new_html", "File"));

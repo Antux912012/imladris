@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using GLib;
 using Gtk;
@@ -30,6 +30,11 @@ namespace Imladris.Editor {
 
     public class CitationCompletionProvider : GLib.Object, GtkSource.CompletionProvider {
         private weak DocumentPage? doc_page;
+        private Gee.ArrayList<CitationItem> cached_items = new Gee.ArrayList<CitationItem> ();
+        private bool cached_inside_brackets = false;
+        private bool cached_inside_latex_cite = false;
+        private Core.CitationStyle cached_cite_style = Core.CitationStyle.PANDOC_AT;
+        private string last_query = "";
 
         public CitationCompletionProvider (DocumentPage? doc_page = null) {
             this.doc_page = doc_page;
@@ -47,15 +52,31 @@ namespace Imladris.Editor {
         }
 
         public int get_priority (GtkSource.CompletionContext context) {
-            return 3;
+            return 40;
         }
 
         public bool is_trigger (Gtk.TextIter iter, unichar ch) {
-            return ch == '@';
+            if (ch == '@') {
+                return true;
+            }
+            // Keep citation popup alive for citekeys with '-', ':', '.' (e.g. @smith-2024)
+            if (ch == '-' || ch == ':' || ch == '.') {
+                Gtk.TextIter line_start = iter;
+                line_start.set_line_offset (0);
+                string prefix = iter.get_buffer ().get_text (line_start, iter, false);
+                int at_idx = prefix.last_index_of ("@");
+                if (at_idx >= 0) {
+                    string after_at = prefix.substring (at_idx + 1);
+                    if (!after_at.contains (" ") && !after_at.contains ("\t")) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         public bool key_activates (GtkSource.CompletionContext context, GtkSource.CompletionProposal proposal, uint keyval, Gdk.ModifierType state) {
-            return false;
+            return keyval == Gdk.Key.Tab || keyval == Gdk.Key.Return || keyval == Gdk.Key.KP_Enter;
         }
 
         public GenericArray<GtkSource.CompletionProposal>? list_alternates (GtkSource.CompletionContext context, GtkSource.CompletionProposal proposal) {
@@ -63,7 +84,52 @@ namespace Imladris.Editor {
         }
 
         public void refilter (GtkSource.CompletionContext context, GLib.ListModel model) {
-            // Contextual filtering
+            var store = new GLib.ListStore (typeof (CitationCompletionProposal));
+            var buffer = context.get_buffer ();
+            if (buffer == null) {
+                context.set_proposals_for_provider (this, store);
+                return;
+            }
+
+            Gtk.TextIter begin_iter, cursor_iter;
+            if (!context.get_bounds (out begin_iter, out cursor_iter)) {
+                context.set_proposals_for_provider (this, store);
+                return;
+            }
+
+            Gtk.TextIter line_start = cursor_iter;
+            line_start.set_line_offset (0);
+            string line_prefix = buffer.get_text (line_start, cursor_iter, false);
+
+            int at_idx = line_prefix.last_index_of ("@");
+            if (at_idx == -1) {
+                last_query = "";
+                context.set_proposals_for_provider (this, store);
+                return;
+            }
+
+            string after_at = line_prefix.substring (at_idx + 1);
+            if (after_at.contains (" ") || after_at.contains ("\t")) {
+                last_query = "";
+                context.set_proposals_for_provider (this, store);
+                return;
+            }
+
+            string q_low = after_at.strip ().down ();
+            last_query = "@" + q_low;
+
+            foreach (var item in cached_items) {
+                if (q_low.length == 0
+                    || item.citekey.down ().contains (q_low)
+                    || item.authors.down ().contains (q_low)
+                    || item.title.down ().contains (q_low)
+                    || item.year.down ().contains (q_low)
+                    || CodeIntelliSenseEngine.compute_match_score (item.citekey, q_low) > 0) {
+                    store.append (new CitationCompletionProposal (item, cached_inside_brackets, cached_cite_style, cached_inside_latex_cite));
+                }
+            }
+
+            context.set_proposals_for_provider (this, store);
         }
 
         public void activate (GtkSource.CompletionContext context, GtkSource.CompletionProposal proposal) {
@@ -117,7 +183,15 @@ namespace Imladris.Editor {
                     cell.set_icon_name ("accessories-dictionary-symbolic");
                     break;
                 case GtkSource.CompletionColumn.TYPED_TEXT:
-                    cell.set_text (@"@$(p.citekey)");
+                    string lbl = @"@$(p.citekey)";
+                    if (last_query.length > 0) {
+                        var attrs = GtkSource.Completion.fuzzy_highlight (lbl, last_query.casefold ());
+                        if (attrs != null) {
+                            cell.set_text_with_attributes (lbl, attrs);
+                            break;
+                        }
+                    }
+                    cell.set_text (lbl);
                     break;
                 case GtkSource.CompletionColumn.DETAILS:
                     string details = @"$(p.authors) ($(p.year)) - $(p.title)";
@@ -146,7 +220,13 @@ namespace Imladris.Editor {
                 return store;
             }
 
-            string query = line_prefix.substring (at_idx + 1).strip ();
+            string after_at = line_prefix.substring (at_idx + 1);
+            if (after_at.contains (" ") || after_at.contains ("\t")) {
+                return store;
+            }
+
+            string query = after_at.strip ();
+            last_query = "@" + query.down ();
             bool inside_brackets = (at_idx > 0 && line_prefix[at_idx - 1] == '[');
             bool inside_latex_cite = false;
             try {
@@ -155,6 +235,9 @@ namespace Imladris.Editor {
             } catch (GLib.RegexError e) {}
 
             var cite_style = get_citation_style ();
+            cached_inside_brackets = inside_brackets;
+            cached_inside_latex_cite = inside_latex_cite;
+            cached_cite_style = cite_style;
 
             // Read local .bib content asynchronously if available (from frontmatter, LaTeX \bibliography/\addbibresource, file dir, or project dir)
             string? fallback_bib = null;
@@ -209,6 +292,7 @@ namespace Imladris.Editor {
             }
 
             var citations = yield ZoteroService.get_default ().search_citations_async (query, fallback_bib);
+            cached_items = citations;
             foreach (var item in citations) {
                 store.append (new CitationCompletionProposal (item, inside_brackets, cite_style, inside_latex_cite));
             }

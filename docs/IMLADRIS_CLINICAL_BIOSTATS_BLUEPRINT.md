@@ -174,7 +174,7 @@ Add two domain-specific starter templates to `ProjectScaffolder` so researchers 
 ### Complete Replacement for `src/core/ChunkParser.vala`
 ```vala
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using Gee;
 
@@ -380,7 +380,7 @@ Implement `Imladris.Bridges.Elbereth.ClinicalBiostatsPopover : Gtk.Popover` cont
 ### Complete Implementation for `src/bridges/elbereth/ClinicalBiostatsPopover.vala`
 ```vala
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using Gtk;
 using Adw;

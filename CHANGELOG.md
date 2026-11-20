@@ -2,6 +2,18 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.40.0] - 2026-11-20
+
+### Changed
+- **Apache-2.0 Hybrid Open-Core Licensing**: Relicensed Imladris Core Desktop Studio from `GPL-3.0-or-later` to **Apache License 2.0 (`Apache-2.0`)** with explicit patent protection (`LICENSE`, `NOTICE`), clean `JSC.Context` / `McpServer` extension boundaries, and Commercial Enterprise Pack readiness for pharma, biotech, and regulated R&D teams. Updated About dialog (`Gtk.License.APACHE_2_0`), AppStream metadata, `README.md`, landing page (`docs/index.html`), and Wiki (`License-and-Enterprise-Policy.md`).
+
+### Added
+- **VS Code & RStudio-Grade Autocompletion**: Implemented live keystroke `refilter()`, `GtkSource.Completion.fuzzy_highlight()`, Markdown/Quarto prose snippets & live document cross-references (`@fig-*`, `@tbl-*`, `@sec-*`, `@eq-*`), HTML5 tag & smart `</tag>` completion, R `library()` package & named function argument completions, Python pandas DataFrame methods, live REPL DataFrame column discovery (`$` / `.`), paired `BackSpace` deletion, and triple-backtick chunk completion.
+- **Quick Table Picker Popover (`Ctrl+Alt+T`)**: Cursor-anchored 8×8 hover grid and custom Rows/Cols dialog (`PopoverFactory.create_table_picker_popover`) with format-aware Markdown, HTML, LaTeX, and RTF table generation from the toolbar, editor context menu, and Command Palette.
+
+### Fixed
+- **Flatpak WebKitGTK 6.0 Live Preview**: Fixed `WebKit.WebContext.get_default()` vs. `JSC.Context` initialization ordering in `Application` and `PluginManager` so live preview renders reliably in Flatpak sandboxes.
+
 ## [0.33.1] - 2026-11-19
 
 ### Added

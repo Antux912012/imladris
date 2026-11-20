@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using GLib;
 using Gtk;
@@ -183,6 +183,22 @@ namespace Imladris.UI {
                 Core.SettingsManager.get_default ().steady_cursor = steady_cursor_row.active;
             });
 
+            var preview_backends = new Gtk.StringList ({
+                "WebKitGTK 6.0 (HTML5, CSS & JavaScript)",
+                "Native GTK4 / Pango (Zero WebKit, Fast Prose & Code)",
+                "Native PDF Pages (Cairo A4 Print-Exact Preview)"
+            });
+            var preview_backend_row = new Adw.ComboRow () {
+                title = "Live Preview Engine",
+                subtitle = "Choose between WebKitGTK, Native GTK4/Pango, or paginated Cairo PDF preview",
+                model = preview_backends,
+                selected = (uint) Core.SettingsManager.get_default ().preview_backend
+            };
+            preview_backend_row.notify["selected"].connect (() => {
+                Core.SettingsManager.get_default ().preview_backend = (Core.PreviewBackend) preview_backend_row.selected;
+            });
+
+            hw_group.add (preview_backend_row);
             hw_group.add (hw_row);
             hw_group.add (gpu_backend_row);
             hw_group.add (physics_row);

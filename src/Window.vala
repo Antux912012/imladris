@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 namespace Imladris {
 
@@ -187,6 +187,7 @@ namespace Imladris {
             new_submenu.append ("R Markdown (.Rmd)", "app.new_rmd");
             new_submenu.append ("Jupyter Notebook (.ipynb)", "app.new_ipynb");
             new_submenu.append ("Simple Markdown (.md)", "app.new_md");
+            new_submenu.append ("Rich Text Document (.rtf)", "app.new_rtf");
             new_submenu.append ("LaTeX Document (.tex)", "app.new_tex");
             new_submenu.append ("LaTeX Publisher Template...", "app.new_tex_template");
             new_submenu.append ("Deck or Poster Template...", "app.new_presentation");
@@ -1171,6 +1172,18 @@ namespace Imladris {
             });
             quick_group.add (md_row);
 
+            var rtf_row = new Adw.ActionRow () {
+                title = "New Rich Text Document (.rtf)",
+                subtitle = "WYSIWYG rich text editor with fonts, styles, colors, and live preview",
+                activatable = true
+            };
+            rtf_row.add_prefix (new Gtk.Image.from_icon_name ("x-office-document-symbolic"));
+            rtf_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            rtf_row.activated.connect (() => {
+                add_document_tab ("untitled.rtf", "rtf");
+            });
+            quick_group.add (rtf_row);
+
             var tex_row = new Adw.ActionRow () {
                 title = "New LaTeX Manuscript (.tex)",
                 subtitle = "Typeset articles with equations, BibTeX citations, and PDF builds",
@@ -1389,6 +1402,7 @@ namespace Imladris {
             page.add (exec_group);
 
             var sci_group = new Adw.PreferencesGroup () { title = "Editing & Scientific Tools" };
+            add_shortcut_row (sci_group, "Insert Table (Popup Picker)", "<Control><Alt>t");
             add_shortcut_row (sci_group, "Insert R Assignment (<-)", "<Alt>minus");
             add_shortcut_row (sci_group, "Insert R Pipe (|>)", "<Control><Shift>m");
             add_shortcut_row (sci_group, "Toggle Line Comment", "<Control><Shift>c");
@@ -1847,10 +1861,15 @@ namespace Imladris {
         public void trigger_selected_scientific_render () {
             uint sel = (export_format_selector != null) ? export_format_selector.selected : 0;
             var doc = get_active_document ();
-            if (doc != null && doc.get_document_format () == DocumentFormat.TEX) {
-                // FormatProfile.TEX targets:
-                // 0: "PDF (latexmk)", 1: "PDF (xelatex)", 2: "PDF (pdflatex)", 3: "HTML (Pandoc)"
-                if (sel == 3) {
+            if (doc == null) return;
+
+            var doc_fmt = doc.get_document_format ();
+            var profile = Core.FormatProfile.for_format (doc_fmt);
+            string[] targets = profile.get_export_targets ();
+            string selected_label = (sel < targets.length) ? targets[sel] : "";
+
+            if (doc_fmt == DocumentFormat.TEX) {
+                if (sel == 3 || selected_label.down ().contains ("html")) {
                     compile_scientific_document_async.begin (Core.ScientificOutputFormat.HTML_MANUSCRIPT, null);
                 } else {
                     string engine = "latexmk";
@@ -1860,12 +1879,131 @@ namespace Imladris {
                 }
                 return;
             }
-            var sc_fmt = Core.ScientificOutputFormat.HTML_MANUSCRIPT;
-            if (sel == 1) sc_fmt = Core.ScientificOutputFormat.PDF_MANUSCRIPT;
-            else if (sel == 2) sc_fmt = Core.ScientificOutputFormat.REVEALJS_SLIDES;
-            else if (sel == 3) sc_fmt = Core.ScientificOutputFormat.BEAMER_PDF_SLIDES;
-            else if (sel == 4) sc_fmt = Core.ScientificOutputFormat.TYPST_POSTER_PDF;
-            compile_scientific_document_async.begin (sc_fmt);
+
+            if (doc_fmt == DocumentFormat.QMD) {
+                var sc_fmt = Core.ScientificOutputFormat.HTML_MANUSCRIPT;
+                if (sel == 1) sc_fmt = Core.ScientificOutputFormat.PDF_MANUSCRIPT;
+                else if (sel == 2) sc_fmt = Core.ScientificOutputFormat.REVEALJS_SLIDES;
+                else if (sel == 3) sc_fmt = Core.ScientificOutputFormat.BEAMER_PDF_SLIDES;
+                else if (sel == 4) sc_fmt = Core.ScientificOutputFormat.TYPST_POSTER_PDF;
+                compile_scientific_document_async.begin (sc_fmt);
+                return;
+            }
+
+            if (doc_fmt == DocumentFormat.TS) {
+                compile_scientific_document_async.begin (Core.ScientificOutputFormat.HTML_MANUSCRIPT);
+                return;
+            }
+
+            // Route all other formats (.Rmd, .md, .ipynb, .rtf, .html) by their FormatProfile target label
+            render_document_target_async.begin (selected_label);
+        }
+
+        private string resolve_render_source_path (DocumentPage doc, DocumentFormat doc_fmt, out string clean_source) throws GLib.Error {
+            clean_source = doc.get_clean_source_text ();
+            if (doc.file_location != null) {
+                return doc.file_location.get_path ();
+            }
+            string cache_dir = Core.PlatformUtils.get_shared_cache_dir ("render");
+            string ext = doc_fmt.get_extension ();
+            if (ext == "") ext = ".md";
+            string s_path = GLib.Path.build_filename (cache_dir, @"document$ext");
+            string payload = (doc_fmt == DocumentFormat.IPYNB)
+                ? Adapters.DocumentAdapter.save_from_editor_buffer (clean_source, DocumentFormat.IPYNB)
+                : clean_source;
+            GLib.FileUtils.set_contents (s_path, payload);
+            return s_path;
+        }
+
+        private string compute_output_path_for_ext (string s_path, string out_ext) {
+            int dot_idx = s_path.last_index_of_char ('.');
+            string stem = (dot_idx > 0) ? s_path.substring (0, dot_idx) : s_path;
+            return @"$stem.$out_ext";
+        }
+
+        private async void render_via_export_service_async (DocumentPage doc, string s_path, string clean_source, string target_ext) {
+            string out_path = compute_output_path_for_ext (s_path, target_ext);
+            doc.append_console_log (@"▶ Rendering $(GLib.Path.get_basename (s_path)) to $(target_ext.up ())...");
+            bool ok = yield Services.ExportService.get_default ().export_document_async (
+                s_path,
+                out_path,
+                target_ext,
+                clean_source
+            );
+            if (!ok || !GLib.FileUtils.test (out_path, GLib.FileTest.EXISTS)) {
+                string err_detail = Services.ExportService.get_default ().last_error_message;
+                doc.append_console_log (@"✖ Render to $(target_ext.up ()) failed.$(err_detail != "" ? @" $err_detail" : "")");
+                show_toast (@"Render to $(target_ext.up ()) failed");
+                return;
+            }
+            doc.append_console_log (@"✔ Rendered $(GLib.Path.get_basename (out_path))");
+            show_toast (@"Rendered $(GLib.Path.get_basename (out_path))");
+            if (target_ext == "html") {
+                string uri = GLib.Filename.to_uri (out_path);
+                doc.show_live_preview (uri);
+            } else {
+                var file = GLib.File.new_for_path (out_path);
+                var launcher = new Gtk.FileLauncher (file);
+                launcher.launch.begin (this, null, null);
+            }
+        }
+
+        public async void render_document_target_async (string selected_label) {
+            var doc = get_active_document ();
+            if (doc == null) return;
+
+            var doc_fmt = doc.get_document_format ();
+            if (doc.file_location != null) {
+                yield save_document_async ();
+            }
+
+            string clean_source = "";
+            string s_path = "";
+            try {
+                s_path = resolve_render_source_path (doc, doc_fmt, out clean_source);
+            } catch (GLib.Error e) {
+                show_toast (@"Failed to prepare document for rendering: $(e.message)");
+                return;
+            }
+
+            string low = selected_label.down ();
+            if (doc_fmt == DocumentFormat.HTML && low.contains ("refresh")) {
+                doc.refresh_live_preview (clean_source);
+                doc.show_live_preview ();
+                show_toast ("Refreshed HTML preview");
+                return;
+            }
+            if (doc_fmt == DocumentFormat.IPYNB && low.contains ("notebook")) {
+                yield export_document_dialog_async ("ipynb");
+                return;
+            }
+            if (doc_fmt == DocumentFormat.RTF && (low == "md" || low.contains ("markdown"))) {
+                string out_md = compute_output_path_for_ext (s_path, "md");
+                try {
+                    string md_text = Core.RtfCodec.rtf_to_plain_text (clean_source);
+                    GLib.FileUtils.set_contents (out_md, md_text);
+                    doc.append_console_log (@"✔ Exported Markdown to $(GLib.Path.get_basename (out_md))");
+                    show_toast (@"Exported $(GLib.Path.get_basename (out_md))");
+                    var file = GLib.File.new_for_path (out_md);
+                    var launcher = new Gtk.FileLauncher (file);
+                    launcher.launch.begin (this, null, null);
+                } catch (GLib.Error e) {
+                    doc.append_console_log (@"✖ Markdown export failed: $(e.message)");
+                    show_toast ("Markdown export failed");
+                }
+                return;
+            }
+
+            string target_ext = "html";
+            if (low.contains ("pdf")) {
+                target_ext = "pdf";
+            } else if (low.contains ("odt")) {
+                target_ext = "odt";
+            } else if (low.contains ("rtf") || low.contains ("word")) {
+                target_ext = "rtf";
+            }
+
+            yield render_via_export_service_async (doc, s_path, clean_source, target_ext);
         }
 
         public async void compile_scientific_document_async (Core.ScientificOutputFormat format, string? preferred_tex_engine = null) {
@@ -1873,38 +2011,22 @@ namespace Imladris {
             if (doc == null) return;
 
             var doc_fmt = doc.get_document_format ();
-            string s_path = "";
             if (doc.file_location != null) {
-                s_path = doc.file_location.get_path ();
                 yield save_document_async ();
-            } else {
-                string cache_dir = Core.PlatformUtils.get_shared_cache_dir ("render");
-                string ext = (doc_fmt == DocumentFormat.TEX) ? ".tex" : (doc_fmt == DocumentFormat.TS ? ".ts" : ".qmd");
-                s_path = GLib.Path.build_filename (cache_dir, @"document$ext");
-                try {
-                    GLib.FileUtils.set_contents (s_path, doc.get_clean_source_text ());
-                } catch (GLib.Error e) {
-                    show_toast (@"Failed to cache document for rendering: $(e.message)");
-                    return;
-                }
+            }
+
+            string clean_source = "";
+            string s_path = "";
+            try {
+                s_path = resolve_render_source_path (doc, doc_fmt, out clean_source);
+            } catch (GLib.Error e) {
+                show_toast (@"Failed to cache document for rendering: $(e.message)");
+                return;
             }
 
             if (doc_fmt == DocumentFormat.TEX) {
                 if (format == Core.ScientificOutputFormat.HTML_MANUSCRIPT) {
-                    string stem_path = s_path.has_suffix (".tex")
-                        ? s_path.substring (0, s_path.length - 4)
-                        : s_path;
-                    string out_html = stem_path + ".html";
-                    doc.append_console_log (@"▶ Exporting LaTeX document $(GLib.Path.get_basename (s_path)) to HTML via Pandoc...");
-                    try {
-                        Services.ExportService.export_to_html (s_path, out_html, doc.get_clean_source_text ());
-                        show_toast (@"Exported $(GLib.Path.get_basename (out_html))");
-                        string uri = GLib.Filename.to_uri (out_html);
-                        doc.show_live_preview (uri);
-                    } catch (GLib.Error e) {
-                        doc.append_console_log (@"✖ HTML export failed: $(e.message)");
-                        show_toast (@"HTML export failed: $(e.message)");
-                    }
+                    yield render_via_export_service_async (doc, s_path, clean_source, "html");
                     return;
                 }
                 doc.append_console_log (@"▶ Building LaTeX document $(GLib.Path.get_basename (s_path))...");
@@ -1917,6 +2039,9 @@ namespace Imladris {
                     var pdf_file = GLib.File.new_for_path (tex_res.pdf_path);
                     var launcher = new Gtk.FileLauncher (pdf_file);
                     launcher.launch.begin (this, null, null);
+                } else if (tex_res.engine_used == "" || tex_res.engine_used == "none") {
+                    doc.append_console_log ("ℹ No system TeX engine detected; using built-in PDF renderer...");
+                    yield render_via_export_service_async (doc, s_path, clean_source, "pdf");
                 } else {
                     string err = tex_res.diagnostics.size > 0
                         ? tex_res.diagnostics.get (0).message
@@ -1949,30 +2074,41 @@ namespace Imladris {
                 return;
             }
 
-            var engine = new Core.QuartoExportEngine ();
-            engine.compilation_progress.connect ((line) => {
-                doc.append_console_log (line);
-            });
-            engine.tex_healing_started.connect (() => {
-                show_toast ("Installing TinyTeX and Beamer packages (first-time setup)...");
-            });
+            string working_dir = GLib.Path.get_dirname (s_path);
+            if (Core.PlatformUtils.is_program_available ("quarto", working_dir)) {
+                var engine = new Core.QuartoExportEngine ();
+                engine.compilation_progress.connect ((line) => {
+                    doc.append_console_log (line);
+                });
+                engine.tex_healing_started.connect (() => {
+                    show_toast ("Installing TinyTeX and Beamer packages (first-time setup)...");
+                });
 
-            try {
-                string out_path = yield engine.render_document_async (s_path, format);
-                show_toast (@"Rendered $(GLib.Path.get_basename (out_path))");
+                try {
+                    string out_path = yield engine.render_document_async (s_path, format);
+                    show_toast (@"Rendered $(GLib.Path.get_basename (out_path))");
 
-                if (format == Core.ScientificOutputFormat.HTML_MANUSCRIPT || format == Core.ScientificOutputFormat.REVEALJS_SLIDES) {
-                    string uri = GLib.Filename.to_uri (out_path);
-                    doc.show_live_preview (uri);
-                } else {
-                    // PDF output (Beamer or Typst)
-                    var file = GLib.File.new_for_path (out_path);
-                    var launcher = new Gtk.FileLauncher (file);
-                    launcher.launch.begin (this, null, null);
+                    if (format == Core.ScientificOutputFormat.HTML_MANUSCRIPT || format == Core.ScientificOutputFormat.REVEALJS_SLIDES) {
+                        string uri = GLib.Filename.to_uri (out_path);
+                        doc.show_live_preview (uri);
+                    } else {
+                        var file = GLib.File.new_for_path (out_path);
+                        var launcher = new Gtk.FileLauncher (file);
+                        launcher.launch.begin (this, null, null);
+                    }
+                    return;
+                } catch (GLib.Error e) {
+                    doc.append_console_log (@"⚠ Quarto render unavailable or failed ($(e.message)); falling back to built-in renderer...");
                 }
-            } catch (GLib.Error e) {
-                show_toast (@"Compilation failed: $(e.message)");
+            } else {
+                doc.append_console_log ("ℹ Quarto CLI not found; using built-in Imladris renderer...");
             }
+
+            string fallback_ext = (format == Core.ScientificOutputFormat.HTML_MANUSCRIPT ||
+                                   format == Core.ScientificOutputFormat.REVEALJS_SLIDES)
+                ? "html"
+                : "pdf";
+            yield render_via_export_service_async (doc, s_path, clean_source, fallback_ext);
         }
 
         private void setup_actions () {
@@ -2051,6 +2187,15 @@ namespace Imladris {
                 insert_in_active_editor ("\n```{" + def_lang + "}\n\n```\n");
             });
             this.add_action (action_insert_chunk);
+
+            var action_insert_table = new GLib.SimpleAction ("insert_table", null);
+            action_insert_table.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null) {
+                    d.show_table_picker_popover ();
+                }
+            });
+            this.add_action (action_insert_table);
 
             var action_toggle_comment = new GLib.SimpleAction ("toggle_comment", null);
             action_toggle_comment.activate.connect (() => {
@@ -2800,11 +2945,11 @@ namespace Imladris {
                 developer_name = "Antonio De Gaetano",
                 developers = devs,
                 copyright = "© 2026 Antonio De Gaetano",
-                license_type = Gtk.License.GPL_3_0,
+                license_type = Gtk.License.APACHE_2_0,
                 website = "https://antux912012.github.io/imladris/",
                 issue_url = "https://github.com/Antux912012/imladris/issues",
                 support_url = "https://github.com/Antux912012/imladris/discussions",
-                comments = "Native Linux scientific notebook studio for Quarto, R, Python, and Jupyter.\n\nEngineered in compiled Vala and GTK4 with 4-quadrant workbench ergonomics, Positron-style Direct Editor Writing, multi-tier AI quota failover, and domain bridges for bioinformatics and biostatistics.\n\n✨ Developed with Google Gemini and Anthropic Claude AI pair-programming assistance."
+                comments = "Native Linux scientific notebook studio for Quarto, R, Python, and Jupyter.\n\nEngineered in compiled Vala and GTK4 with 4-quadrant workbench ergonomics, VS Code & RStudio-grade autocompletion, quick table authoring, multi-tier AI quota failover, and domain bridges for bioinformatics and biostatistics.\n\nCore studio licensed under Apache-2.0 (Hybrid Open-Core for Academic & Enterprise R&D).\n\n✨ Developed with Google Gemini and Anthropic Claude AI pair-programming assistance."
             };
 
             dialog.add_link ("Architecture Blueprint", "https://github.com/Antux912012/imladris/blob/main/docs/ARCHITECTURE.md");

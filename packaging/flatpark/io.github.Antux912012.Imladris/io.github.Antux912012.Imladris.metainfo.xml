@@ -3,7 +3,7 @@
 <component type="desktop-application">
   <id>io.github.Antux912012.Imladris</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-3.0-or-later</project_license>
+  <project_license>Apache-2.0</project_license>
   <name>Imladris</name>
   <summary>Scientific notebook and Quarto IDE</summary>
   <description>
@@ -75,6 +75,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.40.0" date="2026-11-20">
+      <description>
+        <p>Major Release v0.40.0 transitions Imladris Core to the Apache-2.0 Hybrid Open-Core license for frictionless Academic &amp; Enterprise R&amp;D adoption, and delivers major editor and Flatpak upgrades:</p>
+        <ul>
+          <li>Apache-2.0 Hybrid Open-Core Licensing: Relicensed core studio from GPL-3.0-or-later to Apache-2.0 with explicit patent protection, clean JSC.Context/MCP extension boundaries, and Commercial Enterprise Pack readiness.</li>
+          <li>VS Code &amp; RStudio-Grade Autocompletion: Live keystroke refiltering, fuzzy match highlighting, Markdown/Quarto prose snippets &amp; cross-references, HTML5 tag completion, R library()/parameter completions, Python DataFrame methods, live REPL column discovery, and paired BackSpace/triple-backtick handling.</li>
+          <li>Quick Table Picker Popover: Cursor-anchored 8x8 hover grid and custom Rows/Cols dialog (Ctrl+Alt+T) with format-aware Markdown, HTML, LaTeX, and RTF table generation.</li>
+          <li>Flatpak WebKitGTK 6.0 Live Preview Fix: Fixed WebKitWebContext vs. JSC.Context initialization order so live preview renders reliably in Flatpak sandboxes.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.33.1" date="2026-11-19">
       <description>
         <p>Release v0.33.1 introduces Apple TextEdit-style WYSIWYG .rtf editing, rock-solid WebKitGTK 6.0 live preview across Flatpak and host builds, unified single-package toolchains, and a comprehensive security and C/Vala memory audit:</p>

@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-License-Identifier: Apache-2.0
 -->
 
 <p align="center">
@@ -18,15 +18,15 @@ SPDX-License-Identifier: GPL-3.0-or-later
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
   <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
-  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.33.1"><img src="https://img.shields.io/badge/Release-v0.33.1-blue?style=flat-square" alt="Release v0.33.1"></a>
+  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.40.0"><img src="https://img.shields.io/badge/Release-v0.40.0-blue?style=flat-square" alt="Release v0.40.0"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-0.56%2B-green?style=flat-square" alt="Vala">
-  <img src="https://img.shields.io/badge/License-GPL--3.0--or--later-brightgreen?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/License-Apache--2.0%20(Open--Core)-brightgreen?style=flat-square" alt="License">
 </p>
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Official Landing Page</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.33.1">⬇️ Download v0.33.1 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.40.0">⬇️ Download v0.40.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Technical Wiki</a></strong> ·
   <strong><a href="docs/paper/imladris-scientific-paper.qmd">📄 Scientific Paper</a></strong> ·
@@ -43,7 +43,7 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ### Comparative Workflow Matrix
 
-| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.33.1 Approach |
+| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.40.0 Approach |
 | :--- | :--- | :--- |
 | **Idle Memory Overhead** | 1.2–2.5 GB RAM idle | **< 120 MB RAM** (native compiled Vala/GTK4 binary) |
 | **Cold Startup Latency** | 4.0–9.0 seconds | **< 0.6 seconds** instant launch |
@@ -79,12 +79,17 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ---
 
-## What’s New in v0.33.1
+## What’s New in v0.40.0
 
-* **Apple TextEdit-Style WYSIWYG `.rtf` Editor**: Open, edit, and save standards-compliant RTF 1.x documents natively (`RtfCodec` + `RtfEditorView`) with font family/size, Bold/Italic/Underline/Strikethrough (`Ctrl+B`/`I`/`U`), text & highlight colors, paragraph alignment, bullet lists, and live WebKitGTK 6.0 preview.
-* **WebKitGTK 6.0 Live Preview & Flatpak Parity**: Fixed `unrealize`/`map` reparenting across Apostrophe ↔ RStudio mode switches, zero-allocation deferral during `Gtk.Revealer`/`Gtk.Paned` transitions, cancelled-load filtering, and proportional editor-to-preview scroll synchronization.
-* **Unified Single-Package Toolchain**: Integrated scientific runtime dependencies (`R`, `Python`, `pip`/`venv`, `Pandoc`, `curl`, `bzip2`, `git`) directly into the main `.deb`, `.rpm`, AUR `PKGBUILD`, and Nix Flake packages (no separate `imladris-toolchain` package required).
-* **Security, Citation & C/Vala Audit**: Offline-first AI defaults (`OLLAMA`), `GALAXY_API_KEY` subprocess isolation, `0600` `.shadow` recovery files, `bibliography/references.bib` Zotero/DOI resolution, `export_native.c` bounds/UTF-8 safety, and deterministic FD/signal cleanup.
+* **Apache-2.0 Hybrid Open-Core Licensing**: Relicensed the Imladris Core Desktop Studio from GPL-3.0-or-later to **Apache License 2.0** (`Apache-2.0`) with explicit patent protection, clean `JSC.Context` / `McpServer` extension boundaries, and Commercial Enterprise Pack readiness for pharma, biotech, and regulated R&D teams.
+* **VS Code & RStudio-Grade Autocompletion**: Implemented live keystroke `refilter()`, `GtkSource.Completion.fuzzy_highlight()`, Markdown/Quarto prose snippets & live document cross-references (`@fig-*`, `@tbl-*`, `@sec-*`, `@eq-*`), HTML5 tag & smart `</tag>` completion, R `library()` package & named function argument completion, Python DataFrame methods, live REPL DataFrame column discovery (`$` / `.`), paired `BackSpace` deletion, and triple-backtick chunk completion.
+* **Quick Table Picker Popover (`Ctrl+Alt+T`)**: Cursor-anchored 8×8 hover grid and custom Rows/Cols dialog with format-aware Markdown, HTML, LaTeX, and RTF table insertion from the toolbar, editor context menu, and Command Palette.
+* **Flatpak WebKitGTK 6.0 Live Preview Fix**: Resolved `WebKit.WebContext.get_default()` vs. `JSC.Context` initialization ordering so live HTML/Quarto/Markdown preview renders reliably inside Flatpak sandboxes.
+
+### Previous Highlights (v0.33.1)
+
+* **Apple TextEdit-Style WYSIWYG `.rtf` Editor**: Open, edit, and save standards-compliant RTF 1.x documents natively (`RtfCodec` + `RtfEditorView`).
+* **Unified Single-Package Toolchain**: Integrated scientific runtime dependencies directly into `.deb`, `.rpm`, AUR `PKGBUILD`, and Nix Flake packages.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full breakdown of functions added, improvements, and bugs fixed.
 
@@ -240,7 +245,7 @@ sudo apt-get install -f
 ```
 
 ### Solus (`ypkg`)
-Build recipe provided at [`packaging/package.yml`](packaging/package.yml) (`GPL-3.0-or-later`).
+Build recipe provided at [`packaging/package.yml`](packaging/package.yml) (`Apache-2.0`).
 
 ### NixOS (Flakes)
 ```bash
@@ -252,7 +257,7 @@ nix build .#default
 ./result/bin/imladris
 ```
 
-Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.33.1](https://github.com/Antux912012/imladris/releases/tag/v0.33.1).
+Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.40.0](https://github.com/Antux912012/imladris/releases/tag/v0.40.0).
 
 ### Scientific Toolchain Meta-Packages & Cross-Distro Dependencies
 To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
@@ -263,11 +268,11 @@ To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
   Mounts at `/app/toolchain` and is automatically added to `PATH` inside the Imladris sandbox.
 - **Debian / Ubuntu (`.deb` with integrated scientific toolchain & `postinst` verification):**
   ```bash
-  sudo apt install ./imladris_0.33.1_amd64.deb
+  sudo apt install ./imladris_0.40.0_amd64.deb
   ```
 - **Fedora / RHEL (`.rpm` with integrated scientific toolchain & `%post` verification):**
   ```bash
-  sudo dnf install ./imladris-0.33.1-1.fc44.x86_64.rpm
+  sudo dnf install ./imladris-0.40.0-1.fc44.x86_64.rpm
   ```
 - **Arch Linux:**
   ```bash
@@ -364,9 +369,9 @@ imladris document.qmd        # Launch document, notebook, .Rproj, or .mallorn ar
 * **Sandboxed Tooling**: Built-in MCP execution defaults to disabled (`IMLADRIS_MCP_ALLOW_EXEC=1` required) and enforces explicit interpreter binary allowlisting (`Rscript`, `python3`, `quarto`).
 * **GDPR Compliance (Art. 17)**: Execute `imladris --purge-user-data` for complete removal of application data from the local host.
 * **Generative AI & Flathub Compliance Disclosure ([`docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md`](docs/FLATHUB_AI_DISCLOSURE_AND_SUBMISSION.md))**: Imladris is architected, reviewed, and tested by Antonio De Gaetano with AI pair-programming assistance (Google Gemini and Anthropic Claude used across ~60–70% of code scaffolding, refactoring, and documentation). Flathub build manifests (`io.github.Antux912012.Imladris.yml` and `io.github.Antux912012.Imladris.json`) are human-maintained and verified via `flatpak-builder-lint`. In-app Elrond AI features are strictly opt-in with local offline (`llama.cpp`/Ollama/LM Studio) and consent-gated cloud options.
-* **License**: Published under the **[GNU General Public License v3.0 or later (`GPL-3.0-or-later`)](LICENSE)**.
+* **License & Enterprise Open-Core**: Core desktop studio published under the **[Apache License 2.0 (`Apache-2.0`)](LICENSE)** ([`NOTICE`](NOTICE)). Third-party `.implugin` extensions (`JSC.Context`) and out-of-process MCP integrations (`McpServer`) may use any license; Commercial Enterprise Packs (SSO, GxP audit/policy management, proprietary LIMS/ELN connectors) are licensed separately.
 
 ```text
 SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-License-Identifier: Apache-2.0
 ```

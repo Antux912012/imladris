@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using GLib;
 
@@ -100,6 +100,20 @@ namespace Imladris.Core {
             switch (this) {
                 case CUDA: return "NVIDIA CUDA";
                 default: return "Vulkan / Universal GPU";
+            }
+        }
+    }
+
+    public enum PreviewBackend {
+        WEBKIT_HTML = 0,
+        NATIVE_GTK_PANGO = 1,
+        CAIRO_PDF_PAGES = 2;
+
+        public string get_display_name () {
+            switch (this) {
+                case NATIVE_GTK_PANGO: return "Native GTK4 / Pango";
+                case CAIRO_PDF_PAGES:  return "Native PDF Pages (Cairo)";
+                default:               return "WebKitGTK 6.0 (HTML5)";
             }
         }
     }
@@ -340,6 +354,9 @@ namespace Imladris.Core {
         public signal void ai_settings_changed ();
         public signal void physics_changed ();
         public signal void ui_settings_changed ();
+        public signal void preview_backend_changed (PreviewBackend backend);
+
+        private PreviewBackend _preview_backend = PreviewBackend.WEBKIT_HTML;
 
         private bool _elrond_enabled = false;
         private AiAssistanceLevel _elrond_level = AiAssistanceLevel.MEDIUM;
@@ -587,6 +604,17 @@ namespace Imladris.Core {
             }
         }
 
+        public PreviewBackend preview_backend {
+            get { return _preview_backend; }
+            set {
+                if (_preview_backend != value) {
+                    _preview_backend = value;
+                    save_ini ();
+                    preview_backend_changed (value);
+                }
+            }
+        }
+
         public AppTheme app_theme {
             get {
                 if (gsettings != null) {
@@ -744,6 +772,10 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("Workspace", "onboarding_tour_completed")) {
                         _onboarding_tour_completed = config_keyfile.get_boolean ("Workspace", "onboarding_tour_completed");
                     }
+                    if (config_keyfile.has_key ("Workspace", "preview_backend")) {
+                        int pb = config_keyfile.get_integer ("Workspace", "preview_backend").clamp (0, 2);
+                        _preview_backend = (PreviewBackend) pb;
+                    }
                     if (config_keyfile.has_key ("Hardware", "steady_cursor")) {
                         _steady_cursor = config_keyfile.get_boolean ("Hardware", "steady_cursor");
                     }
@@ -778,6 +810,7 @@ namespace Imladris.Core {
                 config_keyfile.set_boolean ("Workspace", "show_status_bar", _show_status_bar);
                 config_keyfile.set_integer ("Workspace", "default_zoom_percent", _default_zoom_percent);
                 config_keyfile.set_boolean ("Workspace", "onboarding_tour_completed", _onboarding_tour_completed);
+                config_keyfile.set_integer ("Workspace", "preview_backend", (int) _preview_backend);
                 FileUtils.set_contents (config_ini_path, config_keyfile.to_data ());
             } catch (Error e) {}
         }

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 #
 # Reproducible container build for Imladris v0.33.1 (Podman & Docker)
 # Build:   podman build -t imladris-builder .   (or docker build -t imladris-builder .)

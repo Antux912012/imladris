@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using Imladris.Core.Layout;
 using Imladris.UI;
@@ -13,6 +13,9 @@ namespace Imladris {
         public RtfEditorView? rtf_editor { get; private set; default = null; }
         public Gtk.TextView console_view { get; private set; }
         public WebKit.WebView web_view { get; private set; }
+        public UI.NativePreviewView native_preview { get; private set; }
+        public Gtk.Stack preview_stack { get; private set; }
+        private ulong preview_backend_handler_id = 0;
         public Gtk.Stack right_stack { get; private set; }
         public Gtk.Revealer console_revealer { get; private set; }
         public string doc_type { get; private set; }
@@ -64,6 +67,10 @@ namespace Imladris {
         private string? active_custom_uri = null;
         private uint deferred_flush_id = 0;
         private uint scroll_sync_debounce_id = 0;
+        private Gtk.Picture webview_snapshot;
+        private bool has_webview_snapshot = false;
+        private string? queued_preview_html = null;
+        private string? queued_preview_base_uri = null;
 
         public Services.LayoutMode get_workbench_mode () {
             return current_layout_mode;
@@ -315,6 +322,7 @@ namespace Imladris {
             setup_cell_execution_shortcut ();
 
             var editor_context_menu = new GLib.Menu ();
+            editor_context_menu.append ("Insert Table...", "win.insert_table");
             editor_context_menu.append ("Write with Elrond Assistance (AI)", "app.elrond_assist");
             editor_context_menu.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
             source_view.extra_menu = editor_context_menu;
@@ -353,18 +361,83 @@ namespace Imladris {
                 }
             });
 
-            // 2. Shared WebKitGTK 6.0 & Console Instances (Kept alive in PersistentPanelRegistry)
+            // 2. Shared WebKitGTK 6.0 & Native Preview Stack (Kept alive in PersistentPanelRegistry)
             web_view = UI.WebViewFactory.create ();
+            webview_snapshot = new Gtk.Picture () {
+                hexpand = true,
+                vexpand = true,
+                can_target = false,
+                visible = false,
+                content_fit = Gtk.ContentFit.FILL
+            };
+            var web_overlay = new Gtk.Overlay () {
+                hexpand = true,
+                vexpand = true
+            };
+            web_overlay.set_child (web_view);
+            web_overlay.add_overlay (webview_snapshot);
+
+            native_preview = new UI.NativePreviewView ();
+            preview_stack = new Gtk.Stack () {
+                transition_type = Gtk.StackTransitionType.CROSSFADE,
+                hexpand = true,
+                vexpand = true
+            };
+            preview_stack.add_named (web_overlay, "webkit");
+            preview_stack.add_named (native_preview, "native");
+            var init_pb = Core.SettingsManager.get_default ().preview_backend;
+            preview_stack.visible_child_name = (init_pb == Core.PreviewBackend.WEBKIT_HTML) ? "webkit" : "native";
+            preview_backend_handler_id = Core.SettingsManager.get_default ().preview_backend_changed.connect ((new_pb) => {
+                preview_stack.visible_child_name = (new_pb == Core.PreviewBackend.WEBKIT_HTML) ? "webkit" : "native";
+                refresh_live_preview ();
+            });
             var settings = web_view.get_settings ();
             settings.enable_javascript = true;
             settings.enable_spatial_navigation = false;
 
+            // Match Apostrophe's PreviewWebView: open user-clicked external links in system browser
+            web_view.decide_policy.connect ((decision, decision_type) => {
+                if (decision_type == WebKit.PolicyDecisionType.NAVIGATION_ACTION) {
+                    var nav_decision = decision as WebKit.NavigationPolicyDecision;
+                    if (nav_decision != null) {
+                        var nav_action = nav_decision.get_navigation_action ();
+                        if (nav_action != null && nav_action.is_user_gesture ()) {
+                            var req = nav_action.get_request ();
+                            string? target_uri = req != null ? req.get_uri () : null;
+                            if (target_uri != null && (target_uri.has_prefix ("http://") || target_uri.has_prefix ("https://"))) {
+                                try {
+                                    GLib.AppInfo.launch_default_for_uri (target_uri, null);
+                                } catch (GLib.Error e) {
+                                    GLib.warning ("Failed to launch external preview URI %s: %s", target_uri, e.message);
+                                }
+                                decision.ignore ();
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            });
+
             web_view.load_changed.connect ((load_event) => {
-                if (load_event == WebKit.LoadEvent.FINISHED) {
+                if (load_event == WebKit.LoadEvent.STARTED) {
+                    if (has_webview_snapshot) {
+                        webview_snapshot.visible = true;
+                    }
+                } else if (load_event == WebKit.LoadEvent.FINISHED) {
                     has_loaded_preview = true;
+                    webview_snapshot.visible = false;
                     if (last_preview_scroll_y > 0.0) {
                         int target_y = (int) Math.round (last_preview_scroll_y);
                         web_view.evaluate_javascript.begin (@"window.scrollTo(0, $(target_y));", -1, null, null, null);
+                    }
+                    // Apostrophe-style queued reload: flush latest edit that arrived mid-load
+                    if (queued_preview_html != null) {
+                        string next_html = queued_preview_html;
+                        string next_base = queued_preview_base_uri ?? "file://localhost/";
+                        queued_preview_html = null;
+                        queued_preview_base_uri = null;
+                        load_html_preserving_scroll (next_html, next_base);
                     }
                 }
             });
@@ -373,6 +446,10 @@ namespace Imladris {
             web_view.web_process_terminated.connect ((reason) => {
                 web_process_crashes++;
                 has_loaded_preview = false;
+                has_webview_snapshot = false;
+                webview_snapshot.visible = false;
+                queued_preview_html = null;
+                queued_preview_base_uri = null;
                 preview_load_generation++;
                 GLib.warning ("WebKit WebProcess terminated (reason: %d, count: %d)", (int) reason, web_process_crashes);
                 if (web_process_crashes <= 2) {
@@ -385,11 +462,12 @@ namespace Imladris {
                     });
                 } else {
                     string fallback = "<!DOCTYPE html><html><body style='font-family:system-ui,sans-serif;padding:24px;color:#b91c1c;background:#fef2f2;'><h3>Live Preview WebProcess Crashed</h3><p>WebKitGTK WebProcess terminated repeatedly. Try disabling Hardware Acceleration in Preferences → Workspace.</p></body></html>";
-                    web_view.load_html (fallback, "file:///");
+                    web_view.load_html (fallback, "file://localhost/");
                 }
             });
 
             web_view.load_failed.connect ((load_event, failing_uri, err) => {
+                webview_snapshot.visible = false;
                 if (err is WebKit.NetworkError.CANCELLED || err is GLib.IOError.CANCELLED) {
                     return true;
                 }
@@ -398,7 +476,7 @@ namespace Imladris {
                     GLib.Markup.escape_text (failing_uri),
                     GLib.Markup.escape_text (err.message)
                 );
-                web_view.load_html (err_html, "file:///");
+                web_view.load_html (err_html, "file://localhost/");
                 return true;
             });
 
@@ -406,6 +484,10 @@ namespace Imladris {
             // which can drop its backing surface; mark it for reload once re-mapped.
             web_view.unrealize.connect (() => {
                 has_loaded_preview = false;
+                has_webview_snapshot = false;
+                webview_snapshot.visible = false;
+                queued_preview_html = null;
+                queued_preview_base_uri = null;
                 preview_load_generation++;
                 if (active_custom_uri != null && pending_preview_uri == null) {
                     pending_preview_uri = active_custom_uri;
@@ -620,6 +702,10 @@ namespace Imladris {
             if (physics_changed_handler_id != 0) {
                 Core.SettingsManager.get_default ().disconnect (physics_changed_handler_id);
                 physics_changed_handler_id = 0;
+            }
+            if (preview_backend_handler_id != 0) {
+                Core.SettingsManager.get_default ().disconnect (preview_backend_handler_id);
+                preview_backend_handler_id = 0;
             }
             if (rstudio_dock_grid != null && rstudio_dock_grid.dock_manager != null) {
                 rstudio_dock_grid.dock_manager.close_all_undocked ();
@@ -911,8 +997,27 @@ Start writing formatted text here.\par
         }
 
         public void refresh_live_preview (string? preloaded_text = null) {
+            // Guard calls triggered during early construction (e.g. populate_starter_template)
+            if (web_view == null || console_revealer == null || right_stack == null) {
+                pending_preview_refresh = true;
+                return;
+            }
             bool is_layout_hidden = (current_layout_mode == Services.LayoutMode.APOSTROPHE &&
                 (!console_revealer.reveal_child || right_stack.visible_child_name != "preview"));
+            var pb = Core.SettingsManager.get_default ().preview_backend;
+            if (pb != Core.PreviewBackend.WEBKIT_HTML) {
+                if (is_layout_hidden) {
+                    pending_preview_refresh = true;
+                    return;
+                }
+                pending_preview_refresh = false;
+                pending_preview_uri = null;
+                active_custom_uri = null;
+                string raw_native = preloaded_text != null ? preloaded_text : get_clean_source_text ();
+                string? src_fp = file_location != null ? file_location.get_path () : null;
+                native_preview.render (raw_native, get_document_format (), pb, src_fp);
+                return;
+            }
             bool is_unallocated = !web_view.get_mapped () ||
                 web_view.get_width () <= 0 ||
                 web_view.get_height () <= 0;
@@ -937,7 +1042,7 @@ Start writing formatted text here.\par
                 if (cwd != null && cwd.length > 0) {
                     base_uri = GLib.File.new_for_path (cwd).get_uri () + "/";
                 } else {
-                    base_uri = "file:///";
+                    base_uri = "file://localhost/";
                 }
             }
 
@@ -1167,10 +1272,37 @@ Start writing formatted text here.\par
         }
 
         private void load_html_preserving_scroll (string html, string base_uri) {
+            if (web_view.is_loading) {
+                // Apostrophe-style queueing: let the current load finish, then load the latest edit
+                queued_preview_html = html;
+                queued_preview_base_uri = base_uri;
+                return;
+            }
+            queued_preview_html = null;
+            queued_preview_base_uri = null;
             uint64 gen = ++preview_load_generation;
-            if (!has_loaded_preview || web_view.is_loading || !web_view.get_mapped ()) {
+            if (!has_loaded_preview || !web_view.get_mapped ()) {
                 web_view.load_html (html, base_uri);
                 return;
+            }
+            // Capture visible snapshot (Apostrophe pattern) to eliminate white flash during reload
+            if (web_view.get_estimated_load_progress () >= 1.0) {
+                web_view.get_snapshot.begin (
+                    WebKit.SnapshotRegion.VISIBLE,
+                    WebKit.SnapshotOptions.NONE,
+                    null,
+                    (s_obj, s_res) => {
+                        try {
+                            var tex = web_view.get_snapshot.end (s_res);
+                            if (tex != null) {
+                                webview_snapshot.set_paintable (tex);
+                                has_webview_snapshot = true;
+                            }
+                        } catch (GLib.Error e) {
+                            // Non-fatal: continue without snapshot overlay
+                        }
+                    }
+                );
             }
             web_view.evaluate_javascript.begin ("window.scrollY || 0", -1, null, null, null, (obj, res) => {
                 try {
@@ -1258,6 +1390,17 @@ Start writing formatted text here.\par
                 }
             }
             if (uri != null) {
+                var pb = Core.SettingsManager.get_default ().preview_backend;
+                if (pb != Core.PreviewBackend.WEBKIT_HTML) {
+                    active_custom_uri = null;
+                    pending_preview_uri = null;
+                    string? local_path = null;
+                    try {
+                        local_path = GLib.Filename.from_uri (uri);
+                    } catch (GLib.Error e) {}
+                    native_preview.render (get_clean_source_text (), get_document_format (), pb, local_path);
+                    return;
+                }
                 active_custom_uri = uri;
                 if (web_view.get_mapped () && web_view.get_width () > 0 && web_view.get_height () > 0) {
                     pending_preview_uri = null;
@@ -1327,6 +1470,7 @@ Start writing formatted text here.\par
             completion.select_on_show = true;
             completion.show_icons = true;
             completion.remember_info_visibility = true;
+            completion.page_size = 10;
 
             var intellisense_provider = new Editor.CodeIntelliSenseProvider (this);
             completion.add_provider (intellisense_provider);
@@ -1428,17 +1572,117 @@ Start writing formatted text here.\par
             source_buffer.insert_at_cursor (snippet, -1);
         }
 
-        public void insert_markdown_table (int rows, int cols) {
-            var sb = new GLib.StringBuilder ("\n|");
-            for (int c = 1; c <= cols; c++) sb.append (@" Header $c |");
-            sb.append ("\n|");
-            for (int c = 1; c <= cols; c++) sb.append (" --- |");
-            for (int r = 1; r <= rows; r++) {
-                sb.append ("\n|");
-                for (int c = 1; c <= cols; c++) sb.append (" Cell |");
+        public void show_table_picker_popover () {
+            Gtk.TextView target_view = (rtf_editor != null) ? rtf_editor.text_view : (Gtk.TextView) source_view;
+            Gtk.TextBuffer target_buf = target_view.buffer;
+
+            var popover = PopoverFactory.create_table_picker_popover ((rows, cols) => {
+                insert_markdown_table (rows, cols);
+            });
+            popover.set_parent (target_view);
+
+            Gtk.TextIter iter;
+            target_buf.get_iter_at_mark (out iter, target_buf.get_insert ());
+            Gdk.Rectangle buf_rect;
+            target_view.get_iter_location (iter, out buf_rect);
+            int wx, wy;
+            target_view.buffer_to_window_coords (Gtk.TextWindowType.WIDGET, buf_rect.x, buf_rect.y, out wx, out wy);
+            int vw = target_view.get_width ();
+            int vh = target_view.get_height ();
+            if (vw > 0 && vh > 0) {
+                Gdk.Rectangle anchor = {
+                    wx.clamp (0, vw - 1),
+                    wy.clamp (0, vh - 1),
+                    1,
+                    buf_rect.height > 0 ? buf_rect.height : 16
+                };
+                popover.set_pointing_to (anchor);
             }
-            sb.append ("\n");
+
+            popover.closed.connect (() => {
+                popover.unparent ();
+                target_view.grab_focus ();
+            });
+            popover.popup ();
+        }
+
+        public void insert_markdown_table (int rows, int cols) {
+            int safe_rows = rows.clamp (1, 100);
+            int safe_cols = cols.clamp (1, 30);
+
+            if (rtf_editor != null) {
+                var sb = new GLib.StringBuilder ("\n");
+                for (int c = 1; c <= safe_cols; c++) {
+                    if (c > 1) sb.append ("\t");
+                    sb.append (@"Header $c");
+                }
+                for (int r = 1; r <= safe_rows; r++) {
+                    sb.append ("\n");
+                    for (int c = 1; c <= safe_cols; c++) {
+                        if (c > 1) sb.append ("\t");
+                        sb.append ("Cell");
+                    }
+                }
+                sb.append ("\n");
+                rtf_editor.buffer.begin_user_action ();
+                rtf_editor.buffer.insert_at_cursor (sb.str, -1);
+                rtf_editor.buffer.end_user_action ();
+                return;
+            }
+
+            var fmt = get_document_format ();
+            var sb = new GLib.StringBuilder ();
+            if (fmt == DocumentFormat.HTML) {
+                sb.append ("\n<table>\n  <thead>\n    <tr>");
+                for (int c = 1; c <= safe_cols; c++) {
+                    sb.append (@"<th>Header $c</th>");
+                }
+                sb.append ("</tr>\n  </thead>\n  <tbody>\n");
+                for (int r = 1; r <= safe_rows; r++) {
+                    sb.append ("    <tr>");
+                    for (int c = 1; c <= safe_cols; c++) {
+                        sb.append ("<td>Cell</td>");
+                    }
+                    sb.append ("</tr>\n");
+                }
+                sb.append ("  </tbody>\n</table>\n");
+            } else if (fmt == DocumentFormat.TEX) {
+                string col_spec = "|";
+                for (int c = 1; c <= safe_cols; c++) {
+                    col_spec += "l|";
+                }
+                sb.append ("\n\\begin{table}[htbp]\n  \\centering\n");
+                sb.append (@"  \\begin{tabular}{$col_spec}\n    \\hline\n    ");
+                for (int c = 1; c <= safe_cols; c++) {
+                    if (c > 1) sb.append (" & ");
+                    sb.append (@"\\textbf{Header $c}");
+                }
+                sb.append (" \\\\\n    \\hline\n");
+                for (int r = 1; r <= safe_rows; r++) {
+                    sb.append ("    ");
+                    for (int c = 1; c <= safe_cols; c++) {
+                        if (c > 1) sb.append (" & ");
+                        sb.append ("Cell");
+                    }
+                    sb.append (" \\\\\n");
+                }
+                sb.append ("    \\hline\n  \\end{tabular}\n  \\caption{Table caption}\n\\end{table}\n");
+            } else {
+                sb.append ("\n|");
+                for (int c = 1; c <= safe_cols; c++) sb.append (@" Header $c |");
+                sb.append ("\n|");
+                for (int c = 1; c <= safe_cols; c++) sb.append (" --- |");
+                for (int r = 1; r <= safe_rows; r++) {
+                    sb.append ("\n|");
+                    for (int c = 1; c <= safe_cols; c++) sb.append (" Cell |");
+                }
+                sb.append ("\n");
+            }
+
+            source_buffer.begin_user_action ();
             source_buffer.insert_at_cursor (sb.str, -1);
+            source_buffer.end_user_action ();
+            refresh_live_preview ();
         }
 
         public void append_console_log (string text, bool focus_console = false) {
@@ -1498,6 +1742,10 @@ Start writing formatted text here.\par
 
         public void set_zoom (int percent) {
             web_view.zoom_level = (double) percent / 100.0;
+            native_preview.set_zoom_percent (percent);
+            if (Core.SettingsManager.get_default ().preview_backend != Core.PreviewBackend.WEBKIT_HTML) {
+                refresh_live_preview ();
+            }
         }
 
         public void apply_heading (int level) {

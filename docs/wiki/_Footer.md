@@ -1,2 +1,2 @@
 ---
-**Imladris IDE** • Licensed under the **GNU General Public License v3.0 (GPLv3)** • Built with Vala, GTK4, Libadwaita, WebKitGTK 6.0 & Papirus Icons.
+**Imladris IDE (v0.40.0)** • Core licensed under **Apache License 2.0 (`Apache-2.0`)** (Hybrid Open-Core) • Built with Vala, GTK4, Libadwaita, WebKitGTK 6.0 & Papirus Icons.

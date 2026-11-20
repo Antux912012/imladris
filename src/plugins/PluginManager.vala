@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 /* PluginManager.vala
  *
@@ -46,7 +46,7 @@ namespace Imladris.Plugins {
         public string version { get; set; default = "1.0.0"; }
         public string author { get; set; default = "Unknown"; }
         public string description { get; set; default = ""; }
-        public string license { get; set; default = "GPL-3.0-or-later"; }
+        public string license { get; set; default = "Apache-2.0"; }
         public string icon { get; set; default = "application-x-addon-symbolic"; }
         public ArrayList<string> permissions { get; set; default = new ArrayList<string> (); }
 
@@ -115,7 +115,7 @@ namespace Imladris.Plugins {
                 m.version = obj.has_member ("version") ? obj.get_string_member ("version") : "1.0.0";
                 m.author = obj.has_member ("author") ? obj.get_string_member ("author") : "Unknown";
                 m.description = obj.has_member ("description") ? obj.get_string_member ("description") : "";
-                m.license = obj.has_member ("license") ? obj.get_string_member ("license") : "GPL-3.0-or-later";
+                m.license = obj.has_member ("license") ? obj.get_string_member ("license") : "Apache-2.0";
                 m.icon = obj.has_member ("icon") ? obj.get_string_member ("icon") : "application-x-addon-symbolic";
 
                 if (obj.has_member ("permissions")) {
@@ -167,6 +167,12 @@ namespace Imladris.Plugins {
             } catch (GLib.Error e) {
                 warning ("Plugin [%s] could not read main.js: %s", manifest.id, e.message);
                 return false;
+            }
+
+            // Ensure WebKit2 is initialized before JSC in GUI runs (avoid touching
+            // WebKit in headless unit tests where GTK is not initialized).
+            if (Gtk.is_initialized ()) {
+                WebKit.WebContext.get_default ();
             }
 
             context = new JSC.Context ();

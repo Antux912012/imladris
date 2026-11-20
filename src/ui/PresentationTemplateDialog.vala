@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * Single Responsibility: Scientific presentations and symposium poster scaffolding dialog.
@@ -345,7 +345,7 @@ namespace Imladris.UI {
 
 \begin{frame}{Summary \& Acknowledgments}
   \begin{alertblock}{Main Contribution}
-    Open-source software and reproducible benchmarks published under GPL-3.0.
+    Open-source software and reproducible benchmarks published under Apache-2.0.
   \end{alertblock}
   \vspace{0.6em}
   Thank you for your attention. Questions?

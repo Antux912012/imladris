@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # Description: Verifies that the latest Imladris GitHub release is synchronized
 # with the FlatPark package registry and that FlatPark uses the Flatpak archive

@@ -102,7 +102,7 @@ Drawing from production workflows in structural biology (AlphaFold / DeepMind / 
 
 > **INSTRUCTIONS FOR GEMINI 3.8-FLASH-MEDIUM:**  
 > Execute the following 6 self-contained Work Packages (`WP-01` through `WP-06`) sequentially.  
-> * Every new or modified file **MUST** start with the 2-line REUSE 3.3 SPDX header (`// SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>` and `// SPDX-License-Identifier: GPL-3.0-or-later`).  
+> * Every new or modified file **MUST** start with the 2-line REUSE 3.3 SPDX header (`// SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>` and `// SPDX-License-Identifier: Apache-2.0`).  
 > * All comments and UI strings **MUST** follow **ASD-STE100** (Simplified Technical English: active voice, concrete technical nouns, zero AI-slop filler).  
 > * Zero new external C/Vala library dependencies may be added to `meson.build`. Use only the existing dependencies (`gtk4`, `libadwaita-1`, `gtksourceview-5`, `libsoup-3.0`, `json-glib-1.0`, `libsecret-1`, `gee-0.8`, `cairo`).  
 > * Verify each Work Package by compiling and running `ninja -C build test`.

@@ -90,7 +90,7 @@ Create the pure-Vala, deterministic symbol resolution and fuzzy-ranking engine i
 #### Complete Source for `src/editor/CodeIntelliSenseEngine.vala`
 ```vala
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * Single Responsibility: Deterministic, non-AI polyglot symbol indexing, context detection,
@@ -853,7 +853,7 @@ Create `src/editor/CodeIntelliSenseProvider.vala` implementing `GtkSource.Comple
 #### Complete Source for `src/editor/CodeIntelliSenseProvider.vala`
 ```vala
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * Single Responsibility: GtkSourceView 5 VS Code-style completion provider and

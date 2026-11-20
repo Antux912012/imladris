@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using GLib;
 using Gee;
@@ -29,7 +29,7 @@ namespace Imladris.Services {
         public DoiBibService () {
             session = new Soup.Session () {
                 timeout = 10,
-                user_agent = "Imladris/0.33.1 (https://github.com/Antux912012/imladris)"
+                user_agent = "Imladris/0.40.0 (https://github.com/Antux912012/imladris)"
             };
         }
 

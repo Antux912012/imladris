@@ -1,6 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 using GLib;
@@ -339,7 +339,7 @@ namespace Imladris.Core {
                         "Export Rich Text Document to PDF/HTML/ODT",
                         "document-save-as-symbolic",
                         "RTF",
-                        new string[] { "pdf", "html", "odt", "md" }
+                        new string[] { "PDF", "HTML", "ODT", "Markdown (.md)" }
                     );
                 case DocumentFormat.TXT:
                     return new FormatProfile (

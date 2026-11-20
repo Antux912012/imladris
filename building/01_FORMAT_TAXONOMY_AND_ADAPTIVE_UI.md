@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-License-Identifier: Apache-2.0
 -->
 
 # Building File 01 — Universal 7-Format Taxonomy & Adaptive GTK4/Libadwaita UI

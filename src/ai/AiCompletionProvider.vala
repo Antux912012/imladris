@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using GLib;
 using Gtk;
@@ -30,19 +30,16 @@ namespace Imladris.AI {
         }
 
         public int get_priority (GtkSource.CompletionContext context) {
-            return 5; // Higher priority than dictionary words (10)
+            return 5; // Lower priority than instant IntelliSense (30), snippets (20), and document words (10)
         }
 
         public bool is_trigger (Gtk.TextIter iter, unichar ch) {
-            if (!SettingsManager.get_default ().inline_completion_enabled) {
-                return false;
-            }
-            // Trigger on code-relevant characters or alphanumeric
-            return ch.isalnum () || ch == '.' || ch == '$' || ch == '_' || ch == '>' || ch == '(';
+            // Never hijack per-keystroke interactive triggers; participate when completion starts or on Ctrl+Space
+            return false;
         }
 
         public bool key_activates (GtkSource.CompletionContext context, GtkSource.CompletionProposal proposal, uint keyval, Gdk.ModifierType state) {
-            return false;
+            return keyval == Gdk.Key.Tab || keyval == Gdk.Key.Return || keyval == Gdk.Key.KP_Enter;
         }
 
         public GenericArray<GtkSource.CompletionProposal>? list_alternates (GtkSource.CompletionContext context, GtkSource.CompletionProposal proposal) {
@@ -52,11 +49,14 @@ namespace Imladris.AI {
         public void activate (GtkSource.CompletionContext context, GtkSource.CompletionProposal proposal) {
             var p = proposal as AiCompletionProposal;
             if (p != null) {
-                Gtk.TextIter iter;
-                context.get_bounds (out iter, null);
+                Gtk.TextIter cursor_iter;
+                context.get_bounds (null, out cursor_iter);
                 var buffer = context.get_buffer ();
+                if (buffer == null) {
+                    return;
+                }
                 buffer.begin_user_action ();
-                buffer.insert (ref iter, p.text, -1);
+                buffer.insert (ref cursor_iter, p.text, -1);
                 buffer.end_user_action ();
             }
         }
@@ -97,16 +97,21 @@ namespace Imladris.AI {
                 return store;
             }
 
-            Gtk.TextIter cursor_iter;
-            context.get_bounds (out cursor_iter, null);
             var buffer = context.get_buffer ();
+            if (buffer == null) {
+                return store;
+            }
+
+            Gtk.TextIter cursor_iter;
+            context.get_bounds (null, out cursor_iter);
 
             // Inspect line before cursor
             Gtk.TextIter line_start = cursor_iter;
             line_start.set_line_offset (0);
             string line_prefix = buffer.get_text (line_start, cursor_iter, false);
-            if (line_prefix.strip ().length < 2) {
-                return store; // Don't trigger on trivial or empty lines
+            bool manual = (context.get_activation () == GtkSource.CompletionActivation.USER_REQUESTED);
+            if (!manual && line_prefix.strip ().length < 4) {
+                return store; // Keep short interactive typing instant without waiting on AI
             }
 
             // Extract window of context before and after cursor

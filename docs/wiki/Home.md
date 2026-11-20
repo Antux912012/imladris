@@ -1,11 +1,11 @@
 <!--
 SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-License-Identifier: Apache-2.0
 -->
 
 # Welcome to the Imladris IDE Wiki
 
-**Imladris (`v0.33.1`)** is a native Linux scientific authoring, bioinformatics provenance, and polyglot notebook IDE built with **Vala**, **GTK4**, **Libadwaita**, **GtkSourceView 5**, and **WebKitGTK 6.0**. Designed for researchers, bioinformaticians, statisticians, and data scientists, Imladris combines the reproducibility of RStudio and Jupyter with a modern GNOME HIG-compliant interface, an Apple TextEdit-style WYSIWYG **`.rtf` Rich Text Editor**, the **Arekyer Galaxy-to-Quarto Provenance Bridge**, the **Natural Math & Chemical Reaction Studio**, local Vulkan-accelerated AI assistance (**Elrond**), opt-in Free-Tier AI orchestration, GitHub Copilot OAuth, and an Obsidian-style JavaScript extension ecosystem (`JSC.Context`).
+**Imladris (`v0.40.0`)** is a native Linux scientific authoring, bioinformatics provenance, and polyglot notebook IDE built with **Vala**, **GTK4**, **Libadwaita**, **GtkSourceView 5**, and **WebKitGTK 6.0** (Core licensed under **Apache-2.0** Open-Core). Designed for researchers, bioinformaticians, statisticians, and data scientists, Imladris combines the reproducibility of RStudio and Jupyter with a modern GNOME HIG-compliant interface, VS Code & RStudio-grade autocompletion, quick Table Picker (`Ctrl+Alt+T`), an Apple TextEdit-style WYSIWYG **`.rtf` Rich Text Editor**, the **Arekyer Galaxy-to-Quarto Provenance Bridge**, the **Natural Math & Chemical Reaction Studio**, local Vulkan-accelerated AI assistance (**Elrond**), opt-in Free-Tier AI orchestration, GitHub Copilot OAuth, and an Obsidian-style JavaScript extension ecosystem (`JSC.Context`).
 
 > [!TIP]
 > 🌐 **Visit the Official Project Landing Page:** [https://antux912012.github.io/imladris/](https://antux912012.github.io/imladris/)  
@@ -100,4 +100,4 @@ graph TD
 * [[Plugin Development Guide|Plugin-Development-Guide]] — Build your first `.implugin` extension in 5 minutes using JavaScript.
 * [[Plugin API Reference|Plugin-API-Reference]] — Complete documentation for the `imladris.*` JavaScriptCore bridge.
 * [[Architecture and HIG|Architecture-and-HIG]] — Technical design notes and GNOME Human Interface Guidelines compliance.
-* [[License and GPLv3|License-and-GPLv3]] — GNU GPLv3 terms and the Script Interface Exception for third-party plugin authors.
+* [[License & Enterprise Policy|License-and-Enterprise-Policy]] — Apache-2.0 Hybrid Open-Core terms, patent protection, and extension boundaries.

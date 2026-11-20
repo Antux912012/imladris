@@ -1,0 +1,22 @@
+Imladris Scientific Workbench
+Copyright 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+---
+Hybrid Open-Core & Enterprise Policy:
+- The Imladris Core Desktop Studio is 100% open-source under Apache-2.0.
+- Third-party extensions (.implugin / JSC.Context) and out-of-process MCP
+  integrations (McpServer) may use any license chosen by their authors.
+- Commercial Enterprise Packs (SSO, centralized GxP audit/policy management,
+  and proprietary LIMS/ELN connectors) are licensed separately.

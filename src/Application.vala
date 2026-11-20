@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * Single Responsibility: Main application life-cycle manager and action dispatcher.
@@ -10,7 +10,7 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.33.1";
+        public const string APP_VERSION = "0.40.0";
         private bool first_launch_toolchain_checked = false;
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
@@ -149,6 +149,7 @@ namespace Imladris {
             this.set_accels_for_action ("app.math_chem_editor", { "<Control>m" });
             this.set_accels_for_action ("app.mermaid_studio", { "<Control><Shift>d", "<Control><Alt>m" });
             this.set_accels_for_action ("win.insert_chunk", { "<Control><Alt>i" });
+            this.set_accels_for_action ("win.insert_table", { "<Control><Alt>t" });
             this.set_accels_for_action ("win.insert_pipe", { "<Control><Shift>m" });
             this.set_accels_for_action ("win.toggle_comment", { "<Control><Shift>c" });
             this.set_accels_for_action ("win.insert_assignment", { "<Alt>minus" });
@@ -184,6 +185,11 @@ namespace Imladris {
 
             Core.SettingsManager.get_default ().apply_theme (Core.SettingsManager.get_default ().app_theme);
             Core.SettingsManager.get_default ().apply_accent_color (Core.SettingsManager.get_default ().accent_color);
+
+            // WebKitGTK 6.0 (WebKit 2.52+) must initialize WebKit2 before any standalone
+            // JSC.Context is created in the UI process, otherwise WTF/JSC initialization
+            // runs without WebKit2 IPC/RunLoop setup and every WebKit.WebView stalls at 10%.
+            WebKit.WebContext.get_default ();
 
             Imladris.Plugins.PluginManager.get_default ().initialize ();
         }

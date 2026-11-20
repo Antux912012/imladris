@@ -1,9 +1,9 @@
 Name:           imladris
-Version:        0.33.1
+Version:        0.40.0
 Release:        1%{?dist}
 Summary:        Native scientific notebook studio for Quarto, R, Python, and Jupyter
 
-License:        GPL-3.0-or-later
+License:        Apache-2.0
 URL:            https://antux912012.github.io/imladris/
 Source0:        %{name}-%{version}.tar.gz
 

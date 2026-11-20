@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 project('imladris', 'vala', 'c',
-  version: '0.33.1',
+  version: '0.40.0',
   default_options: ['warning_level=1']
 )
 
@@ -116,6 +116,7 @@ sources = files(
   'src/ui/PackagesRibbonBar.vala',
   'src/ui/InlineChunkOutputWidget.vala',
   'src/ui/RtfEditorView.vala',
+  'src/ui/NativePreviewView.vala',
   'src/ui/WebViewFactory.vala',
   'src/ui/PreferencesDialog.vala',
   'src/ui/ThemeSelectorWidget.vala',

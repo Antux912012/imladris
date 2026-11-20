@@ -1,11 +1,11 @@
 # Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 pkgname=imladris
-pkgver=0.33.1
+pkgver=0.40.0
 pkgrel=1
 pkgdesc="Native scientific notebook IDE for Quarto, R, Python & Jupyter with GTK4 and AI"
 arch=('x86_64')
 url="https://antux912012.github.io/imladris/"
-license=('GPL-3.0-or-later')
+license=('Apache-2.0')
 depends=(
     'gtk4>=4.14'
     'libadwaita>=1.5'

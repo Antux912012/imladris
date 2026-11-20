@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 using GLib;
 using Imladris.Core;
@@ -95,6 +95,112 @@ l.3 \usepackage{nonexistent}
         var q_items = CodeIntelliSenseEngine.query_completions (qmd, 1, "#| ec", "qmd");
         assert (q_items.size > 0);
         assert (!q_items.get (0).insert_text.has_prefix ("#|"));
+    }
+
+    private static void test_intellisense_vscode_rstudio_writing_parity () {
+        // 1. Context-aware token extraction must NOT swallow '$' before '\alpha' or '-' before R identifiers
+        assert (CodeIntelliSenseEngine.extract_active_token_for_context ("Let $\\alp", IntelliSenseContext.LATEX_MATH_CHEM) == "\\alp");
+        assert (CodeIntelliSenseEngine.extract_active_token_for_context ("x-mea", IntelliSenseContext.R_CODE) == "mea");
+        assert (CodeIntelliSenseEngine.extract_active_token_for_context ("mtcars$mp", IntelliSenseContext.R_CODE) == "mtcars$mp");
+        assert (CodeIntelliSenseEngine.extract_active_token_for_context ("hello <div", IntelliSenseContext.HTML_CODE) == "<div");
+        assert (CodeIntelliSenseEngine.extract_active_token_for_context ("See @fig-vo", IntelliSenseContext.MARKDOWN_PROSE) == "@fig-vo");
+
+        // 2. Markdown prose writing snippets and Quarto cross-references (@fig-*, @sec-*)
+        string qmd_doc = "# Methods {#sec-methods}\n\nSee @fig-\n\n:::call\n\n```{r}\n#| label: fig-volcano\nlibrary(ggp\nmy_model = lm(mpg ~ wt, data = mtcars)\nggplot(mtcars, ma\n```\n\n```{python}\nimport pan\ndf_bio = pd.read_csv('a.csv')\nx = df_bio['gene_id']\ndf_bio.hea\n```\n\n```{bash}\nquar\n```\n";
+
+        var xref_items = CodeIntelliSenseEngine.query_completions (qmd_doc, 2, "See @fig-", "qmd");
+        bool found_fig_ref = false;
+        foreach (var it in xref_items) {
+            if (it.label == "@fig-volcano") found_fig_ref = true;
+        }
+        assert (found_fig_ref);
+
+        var sec_items = CodeIntelliSenseEngine.query_completions (qmd_doc, 2, "See @sec-", "qmd");
+        bool found_sec_ref = false;
+        foreach (var it in sec_items) {
+            if (it.label == "@sec-methods") found_sec_ref = true;
+        }
+        assert (found_sec_ref);
+
+        var callout_items = CodeIntelliSenseEngine.query_completions (qmd_doc, 4, ":::call", "qmd");
+        bool found_callout = false;
+        foreach (var it in callout_items) {
+            if (it.label == ":::callout-note") found_callout = true;
+        }
+        assert (found_callout);
+
+        // Ctrl+Space (manual_trigger = true) on empty line in Markdown prose returns writing snippets
+        var md_manual = CodeIntelliSenseEngine.query_completions (qmd_doc, 3, "", "qmd", true);
+        assert (md_manual.size > 5);
+
+        // 3. HTML tag completion + smart closing tag completion
+        string html_doc = "<div>\n  <p>Hello\n  </";
+        assert (CodeIntelliSenseEngine.detect_context (html_doc, 2, "  </", "html") == IntelliSenseContext.HTML_CODE);
+        var close_items = CodeIntelliSenseEngine.query_completions (html_doc, 2, "  </", "html");
+        assert (close_items.size > 0);
+        assert (close_items.get (0).label == "</p>");
+
+        var inline_html = CodeIntelliSenseEngine.query_completions ("Text <tab", 0, "Text <tab", "markdown");
+        bool found_table_tag = false;
+        foreach (var it in inline_html) {
+            if (it.label == "<table") found_table_tag = true;
+        }
+        assert (found_table_tag);
+
+        // 4. RStudio parity: library() package completion, named function args, '=' assignment, Ctrl+Space
+        var r_pkg_items = CodeIntelliSenseEngine.query_completions (qmd_doc, 8, "library(ggp", "qmd");
+        bool found_ggplot2_pkg = false;
+        foreach (var it in r_pkg_items) {
+            if (it.label == "ggplot2") found_ggplot2_pkg = true;
+        }
+        assert (found_ggplot2_pkg);
+
+        var r_arg_items = CodeIntelliSenseEngine.query_completions (qmd_doc, 10, "ggplot(mtcars, ma", "qmd");
+        bool found_mapping_arg = false;
+        foreach (var it in r_arg_items) {
+            if (it.label == "mapping =") found_mapping_arg = true;
+        }
+        assert (found_mapping_arg);
+
+        var r_eq_var = CodeIntelliSenseEngine.query_completions (qmd_doc, 10, "my_mo", "qmd");
+        bool found_my_model = false;
+        foreach (var it in r_eq_var) {
+            if (it.label == "my_model") found_my_model = true;
+        }
+        assert (found_my_model);
+
+        var r_manual = CodeIntelliSenseEngine.query_completions (qmd_doc, 10, "", "qmd", true);
+        assert (r_manual.size > 10);
+
+        // 5. VS Code parity in Python: import modules, DataFrame methods & discovered columns, Ctrl+Space
+        var py_imp = CodeIntelliSenseEngine.query_completions (qmd_doc, 14, "import pan", "qmd");
+        bool found_pandas_mod = false;
+        foreach (var it in py_imp) {
+            if (it.label == "pandas") found_pandas_mod = true;
+        }
+        assert (found_pandas_mod);
+
+        var py_df_m = CodeIntelliSenseEngine.query_completions (qmd_doc, 17, "df_bio.hea", "qmd");
+        bool found_df_head = false;
+        foreach (var it in py_df_m) {
+            if (it.label == "df_bio.head") found_df_head = true;
+        }
+        assert (found_df_head);
+
+        var py_df_col = CodeIntelliSenseEngine.query_completions (qmd_doc, 17, "df_bio.ge", "qmd");
+        bool found_gene_id = false;
+        foreach (var it in py_df_col) {
+            if (it.label == "df_bio.gene_id") found_gene_id = true;
+        }
+        assert (found_gene_id);
+
+        // 6. Bash chunk completions
+        var bash_items = CodeIntelliSenseEngine.query_completions (qmd_doc, 21, "quar", "qmd");
+        bool found_quarto_cmd = false;
+        foreach (var it in bash_items) {
+            if (it.label == "quarto") found_quarto_cmd = true;
+        }
+        assert (found_quarto_cmd);
     }
 
     private static void test_recovery_sanitized_id_and_purge () {
@@ -258,6 +364,53 @@ def summarize(n):
         }
     }
 
+    private static void test_rtf_and_all_formats_html_pdf () {
+        string sample_rtf = """{\rtf1\ansi\ansicpg1252\deff0
+{\fonttbl{\f0\fswiss Liberation Sans;}}
+\pard {\b Bold Heading}\par
+\pard Plain paragraph from RTF.\par
+}""";
+        string rtf_src = GLib.Path.build_filename (_test_tmp_root, "notes.rtf");
+        string rtf_html = GLib.Path.build_filename (_test_tmp_root, "notes_rtf.html");
+        string rtf_pdf = GLib.Path.build_filename (_test_tmp_root, "notes_rtf.pdf");
+        string rtf_copy = GLib.Path.build_filename (_test_tmp_root, "notes_copy.rtf");
+
+        string rmd_src = GLib.Path.build_filename (_test_tmp_root, "analysis.Rmd");
+        string rmd_html = GLib.Path.build_filename (_test_tmp_root, "analysis_rmd.html");
+        string rmd_pdf = GLib.Path.build_filename (_test_tmp_root, "analysis_rmd.pdf");
+
+        try {
+            GLib.FileUtils.set_contents (rtf_src, sample_rtf);
+            ExportService.export_to_html (rtf_src, rtf_html, sample_rtf);
+            assert (GLib.FileUtils.test (rtf_html, GLib.FileTest.EXISTS));
+            string html_out;
+            GLib.FileUtils.get_contents (rtf_html, out html_out);
+            assert (html_out.contains ("Bold Heading"));
+            assert (html_out.contains ("Plain paragraph from RTF."));
+
+            ExportService.export_to_pdf (rtf_src, rtf_pdf, sample_rtf);
+            assert (GLib.FileUtils.test (rtf_pdf, GLib.FileTest.EXISTS));
+            uint8[] rtf_pdf_bytes;
+            GLib.FileUtils.get_data (rtf_pdf, out rtf_pdf_bytes);
+            assert (rtf_pdf_bytes.length > 200);
+            assert (rtf_pdf_bytes[0] == '%' && rtf_pdf_bytes[1] == 'P' && rtf_pdf_bytes[2] == 'D' && rtf_pdf_bytes[3] == 'F');
+
+            ExportService.export_to_rtf (rtf_src, rtf_copy, sample_rtf);
+            string rtf_copy_text;
+            GLib.FileUtils.get_contents (rtf_copy, out rtf_copy_text);
+            assert (rtf_copy_text.contains ("Bold Heading"));
+
+            string rmd_content = "# R Markdown Report\n\nSummary text.\n";
+            GLib.FileUtils.set_contents (rmd_src, rmd_content);
+            ExportService.export_to_html (rmd_src, rmd_html, rmd_content);
+            assert (GLib.FileUtils.test (rmd_html, GLib.FileTest.EXISTS));
+            ExportService.export_to_pdf (rmd_src, rmd_pdf, rmd_content);
+            assert (GLib.FileUtils.test (rmd_pdf, GLib.FileTest.EXISTS));
+        } catch (GLib.Error e) {
+            error ("RTF/Rmd export failed: %s", e.message);
+        }
+    }
+
     public static int main (string[] args) {
         setup_isolated_xdg ();
         Test.init (ref args);
@@ -265,11 +418,13 @@ def summarize(n):
         Test.add_func ("/runners/latex_log_diagnostics", test_latex_log_diagnostics);
         Test.add_func ("/runners/typescript_diagnostics_and_ansi", test_typescript_diagnostics_and_ansi);
         Test.add_func ("/intellisense/ts_latex_and_python_backticks", test_intellisense_ts_latex_and_python_backticks);
+        Test.add_func ("/intellisense/vscode_rstudio_writing_parity", test_intellisense_vscode_rstudio_writing_parity);
         Test.add_func ("/recovery/sanitized_id_and_purge", test_recovery_sanitized_id_and_purge);
         Test.add_func ("/security/mallorn_rejects_symlinks", test_mallorn_rejects_symlinks);
         Test.add_func ("/security/platform_venv_and_package_validation", test_platform_venv_and_package_validation);
         Test.add_func ("/export/error_propagation", test_export_service_error_propagation);
         Test.add_func ("/export/builtin_pdf_odt_rtf", test_builtin_pdf_odt_rtf_export);
+        Test.add_func ("/export/rtf_and_all_formats_html_pdf", test_rtf_and_all_formats_html_pdf);
 
         int rc = Test.run ();
         if (_test_tmp_root != "") {
