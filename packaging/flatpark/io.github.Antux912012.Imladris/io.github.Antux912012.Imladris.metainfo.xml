@@ -75,9 +75,9 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="0.40.0" date="2026-11-20">
+    <release version="0.40.0" date="2026-11-20" type="stable">
       <description>
-        <p>Major Release v0.40.0 transitions Imladris Core to the Apache-2.0 Hybrid Open-Core license for frictionless Academic &amp; Enterprise R&amp;D adoption, and delivers major editor and Flatpak upgrades:</p>
+        <p>Most Stable Release (v0.40.0): Transitions Imladris Core to the Apache-2.0 Hybrid Open-Core license for frictionless Academic &amp; Enterprise R&amp;D adoption, and delivers major editor and Flatpak stability upgrades:</p>
         <ul>
           <li>Apache-2.0 Hybrid Open-Core Licensing: Relicensed core studio from GPL-3.0-or-later to Apache-2.0 with explicit patent protection, clean JSC.Context/MCP extension boundaries, and Commercial Enterprise Pack readiness.</li>
           <li>VS Code &amp; RStudio-Grade Autocompletion: Live keystroke refiltering, fuzzy match highlighting, Markdown/Quarto prose snippets &amp; cross-references, HTML5 tag completion, R library()/parameter completions, Python DataFrame methods, live REPL column discovery, and paired BackSpace/triple-backtick handling.</li>
