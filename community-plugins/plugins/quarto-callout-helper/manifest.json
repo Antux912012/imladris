@@ -1,0 +1,10 @@
+{
+  "id": "quarto-callout-helper",
+  "name": "Quarto Callout & Figure Helper",
+  "version": "1.0.0",
+  "author": "Imladris Community",
+  "description": "Wraps selected text in Quarto callout blocks (.callout-note / .callout-important) and inserts cross-referenced figure templates from the Ribbon.",
+  "license": "Apache-2.0",
+  "icon": "dialog-information-symbolic",
+  "permissions": ["editor"]
+}

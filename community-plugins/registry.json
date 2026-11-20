@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "updated": "2026-11-20",
+  "repository": "https://github.com/Antux912012/imladris",
+  "plugins": [
+    {
+      "id": "biostat-table-generator",
+      "name": "APA & Lancet Table Formatter",
+      "version": "1.0.0",
+      "author": "Imladris Community",
+      "description": "Inserts publication-ready gt and gtsummary R Table 1 code chunks for the selected dataframe or mtcars.",
+      "license": "Apache-2.0",
+      "icon": "x-office-spreadsheet-symbolic",
+      "category": "Biostatistics",
+      "language": "TypeScript",
+      "tags": ["r", "tables", "apa", "lancet", "gt", "gtsummary", "clinical"],
+      "permissions": ["editor", "repl_r"],
+      "homepage": "https://github.com/Antux912012/imladris/tree/main/community-plugins/plugins/biostat-table-generator",
+      "files": {
+        "manifest": "community-plugins/plugins/biostat-table-generator/manifest.json",
+        "main": "community-plugins/plugins/biostat-table-generator/main.js"
+      }
+    },
+    {
+      "id": "citation-audit",
+      "name": "Citation & Cross-Ref Auditor",
+      "version": "1.0.0",
+      "author": "Imladris Community",
+      "description": "Audits the active Quarto/Markdown/LaTeX manuscript for @citekey citations and @fig-/@tbl-/@sec- cross-references in a clean summary dialog.",
+      "license": "Apache-2.0",
+      "icon": "accessories-dictionary-symbolic",
+      "category": "Scientific Writing",
+      "language": "JavaScript",
+      "tags": ["citations", "zotero", "bibtex", "quarto", "audit", "cross-ref"],
+      "permissions": ["editor", "ui"],
+      "homepage": "https://github.com/Antux912012/imladris/tree/main/community-plugins/plugins/citation-audit",
+      "files": {
+        "manifest": "community-plugins/plugins/citation-audit/manifest.json",
+        "main": "community-plugins/plugins/citation-audit/main.js"
+      }
+    },
+    {
+      "id": "quarto-callout-helper",
+      "name": "Quarto Callout & Figure Helper",
+      "version": "1.0.0",
+      "author": "Imladris Community",
+      "description": "Wraps selected text in Quarto callout blocks (.callout-note / .callout-important) and inserts cross-referenced figure templates from the Ribbon.",
+      "license": "Apache-2.0",
+      "icon": "dialog-information-symbolic",
+      "category": "Authoring",
+      "language": "TypeScript",
+      "tags": ["quarto", "markdown", "callouts", "figures", "writing"],
+      "permissions": ["editor"],
+      "homepage": "https://github.com/Antux912012/imladris/tree/main/community-plugins/plugins/quarto-callout-helper",
+      "files": {
+        "manifest": "community-plugins/plugins/quarto-callout-helper/manifest.json",
+        "main": "community-plugins/plugins/quarto-callout-helper/main.js"
+      }
+    }
+  ]
+}

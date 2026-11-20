@@ -1,0 +1,10 @@
+{
+  "id": "biostat-table-generator",
+  "name": "APA & Lancet Table Formatter",
+  "version": "1.0.0",
+  "author": "Imladris Community",
+  "description": "Inserts publication-ready gt and gtsummary R Table 1 code chunks for the selected dataframe or mtcars.",
+  "license": "Apache-2.0",
+  "icon": "x-office-spreadsheet-symbolic",
+  "permissions": ["editor", "repl_r"]
+}

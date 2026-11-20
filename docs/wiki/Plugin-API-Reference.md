@@ -1,6 +1,14 @@
-# Plugin API Reference
+<!--
+SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+SPDX-License-Identifier: Apache-2.0
+-->
 
-When your plugin's `main.js` is evaluated inside its isolated `JSC.Context` virtual machine, Imladris automatically exposes the global host namespace object **`imladris`**. 
+# Plugin API Reference (TypeScript & JavaScript)
+
+When your plugin's `main.js` (written directly in JavaScript or compiled from TypeScript) is evaluated inside its isolated `JSC.Context` virtual machine, Imladris automatically exposes the global host namespace object **`imladris`**.
+
+> [!TIP]
+> **TypeScript Developers:** Reference [`community-plugins/types/imladris.d.ts`](https://github.com/Antux912012/imladris/blob/main/community-plugins/types/imladris.d.ts) in your `tsconfig.json` for full type-checking and IntelliSense across every API below.
 
 ---
 
@@ -100,17 +108,12 @@ Dispatches Python code directly to the persistent interactive Python / IPython s
 > Requires the `"elrond_ai"` permission declared in your `manifest.json`.
 
 ### `imladris.elrond.ask(prompt)`
-Queries the local Vulkan/CPU **Elrond Assistance (AI)** engine using the active document narrative and dataframe context.
-* **Parameters**: `prompt` (string) — Custom instructions or questions for Elrond.
-* **Returns**: `Promise<string>` — The generated response from the local GGUF model.
+Sends a prompt directly to the **Elrond Assistance (AI)** panel using the active document narrative and dataframe context.
+* **Parameters**: `prompt` (`string`) — Custom instructions or questions for Elrond.
+* **Returns**: `void`
 * **Example**:
-  ```javascript
-  // Async usage with Elrond
-  async function suggestPlot() {
-      const advice = await imladris.elrond.ask("Suggest a ggplot2 command for these variables.");
-      imladris.editor.insertAtCursor(advice);
-  }
-  suggestPlot();
+  ```typescript
+  imladris.elrond.ask("Suggest a ggplot2 command for the active dataset.");
   ```
 
 ---

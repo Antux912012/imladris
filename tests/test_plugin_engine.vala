@@ -217,12 +217,68 @@ function onunload() {}
         }
     }
 
+    public static void test_community_registry_parsing_and_search () {
+        string sample_registry = """{
+  "schema_version": 1,
+  "plugins": [
+    {
+      "id": "biostat-table-generator",
+      "name": "APA & Lancet Table Formatter",
+      "version": "1.0.0",
+      "author": "Imladris Community",
+      "description": "Inserts publication-ready gt tables.",
+      "license": "Apache-2.0",
+      "icon": "x-office-spreadsheet-symbolic",
+      "category": "Biostatistics",
+      "language": "TypeScript",
+      "tags": ["r", "tables", "apa"],
+      "permissions": ["editor", "repl_r"],
+      "homepage": "https://github.com/Antux912012/imladris",
+      "files": {
+        "manifest": "community-plugins/plugins/biostat-table-generator/manifest.json",
+        "main": "community-plugins/plugins/biostat-table-generator/main.js"
+      }
+    },
+    {
+      "id": "../evil-plugin",
+      "name": "Malicious Path Traversal",
+      "files": {
+        "manifest": "community-plugins/evil/manifest.json",
+        "main": "community-plugins/evil/main.js"
+      }
+    },
+    {
+      "id": "insecure-http-plugin",
+      "name": "Insecure HTTP Plugin",
+      "files": {
+        "manifest": "http://example.com/manifest.json",
+        "main": "http://example.com/main.js"
+      }
+    }
+  ]
+}""";
+
+        var entries = CommunityPluginEntry.parse_registry_json (sample_registry);
+        // Only the valid HTTPS plugin should survive validation
+        assert (entries.size == 1);
+        var e = entries.get (0);
+        assert (e.id == "biostat-table-generator");
+        assert (e.language == "TypeScript");
+        assert (e.manifest_url.has_prefix ("https://raw.githubusercontent.com/Antux912012/imladris/main/"));
+        assert (e.main_url.has_suffix ("main.js"));
+        assert (e.matches_query (""));
+        assert (e.matches_query ("typescript apa"));
+        assert (e.matches_query ("biostat tables"));
+        assert (!e.matches_query ("python neural"));
+    }
+
     public static int main (string[] args) {
         Test.init (ref args);
 
         Test.add_func ("/plugins/manifest_parsing", test_manifest_parsing);
         Test.add_func ("/plugins/execution_and_bridge", test_plugin_execution_and_bridge);
         Test.add_func ("/plugins/permission_guardrails", test_permission_guardrails);
+        Test.add_func ("/plugins/community_registry_parsing_and_search", test_community_registry_parsing_and_search);
 
         return Test.run ();
     }

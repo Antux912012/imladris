@@ -13,11 +13,25 @@ namespace Imladris.UI {
         private ulong accent_changed_hid = 0;
         private ulong elrond_status_hid = 0;
         private ulong plugins_changed_hid = 0;
+        private GLib.Cancellable? community_cancellable = null;
+        private Gee.ArrayList<Imladris.Plugins.CommunityPluginEntry> community_entries = new Gee.ArrayList<Imladris.Plugins.CommunityPluginEntry> ();
+        private Gee.ArrayList<Gtk.Widget> community_rows = new Gee.ArrayList<Gtk.Widget> ();
+        private Adw.PreferencesGroup? community_group = null;
+        private Gtk.SearchEntry? community_search_entry = null;
+        private Gtk.Spinner? community_spinner = null;
+
+        public void open_extensions_page () {
+            this.set_visible_page_name ("extensions");
+        }
 
         public PreferencesDialog () {
             Object (title: "Preferences");
 
             this.closed.connect (() => {
+                if (community_cancellable != null) {
+                    community_cancellable.cancel ();
+                    community_cancellable = null;
+                }
                 if (accent_changed_hid != 0) {
                     Core.SettingsManager.get_default ().disconnect (accent_changed_hid);
                     accent_changed_hid = 0;
@@ -789,15 +803,76 @@ namespace Imladris.UI {
             ai_page.add (keys_group);
             this.add (ai_page);
 
-            // Page 6: Extensions & Plugins (Obsidian-Style JSC Engine)
+            // Page 6: Extensions & Plugins (Obsidian-Style JSC Engine + Community Marketplace)
             var ext_page = new Adw.PreferencesPage () {
+                name = "extensions",
                 title = "Extensions",
                 icon_name = "application-x-addon-symbolic"
             };
 
+            // Community Plugins Search & 1-Click Installer
+            community_group = new Adw.PreferencesGroup () {
+                title = "Community Plugins",
+                description = "Search and install TypeScript & JavaScript extensions published by the Imladris community."
+            };
+
+            var comm_header_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+                valign = Gtk.Align.CENTER
+            };
+            community_spinner = new Gtk.Spinner () {
+                visible = false
+            };
+            comm_header_box.append (community_spinner);
+
+            var btn_refresh_comm = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
+                tooltip_text = "Refresh Community Plugin Registry",
+                valign = Gtk.Align.CENTER
+            };
+            btn_refresh_comm.add_css_class ("flat");
+            btn_refresh_comm.clicked.connect (() => {
+                load_community_registry (true);
+            });
+            comm_header_box.append (btn_refresh_comm);
+
+            var btn_publish_guide = new Gtk.Button.with_label ("Publish Guide") {
+                tooltip_text = "Learn how to create and submit a TypeScript/JavaScript plugin",
+                valign = Gtk.Align.CENTER
+            };
+            btn_publish_guide.add_css_class ("flat");
+            btn_publish_guide.clicked.connect (() => {
+                var launcher = new Gtk.UriLauncher ("https://github.com/Antux912012/imladris/wiki/Plugin-Development-Guide");
+                launcher.launch.begin (this.root as Gtk.Window, null, null);
+            });
+            comm_header_box.append (btn_publish_guide);
+            community_group.set_header_suffix (comm_header_box);
+
+            var search_row = new Adw.PreferencesRow () {
+                activatable = false,
+                selectable = false
+            };
+            var search_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
+                margin_top = 8,
+                margin_bottom = 8,
+                margin_start = 12,
+                margin_end = 12
+            };
+            community_search_entry = new Gtk.SearchEntry () {
+                placeholder_text = "Search community plugins by name, tag, author, or TypeScript/JavaScript…",
+                hexpand = true
+            };
+            community_search_entry.search_changed.connect (() => {
+                render_community_plugins ();
+            });
+            search_box.append (community_search_entry);
+            search_row.set_child (search_box);
+            community_group.add (search_row);
+
+            ext_page.add (community_group);
+            load_community_registry (false);
+
             var mgr_group = new Adw.PreferencesGroup () {
-                title = "Plugin Manager",
-                description = "Install and manage JavaScript plugins with native GTK4/Libadwaita integration."
+                title = "Local Plugin Manager",
+                description = "Import local .implugin/.zip bundles or inspect your local plugins folder."
             };
 
             var import_row = new Adw.ActionRow () {
@@ -877,12 +952,179 @@ namespace Imladris.UI {
                 GLib.Idle.add (() => {
                     if (plugins_changed_hid != 0) {
                         populate_plugins_group (plugins_group);
+                        render_community_plugins ();
                     }
                     return false;
                 });
             });
 
             this.add (ext_page);
+        }
+
+        private void load_community_registry (bool force_refresh) {
+            if (community_group == null) return;
+            if (community_cancellable != null) {
+                community_cancellable.cancel ();
+            }
+            community_cancellable = new GLib.Cancellable ();
+            var cancellable = community_cancellable;
+
+            if (community_spinner != null) {
+                community_spinner.visible = true;
+                community_spinner.start ();
+            }
+
+            Imladris.Plugins.PluginManager.get_default ().fetch_community_registry_async.begin (force_refresh, cancellable, (o, res) => {
+                if (cancellable.is_cancelled ()) return;
+                if (community_spinner != null) {
+                    community_spinner.stop ();
+                    community_spinner.visible = false;
+                }
+                try {
+                    community_entries = Imladris.Plugins.PluginManager.get_default ().fetch_community_registry_async.end (res);
+                    render_community_plugins ();
+                } catch (GLib.Error err) {
+                    render_community_error (err.message);
+                }
+            });
+        }
+
+        private void clear_community_rows () {
+            if (community_group == null) return;
+            foreach (var w in community_rows) {
+                community_group.remove (w);
+            }
+            community_rows.clear ();
+        }
+
+        private void render_community_error (string err_msg) {
+            if (community_group == null) return;
+            clear_community_rows ();
+            var err_row = new Adw.ActionRow () {
+                title = "Could not load Community Plugins registry",
+                subtitle = GLib.Markup.escape_text (err_msg)
+            };
+            err_row.add_prefix (new Gtk.Image.from_icon_name ("network-offline-symbolic"));
+            var retry_btn = new Gtk.Button.with_label ("Retry") {
+                valign = Gtk.Align.CENTER
+            };
+            retry_btn.clicked.connect (() => {
+                load_community_registry (true);
+            });
+            err_row.add_suffix (retry_btn);
+            community_rows.add (err_row);
+            community_group.add (err_row);
+        }
+
+        private void render_community_plugins () {
+            if (community_group == null) return;
+            clear_community_rows ();
+
+            string query = (community_search_entry != null) ? community_search_entry.text : "";
+            var pm = Imladris.Plugins.PluginManager.get_default ();
+
+            int matched = 0;
+            foreach (var entry in community_entries) {
+                if (!entry.matches_query (query)) {
+                    continue;
+                }
+                matched++;
+                string icon_name = (entry.icon.length > 0) ? entry.icon : "application-x-addon-symbolic";
+                var exp_row = new Adw.ExpanderRow () {
+                    title = GLib.Markup.escape_text (entry.name),
+                    subtitle = @"v$(GLib.Markup.escape_text (entry.version)) by $(GLib.Markup.escape_text (entry.author)) • $(GLib.Markup.escape_text (entry.language)) • $(GLib.Markup.escape_text (entry.category)) • $(GLib.Markup.escape_text (entry.license))"
+                };
+                exp_row.add_prefix (new Gtk.Image.from_icon_name (icon_name));
+
+                bool already_installed = pm.plugins.has_key (entry.id);
+                string btn_label = "Install";
+                if (already_installed) {
+                    var installed_inst = pm.plugins.get (entry.id);
+                    btn_label = (installed_inst.manifest.version != entry.version) ? "Update" : "Installed";
+                }
+
+                var install_btn = new Gtk.Button.with_label (btn_label) {
+                    valign = Gtk.Align.CENTER
+                };
+                if (btn_label == "Installed") {
+                    install_btn.sensitive = false;
+                } else {
+                    install_btn.add_css_class ("suggested-action");
+                }
+
+                var captured_entry = entry;
+                install_btn.clicked.connect (() => {
+                    install_btn.sensitive = false;
+                    install_btn.label = "Installing…";
+                    var parent_win = this.root as Gtk.Window;
+                    pm.install_community_plugin_async.begin (captured_entry, parent_win, null, (obj, res) => {
+                        try {
+                            bool ok = pm.install_community_plugin_async.end (res);
+                            if (!ok) {
+                                install_btn.label = btn_label;
+                                install_btn.sensitive = true;
+                            }
+                        } catch (GLib.Error err) {
+                            install_btn.label = btn_label;
+                            install_btn.sensitive = true;
+                            var alert_parent = this.root as Gtk.Window ?? parent_win;
+                            if (alert_parent != null) {
+                                var err_alert = new Adw.AlertDialog ("Community Install Failed", err.message);
+                                err_alert.add_response ("ok", "OK");
+                                err_alert.present (alert_parent);
+                            }
+                        }
+                    });
+                });
+                exp_row.add_suffix (install_btn);
+
+                var desc_row = new Adw.ActionRow () {
+                    title = "Description",
+                    subtitle = GLib.Markup.escape_text (entry.description)
+                };
+                exp_row.add_row (desc_row);
+
+                var perm_row = new Adw.ActionRow () {
+                    title = "Requested Permissions",
+                    subtitle = GLib.Markup.escape_text (entry.format_permissions_summary ())
+                };
+                exp_row.add_row (perm_row);
+
+                if (entry.tags.size > 0 || entry.homepage.length > 0) {
+                    string tags_str = entry.tags.size > 0 ? string.joinv (", ", entry.tags.to_array ()) : "Community Extension";
+                    var meta_row = new Adw.ActionRow () {
+                        title = "Tags",
+                        subtitle = GLib.Markup.escape_text (tags_str)
+                    };
+                    if (entry.homepage.length > 0) {
+                        var src_btn = new Gtk.Button.with_label ("View Source") {
+                            valign = Gtk.Align.CENTER
+                        };
+                        src_btn.add_css_class ("flat");
+                        string hp_url = entry.homepage;
+                        src_btn.clicked.connect (() => {
+                            var launcher = new Gtk.UriLauncher (hp_url);
+                            launcher.launch.begin (this.root as Gtk.Window, null, null);
+                        });
+                        meta_row.add_suffix (src_btn);
+                    }
+                    exp_row.add_row (meta_row);
+                }
+
+                community_rows.add (exp_row);
+                community_group.add (exp_row);
+            }
+
+            if (matched == 0) {
+                var empty_row = new Adw.ActionRow () {
+                    title = (community_entries.size == 0) ? "Loading community plugins…" : "No matching community plugins",
+                    subtitle = (community_entries.size == 0)
+                        ? "Fetching community-plugins/registry.json from GitHub."
+                        : "Try a different keyword or click Refresh to update the catalog."
+                };
+                community_rows.add (empty_row);
+                community_group.add (empty_row);
+            }
         }
 
         private Gee.ArrayList<Gtk.Widget> plugin_rows = new Gee.ArrayList<Gtk.Widget> ();

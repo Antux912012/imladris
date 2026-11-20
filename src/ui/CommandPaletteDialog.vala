@@ -84,6 +84,7 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Switch Physics: PuTTY Instant (0ms)", "Set zero-latency instantaneous state snap", "utilities-terminal-symbolic", "physics.putty", "Hardware"));
             all_items.add (new CommandPaletteItem ("Switch Physics: Libadwaita Smooth (180ms)", "Set standard GNOME Libadwaita smooth easing", "emblem-system-symbolic", "physics.adwaita", "Hardware"));
             all_items.add (new CommandPaletteItem ("Toggle Steady Cursor", "Toggle blinking versus non-blinking solid terminal caret", "edit-paste-symbolic", "physics.cursor", "Hardware"));
+            all_items.add (new CommandPaletteItem ("Browse Community Plugins…", "Search and install community TypeScript/JavaScript plugins", "application-x-addon-symbolic", "ext.browse", "General"));
             all_items.add (new CommandPaletteItem ("Open Application Preferences", "Configure GPU backend, appearance, and AI credentials (Ctrl+,)", "preferences-system-symbolic", "app.preferences", "General"));
             all_items.add (new CommandPaletteItem ("Feature Tour...", "Walk through Imladris scientific workbench capabilities", "help-about-symbolic", "app.show_tour", "General"));
             all_items.add (new CommandPaletteItem ("Keyboard Shortcuts", "View all editor, execution, and scientific shortcuts (Ctrl+?)", "preferences-desktop-keyboard-shortcuts-symbolic", "app.shortcuts", "General"));
@@ -229,7 +230,13 @@ namespace Imladris.UI {
         private void dispatch_action (string action_id) {
             var sm = Core.SettingsManager.get_default ();
 
-            if (action_id == "physics.alacritty") {
+            if (action_id == "ext.browse") {
+                if (parent_window != null) {
+                    var prefs = new PreferencesDialog ();
+                    prefs.open_extensions_page ();
+                    prefs.present (parent_window);
+                }
+            } else if (action_id == "physics.alacritty") {
                 sm.animation_physics = Core.AnimationPhysicsMode.ALACRITTY_CRISP;
                 if (parent_window != null) parent_window.show_toast ("Switched to Alacritty Crisp Physics (65ms)");
             } else if (action_id == "physics.putty") {

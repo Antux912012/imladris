@@ -1,0 +1,10 @@
+{
+  "id": "citation-audit",
+  "name": "Citation & Cross-Ref Auditor",
+  "version": "1.0.0",
+  "author": "Imladris Community",
+  "description": "Audits the active Quarto/Markdown/LaTeX manuscript for @citekey citations and @fig-/@tbl-/@sec- cross-references in a clean summary dialog.",
+  "license": "Apache-2.0",
+  "icon": "accessories-dictionary-symbolic",
+  "permissions": ["editor", "ui"]
+}

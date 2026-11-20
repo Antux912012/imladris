@@ -3,25 +3,18 @@
 
 /* PluginManager.vala
  *
- * Copyright 2026 Antonio Antux
+ * Copyright 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
 using GLib;
 using JSC;
 using Gee;
+using Soup;
 
 namespace Imladris.Plugins {
 
@@ -531,7 +524,7 @@ namespace Imladris.Plugins {
   "version": "1.0.0",
   "author": "Imladris Community",
   "description": "Calculates words, characters, lines and reading time stats in the active document.",
-  "license": "GPL-3.0-or-later",
+  "license": "Apache-2.0",
   "icon": "format-text-bold-symbolic",
   "permissions": ["editor"]
 }""";
@@ -568,7 +561,7 @@ function onunload() {
   "version": "1.0.0",
   "author": "Imladris Community",
   "description": "Inserts current ISO timestamp comment at cursor position.",
-  "license": "GPL-3.0-or-later",
+  "license": "Apache-2.0",
   "icon": "alarm-symbolic",
   "permissions": ["editor"]
 }""";
@@ -1081,6 +1074,344 @@ function onunload() {
             } finally {
                 try { enumerator.close (); } catch (GLib.Error e) {}
             }
+        }
+
+        public const string COMMUNITY_RAW_BASE_URL = "https://raw.githubusercontent.com/Antux912012/imladris/main/";
+        public const string COMMUNITY_REGISTRY_URL = "https://raw.githubusercontent.com/Antux912012/imladris/main/community-plugins/registry.json";
+
+        private Soup.Session? community_session = null;
+
+        private Soup.Session get_community_session () {
+            if (community_session == null) {
+                community_session = new Soup.Session () {
+                    timeout = 20,
+                    user_agent = "Imladris/0.40.0 (https://github.com/Antux912012/imladris)"
+                };
+            }
+            return community_session;
+        }
+
+        private string get_registry_cache_path () {
+            return Path.build_filename (Environment.get_user_cache_dir (), "imladris", "community_plugins_registry.json");
+        }
+
+        private async GLib.Bytes download_https_bytes_async (string url, GLib.Cancellable? cancellable = null) throws GLib.Error {
+            if (!url.has_prefix ("https://")) {
+                throw new IOError.INVALID_ARGUMENT (@"Refusing non-HTTPS plugin URL: $url");
+            }
+            var msg = new Soup.Message ("GET", url);
+            msg.request_headers.append ("Accept", "application/json, text/plain, application/octet-stream, */*");
+            var bytes = yield get_community_session ().send_and_read_async (msg, Priority.DEFAULT, cancellable);
+            if (msg.status_code != 200 || bytes == null) {
+                throw new IOError.FAILED (@"HTTP $(msg.status_code) while fetching $url");
+            }
+            return bytes;
+        }
+
+        public async ArrayList<CommunityPluginEntry> fetch_community_registry_async (
+            bool force_refresh = false,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            string cache_path = get_registry_cache_path ();
+            string? raw_json = null;
+
+            try {
+                var bytes = yield download_https_bytes_async (COMMUNITY_REGISTRY_URL, cancellable);
+                raw_json = Core.PlatformUtils.bytes_to_string (bytes);
+                if (raw_json != null && raw_json.strip ().length > 0) {
+                    try {
+                        var cache_dir = File.new_for_path (Path.get_dirname (cache_path));
+                        if (!cache_dir.query_exists ()) {
+                            cache_dir.make_directory_with_parents ();
+                        }
+                        FileUtils.set_contents (cache_path, raw_json);
+                    } catch (GLib.Error ce) {
+                        debug ("Could not cache community plugin registry: %s", ce.message);
+                    }
+                }
+            } catch (GLib.Error net_err) {
+                if (!force_refresh && FileUtils.test (cache_path, FileTest.EXISTS)) {
+                    try {
+                        FileUtils.get_contents (cache_path, out raw_json);
+                    } catch (GLib.Error re) {}
+                }
+                if (raw_json == null || raw_json.strip ().length == 0) {
+                    string local_repo_reg = Path.build_filename (Environment.get_current_dir (), "community-plugins", "registry.json");
+                    if (FileUtils.test (local_repo_reg, FileTest.EXISTS)) {
+                        try {
+                            FileUtils.get_contents (local_repo_reg, out raw_json);
+                        } catch (GLib.Error le) {}
+                    }
+                }
+                if (raw_json == null || raw_json.strip ().length == 0) {
+                    throw net_err;
+                }
+            }
+
+            return CommunityPluginEntry.parse_registry_json (raw_json ?? "");
+        }
+
+        public async bool install_community_plugin_async (
+            CommunityPluginEntry entry,
+            Gtk.Window? parent_window,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            if (!PluginManifest.is_valid_plugin_id (entry.id)) {
+                throw new IOError.INVALID_DATA (@"Invalid community plugin ID: $(entry.id)");
+            }
+
+            // Always show permission consent dialog before downloading or installing executable JS
+            if (parent_window != null) {
+                var alert = new Adw.AlertDialog (
+                    @"Install Community Plugin: $(entry.name)",
+                    @"Author: $(entry.author)\n" +
+                    @"Version: $(entry.version) ($(entry.language))\n" +
+                    @"License: $(entry.license)\n\n" +
+                    @"Description:\n$(entry.description)\n\n" +
+                    @"Requested Permissions:\n" + format_permissions_list (entry.permissions)
+                );
+                alert.add_response ("cancel", "Cancel");
+                alert.add_response ("install", "Download & Enable");
+                alert.set_response_appearance ("install", Adw.ResponseAppearance.SUGGESTED);
+                alert.set_default_response ("install");
+                alert.set_close_response ("cancel");
+
+                string response = yield alert.choose (parent_window, null);
+                if (response != "install") {
+                    return false;
+                }
+            }
+
+            // Option A: Archive URL (.implugin / .zip)
+            if (entry.archive_url.length > 0) {
+                string tmp_dir = DirUtils.make_tmp ("imladris_community_dl_XXXXXX");
+                try {
+                    var archive_bytes = yield download_https_bytes_async (entry.archive_url, cancellable);
+                    string local_zip = Path.build_filename (tmp_dir, @"$(entry.id).implugin");
+                    FileUtils.set_data (local_zip, archive_bytes.get_data ());
+                    bool ok = yield import_plugin_archive (local_zip, parent_window);
+                    Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
+                    return ok;
+                } catch (GLib.Error e) {
+                    Core.PlatformUtils.delete_directory_recursive (File.new_for_path (tmp_dir));
+                    throw e;
+                }
+            }
+
+            // Option B: Direct repository files (manifest.json + main.js + optional assets)
+            if (entry.manifest_url.length == 0 || entry.main_url.length == 0) {
+                throw new IOError.INVALID_DATA (@"Community plugin '$(entry.id)' is missing manifest/main download URLs.");
+            }
+
+            var manifest_bytes = yield download_https_bytes_async (entry.manifest_url, cancellable);
+            string manifest_json = Core.PlatformUtils.bytes_to_string (manifest_bytes);
+            var parsed_manifest = PluginManifest.from_json (manifest_json);
+            if (parsed_manifest == null || parsed_manifest.id != entry.id) {
+                throw new IOError.INVALID_DATA (@"Downloaded manifest.json for '$(entry.id)' is invalid or ID mismatch.");
+            }
+
+            var main_bytes = yield download_https_bytes_async (entry.main_url, cancellable);
+            string main_js = Core.PlatformUtils.bytes_to_string (main_bytes);
+            if (main_js.strip ().length == 0) {
+                throw new IOError.INVALID_DATA (@"Downloaded main.js for '$(entry.id)' is empty.");
+            }
+
+            ensure_directories ();
+            string target_dir = Path.build_filename (user_plugins_dir, parsed_manifest.id);
+            var target_file = File.new_for_path (target_dir);
+            if (target_file.query_exists ()) {
+                if (plugins.has_key (parsed_manifest.id)) {
+                    disable_plugin (parsed_manifest.id);
+                }
+                Core.PlatformUtils.delete_directory_recursive (target_file);
+            }
+            target_file.make_directory_with_parents ();
+
+            FileUtils.set_contents (Path.build_filename (target_dir, "manifest.json"), manifest_json);
+            FileUtils.set_contents (Path.build_filename (target_dir, "main.js"), main_js);
+
+            foreach (var asset_entry in entry.asset_urls.entries) {
+                string rel_path = asset_entry.key;
+                string asset_url = asset_entry.value;
+                if (rel_path.has_prefix ("/") || rel_path.contains ("..")) {
+                    continue;
+                }
+                var a_bytes = yield download_https_bytes_async (asset_url, cancellable);
+                string full_asset_path = Path.build_filename (target_dir, rel_path);
+                var parent_dir = File.new_for_path (Path.get_dirname (full_asset_path));
+                if (!parent_dir.query_exists ()) {
+                    parent_dir.make_directory_with_parents ();
+                }
+                FileUtils.set_data (full_asset_path, a_bytes.get_data ());
+            }
+
+            var inst = load_plugin_from_directory (target_dir);
+            if (inst != null) {
+                enable_plugin (parsed_manifest.id);
+                show_toast (@"Community plugin '$(parsed_manifest.name)' installed and activated!");
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Metadata record for a plugin published in community-plugins/registry.json.
+     */
+    public class CommunityPluginEntry : GLib.Object {
+        public string id { get; set; default = ""; }
+        public string name { get; set; default = ""; }
+        public string version { get; set; default = "1.0.0"; }
+        public string author { get; set; default = "Community"; }
+        public string description { get; set; default = ""; }
+        public string license { get; set; default = "Apache-2.0"; }
+        public string icon { get; set; default = "application-x-addon-symbolic"; }
+        public string category { get; set; default = "General"; }
+        public string language { get; set; default = "JavaScript"; }
+        public string homepage { get; set; default = ""; }
+        public string manifest_url { get; set; default = ""; }
+        public string main_url { get; set; default = ""; }
+        public string archive_url { get; set; default = ""; }
+        public ArrayList<string> tags { get; set; default = new ArrayList<string> (); }
+        public ArrayList<string> permissions { get; set; default = new ArrayList<string> (); }
+        public HashMap<string, string> asset_urls { get; set; default = new HashMap<string, string> (); }
+
+        public bool matches_query (string raw_query) {
+            string q = raw_query.strip ().down ();
+            if (q.length == 0) {
+                return true;
+            }
+
+            var haystack = new StringBuilder ();
+            haystack.append (id.down ());
+            haystack.append_c (' ');
+            haystack.append (name.down ());
+            haystack.append_c (' ');
+            haystack.append (author.down ());
+            haystack.append_c (' ');
+            haystack.append (description.down ());
+            haystack.append_c (' ');
+            haystack.append (category.down ());
+            haystack.append_c (' ');
+            haystack.append (language.down ());
+            foreach (var t in tags) {
+                haystack.append_c (' ');
+                haystack.append (t.down ());
+            }
+            string hay = haystack.str;
+
+            foreach (string token in q.split (" ")) {
+                string tk = token.strip ();
+                if (tk.length > 0 && !hay.contains (tk)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public string format_permissions_summary () {
+            var tmp = new PluginManifest ();
+            tmp.permissions = this.permissions;
+            return tmp.format_permissions_summary ();
+        }
+
+        private static string resolve_repo_url (string raw) {
+            string s = raw.strip ();
+            if (s.length == 0) return "";
+            if (s.has_prefix ("https://")) return s;
+            if (s.has_prefix ("http://")) return ""; // Reject insecure HTTP
+            while (s.has_prefix ("/")) {
+                s = s.substring (1);
+            }
+            if (s.contains ("..")) return "";
+            return PluginManager.COMMUNITY_RAW_BASE_URL + s;
+        }
+
+        public static ArrayList<CommunityPluginEntry> parse_registry_json (string json_content) {
+            var results = new ArrayList<CommunityPluginEntry> ();
+            if (json_content.strip ().length == 0) {
+                return results;
+            }
+            try {
+                var parser = new Json.Parser ();
+                parser.load_from_data (json_content);
+                var root = parser.get_root ();
+                if (root == null || root.get_node_type () != Json.NodeType.OBJECT) {
+                    return results;
+                }
+                var root_obj = root.get_object ();
+                if (!root_obj.has_member ("plugins") || root_obj.get_member ("plugins").get_node_type () != Json.NodeType.ARRAY) {
+                    return results;
+                }
+                var arr = root_obj.get_array_member ("plugins");
+                for (uint i = 0; i < arr.get_length (); i++) {
+                    if (arr.get_element (i).get_node_type () != Json.NodeType.OBJECT) continue;
+                    var obj = arr.get_object_element (i);
+                    string id = obj.has_member ("id") ? (obj.get_string_member ("id") ?? "").strip () : "";
+                    if (!PluginManifest.is_valid_plugin_id (id)) continue;
+
+                    var e = new CommunityPluginEntry ();
+                    e.id = id;
+                    e.name = obj.has_member ("name") ? (obj.get_string_member ("name") ?? id) : id;
+                    e.version = obj.has_member ("version") ? (obj.get_string_member ("version") ?? "1.0.0") : "1.0.0";
+                    e.author = obj.has_member ("author") ? (obj.get_string_member ("author") ?? "Community") : "Community";
+                    e.description = obj.has_member ("description") ? (obj.get_string_member ("description") ?? "") : "";
+                    e.license = obj.has_member ("license") ? (obj.get_string_member ("license") ?? "Apache-2.0") : "Apache-2.0";
+                    e.icon = obj.has_member ("icon") ? (obj.get_string_member ("icon") ?? "application-x-addon-symbolic") : "application-x-addon-symbolic";
+                    e.category = obj.has_member ("category") ? (obj.get_string_member ("category") ?? "General") : "General";
+                    e.language = obj.has_member ("language") ? (obj.get_string_member ("language") ?? "JavaScript") : "JavaScript";
+                    if (obj.has_member ("homepage")) {
+                        string hp = (obj.get_string_member ("homepage") ?? "").strip ();
+                        if (hp.has_prefix ("https://")) {
+                            e.homepage = hp;
+                        }
+                    }
+                    if (obj.has_member ("archive_url")) {
+                        e.archive_url = resolve_repo_url (obj.get_string_member ("archive_url") ?? "");
+                    }
+                    if (obj.has_member ("files") && obj.get_member ("files").get_node_type () == Json.NodeType.OBJECT) {
+                        var files_obj = obj.get_object_member ("files");
+                        if (files_obj.has_member ("manifest")) {
+                            e.manifest_url = resolve_repo_url (files_obj.get_string_member ("manifest") ?? "");
+                        }
+                        if (files_obj.has_member ("main")) {
+                            e.main_url = resolve_repo_url (files_obj.get_string_member ("main") ?? "");
+                        }
+                        if (files_obj.has_member ("assets") && files_obj.get_member ("assets").get_node_type () == Json.NodeType.OBJECT) {
+                            var assets_obj = files_obj.get_object_member ("assets");
+                            assets_obj.foreach_member ((o, member_name, node) => {
+                                if (node.get_node_type () == Json.NodeType.VALUE) {
+                                    string resolved = resolve_repo_url (node.get_string () ?? "");
+                                    if (resolved.length > 0 && !member_name.has_prefix ("/") && !member_name.contains ("..")) {
+                                        e.asset_urls.set (member_name, resolved);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    if (obj.has_member ("tags") && obj.get_member ("tags").get_node_type () == Json.NodeType.ARRAY) {
+                        var tags_arr = obj.get_array_member ("tags");
+                        for (uint ti = 0; ti < tags_arr.get_length (); ti++) {
+                            string? tv = tags_arr.get_string_element (ti);
+                            if (tv != null && tv.strip ().length > 0) e.tags.add (tv.strip ());
+                        }
+                    }
+                    if (obj.has_member ("permissions") && obj.get_member ("permissions").get_node_type () == Json.NodeType.ARRAY) {
+                        var perms_arr = obj.get_array_member ("permissions");
+                        for (uint pi = 0; pi < perms_arr.get_length (); pi++) {
+                            string? pv = perms_arr.get_string_element (pi);
+                            if (pv != null && pv.strip ().length > 0) e.permissions.add (pv.strip ());
+                        }
+                    }
+
+                    if (e.archive_url.length > 0 || (e.manifest_url.length > 0 && e.main_url.length > 0)) {
+                        results.add (e);
+                    }
+                }
+            } catch (GLib.Error e) {
+                debug ("Failed to parse community plugin registry: %s", e.message);
+            }
+            return results;
         }
     }
 }
