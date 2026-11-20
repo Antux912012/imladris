@@ -8,11 +8,13 @@ All notable changes to **Imladris** are documented in this file.
 - **Apache-2.0 Hybrid Open-Core Licensing**: Relicensed Imladris Core Desktop Studio from `GPL-3.0-or-later` to **Apache License 2.0 (`Apache-2.0`)** with explicit patent protection (`LICENSE`, `NOTICE`), clean `JSC.Context` / `McpServer` extension boundaries, and Commercial Enterprise Pack readiness for pharma, biotech, and regulated R&D teams. Updated About dialog (`Gtk.License.APACHE_2_0`), AppStream metadata, `README.md`, landing page (`docs/index.html`), and Wiki (`License-and-Enterprise-Policy.md`).
 
 ### Added
+- **Community Plugins Registry & In-App Marketplace (`community-plugins/`)**: Added `community-plugins/registry.json`, TypeScript ambient declarations (`community-plugins/types/imladris.d.ts`), 3 starter TypeScript/JavaScript plugins, live search & 1-click installer in **Preferences → Extensions** (with HTTPS validation and permission consent dialogs), and reworked the Plugin Development Wiki.
 - **VS Code & RStudio-Grade Autocompletion**: Implemented live keystroke `refilter()`, `GtkSource.Completion.fuzzy_highlight()`, Markdown/Quarto prose snippets & live document cross-references (`@fig-*`, `@tbl-*`, `@sec-*`, `@eq-*`), HTML5 tag & smart `</tag>` completion, R `library()` package & named function argument completions, Python pandas DataFrame methods, live REPL DataFrame column discovery (`$` / `.`), paired `BackSpace` deletion, and triple-backtick chunk completion.
 - **Quick Table Picker Popover (`Ctrl+Alt+T`)**: Cursor-anchored 8×8 hover grid and custom Rows/Cols dialog (`PopoverFactory.create_table_picker_popover`) with format-aware Markdown, HTML, LaTeX, and RTF table generation from the toolbar, editor context menu, and Command Palette.
 
 ### Fixed
 - **Flatpak WebKitGTK 6.0 Live Preview**: Fixed `WebKit.WebContext.get_default()` vs. `JSC.Context` initialization ordering in `Application` and `PluginManager` so live preview renders reliably in Flatpak sandboxes.
+- **Deep Codebase Audit (Memory, GUI Glitches, Performance & Zero Warnings)**: Fixed Command Palette `win.insert_table` & bridge snippet wiring, RTF starter template & pending typing styles, RTF Undo/Redo/Clipboard/Heading routing, NativePreview un-hide refresh, color palette swatch painting, `Adw.ButtonContent` inline buttons, `RStudioDockGrid` crosshair drag sync, `DocumentPage`/dock/theme/datagrid reference cycles and singleton signal leaks, `Application.shutdown()` pooled R/Python & Shiny cleanup, `CodeIntelliSenseEngine`/`NativePreviewView` regex caching and Pango markup safety, and eliminated all Vala compiler warnings (`Ok: 10, Fail: 0`).
 
 ## [0.33.1] - 2026-11-19
 
