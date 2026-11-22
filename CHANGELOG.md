@@ -2,6 +2,17 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.42.0] - 2026-11-22
+
+### Added
+- **Elrond AI Hardware Auto-Optimizer:** Added `ElrondHardwareProbe` (`llama-server --list-devices` async probing, `/proc/meminfo` & CPU core detection, 5-tier NVIDIA/AMD/Intel Arc/iGPU/CPU classification), `ElrondOptimizer` flag profiles, `elrond-auto-optimize` and `elrond-compute-mode` GSettings keys, 15-second `/health` crash recovery with automatic CPU fallback + `Adw.Toast`, and an active hardware profile badge in Preferences.
+- **Flatpak Host Bridge & Kernel Routing (`HostBridge`, `EnvDiscovery`, `ExecutionRouter`):** Added `--watch-bus` `flatpak-spawn --host` abstraction, single-shot host probe for `.venv`, `uv`, `~/.conda/environments.txt`, `renv`, multi-version `rig` R (`/opt/R/*/bin/Rscript`), and Quarto, plus Quarto/R/Python kernel selection, **Rescan Environments**, and a Host/Sandbox scope toggle in the Environment panel.
+- **Redesigned Elrond AI Chat Panel (`ElrondChatPanel`, `ElrondChatWidgets`, `elrond-chat.css`):** Native `Adw.ToolbarView` with `.flat` `Adw.HeaderBar`, searchable session popover, `Adw.StatusPage` empty state with starter pills, floating `ElrondComposer` with removable context chips, `@` attachment popover, model/hardware pill, context usage meter, circular Send/Stop button, collapsible `Gtk.Expander` thinking row, `30ms` throttled streaming Markdown, read-only `GtkSource.View` code blocks, and smart auto-scroll.
+
+### Changed
+- **Latest R & CRAN Parity:** Unpinned `r-base` in `ToolchainManager` (`r_ver = "latest"`) so managed R installations track the latest R and CRAN releases 1-to-1.
+- **Deep Codebase Audit & Optimization:** Consolidated `bytes_to_string` and `flatpak-spawn` wrappers onto `PlatformUtils`/`HostBridge`, cached `GLib.Regex` instances in `AiClient`, `RtfCodec`, `ExportService`, `DoiBibService`, `CitationCompletionProvider`, `MathChemEngine`, and `ElrondHardwareProbe`, and added explicit HTTP timeouts on `PackageIndexCache`.
+
 ## [0.41.0] - 2026-11-22
 
 ### Added

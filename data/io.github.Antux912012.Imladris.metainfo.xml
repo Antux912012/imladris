@@ -75,6 +75,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.42.0" date="2026-11-22" type="stable">
+      <description>
+        <p>Release 0.42.0 introduces Elrond AI Hardware Auto-Optimization, the Flatpak Host Bridge with Quarto/R/Python kernel routing, and a redesigned native GTK4/Libadwaita Elrond AI chat panel:</p>
+        <ul>
+          <li>Elrond AI Hardware Auto-Optimizer: Automatic 5-tier Vulkan GPU/iGPU/CPU probing via llama-server --list-devices, tailored launch profiles, 15s /health startup monitoring with automatic CPU fallback, and Preferences profile badge.</li>
+          <li>Flatpak Host Bridge &amp; Kernel Routing: Added HostBridge (--watch-bus orphan prevention), single-shot EnvDiscovery (uv, Conda, venv, multi-version rig R, Quarto), ExecutionRouter with Quarto/R/Python kernel selector, Host/Sandbox scope toggle, and latest unpinned R/CRAN support.</li>
+          <li>Redesigned Elrond AI Chat UI: Native Adw.ToolbarView layout, searchable past sessions, Adw.StatusPage empty state, tactile floating composer with context chips and @ mentions, 30ms throttled streaming Markdown, collapsible reasoning row, and syntax-highlighted GtkSourceView code blocks.</li>
+          <li>Codebase Audit &amp; Optimization: Unified Flatpak/bytes helpers, cached compiled regular expressions, and added HTTP session timeouts.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.41.0" date="2026-11-22" type="stable">
       <description>
         <p>Release 0.41.0 improves MCP automation, offline LaTeX and Quarto builds, scientific toolchains, and enterprise security controls:</p>

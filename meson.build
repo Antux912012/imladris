@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 project('imladris', 'vala', 'c',
-  version: '0.41.0',
+  version: '0.42.0',
   default_options: ['warning_level=1']
 )
 
@@ -102,6 +102,7 @@ sources = files(
   'src/ui/DataGridViewer.vala',
   'src/ui/EnvironmentController.vala',
   'src/ui/ElrondChatPanel.vala',
+  'src/ui/ElrondChatWidgets.vala',
   'src/ui/LayoutSerializer.vala',
   'src/ui/WorkspaceDockManager.vala',
   'src/ui/new_project_dialog.vala',

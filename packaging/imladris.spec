@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.41.0
+Version:        0.42.0
 Release:        1%{?dist}
 Summary:        Native scientific notebook studio for Quarto, R, Python, and Jupyter
 
@@ -91,6 +91,12 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Sun Nov 22 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.42.0-1
+- Release 0.42.0: Elrond AI Hardware Auto-Optimizer, Flatpak Host Bridge & Kernel Routing, and Redesigned Native Chat UI:
+  * Elrond AI Hardware Auto-Optimizer: Added ElrondHardwareProbe (llama-server --list-devices, 5-tier GPU/iGPU/CPU classification), ElrondOptimizer flag profiles, elrond-auto-optimize/elrond-compute-mode GSettings, 15s /health monitoring with automatic CPU fallback and toast notice, and active hardware profile badge in Preferences.
+  * Flatpak Host Bridge & Kernel Routing: Added HostBridge (flatpak-spawn --host --watch-bus), single-shot EnvDiscovery (uv, Conda, venv, rig/Host R, Quarto), ExecutionRouter with Quarto/R/Python kernel selector and Host/Sandbox scope toggle, and unpinned latest R/CRAN toolchain support.
+  * Redesigned Elrond AI Chat Panel: Native Adw.ToolbarView layout, searchable session popover, Adw.StatusPage empty state, tactile ElrondComposer with removable context chips and @ attachment, 30ms throttled streaming Markdown, collapsible thinking row, and GtkSource.View code blocks.
+
 * Sat Nov 14 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.25.0-1
 - Release 0.25.0: Free-Tier AI APIs, Automatic Quota Failover, GitHub Copilot OAuth, Positron-Style Direct Editing & Security Hardening:
   * Functions Added: Free-tier AI providers (Groq, Cerebras, OpenRouter Free, GitHub Models, FreeLLMAPI Local) with HTTP 429 automatic failover and privacy opt-in (free_api_consent_accepted).

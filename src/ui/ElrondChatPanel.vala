@@ -8,61 +8,62 @@ using Imladris.AI;
 
 namespace Imladris.UI {
 
-    /**
-     * ElrondChatMessage
-     * Represents a single prompt or AI response in the chat timeline.
-     */
-    public class ElrondChatMessage : GLib.Object {
-        public string sender { get; construct set; } // "user" or "assistant"
-        public string text { get; construct set; }
-        public int64 timestamp { get; construct set; }
+    public class ElrondChatSession : GLib.Object {
+        public string title { owned get; set; default = "New Chat"; }
+        public Gee.ArrayList<ElrondChatTurn> turns { get; private set; }
 
-        public ElrondChatMessage (string sender, string text) {
-            Object (
-                sender: sender,
-                text: text,
-                timestamp: GLib.get_real_time ()
-            );
+        public ElrondChatSession (string title = "New Chat") {
+            this.title = title;
+            this.turns = new Gee.ArrayList<ElrondChatTurn> ();
         }
     }
 
     /**
      * ElrondChatPanel
-     * Integrated Elrond Local AI Copilot Chat Tab.
-     * Features context toggle chips, interactive code blocks,
-     * "Insert at Cursor", and "Run in Console".
+     *
+     * Native GTK4 / Libadwaita Elrond AI Side Panel with Adw.ToolbarView root,
+     * searchable session popover, Adw.StatusPage empty state, smart auto-scroll,
+     * tactile ElrondComposer, throttled 30ms streaming Markdown, collapsible
+     * reasoning row, and native GtkSource.View code blocks.
      */
-    public class ElrondChatPanel : Gtk.Box {
+    public class ElrondChatPanel : Adw.Bin {
 
-        private Gtk.ListBox message_list;
+        private static bool css_loaded = false;
+        private static GLib.Regex? cached_bold_rx = null;
+        private static GLib.Regex? cached_code_rx = null;
+
+        private Adw.ToolbarView toolbar_view;
+        private Gtk.MenuButton session_btn;
+        private Gtk.SearchEntry session_search;
+        private Gtk.ListBox session_list;
+        private Gtk.Popover session_popover;
+
+        private Gtk.Stack content_stack;
         private Gtk.ScrolledWindow scroller;
-        private Gtk.TextView prompt_input;
-        private Gtk.Button send_btn;
-        private Gtk.Button stop_btn;
-        private Gtk.Spinner generating_spinner;
-        private Gtk.Label status_indicator;
-
-        private Gtk.ToggleButton chip_active_file;
-        private Gtk.ToggleButton chip_selection;
-        private Gtk.ToggleButton chip_dataframes;
-        private Gtk.ToggleButton chip_last_error;
-        private Gtk.Button provider_pill_btn;
+        private Gtk.Box message_list;
+        private Gtk.Button scroll_bottom_btn;
+        private ElrondComposer composer;
 
         private unowned DocumentPage doc_page;
         private unowned PersistentPanelRegistry panel_reg;
         private unowned Window? parent_window;
 
         private Cancellable? cancellable = null;
-        private Gee.ArrayList<ElrondChatTurn> conversation_history = new Gee.ArrayList<ElrondChatTurn> ();
+        private Gee.ArrayList<ElrondChatSession> sessions = new Gee.ArrayList<ElrondChatSession> ();
+        private ElrondChatSession active_session;
         private bool is_busy = false;
+        private bool auto_scroll_paused = false;
         private uint scroll_idle_id = 0;
-        private static GLib.Regex? cached_bold_rx = null;
-        private static GLib.Regex? cached_code_rx = null;
+        private uint stream_throttle_id = 0;
 
         public override void dispose () {
             if (scroll_idle_id != 0) {
                 GLib.Source.remove (scroll_idle_id);
                 scroll_idle_id = 0;
+            }
+            if (stream_throttle_id != 0) {
+                GLib.Source.remove (stream_throttle_id);
+                stream_throttle_id = 0;
             }
             if (cancellable != null) {
                 cancellable.cancel ();
@@ -72,7 +73,6 @@ namespace Imladris.UI {
         }
 
         public ElrondChatPanel (DocumentPage page, PersistentPanelRegistry reg, Window? win) {
-            Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
             this.doc_page = page;
             this.panel_reg = reg;
             this.parent_window = win;
@@ -80,188 +80,173 @@ namespace Imladris.UI {
             this.vexpand = true;
             this.add_css_class ("elrond-chat-panel");
 
-            setup_header_bar ();
-            setup_context_chips ();
-            setup_message_stream ();
-            setup_input_bar ();
+            ensure_css_loaded ();
 
-            add_welcome_message ();
-        }
+            active_session = new ElrondChatSession ("Current Session");
+            sessions.add (active_session);
 
-        private void setup_header_bar () {
-            var header = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
-                margin_top = 4,
-                margin_bottom = 4,
-                margin_start = 8,
-                margin_end = 8
-            };
-            header.add_css_class ("dock-subtoolbar");
+            toolbar_view = new Adw.ToolbarView ();
+            toolbar_view.add_top_bar (build_top_bar ());
+            toolbar_view.set_content (build_center_stack ());
 
-            var icon = new Gtk.Image.from_icon_name ("ai-elrond");
-            header.append (icon);
-
-            var title = new Gtk.Label ("Elrond AI") {
-                css_classes = { "heading" },
-                xalign = 0
-            };
-            header.append (title);
-
-            status_indicator = new Gtk.Label ("Ready") {
-                css_classes = { "dim-label", "caption" },
-                margin_start = 4
-            };
-            header.append (status_indicator);
-
-            generating_spinner = new Gtk.Spinner () {
-                spinning = false,
-                visible = false,
-                margin_start = 4
-            };
-            header.append (generating_spinner);
-
-            header.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
-
-            provider_pill_btn = new Gtk.Button.with_label (get_active_backend_label ()) {
-                tooltip_text = "Active AI Backend — Click to configure"
-            };
-            provider_pill_btn.add_css_class ("pill");
-            provider_pill_btn.add_css_class ("caption");
-            provider_pill_btn.clicked.connect (() => {
-                if (parent_window != null) {
-                    var dlg = new AiSettingsDialog ();
-                    dlg.closed.connect (() => {
-                        provider_pill_btn.label = get_active_backend_label ();
-                    });
-                    dlg.present (parent_window);
+            composer = new ElrondComposer ();
+            composer.attach_context (new ElrondContextItem (
+                ElrondContextKind.ACTIVE_FILE, "active-file", "Active Document"
+            ));
+            composer.attach_context (new ElrondContextItem (
+                ElrondContextKind.ACTIVE_SELECTION, "selection", "Active Selection"
+            ));
+            composer.send_requested.connect ((text) => {
+                submit_prompt_async.begin (text);
+            });
+            composer.stop_requested.connect (() => {
+                if (cancellable != null && !cancellable.is_cancelled ()) {
+                    cancellable.cancel ();
                 }
             });
-            header.append (provider_pill_btn);
+            composer.open_settings_requested.connect (open_ai_settings);
+            composer.context_changed.connect (refresh_context_meter);
 
-            var btn_clear = new Gtk.Button.from_icon_name ("edit-clear-all-symbolic") {
-                tooltip_text = "Clear Chat History"
-            };
-            btn_clear.add_css_class ("flat");
-            btn_clear.clicked.connect (clear_chat_history);
-            header.append (btn_clear);
+            toolbar_view.add_bottom_bar (composer);
+            this.set_child (toolbar_view);
 
-            var btn_settings = new Gtk.Button.from_icon_name ("preferences-system-symbolic") {
-                tooltip_text = "Elrond AI Settings"
-            };
-            btn_settings.add_css_class ("flat");
-            btn_settings.clicked.connect (() => {
-                if (parent_window != null) {
-                    var dlg = new AiSettingsDialog ();
-                    dlg.present (parent_window);
-                }
-            });
-            header.append (btn_settings);
-
-            this.append (header);
+            refresh_context_meter ();
         }
 
-        private void setup_context_chips () {
-            var chips_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+        private static void ensure_css_loaded () {
+            if (css_loaded) return;
+            css_loaded = true;
+            var display = Gdk.Display.get_default ();
+            if (display == null) return;
+            var provider = new Gtk.CssProvider ();
+            provider.load_from_resource ("/org/imladris/app/elrond-chat.css");
+            Core.SettingsManager.add_css_provider_for_display (
+                display,
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            );
+        }
+
+        private Adw.HeaderBar build_top_bar () {
+            var header = new Adw.HeaderBar () {
+                show_end_title_buttons = false,
+                show_start_title_buttons = false
+            };
+            header.add_css_class ("flat");
+
+            // Left: Searchable Session Title Dropdown
+            session_popover = new Gtk.Popover ();
+            var pop_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
+                margin_top = 8,
+                margin_bottom = 8,
                 margin_start = 8,
                 margin_end = 8,
-                margin_top = 2,
-                margin_bottom = 4
+                width_request = 240
             };
-
-            var lbl = new Gtk.Label ("Context:") {
-                css_classes = { "dim-label", "caption" }
+            session_search = new Gtk.SearchEntry () {
+                placeholder_text = "Search sessions…"
             };
-            chips_box.append (lbl);
+            session_search.search_changed.connect (rebuild_session_list);
+            pop_box.append (session_search);
 
-            chip_active_file = new Gtk.ToggleButton.with_label ("Active File") {
-                active = true,
-                tooltip_text = "Include active document text in AI context"
-            };
-            chip_active_file.add_css_class ("suggested-chip");
-            chips_box.append (chip_active_file);
-
-            chip_selection = new Gtk.ToggleButton.with_label ("Selection") {
-                active = true,
-                tooltip_text = "Prioritize currently selected code or text"
-            };
-            chip_selection.add_css_class ("suggested-chip");
-            chips_box.append (chip_selection);
-
-            chip_dataframes = new Gtk.ToggleButton.with_label ("Data") {
-                active = true,
-                tooltip_text = "Include active environment variables & dataframes in AI context"
-            };
-            chip_dataframes.add_css_class ("suggested-chip");
-            chips_box.append (chip_dataframes);
-
-            chip_last_error = new Gtk.ToggleButton.with_label ("Last Error") {
-                active = false,
-                tooltip_text = "Include recent console errors to debug"
-            };
-            chip_last_error.add_css_class ("suggested-chip");
-            chips_box.append (chip_last_error);
-
-            this.append (chips_box);
-
-            // Quick-action improvement chips (Positron/RStudio style)
-            var actions_box = new Gtk.FlowBox () {
+            session_list = new Gtk.ListBox () {
                 selection_mode = Gtk.SelectionMode.NONE,
-                row_spacing = 4,
-                column_spacing = 4,
-                margin_start = 8,
-                margin_end = 8,
-                margin_bottom = 2,
+                css_classes = { "boxed-list" }
+            };
+            var pop_scroll = new Gtk.ScrolledWindow () {
+                child = session_list,
+                hscrollbar_policy = Gtk.PolicyType.NEVER,
+                max_content_height = 220,
+                propagate_natural_height = true
+            };
+            pop_box.append (pop_scroll);
+            session_popover.set_child (pop_box);
+
+            session_btn = new Gtk.MenuButton () {
+                label = active_session.title,
+                popover = session_popover,
+                css_classes = { "flat" },
+                tooltip_text = "Switch chat session"
+            };
+            header.pack_start (session_btn);
+
+            // Right: New Chat + Elrond Settings
+            var btn_new = new Gtk.Button.from_icon_name ("list-add-symbolic") {
+                tooltip_text = "New Chat",
+                css_classes = { "flat" }
+            };
+            btn_new.clicked.connect (start_new_chat);
+            header.pack_end (btn_new);
+
+            var btn_settings = new Gtk.Button.from_icon_name ("emblem-system-symbolic") {
+                tooltip_text = "Elrond Settings",
+                css_classes = { "flat" }
+            };
+            btn_settings.clicked.connect (open_ai_settings);
+            header.pack_end (btn_settings);
+
+            rebuild_session_list ();
+            return header;
+        }
+
+        private Gtk.Stack build_center_stack () {
+            content_stack = new Gtk.Stack () {
+                transition_type = Gtk.StackTransitionType.CROSSFADE,
+                transition_duration = 150,
+                hexpand = true,
+                vexpand = true
+            };
+
+            // Page 1: Empty State (Adw.StatusPage)
+            var status_page = new Adw.StatusPage () {
+                icon_name = "ai-elrond",
+                title = "Elrond AI",
+                description = "Zero-configuration scientific copilot for R, Python, and Quarto"
+            };
+
+            var starters_box = new Gtk.FlowBox () {
+                selection_mode = Gtk.SelectionMode.NONE,
+                row_spacing = 8,
+                column_spacing = 8,
+                halign = Gtk.Align.CENTER,
                 max_children_per_line = 3
             };
-
-            var btn_improve = new Gtk.Button.with_label ("Improve Writing") {
-                tooltip_text = "Improve clarity, academic tone, and grammar of selected text"
+            string[] starters = {
+                "Explain Selection",
+                "Debug Active Chunk",
+                "Improve Quarto Prose"
             };
-            btn_improve.add_css_class ("flat");
-            btn_improve.add_css_class ("caption");
-            btn_improve.clicked.connect (() => {
-                trigger_quick_action ("Improve clarity, academic tone, and grammar of the selected text. Return the revised text.", true, false);
-            });
-            actions_box.append (btn_improve);
+            foreach (string s in starters) {
+                string prompt_text = s;
+                var pill = new Gtk.Button.with_label (prompt_text) {
+                    css_classes = { "pill" }
+                };
+                pill.clicked.connect (() => {
+                    if (prompt_text == "Explain Selection") {
+                        composer.attach_context (new ElrondContextItem (
+                            ElrondContextKind.ACTIVE_SELECTION, "selection", "Active Selection"
+                        ));
+                    } else if (prompt_text == "Debug Active Chunk") {
+                        composer.attach_context (new ElrondContextItem (
+                            ElrondContextKind.LAST_ERROR, "last-error", "Last Console Error"
+                        ));
+                    }
+                    submit_external_prompt (prompt_text);
+                });
+                starters_box.append (pill);
+            }
+            status_page.set_child (starters_box);
+            content_stack.add_named (status_page, "empty");
 
-            var btn_refactor = new Gtk.Button.with_label ("Refactor Code") {
-                tooltip_text = "Refactor selected code or active chunk for readability and best practices"
-            };
-            btn_refactor.add_css_class ("flat");
-            btn_refactor.add_css_class ("caption");
-            btn_refactor.clicked.connect (() => {
-                trigger_quick_action ("Refactor this code for readability, performance, and best practices. Return the updated code in a single fenced block.", true, false);
-            });
-            actions_box.append (btn_refactor);
+            // Page 2: Chat Stream + Smart Auto-Scroll Overlay
+            var overlay = new Gtk.Overlay ();
 
-            var btn_fix = new Gtk.Button.with_label ("Fix Error") {
-                tooltip_text = "Diagnose the last console error and provide corrected code"
-            };
-            btn_fix.add_css_class ("flat");
-            btn_fix.add_css_class ("caption");
-            btn_fix.clicked.connect (() => {
-                trigger_quick_action ("Diagnose the last console error and provide the corrected code.", true, true);
-            });
-            actions_box.append (btn_fix);
-
-            this.append (actions_box);
-        }
-
-        private void trigger_quick_action (string prompt_template, bool include_selection, bool include_error) {
-            if (is_busy) return;
-            if (include_selection) chip_selection.active = true;
-            if (include_error) chip_last_error.active = true;
-            prompt_input.buffer.text = prompt_template;
-            send_prompt.begin ();
-        }
-
-        private void setup_message_stream () {
-            message_list = new Gtk.ListBox () {
-                selection_mode = Gtk.SelectionMode.NONE,
-                css_classes = { "boxed-list", "elrond-messages-list" },
-                margin_start = 8,
-                margin_end = 8,
-                margin_top = 4,
-                margin_bottom = 6
+            message_list = new Gtk.Box (Gtk.Orientation.VERTICAL, 18) {
+                margin_top = 16,
+                margin_bottom = 16,
+                margin_start = 16,
+                margin_end = 16,
+                hexpand = true
             };
 
             scroller = new Gtk.ScrolledWindow () {
@@ -271,211 +256,181 @@ namespace Imladris.UI {
                 hscrollbar_policy = Gtk.PolicyType.NEVER,
                 vscrollbar_policy = Gtk.PolicyType.AUTOMATIC
             };
-
-            this.append (scroller);
-        }
-
-        private void setup_input_bar () {
-            var input_container = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
-                margin_start = 8,
-                margin_end = 8,
-                margin_bottom = 8,
-                margin_top = 2
-            };
-
-            var input_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
-
-            var input_scroller = new Gtk.ScrolledWindow () {
-                hscrollbar_policy = Gtk.PolicyType.NEVER,
-                vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
-                height_request = 48,
-                hexpand = true
-            };
-            input_scroller.add_css_class ("card");
-
-            prompt_input = new Gtk.TextView () {
-                wrap_mode = Gtk.WrapMode.WORD_CHAR,
-                accepts_tab = false,
-                margin_start = 4,
-                margin_end = 4,
-                margin_top = 4,
-                margin_bottom = 4
-            };
-            input_scroller.set_child (prompt_input);
-            input_row.append (input_scroller);
-
-            send_btn = new Gtk.Button.from_icon_name ("send-symbolic") {
-                tooltip_text = "Send to Elrond (Enter)",
-                valign = Gtk.Align.END
-            };
-            send_btn.add_css_class ("suggested-action");
-            send_btn.clicked.connect (() => {
-                send_prompt.begin ();
-            });
-            input_row.append (send_btn);
-
-            stop_btn = new Gtk.Button.from_icon_name ("process-stop-symbolic") {
-                tooltip_text = "Cancel Generation",
-                valign = Gtk.Align.END,
-                visible = false
-            };
-            stop_btn.add_css_class ("destructive-action");
-            stop_btn.clicked.connect (() => {
-                if (cancellable != null && !cancellable.is_cancelled ()) {
-                    cancellable.cancel ();
-                }
-            });
-            input_row.append (stop_btn);
-
-            input_container.append (input_row);
-            this.append (input_container);
-
-            // Handle Enter key (Shift+Enter for newline)
-            var key_controller = new Gtk.EventControllerKey ();
-            key_controller.key_pressed.connect ((keyval, keycode, state) => {
-                if (keyval == Gdk.Key.Return || keyval == Gdk.Key.KP_Enter) {
-                    if ((state & Gdk.ModifierType.SHIFT_MASK) == 0) {
-                        send_prompt.begin ();
-                        return true;
+            var vadj = scroller.get_vadjustment ();
+            if (vadj != null) {
+                vadj.value_changed.connect (() => {
+                    double dist_from_bottom = vadj.get_upper () - (vadj.get_value () + vadj.get_page_size ());
+                    if (dist_from_bottom > 40.0) {
+                        auto_scroll_paused = true;
+                        scroll_bottom_btn.visible = true;
+                    } else {
+                        auto_scroll_paused = false;
+                        scroll_bottom_btn.visible = false;
                     }
-                }
-                return false;
-            });
-            prompt_input.add_controller (key_controller);
-        }
-
-        private void add_welcome_message () {
-            append_assistant_card (
-                "Hello! I'm **Elrond**, your scientific copilot.\n\n" +
-                "Ask me to write **R**, **Python**, or **Quarto** code, generate plots, or explain an error."
-            );
-
-            // Starter prompt pills so newcomers can start with one click
-            var starter_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
-                margin_start = 8,
-                margin_end = 8,
-                margin_top = 2,
-                margin_bottom = 4,
-                halign = Gtk.Align.START
-            };
-            string[] starters = {
-                "Summarize active file",
-                "Plot a dataset",
-                "Explain last error"
-            };
-            foreach (string s in starters) {
-                string starter_prompt = s;
-                var pill = new Gtk.Button.with_label (starter_prompt);
-                pill.add_css_class ("pill");
-                pill.add_css_class ("caption");
-                pill.clicked.connect (() => {
-                    if (starter_prompt == "Explain last error") {
-                        chip_last_error.active = true;
-                    }
-                    prompt_input.buffer.text = starter_prompt;
-                    send_prompt.begin ();
                 });
-                starter_row.append (pill);
             }
-            var lb_row = new Gtk.ListBoxRow () {
-                selectable = false,
-                activatable = false,
-                child = starter_row
+            overlay.set_child (scroller);
+
+            scroll_bottom_btn = new Gtk.Button.from_icon_name ("go-down-symbolic") {
+                tooltip_text = "Scroll to bottom",
+                halign = Gtk.Align.CENTER,
+                valign = Gtk.Align.END,
+                margin_bottom = 12,
+                visible = false,
+                css_classes = { "pill", "elrond-scroll-pill" }
             };
-            message_list.append (lb_row);
+            scroll_bottom_btn.clicked.connect (() => {
+                auto_scroll_paused = false;
+                scroll_bottom_btn.visible = false;
+                scroll_to_bottom (true);
+            });
+            overlay.add_overlay (scroll_bottom_btn);
+
+            content_stack.add_named (overlay, "chat");
+            content_stack.set_visible_child_name ("empty");
+            return content_stack;
+        }
+
+        private void rebuild_session_list () {
+            if (session_list == null) return;
+            Gtk.Widget? child = session_list.get_first_child ();
+            while (child != null) {
+                var next = child.get_next_sibling ();
+                session_list.remove (child);
+                child = next;
+            }
+
+            string q = session_search != null ? session_search.text.strip ().down () : "";
+            foreach (var sess in sessions) {
+                if (q.length > 0 && !sess.title.down ().contains (q)) {
+                    continue;
+                }
+                var row_btn = new Gtk.Button.with_label (sess.title) {
+                    css_classes = { "flat" },
+                    halign = Gtk.Align.FILL
+                };
+                ElrondChatSession target_sess = sess;
+                row_btn.clicked.connect (() => {
+                    switch_to_session (target_sess);
+                    session_popover.popdown ();
+                });
+                session_list.append (row_btn);
+            }
+        }
+
+        private void switch_to_session (ElrondChatSession sess) {
+            active_session = sess;
+            session_btn.label = sess.title;
+            clear_message_widgets ();
+
+            if (sess.turns.size == 0) {
+                content_stack.set_visible_child_name ("empty");
+                return;
+            }
+
+            content_stack.set_visible_child_name ("chat");
+            ensure_inline_regexes ();
+            foreach (var turn in sess.turns) {
+                if (turn.role == "user") {
+                    append_user_widget (turn.content);
+                } else {
+                    var am = append_assistant_widget ("Done", "");
+                    am.finish_response (turn.content, cached_code_rx, cached_bold_rx);
+                }
+            }
+            scroll_to_bottom (true);
+        }
+
+        private void start_new_chat () {
+            if (is_busy && cancellable != null) {
+                cancellable.cancel ();
+            }
+            active_session = new ElrondChatSession (@"Session $(sessions.size + 1)");
+            sessions.insert (0, active_session);
+            session_btn.label = active_session.title;
+            clear_message_widgets ();
+            content_stack.set_visible_child_name ("empty");
+            rebuild_session_list ();
+            refresh_context_meter ();
         }
 
         public void clear_chat_history () {
-            conversation_history.clear ();
+            start_new_chat ();
+        }
+
+        private void clear_message_widgets () {
             Gtk.Widget? child = message_list.get_first_child ();
             while (child != null) {
                 var next = child.get_next_sibling ();
                 message_list.remove (child);
                 child = next;
             }
-            add_welcome_message ();
+        }
+
+        private void open_ai_settings () {
+            if (parent_window != null) {
+                var dlg = new AiSettingsDialog ();
+                dlg.closed.connect (() => {
+                    composer.refresh_model_pill ();
+                });
+                dlg.present (parent_window);
+            }
         }
 
         public void focus_input () {
-            prompt_input.grab_focus ();
+            composer.focus_input ();
         }
 
         public void submit_external_prompt (string prompt) {
             if (is_busy || prompt.strip ().length == 0) return;
-            prompt_input.buffer.text = prompt.strip ();
-            send_prompt.begin ();
+            submit_prompt_async.begin (prompt.strip ());
         }
 
-        private string get_active_backend_label () {
-            if (ElrondEngineController.get_default ().is_ready) {
-                return "Elrond Local";
+        private void refresh_context_meter () {
+            int chars = 0;
+            if (composer.has_context_kind (ElrondContextKind.ACTIVE_SELECTION)) {
+                chars += doc_page.get_selected_text ().length;
             }
-            var cfg = Core.AiConfigManager.get_default ();
-            return cfg.active_provider.get_short_name ();
+            if (composer.has_context_kind (ElrondContextKind.ACTIVE_FILE)) {
+                chars += int.min (4000, doc_page.get_clean_source_text ().length);
+            }
+            foreach (var t in active_session.turns) {
+                chars += t.content.length;
+            }
+            composer.update_context_meter (chars, 16000);
         }
 
-        private async void send_prompt () {
+        private async void submit_prompt_async (string raw_prompt) {
             if (is_busy) return;
-            string prompt = prompt_input.buffer.text.strip ();
+            string prompt = raw_prompt.strip ();
             if (prompt.length == 0) return;
 
-            prompt_input.buffer.text = "";
-            append_user_card (prompt);
+            composer.set_text ("");
+            content_stack.set_visible_child_name ("chat");
+
+            if (active_session.turns.size == 0) {
+                string short_title = prompt.length > 26 ? prompt.substring (0, 26) + "…" : prompt;
+                active_session.title = short_title;
+                session_btn.label = short_title;
+                rebuild_session_list ();
+            }
+
+            append_user_widget (prompt);
+            auto_scroll_paused = false;
+            scroll_to_bottom (true);
 
             is_busy = true;
-            send_btn.visible = false;
-            stop_btn.visible = true;
-            generating_spinner.visible = true;
-            generating_spinner.spinning = true;
-            status_indicator.label = "Thinking...";
-
+            composer.set_streaming (true);
             cancellable = new Cancellable ();
 
-            // Assemble context based on chips
-            var context_sb = new GLib.StringBuilder ();
-            if (chip_selection.active) {
-                string sel = doc_page.get_selected_text ().strip ();
-                if (sel.length > 0) {
-                    context_sb.append_printf ("[Selected Text / Code]:\n%s\n\n", sel);
-                }
-            }
-            if (chip_active_file.active) {
-                string doc_text = doc_page.get_clean_source_text ();
-                if (doc_text.length > 4000) {
-                    doc_text = doc_text.substring (0, 4000) + "\n... [truncated]";
-                }
-                context_sb.append_printf ("[Active File Content (%s)]:\n%s\n\n", doc_page.doc_type, doc_text);
-            }
-
             string env_summary = "";
-            if (chip_dataframes.active && panel_reg != null && panel_reg.environment_controller != null) {
-                var vars = panel_reg.environment_controller.get_cached_variables ();
-                if (vars.size > 0) {
-                    var sb_env = new GLib.StringBuilder ();
-                    int count = 0;
-                    foreach (var v in vars) {
-                        if (count > 0) sb_env.append (", ");
-                        sb_env.append (@"$(v.name) ($(v.var_type): $(v.dimensions))");
-                        count++;
-                        if (count >= 12) break;
-                    }
-                    env_summary = sb_env.str;
-                    context_sb.append_printf ("[Active Environment Objects]:\n%s\n\n", env_summary);
-                }
-            }
+            string ctx_summary = "";
+            string combined_prompt = assemble_context_prompt (prompt, out env_summary, out ctx_summary);
+            string thinking_status = composer.has_context_kind (ElrondContextKind.ACTIVE_FILE)
+                ? "Reading active document…" : "Thinking…";
 
-            if (chip_last_error.active) {
-                string console_text = doc_page.console_view.buffer.text;
-                if (console_text.contains ("Error") || console_text.contains ("✖")) {
-                    int start_idx = int.max (0, console_text.length - 500);
-                    while (start_idx > 0 && start_idx < console_text.length && (console_text[start_idx] & 0xC0) == 0x80) {
-                        start_idx++;
-                    }
-                    context_sb.append_printf ("[Recent Console Output]:\n%s\n\n", console_text.substring (start_idx));
-                }
-            }
-
-            string combined_prompt = context_sb.str + "[User Query]:\n" + prompt;
+            var assistant_msg = append_assistant_widget (thinking_status, ctx_summary);
+            scroll_to_bottom (false);
 
             try {
                 var controller = ElrondEngineController.get_default ();
@@ -489,72 +444,230 @@ namespace Imladris.UI {
                 if (!controller.is_ready && cfg.active_provider.is_free_tier () && !cfg.free_api_consent_accepted) {
                     bool accepted = yield ensure_free_api_consent_async ();
                     if (!accepted) {
-                        append_assistant_card ("*Cancelled: Free-tier cloud AI consent was declined. You can select a local provider (Ollama / LM Studio) or configure your own API key in **AI Settings**.*");
+                        ensure_inline_regexes ();
+                        assistant_msg.finish_response (
+                            "*Cancelled: Free-tier cloud AI consent was declined.*",
+                            cached_code_rx, cached_bold_rx
+                        );
                         return;
                     }
                 }
 
-                var intent = ElrondEngineController.classify_intent_fast (prompt);
-                status_indicator.label = @"Elrond • $(intent.to_label ())";
-
-                string response;
+                string response = "";
                 if (controller.is_ready) {
-                    Gtk.Box stream_box;
-                    Gtk.Label stream_lbl;
-                    create_streaming_assistant_card (out stream_box, out stream_lbl);
                     var stream_sb = new StringBuilder ();
+                    bool stream_dirty = false;
 
-                    response = yield controller.write_with_elrond_stream_async (
-                        doc_page.doc_type,
-                        chip_active_file.active ? doc_page.get_clean_source_text () : "",
-                        env_summary,
-                        combined_prompt,
-                        conversation_history,
-                        (delta) => {
-                            stream_sb.append (delta);
-                            stream_lbl.label = stream_sb.str;
-                            scroll_to_bottom ();
-                        },
-                        cancellable
-                    );
+                    // Throttle UI updates during streaming to 30ms intervals
+                    stream_throttle_id = GLib.Timeout.add (30, () => {
+                        if (stream_dirty) {
+                            stream_dirty = false;
+                            assistant_msg.update_streaming_preview (stream_sb.str);
+                            scroll_to_bottom (false);
+                        }
+                        return GLib.Source.CONTINUE;
+                    });
 
-                    stream_box.remove (stream_lbl);
-                    render_markdown_blocks (stream_box, response);
-                    scroll_to_bottom ();
+                    try {
+                        response = yield controller.write_with_elrond_stream_async (
+                            doc_page.doc_type,
+                            composer.has_context_kind (ElrondContextKind.ACTIVE_FILE)
+                                ? doc_page.get_clean_source_text () : "",
+                            env_summary,
+                            combined_prompt,
+                            active_session.turns,
+                            (delta) => {
+                                stream_sb.append (delta);
+                                stream_dirty = true;
+                            },
+                            cancellable
+                        );
+                    } finally {
+                        if (stream_throttle_id != 0) {
+                            GLib.Source.remove (stream_throttle_id);
+                            stream_throttle_id = 0;
+                        }
+                    }
                 } else if (has_cloud_or_local_api || has_failover_backup) {
                     var ai_client = new AiClient ();
-                    ai_client.provider_failover_triggered.connect ((from_p, to_p) => {
-                        status_indicator.label = @"Failover → $(to_p.get_short_name ())";
-                    });
                     string sys_prompt = "You are Elrond AI, an expert scientific writing and data science copilot inside Imladris (R, Python, Quarto, LaTeX, Biostats). Give concise, accurate answers with fenced ```r or ```python code blocks when helpful.";
                     response = yield ai_client.send_chat_completion_async (sys_prompt, combined_prompt, cancellable);
-                    append_assistant_card (response);
                 } else {
-                    // Antigravity or local fallback
                     response = yield ElrondEngineController.run_agy_prompt_async (combined_prompt, cancellable);
-                    append_assistant_card (response);
                 }
 
-                conversation_history.add (new ElrondChatTurn ("user", prompt));
-                conversation_history.add (new ElrondChatTurn ("assistant", response));
-                while (conversation_history.size > 10) {
-                    conversation_history.remove_at (0);
+                ensure_inline_regexes ();
+                assistant_msg.finish_response (response, cached_code_rx, cached_bold_rx);
+
+                active_session.turns.add (new ElrondChatTurn ("user", prompt));
+                active_session.turns.add (new ElrondChatTurn ("assistant", response));
+                while (active_session.turns.size > 16) {
+                    active_session.turns.remove_at (0);
                 }
             } catch (GLib.Error e) {
+                ensure_inline_regexes ();
                 if (e is GLib.IOError.CANCELLED) {
-                    append_assistant_card ("*Generation cancelled.*");
+                    assistant_msg.finish_response ("*Generation cancelled.*", cached_code_rx, cached_bold_rx);
                 } else {
-                    append_assistant_card (@"⚠️ **Elrond Error:** $(e.message)\n\nPlease check your active AI provider or local server in **AI Settings**.");
+                    assistant_msg.finish_response (
+                        @"⚠️ **Elrond Error:** $(e.message)\n\nPlease check your active AI provider or local server in **AI Settings**.",
+                        cached_code_rx, cached_bold_rx
+                    );
                 }
             } finally {
                 is_busy = false;
-                send_btn.visible = true;
-                stop_btn.visible = false;
-                generating_spinner.spinning = false;
-                generating_spinner.visible = false;
-                status_indicator.label = "Ready";
-                provider_pill_btn.label = get_active_backend_label ();
-                scroll_to_bottom ();
+                composer.set_streaming (false);
+                composer.refresh_model_pill ();
+                refresh_context_meter ();
+                scroll_to_bottom (false);
+            }
+        }
+
+        private string assemble_context_prompt (string prompt, out string env_summary, out string ctx_summary) {
+            env_summary = "";
+            var context_sb = new GLib.StringBuilder ();
+            var summary_parts = new Gee.ArrayList<string> ();
+
+            if (composer.has_context_kind (ElrondContextKind.ACTIVE_SELECTION)) {
+                string sel = doc_page.get_selected_text ().strip ();
+                if (sel.length > 0) {
+                    context_sb.append_printf ("[Selected Text / Code]:\n%s\n\n", sel);
+                    summary_parts.add (@"Selection ($(sel.length) chars)");
+                }
+            }
+
+            if (composer.has_context_kind (ElrondContextKind.ACTIVE_FILE)) {
+                string doc_text = doc_page.get_clean_source_text ();
+                if (doc_text.length > 4000) {
+                    doc_text = doc_text.substring (0, 4000) + "\n... [truncated]";
+                }
+                context_sb.append_printf ("[Active File Content (%s)]:\n%s\n\n", doc_page.doc_type, doc_text);
+                summary_parts.add (@"Active $(doc_page.doc_type) document");
+            }
+
+            if (composer.has_context_kind (ElrondContextKind.DATAFRAMES) &&
+                panel_reg != null && panel_reg.environment_controller != null) {
+                var vars = panel_reg.environment_controller.get_cached_variables ();
+                if (vars.size > 0) {
+                    var sb_env = new GLib.StringBuilder ();
+                    int count = 0;
+                    foreach (var v in vars) {
+                        if (count > 0) sb_env.append (", ");
+                        sb_env.append (@"$(v.name) ($(v.var_type): $(v.dimensions))");
+                        count++;
+                        if (count >= 12) break;
+                    }
+                    env_summary = sb_env.str;
+                    context_sb.append_printf ("[Active Environment Objects]:\n%s\n\n", env_summary);
+                    summary_parts.add (@"$count environment object(s)");
+                }
+            }
+
+            if (composer.has_context_kind (ElrondContextKind.LAST_ERROR)) {
+                string console_text = doc_page.console_view.buffer.text;
+                if (console_text.contains ("Error") || console_text.contains ("✖")) {
+                    int start_idx = int.max (0, console_text.length - 500);
+                    while (start_idx > 0 && start_idx < console_text.length && (console_text[start_idx] & 0xC0) == 0x80) {
+                        start_idx++;
+                    }
+                    context_sb.append_printf ("[Recent Console Output]:\n%s\n\n", console_text.substring (start_idx));
+                    summary_parts.add ("Console error tail");
+                }
+            }
+
+            ctx_summary = summary_parts.size > 0
+                ? "Context: " + string.joinv (", ", summary_parts.to_array ())
+                : "";
+            return context_sb.str + "[User Query]:\n" + prompt;
+        }
+
+        private void append_user_widget (string text) {
+            var msg = new ElrondUserMessage (text);
+            msg.copy_requested.connect (copy_to_clipboard);
+            msg.edit_requested.connect ((t) => {
+                composer.set_text (t);
+                composer.focus_input ();
+            });
+            message_list.append (msg);
+        }
+
+        private ElrondAssistantMessage append_assistant_widget (string thinking_status, string ctx_summary) {
+            var msg = new ElrondAssistantMessage (thinking_status, ctx_summary);
+            msg.copy_markdown_requested.connect (copy_to_clipboard);
+            msg.copy_code_requested.connect (copy_to_clipboard);
+            msg.insert_code_requested.connect (insert_code_at_cursor);
+            msg.apply_code_requested.connect (apply_code_to_selection);
+            msg.delete_requested.connect ((target) => {
+                message_list.remove (target);
+            });
+            msg.regenerate_requested.connect (() => {
+                if (!is_busy && active_session.turns.size >= 2) {
+                    string last_user = active_session.turns.get (active_session.turns.size - 2).content;
+                    submit_prompt_async.begin (last_user);
+                }
+            });
+            message_list.append (msg);
+            return msg;
+        }
+
+        private void copy_to_clipboard (string text) {
+            var disp = Gdk.Display.get_default ();
+            if (disp != null) {
+                disp.get_clipboard ().set_text (text);
+                if (parent_window != null) {
+                    parent_window.show_toast ("Copied to clipboard");
+                }
+            }
+        }
+
+        private void insert_code_at_cursor (string code, string lang) {
+            string to_insert = code;
+            string lang_lower = lang.down ();
+            string code_engine = "r";
+            if (lang_lower == "python" || lang_lower == "py") {
+                code_engine = "python";
+            } else if (lang_lower == "bash" || lang_lower == "sh" || lang_lower == "zsh") {
+                code_engine = "bash";
+            }
+
+            var fmt = doc_page.get_document_format ();
+            if (fmt == DocumentFormat.QMD || fmt == DocumentFormat.RMD || fmt == DocumentFormat.IPYNB) {
+                Gtk.TextIter cur_it;
+                doc_page.source_buffer.get_iter_at_mark (out cur_it, doc_page.source_buffer.get_insert ());
+                var chunk = Core.ChunkParser.find_chunk_at_line (doc_page.get_clean_source_text (), cur_it.get_line ());
+                if (chunk == null && (code_engine == "r" || code_engine == "python" || code_engine == "bash")) {
+                    to_insert = "\n```{" + code_engine + "}\n" + code.strip () + "\n```\n";
+                }
+            }
+            doc_page.source_buffer.begin_user_action ();
+            try {
+                doc_page.source_buffer.insert_at_cursor (to_insert, -1);
+            } finally {
+                doc_page.source_buffer.end_user_action ();
+            }
+            if (parent_window != null) {
+                parent_window.show_toast_with_action ("Inserted code at cursor", "Undo", "win.undo");
+            }
+        }
+
+        private void apply_code_to_selection (string code) {
+            if (!doc_page.source_buffer.has_selection) {
+                if (parent_window != null) {
+                    parent_window.show_toast ("Select text or code in the editor first");
+                }
+                return;
+            }
+            Gtk.TextIter sel_start, sel_end;
+            doc_page.source_buffer.get_selection_bounds (out sel_start, out sel_end);
+            doc_page.source_buffer.begin_user_action ();
+            try {
+                doc_page.source_buffer.delete (ref sel_start, ref sel_end);
+                doc_page.source_buffer.insert (ref sel_start, code.strip (), -1);
+            } finally {
+                doc_page.source_buffer.end_user_action ();
+            }
+            if (parent_window != null) {
+                parent_window.show_toast_with_action ("Applied AI edit to selection", "Undo", "win.undo");
             }
         }
 
@@ -581,361 +694,17 @@ namespace Imladris.UI {
             return false;
         }
 
-        private void append_user_card (string text) {
-            var row = new Gtk.ListBoxRow ();
-            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
-                margin_start = 24,
-                margin_end = 4,
-                margin_top = 4,
-                margin_bottom = 4
-            };
-            box.add_css_class ("card");
-            box.add_css_class ("user-message-card");
-
-            var header = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
-                margin_start = 8,
-                margin_end = 8,
-                margin_top = 6
-            };
-            header.append (new Gtk.Image.from_icon_name ("avatar-default-symbolic"));
-            header.append (new Gtk.Label ("You") { css_classes = { "heading", "caption" } });
-            box.append (header);
-
-            var lbl = new Gtk.Label (text) {
-                xalign = 0,
-                wrap = true,
-                wrap_mode = Pango.WrapMode.WORD_CHAR,
-                selectable = true,
-                margin_start = 8,
-                margin_end = 8,
-                margin_bottom = 8
-            };
-            box.append (lbl);
-            row.set_child (box);
-            message_list.append (row);
-            scroll_to_bottom ();
-        }
-
-        private void create_streaming_assistant_card (out Gtk.Box box_out, out Gtk.Label label_out) {
-            var row = new Gtk.ListBoxRow ();
-            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
-                margin_start = 4,
-                margin_end = 24,
-                margin_top = 4,
-                margin_bottom = 4
-            };
-            box.add_css_class ("card");
-            box.add_css_class ("assistant-message-card");
-
-            var header = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
-                margin_start = 8,
-                margin_end = 8,
-                margin_top = 6
-            };
-            header.append (new Gtk.Image.from_icon_name ("ai-elrond"));
-            header.append (new Gtk.Label ("Elrond AI") { css_classes = { "heading", "caption" } });
-            box.append (header);
-
-            var lbl = new Gtk.Label ("") {
-                wrap = true,
-                wrap_mode = Pango.WrapMode.WORD_CHAR,
-                xalign = 0,
-                selectable = true,
-                margin_start = 8,
-                margin_end = 8,
-                margin_bottom = 8
-            };
-            box.append (lbl);
-
-            row.set_child (box);
-            message_list.append (row);
-            scroll_to_bottom ();
-
-            box_out = box;
-            label_out = lbl;
-        }
-
-        private void append_assistant_card (string raw_text) {
-            var row = new Gtk.ListBoxRow ();
-            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
-                margin_start = 4,
-                margin_end = 24,
-                margin_top = 4,
-                margin_bottom = 4
-            };
-            box.add_css_class ("card");
-            box.add_css_class ("assistant-message-card");
-
-            var header = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
-                margin_start = 8,
-                margin_end = 8,
-                margin_top = 6
-            };
-            header.append (new Gtk.Image.from_icon_name ("ai-elrond"));
-            header.append (new Gtk.Label ("Elrond AI") { css_classes = { "heading", "caption" } });
-            box.append (header);
-
-            // Parse text and code blocks
-            render_markdown_blocks (box, raw_text);
-
-            row.set_child (box);
-            message_list.append (row);
-            scroll_to_bottom ();
-        }
-
-        private void render_markdown_blocks (Gtk.Box container, string raw) {
-            string[] lines = raw.split ("\n");
-            var text_buf = new GLib.StringBuilder ();
-            var code_buf = new GLib.StringBuilder ();
-            bool in_code = false;
-            string code_lang = "r";
-
-            for (int i = 0; i < lines.length; i++) {
-                string line = lines[i];
-                if (line.has_prefix ("```")) {
-                    if (!in_code) {
-                        // Flush previous text block
-                        if (text_buf.len > 0) {
-                            add_text_label (container, text_buf.str.strip ());
-                            text_buf.truncate (0);
-                        }
-                        in_code = true;
-                        string info = line.substring (3).strip ();
-                        code_lang = info.length > 0 ? info : "r";
-                    } else {
-                        // End code block
-                        in_code = false;
-                        add_code_card (container, code_buf.str.strip (), code_lang);
-                        code_buf.truncate (0);
-                    }
-                } else if (in_code) {
-                    code_buf.append (line + "\n");
-                } else {
-                    text_buf.append (line + "\n");
-                }
-            }
-
-            if (in_code && code_buf.len > 0) {
-                add_code_card (container, code_buf.str.strip (), code_lang);
-            } else if (text_buf.len > 0) {
-                add_text_label (container, text_buf.str.strip ());
-            }
-        }
-
-        private string format_inline_markdown_to_pango (string raw) {
-            string escaped = GLib.Markup.escape_text (raw);
+        private static void ensure_inline_regexes () {
             try {
                 if (cached_code_rx == null) cached_code_rx = new GLib.Regex ("`([^`]+?)`");
                 if (cached_bold_rx == null) cached_bold_rx = new GLib.Regex ("\\*\\*(.+?)\\*\\*");
+            } catch (GLib.RegexError e) {}
+        }
 
-                var code_spans = new Gee.ArrayList<string> ();
-                string protected_str = cached_code_rx.replace_eval (escaped, -1, 0, 0, (mi, res) => {
-                    string placeholder = @"\x01CODE$(code_spans.size)\x02";
-                    code_spans.add ("<tt>" + mi.fetch (1) + "</tt>");
-                    res.append (placeholder);
-                    return false;
-                });
-                protected_str = cached_bold_rx.replace (protected_str, -1, 0, "<b>\\1</b>");
-                for (int i = 0; i < code_spans.size; i++) {
-                    protected_str = protected_str.replace (@"\x01CODE$i\x02", code_spans.get (i));
-                }
-                if (Pango.parse_markup (protected_str, -1, 0, null, null, null)) {
-                    return protected_str;
-                }
-            } catch (GLib.Error e) {
-                return escaped;
+        private void scroll_to_bottom (bool force) {
+            if (!force && auto_scroll_paused) {
+                return;
             }
-            return escaped;
-        }
-
-        private void add_text_label (Gtk.Box container, string text) {
-            if (text.length == 0) return;
-            var lbl = new Gtk.Label (null) {
-                xalign = 0,
-                wrap = true,
-                wrap_mode = Pango.WrapMode.WORD_CHAR,
-                selectable = true,
-                use_markup = true,
-                margin_start = 8,
-                margin_end = 8,
-                margin_bottom = 4
-            };
-            lbl.set_markup (format_inline_markdown_to_pango (text));
-            container.append (lbl);
-        }
-
-        private void add_code_card (Gtk.Box container, string code, string lang) {
-            if (code.length == 0) return;
-
-            var code_card = new Gtk.Box (Gtk.Orientation.VERTICAL, 2) {
-                margin_start = 8,
-                margin_end = 8,
-                margin_top = 4,
-                margin_bottom = 6
-            };
-            code_card.add_css_class ("code-snippet-box");
-
-            // Code card header with action buttons
-            var code_header = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
-                margin_start = 6,
-                margin_end = 6,
-                margin_top = 4
-            };
-            code_header.append (new Gtk.Label (lang.up ()) { css_classes = { "dim-label", "caption", "monospace" } });
-            code_header.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
-
-            string code_copy = code;
-            string lang_lower = lang.down ();
-            string code_engine = "r";
-            if (lang_lower == "python" || lang_lower == "py") {
-                code_engine = "python";
-            } else if (lang_lower == "bash" || lang_lower == "sh" || lang_lower == "zsh") {
-                code_engine = "bash";
-            }
-
-            // Action: Insert at cursor
-            var btn_insert = new Gtk.Button.from_icon_name ("insert-text-symbolic") {
-                tooltip_text = "Insert code snippet at active cursor"
-            };
-            btn_insert.add_css_class ("flat");
-            btn_insert.clicked.connect (() => {
-                string to_insert = code_copy;
-                var fmt = doc_page.get_document_format ();
-                if (fmt == DocumentFormat.QMD || fmt == DocumentFormat.RMD || fmt == DocumentFormat.IPYNB) {
-                    Gtk.TextIter cur_it;
-                    doc_page.source_buffer.get_iter_at_mark (out cur_it, doc_page.source_buffer.get_insert ());
-                    var chunk = Core.ChunkParser.find_chunk_at_line (doc_page.get_clean_source_text (), cur_it.get_line ());
-                    if (chunk == null && (code_engine == "r" || code_engine == "python" || code_engine == "bash")) {
-                        to_insert = "\n```{" + code_engine + "}\n" + code_copy.strip () + "\n```\n";
-                    }
-                }
-                doc_page.source_buffer.begin_user_action ();
-                try {
-                    doc_page.source_buffer.insert_at_cursor (to_insert, -1);
-                } finally {
-                    doc_page.source_buffer.end_user_action ();
-                }
-                if (parent_window != null) {
-                    parent_window.show_toast_with_action ("Inserted code at cursor", "Undo", "win.undo");
-                }
-            });
-            code_header.append (btn_insert);
-
-            // Action: Apply to Selection (Positron/RStudio direct editor write)
-            var btn_apply_sel = new Gtk.Button.from_icon_name ("edit-find-replace-symbolic") {
-                tooltip_text = "Replace selected editor text with this snippet (Ctrl+Z to undo)"
-            };
-            btn_apply_sel.add_css_class ("flat");
-            btn_apply_sel.clicked.connect (() => {
-                if (!doc_page.source_buffer.has_selection) {
-                    if (parent_window != null) {
-                        parent_window.show_toast ("Select text or code in the editor first");
-                    }
-                    return;
-                }
-                Gtk.TextIter sel_start, sel_end;
-                doc_page.source_buffer.get_selection_bounds (out sel_start, out sel_end);
-                doc_page.source_buffer.begin_user_action ();
-                try {
-                    doc_page.source_buffer.delete (ref sel_start, ref sel_end);
-                    doc_page.source_buffer.insert (ref sel_start, code_copy.strip (), -1);
-                } finally {
-                    doc_page.source_buffer.end_user_action ();
-                }
-                if (parent_window != null) {
-                    parent_window.show_toast_with_action ("Applied AI edit to selection", "Undo", "win.undo");
-                }
-            });
-            code_header.append (btn_apply_sel);
-
-            // Action: Update Active Chunk (preserving #| Quarto options)
-            var btn_update_chunk = new Gtk.Button.from_icon_name ("document-edit-symbolic") {
-                tooltip_text = "Replace active code chunk body while preserving #| options"
-            };
-            btn_update_chunk.add_css_class ("flat");
-            btn_update_chunk.clicked.connect (() => {
-                Gtk.TextIter cur_it;
-                doc_page.source_buffer.get_iter_at_mark (out cur_it, doc_page.source_buffer.get_insert ());
-                int body_start_line = -1;
-                int end_fence_line = -1;
-                if (!Editor.AiBufferEditHelper.get_active_chunk_body_range (
-                        doc_page.get_clean_source_text (), cur_it.get_line (), out body_start_line, out end_fence_line)) {
-                    if (parent_window != null) {
-                        parent_window.show_toast ("Place cursor inside a code chunk to update it");
-                    }
-                    return;
-                }
-                string clean_code = code_copy;
-                while (clean_code.has_suffix ("\n")) {
-                    clean_code = clean_code.substring (0, clean_code.length - 1);
-                }
-                Gtk.TextIter start_it, end_it;
-                doc_page.source_buffer.get_iter_at_line (out start_it, body_start_line);
-                doc_page.source_buffer.get_iter_at_line (out end_it, end_fence_line);
-
-                doc_page.source_buffer.begin_user_action ();
-                try {
-                    doc_page.source_buffer.delete (ref start_it, ref end_it);
-                    doc_page.source_buffer.insert (ref start_it, clean_code + "\n", -1);
-                } finally {
-                    doc_page.source_buffer.end_user_action ();
-                }
-                if (parent_window != null) {
-                    parent_window.show_toast_with_action ("Updated active chunk (preserved #| options)", "Undo", "win.undo");
-                }
-            });
-            code_header.append (btn_update_chunk);
-
-            // Action: Run in Console
-            var btn_run = new Gtk.Button.from_icon_name ("media-playback-start-symbolic") {
-                tooltip_text = @"Run directly in $code_engine Console"
-            };
-            btn_run.add_css_class ("flat");
-            btn_run.clicked.connect (() => {
-                panel_reg.run_code_snippet_in_console (code_engine, code_copy);
-                if (parent_window != null) {
-                    parent_window.show_toast (@"Running snippet in $code_engine console");
-                }
-            });
-            code_header.append (btn_run);
-
-            // Action: Copy to clipboard
-            var btn_copy = new Gtk.Button.from_icon_name ("edit-copy-symbolic") {
-                tooltip_text = "Copy code to clipboard"
-            };
-            btn_copy.add_css_class ("flat");
-            btn_copy.clicked.connect (() => {
-                var disp = Gdk.Display.get_default ();
-                if (disp != null) {
-                    disp.get_clipboard ().set_text (code_copy);
-                    if (parent_window != null) {
-                        parent_window.show_toast ("Copied code to clipboard");
-                    }
-                }
-            });
-            code_header.append (btn_copy);
-
-            code_card.append (code_header);
-
-            var code_scroller = new Gtk.ScrolledWindow () {
-                hscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
-                vscrollbar_policy = Gtk.PolicyType.NEVER,
-                margin_start = 6,
-                margin_end = 6,
-                margin_bottom = 6
-            };
-            var code_lbl = new Gtk.Label (code) {
-                xalign = 0,
-                selectable = true,
-                css_classes = { "monospace", "caption" }
-            };
-            code_scroller.set_child (code_lbl);
-            code_card.append (code_scroller);
-
-            container.append (code_card);
-        }
-
-        private void scroll_to_bottom () {
             if (scroll_idle_id != 0) {
                 return;
             }

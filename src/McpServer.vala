@@ -98,7 +98,7 @@ namespace Imladris {
 
     public class McpServer : GLib.Object {
 
-        public const string MCP_VERSION = "0.41.0";
+        public const string MCP_VERSION = "0.42.0";
         public const string DBUS_BUS_NAME = "io.github.Antux912012.Imladris";
         public const string DBUS_OBJECT_PATH = "/io/github/Antux912012/Imladris/McpBridge";
 

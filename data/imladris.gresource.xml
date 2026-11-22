@@ -2,6 +2,7 @@
 <gresources>
   <gresource prefix="/org/imladris/app">
     <file compressed="true">style.css</file>
+    <file compressed="true">elrond-chat.css</file>
     <file>language-specs/quarto.lang</file>
     <file>language-specs/rmd.lang</file>
     <file>language-specs/typescript.lang</file>

@@ -1,0 +1,104 @@
+/* Elrond AI Chat Panel — macOS / elementary OS + Nord Polish */
+
+.elrond-chat-panel {
+    background-color: @window_bg_color;
+}
+
+.elrond-composer {
+    border-radius: 14px;
+    border: 1px solid alpha(@borders, 0.75);
+    background-color: mix(@card_bg_color, #2e3440, 0.05);
+    padding: 8px 10px 8px 10px;
+    box-shadow: 0 2px 8px alpha(black, 0.06);
+    transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.elrond-composer:focus-within {
+    border-color: alpha(@accent_bg_color, 0.85);
+    box-shadow: 0 0 0 2px alpha(@accent_bg_color, 0.18), 0 4px 12px alpha(black, 0.08);
+}
+
+.elrond-composer textview.inline {
+    background-color: transparent;
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 4px 2px;
+}
+
+.elrond-context-chip {
+    border-radius: 999px;
+    padding: 2px 8px;
+    background-color: alpha(@accent_bg_color, 0.12);
+    border: 1px solid alpha(@accent_bg_color, 0.25);
+    font-size: 0.85em;
+}
+
+.elrond-context-chip button {
+    min-width: 16px;
+    min-height: 16px;
+    padding: 0;
+    margin-left: 2px;
+}
+
+.elrond-user-bubble {
+    border-radius: 14px;
+    padding: 10px 14px;
+    background-color: alpha(@accent_bg_color, 0.14);
+    border: 1px solid alpha(@accent_bg_color, 0.22);
+}
+
+.elrond-assistant-message {
+    padding: 2px 0;
+}
+
+.elrond-thinking-expander {
+    border-radius: 10px;
+    background-color: alpha(@card_bg_color, 0.65);
+    border: 1px solid alpha(@borders, 0.45);
+    padding: 4px 8px;
+}
+
+.elrond-code-block {
+    border-radius: 12px;
+    border: 1px solid alpha(@borders, 0.75);
+    background-color: @card_bg_color;
+    overflow: hidden;
+}
+
+.elrond-code-header {
+    padding: 4px 8px;
+    background-color: alpha(@borders, 0.16);
+    border-bottom: 1px solid alpha(@borders, 0.45);
+}
+
+.elrond-code-view {
+    padding: 6px 4px;
+    background-color: transparent;
+}
+
+.elrond-hover-actions {
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.elrond-message-row:hover .elrond-hover-actions,
+.elrond-message-row:focus-within .elrond-hover-actions {
+    opacity: 1;
+}
+
+.elrond-scroll-pill {
+    box-shadow: 0 2px 10px alpha(black, 0.18);
+    background-color: @card_bg_color;
+    border: 1px solid alpha(@borders, 0.8);
+}
+
+.elrond-ctx-warn {
+    color: @warning_color;
+    font-weight: 600;
+}
+
+.elrond-ctx-err {
+    color: @error_color;
+    font-weight: 700;
+}
