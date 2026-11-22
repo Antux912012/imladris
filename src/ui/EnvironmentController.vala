@@ -99,6 +99,45 @@ namespace Imladris.UI {
 
             toolbar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
 
+            var kernel_drop = new Gtk.DropDown.from_strings ({ "Auto Kernel", "Quarto", "R Kernel", "Python Kernel" }) {
+                tooltip_text = "Select preferred execution kernel (Auto, Quarto, R, or Python)",
+                selected = (uint) Core.SettingsManager.get_default ().preferred_kernel
+            };
+            kernel_drop.notify["selected"].connect (() => {
+                Core.SettingsManager.get_default ().preferred_kernel = (Core.KernelOption) kernel_drop.selected;
+            });
+            toolbar.append (kernel_drop);
+
+            var btn_host_scope = new Gtk.ToggleButton.with_label ("Host") {
+                tooltip_text = "Switch between bundled Flatpak out-of-box toolchain (off) and host R/Python/Quarto via flatpak-spawn (on)",
+                active = (Core.SettingsManager.get_default ().runtime_scope == Core.RuntimeExecutionScope.PREFER_HOST)
+            };
+            btn_host_scope.add_css_class ("flat");
+            btn_host_scope.toggled.connect (() => {
+                var scope = btn_host_scope.active
+                    ? Core.RuntimeExecutionScope.PREFER_HOST
+                    : Core.RuntimeExecutionScope.IN_SANDBOX_FIRST;
+                Core.SettingsManager.get_default ().runtime_scope = scope;
+                toast_requested (btn_host_scope.active
+                    ? "Runtime scope: Host system (flatpak-spawn --host)"
+                    : "Runtime scope: Out-of-box Flatpak / Managed Toolchain");
+            });
+            toolbar.append (btn_host_scope);
+
+            var btn_rescan_envs = new Gtk.Button.from_icon_name ("system-search-symbolic") {
+                tooltip_text = "Rescan Host & Project Environments (R, Python, uv, Conda, Quarto)"
+            };
+            btn_rescan_envs.add_css_class ("flat");
+            btn_rescan_envs.clicked.connect (() => {
+                string ws = get_session_manager ().current_working_dir;
+                Core.EnvDiscovery.get_default ().discover_async.begin (ws, true, null, (obj, res) => {
+                    var result = Core.EnvDiscovery.get_default ().discover_async.end (res);
+                    string r_info = result.latest_r_version != "" ? @"R $(result.latest_r_version)" : "R";
+                    toast_requested (@"Rescanned $(result.environments.size) environment(s) ($r_info)");
+                });
+            });
+            toolbar.append (btn_rescan_envs);
+
             search_entry = new Gtk.SearchEntry () {
                 placeholder_text = "Filter objects...",
                 width_request = 130

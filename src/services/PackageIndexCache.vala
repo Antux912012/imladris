@@ -84,7 +84,10 @@ namespace Imladris.UI {
         public PackageIndexCache () {
             cran_packages = new GenericArray<string> ();
             pypi_packages = new GenericArray<string> ();
-            soup_session = new Soup.Session ();
+            soup_session = new Soup.Session () {
+                timeout = 20,
+                idle_timeout = 30
+            };
             soup_session.user_agent = "Imladris-IDE/1.0";
 
             cache_dir = Path.build_filename (Environment.get_user_cache_dir (), "imladris", "indices");

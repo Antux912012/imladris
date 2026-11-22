@@ -108,7 +108,7 @@ command=imladris
 shared=ipc;network;
 sockets=fallback-x11;wayland;
 devices=dri;
-filesystems=xdg-documents;xdg-download;
+filesystems=home;/etc/imladris:ro;
 EOF_META
 
   run_meson_build "build-flatpak" "/app" "${PROJECT_DIR}/build-flatpak-app/files"
@@ -183,14 +183,9 @@ PYEOF
     --socket=fallback-x11 \
     --socket=wayland \
     --device=dri \
-    --talk-name=org.freedesktop.Flatpak \
-    --talk-name=org.gtk.vfs.* \
-    --filesystem=xdg-run/gvfs \
-    --filesystem=xdg-run/gvfsd \
-    --filesystem=xdg-documents \
-    --filesystem=xdg-download \
-    --filesystem=xdg-cache/imladris:create \
     --filesystem=home \
+    --filesystem=/etc/imladris:ro \
+    --talk-name=org.freedesktop.Flatpak \
     --env=PATH=/app/bin:/app/toolchain/bin:/usr/bin
 
   flatpak build-export --disable-sandbox repo build-flatpak-app master

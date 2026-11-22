@@ -689,6 +689,11 @@ namespace Imladris.Services {
             return fallback ?? "";
         }
 
+        private static GLib.Regex? cached_html_style_re = null;
+        private static GLib.Regex? cached_html_script_re = null;
+        private static GLib.Regex? cached_html_block_re = null;
+        private static GLib.Regex? cached_html_tag_re = null;
+
         private static string normalize_source_for_native_export (string source_text, DocumentFormat fmt) {
             string trimmed = source_text.strip ();
             if (fmt == DocumentFormat.RTF || trimmed.has_prefix ("{\\rtf")) {
@@ -697,14 +702,14 @@ namespace Imladris.Services {
             if (fmt == DocumentFormat.HTML || trimmed.down ().has_prefix ("<!doctype html") || trimmed.down ().has_prefix ("<html")) {
                 string cleaned = source_text;
                 try {
-                    var style_re = new GLib.Regex ("<style[^>]*>.*?</style>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
-                    cleaned = style_re.replace (cleaned, -1, 0, "");
-                    var script_re = new GLib.Regex ("<script[^>]*>.*?</script>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
-                    cleaned = script_re.replace (cleaned, -1, 0, "");
-                    var block_re = new GLib.Regex ("</?(p|div|br|li|h[1-6]|tr)[^>]*>", GLib.RegexCompileFlags.CASELESS);
-                    cleaned = block_re.replace (cleaned, -1, 0, "\n");
-                    var tag_re = new GLib.Regex ("<[^>]+>");
-                    cleaned = tag_re.replace (cleaned, -1, 0, "");
+                    if (cached_html_style_re == null) cached_html_style_re = new GLib.Regex ("<style[^>]*>.*?</style>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
+                    if (cached_html_script_re == null) cached_html_script_re = new GLib.Regex ("<script[^>]*>.*?</script>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
+                    if (cached_html_block_re == null) cached_html_block_re = new GLib.Regex ("</?(p|div|br|li|h[1-6]|tr)[^>]*>", GLib.RegexCompileFlags.CASELESS);
+                    if (cached_html_tag_re == null) cached_html_tag_re = new GLib.Regex ("<[^>]+>");
+                    cleaned = cached_html_style_re.replace (cleaned, -1, 0, "");
+                    cleaned = cached_html_script_re.replace (cleaned, -1, 0, "");
+                    cleaned = cached_html_block_re.replace (cleaned, -1, 0, "\n");
+                    cleaned = cached_html_tag_re.replace (cleaned, -1, 0, "");
                 } catch (GLib.RegexError e) {}
                 return cleaned
                     .replace ("&nbsp;", " ")

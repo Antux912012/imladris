@@ -129,35 +129,42 @@ namespace Imladris.Services {
             throw new GLib.IOError.FAILED (@"Could not resolve arXiv ID '$arxiv_id' (HTTP $(msg.status_code)).");
         }
 
+        private static GLib.Regex? cached_arxiv_entry_reg = null;
+        private static GLib.Regex? cached_arxiv_title_reg = null;
+        private static GLib.Regex? cached_arxiv_ws_reg = null;
+        private static GLib.Regex? cached_arxiv_pub_reg = null;
+        private static GLib.Regex? cached_arxiv_auth_reg = null;
+
         public static string? arxiv_atom_to_bibtex (string atom_xml, string arxiv_id) {
             try {
-                var entry_reg = new GLib.Regex ("<entry>([\\s\\S]*?)</entry>");
+                if (cached_arxiv_entry_reg == null) cached_arxiv_entry_reg = new GLib.Regex ("<entry>([\\s\\S]*?)</entry>");
+                if (cached_arxiv_title_reg == null) cached_arxiv_title_reg = new GLib.Regex ("<title>([\\s\\S]*?)</title>");
+                if (cached_arxiv_ws_reg == null) cached_arxiv_ws_reg = new GLib.Regex ("\\s+");
+                if (cached_arxiv_pub_reg == null) cached_arxiv_pub_reg = new GLib.Regex ("<published>(\\d{4})");
+                if (cached_arxiv_auth_reg == null) cached_arxiv_auth_reg = new GLib.Regex ("<author>\\s*<name>([\\s\\S]*?)</name>");
+
                 GLib.MatchInfo entry_mi;
-                if (!entry_reg.match (atom_xml, 0, out entry_mi)) return null;
+                if (!cached_arxiv_entry_reg.match (atom_xml, 0, out entry_mi)) return null;
                 string entry = entry_mi.fetch (1);
 
                 string title = "";
-                var title_reg = new GLib.Regex ("<title>([\\s\\S]*?)</title>");
                 GLib.MatchInfo title_mi;
-                if (title_reg.match (entry, 0, out title_mi)) {
+                if (cached_arxiv_title_reg.match (entry, 0, out title_mi)) {
                     title = unescape_xml_entities (title_mi.fetch (1).replace ("\n", " ").replace ("\r", "")).strip ();
-                    var ws_reg = new GLib.Regex ("\\s+");
-                    title = ws_reg.replace (title, -1, 0, " ");
+                    title = cached_arxiv_ws_reg.replace (title, -1, 0, " ");
                 }
                 if (title == "") return null;
 
                 string year = "n.d.";
-                var pub_reg = new GLib.Regex ("<published>(\\d{4})");
                 GLib.MatchInfo pub_mi;
-                if (pub_reg.match (entry, 0, out pub_mi)) {
+                if (cached_arxiv_pub_reg.match (entry, 0, out pub_mi)) {
                     year = pub_mi.fetch (1);
                 }
 
                 var authors = new GLib.GenericArray<string> ();
                 string first_family = "arxiv";
-                var auth_reg = new GLib.Regex ("<author>\\s*<name>([\\s\\S]*?)</name>");
                 GLib.MatchInfo auth_mi;
-                if (auth_reg.match (entry, 0, out auth_mi)) {
+                if (cached_arxiv_auth_reg.match (entry, 0, out auth_mi)) {
                     do {
                         string full_name = unescape_xml_entities (auth_mi.fetch (1)).strip ();
                         if (full_name == "") continue;

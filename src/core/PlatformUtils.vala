@@ -38,7 +38,6 @@ namespace Imladris.Core {
 
     public class PlatformUtils : GLib.Object {
 
-        private static bool? _is_flatpak_cached = null;
         private static GLib.HashTable<string, bool> _availability_cache = null;
         private static GLib.HashTable<string, string?> _path_cache = null;
         private static GLib.Mutex _cache_mutex;
@@ -47,12 +46,7 @@ namespace Imladris.Core {
          * Returns true if Imladris is running inside a Flatpak container sandbox.
          */
         public static bool is_flatpak () {
-            if (_is_flatpak_cached == null) {
-                bool exists = GLib.FileUtils.test ("/.flatpak-info", GLib.FileTest.EXISTS);
-                bool env_set = GLib.Environment.get_variable ("FLATPAK_ID") != null;
-                _is_flatpak_cached = exists || env_set;
-            }
-            return _is_flatpak_cached;
+            return HostBridge.is_flatpak ();
         }
 
         /**
@@ -138,6 +132,14 @@ namespace Imladris.Core {
 
             // Tier 2.5: Flatpak SDK Extension /app/toolchain, /app/bin, or /usr/lib/sdk/texlive
             if (is_flatpak ()) {
+                if (HostBridge.prefer_host_runtimes) {
+                    string? host_first = resolve_host_program_path (binary_name);
+                    if (host_first != null) {
+                        resolved_path = host_first;
+                        return RuntimeSource.HOST_FLATPAK_SPAWN;
+                    }
+                }
+
                 string[] ext_bins = {
                     GLib.Path.build_filename ("/app/toolchain/bin", binary_name),
                     GLib.Path.build_filename ("/usr/lib/sdk/texlive/bin/x86_64-linux", binary_name),
@@ -403,49 +405,7 @@ namespace Imladris.Core {
             string? working_dir = null,
             string[]? env_vars = null
         ) {
-            if (!is_flatpak ()) {
-                return argv;
-            }
-
-            var cmd = new GLib.GenericArray<string> ();
-            cmd.add ("flatpak-spawn");
-            cmd.add ("--host");
-            cmd.add ("--watch-bus");
-
-            if (working_dir != null && working_dir != "" &&
-                !working_dir.has_prefix ("/app/") && !working_dir.has_prefix ("/run/build/")) {
-                cmd.add ("--directory=" + working_dir);
-            }
-
-            if (env_vars != null) {
-                foreach (string kv in env_vars) {
-                    if (kv != null && kv.contains ("=")) {
-                        cmd.add ("--env=" + kv);
-                    }
-                }
-            }
-
-            string[] proxy_ca_vars = {
-                "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY",
-                "https_proxy", "http_proxy", "no_proxy",
-                "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"
-            };
-            foreach (string var_name in proxy_ca_vars) {
-                string? val = GLib.Environment.get_variable (var_name);
-                if (val != null && val != "") {
-                    cmd.add (@"--env=$var_name=$val");
-                }
-            }
-
-            for (int i = 0; i < argv.length; i++) {
-                cmd.add (argv[i]);
-            }
-
-            string[] result = new string[cmd.length];
-            for (int i = 0; i < cmd.length; i++) {
-                result[i] = cmd[i];
-            }
-            return result;
+            return HostBridge.wrap_command (argv, working_dir, env_vars);
         }
 
         /**
@@ -521,7 +481,7 @@ namespace Imladris.Core {
 
         private static string? resolve_host_program_path (string program) {
             try {
-                string[] argv = { "flatpak-spawn", "--host", "sh", "-c", "command -v \"$1\"", "_", program };
+                string[] argv = HostBridge.wrap_command ({ "sh", "-c", "command -v \"$1\"", "_", program }, null, null, true);
                 var proc = new GLib.Subprocess.newv (argv, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_SILENCE);
                 string? output = null;
                 proc.communicate_utf8 (null, null, out output, null);

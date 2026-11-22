@@ -153,12 +153,17 @@ namespace Imladris.Core {
             return -1;
         }
 
+        private static GLib.Regex? cached_fonttbl_rx = null;
+        private static GLib.Regex? cached_red_rx = null;
+        private static GLib.Regex? cached_green_rx = null;
+        private static GLib.Regex? cached_blue_rx = null;
+
         private static void parse_fonttbl (string group_raw, Gee.HashMap<int, string> fonttbl) {
             // Matches {\f0\fswiss... Font Name;} or \f0... Font Name;
             try {
-                var rx = new GLib.Regex ("\\\\f(\\d+)[^;{}]*?\\s+([^;{}]+);");
+                if (cached_fonttbl_rx == null) cached_fonttbl_rx = new GLib.Regex ("\\\\f(\\d+)[^;{}]*?\\s+([^;{}]+);");
                 GLib.MatchInfo mi;
-                if (rx.match (group_raw, 0, out mi)) {
+                if (cached_fonttbl_rx.match (group_raw, 0, out mi)) {
                     do {
                         int idx = int.parse (mi.fetch (1));
                         string fname = mi.fetch (2).strip ();
@@ -189,13 +194,13 @@ namespace Imladris.Core {
                 int r = 0, g = 0, b = 0;
                 bool has_rgb = false;
                 try {
-                    var rx_r = new GLib.Regex ("\\\\red(\\d+)");
-                    var rx_g = new GLib.Regex ("\\\\green(\\d+)");
-                    var rx_b = new GLib.Regex ("\\\\blue(\\d+)");
+                    if (cached_red_rx == null) cached_red_rx = new GLib.Regex ("\\\\red(\\d+)");
+                    if (cached_green_rx == null) cached_green_rx = new GLib.Regex ("\\\\green(\\d+)");
+                    if (cached_blue_rx == null) cached_blue_rx = new GLib.Regex ("\\\\blue(\\d+)");
                     GLib.MatchInfo mi;
-                    if (rx_r.match (entry, 0, out mi)) { r = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
-                    if (rx_g.match (entry, 0, out mi)) { g = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
-                    if (rx_b.match (entry, 0, out mi)) { b = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
+                    if (cached_red_rx.match (entry, 0, out mi)) { r = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
+                    if (cached_green_rx.match (entry, 0, out mi)) { g = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
+                    if (cached_blue_rx.match (entry, 0, out mi)) { b = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
                 } catch (GLib.RegexError e) {}
                 colortbl.add (has_rgb ? "#%02x%02x%02x".printf (r, g, b) : null);
             }

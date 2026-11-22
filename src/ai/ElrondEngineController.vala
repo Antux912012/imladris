@@ -56,16 +56,22 @@ namespace Imladris.AI {
         private Soup.Session soup_session;
         private Cancellable? probe_cancellable = null;
         private Subprocess? managed_server_process = null;
-        private string managed_server_model_path = "";
+        private string managed_server_launch_key = "";
+        private StringBuilder managed_stderr_buf = new StringBuilder ();
+        private int managed_last_exit_code = 0;
+        private bool hardware_probed_with_binary = false;
 
         public signal void status_updated (string status_text, bool is_busy, double progress_fraction);
         public signal void statusbar_telemetry_updated (string statusbar_text, bool active);
+        public signal void hardware_probe_updated (ElrondHardwareProbeResult result);
+        public signal void toast_notification_requested (string message);
 
         public bool is_ready { get; private set; default = false; }
         public ElrondMode active_mode { get; private set; default = ElrondMode.AUTO_DETECT; }
         public string active_endpoint { get; private set; default = ""; }
         public string active_model_name { get; private set; default = ""; }
         public string active_display_name { get; private set; default = "Local AI"; }
+        public ElrondHardwareProbeResult? hardware_probe_result { get; private set; default = null; }
 
         private ElrondEngineController () {
             soup_session = new Soup.Session () {
@@ -85,8 +91,22 @@ namespace Imladris.AI {
             }
 
             if (SettingsManager.get_default ().elrond_enabled) {
+                ensure_hardware_probe_async.begin ();
                 sync_with_preferences.begin ();
             }
+        }
+
+        public async ElrondHardwareProbeResult ensure_hardware_probe_async (bool force_reprobe = false) {
+            if (hardware_probe_result != null && !force_reprobe && hardware_probed_with_binary) {
+                return hardware_probe_result;
+            }
+            bool is_host_binary = false;
+            string? binary = find_llama_server_binary (ElrondBackend.VULKAN, out is_host_binary);
+            hardware_probed_with_binary = (binary != null);
+            var res = yield ElrondHardwareProbe.probe_async (binary, is_host_binary);
+            hardware_probe_result = res;
+            hardware_probe_updated (res);
+            return res;
         }
 
         public static ElrondEngineController get_default () {
@@ -121,7 +141,7 @@ namespace Imladris.AI {
             if (managed_server_process != null) {
                 managed_server_process.force_exit ();
                 managed_server_process = null;
-                managed_server_model_path = "";
+                managed_server_launch_key = "";
             }
         }
 
@@ -192,39 +212,128 @@ namespace Imladris.AI {
                 return false;
             }
 
-            if (managed_server_process != null && managed_server_model_path != model_path) {
-                managed_server_process.force_exit ();
-                managed_server_process = null;
+            string launch_key = "%s|%s|%s".printf (
+                model_path,
+                settings.elrond_auto_optimize.to_string (),
+                settings.elrond_compute_mode.to_string_id ()
+            );
+            if (managed_server_process != null && managed_server_launch_key != launch_key) {
+                stop_managed_process_only ();
             }
 
+            var probe_res = yield ensure_hardware_probe_async ();
+            bool using_cpu_only = !settings.elrond_auto_optimize &&
+                settings.elrond_compute_mode == ElrondComputeMode.CPU;
+            bool allow_cpu_retry = !using_cpu_only &&
+                probe_res.selected_device != null &&
+                probe_res.effective_tier != ElrondHardwareTier.TIER_5_LEGACY_OR_CPU;
+
             if (managed_server_process == null) {
-                bool is_host_binary = false;
-                string? binary = find_llama_server_binary (ElrondBackend.VULKAN, out is_host_binary);
-                if (binary == null || is_host_binary) {
-                    status_updated ("llama-server is not installed. Use Download & Use in AI settings to install it.", false, 0.0);
-                    return false;
+                bool started = yield start_and_wait_managed_server_async (
+                    model_path, probe_res, settings.elrond_auto_optimize, settings.elrond_compute_mode, false
+                );
+                if (started) {
+                    return true;
                 }
 
-                string[] argv = build_managed_server_argv (binary, model_path, find_preset_for_model_path (model_path));
-                try {
-                    managed_server_process = new Subprocess.newv (
-                        argv, SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE
+                if (allow_cpu_retry) {
+                    GLib.debug ("llama-server Vulkan startup failed (exit=%d), stderr:\n%s",
+                        managed_last_exit_code, managed_stderr_buf.str);
+                    GLib.warning ("Vulkan initialization failed for llama-server; retrying in CPU fallback mode.");
+                    stop_managed_process_only ();
+                    toast_notification_requested ("Vulkan initialization failed. Switched Elrond AI to CPU mode.");
+                    status_updated ("Vulkan initialization failed. Retrying Elrond AI in CPU mode...", true, 0.2);
+
+                    bool cpu_started = yield start_and_wait_managed_server_async (
+                        model_path, probe_res, settings.elrond_auto_optimize, settings.elrond_compute_mode, true
                     );
-                    managed_server_model_path = model_path;
-                    monitor_managed_output.begin (new DataInputStream (managed_server_process.get_stdout_pipe ()));
-                    monitor_managed_output.begin (new DataInputStream (managed_server_process.get_stderr_pipe ()));
-                    watch_managed_process.begin (managed_server_process);
-                } catch (GLib.Error e) {
-                    managed_server_process = null;
-                    status_updated ("Could not start llama-server: %s".printf (e.message), false, 0.0);
-                    return false;
+                    if (cpu_started) {
+                        return true;
+                    }
                 }
+
+                status_updated ("llama-server did not become ready within 15 seconds. Check its startup logs and system memory.", false, 0.0);
+                return false;
+            }
+
+            string detected_model = "";
+            if (yield probe_http_status_ok_async ("http://127.0.0.1:8081/health")) {
+                yield probe_http_endpoint_async ("http://127.0.0.1:8081/v1/models", out detected_model);
+                active_mode = ElrondMode.MANAGED_LLAMA;
+                active_display_name = "Imladris Managed llama.cpp";
+                active_endpoint = "http://127.0.0.1:8081/v1";
+                active_model_name = detected_model.length > 0
+                    ? detected_model : GLib.Path.get_basename (model_path);
+                return true;
+            }
+            return false;
+        }
+
+        private void stop_managed_process_only () {
+            if (managed_server_process != null) {
+                managed_server_process.force_exit ();
+                managed_server_process = null;
+                managed_server_launch_key = "";
+            }
+        }
+
+        private async bool start_and_wait_managed_server_async (
+            string model_path,
+            ElrondHardwareProbeResult probe_res,
+            bool auto_optimize,
+            ElrondComputeMode compute_mode,
+            bool force_cpu_fallback
+        ) {
+            bool is_host_binary = false;
+            string? binary = find_llama_server_binary (ElrondBackend.VULKAN, out is_host_binary);
+            if (binary == null || is_host_binary) {
+                status_updated ("llama-server is not installed. Use Download & Use in AI settings to install it.", false, 0.0);
+                return false;
+            }
+
+            managed_stderr_buf.truncate (0);
+            managed_last_exit_code = 0;
+
+            string[] argv = ElrondOptimizer.build_optimized_argv (
+                binary,
+                model_path,
+                find_preset_for_model_path (model_path),
+                probe_res,
+                auto_optimize,
+                compute_mode,
+                force_cpu_fallback
+            );
+
+            try {
+                managed_server_process = new Subprocess.newv (
+                    argv, SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE
+                );
+                managed_server_launch_key = "%s|%s|%s".printf (
+                    model_path,
+                    auto_optimize.to_string (),
+                    compute_mode.to_string_id ()
+                );
+                monitor_managed_output.begin (new DataInputStream (managed_server_process.get_stdout_pipe ()), false);
+                monitor_managed_output.begin (new DataInputStream (managed_server_process.get_stderr_pipe ()), true);
+                watch_managed_process.begin (managed_server_process);
+            } catch (GLib.Error e) {
+                managed_server_process = null;
+                status_updated ("Could not start llama-server: %s".printf (e.message), false, 0.0);
+                return false;
             }
 
             status_updated ("Starting llama-server with the selected model...", true, 0.15);
-            for (int attempt = 0; attempt < 90; attempt++) {
-                string detected_model = "";
-                if (yield probe_http_endpoint_async ("http://127.0.0.1:8081/v1/models", out detected_model)) {
+            // Monitor startup for 15 seconds (30 * 500ms) or until /health returns HTTP 200
+            for (int attempt = 0; attempt < 30; attempt++) {
+                if (managed_server_process == null) {
+                    break;
+                }
+                if (!force_cpu_fallback && ElrondOptimizer.is_vulkan_failure_stderr (managed_stderr_buf.str)) {
+                    break;
+                }
+                if (yield probe_http_status_ok_async ("http://127.0.0.1:8081/health")) {
+                    string detected_model = "";
+                    yield probe_http_endpoint_async ("http://127.0.0.1:8081/v1/models", out detected_model);
                     active_mode = ElrondMode.MANAGED_LLAMA;
                     active_display_name = "Imladris Managed llama.cpp";
                     active_endpoint = "http://127.0.0.1:8081/v1";
@@ -232,24 +341,37 @@ namespace Imladris.AI {
                         ? detected_model : GLib.Path.get_basename (model_path);
                     return true;
                 }
-                if (managed_server_process == null) {
-                    break;
-                }
                 yield delay_async (500);
             }
-
-            status_updated ("llama-server did not become ready within 45 seconds. Check its startup logs and system memory.", false, 0.0);
             return false;
         }
 
-        private async void monitor_managed_output (DataInputStream stream) {
+        private async bool probe_http_status_ok_async (string url) {
+            try {
+                var msg = new Soup.Message ("GET", url);
+                var cancellable = new Cancellable ();
+                Timeout.add (1000, () => {
+                    cancellable.cancel ();
+                    return Source.REMOVE;
+                });
+                Bytes bytes = yield soup_session.send_and_read_async (msg, Priority.DEFAULT, cancellable);
+                return msg.status_code == Soup.Status.OK && bytes != null;
+            } catch (Error e) {
+                return false;
+            }
+        }
+
+        private async void monitor_managed_output (DataInputStream stream, bool is_stderr = false) {
             try {
                 while (true) {
                     string? line = yield stream.read_line_async (Priority.DEFAULT, null);
                     if (line == null) {
                         break;
                     }
-
+                    if (is_stderr) {
+                        managed_stderr_buf.append (line);
+                        managed_stderr_buf.append_c ('\n');
+                    }
                     status_updated (line, true, 0.5);
                 }
             } catch (GLib.Error e) {
@@ -260,12 +382,18 @@ namespace Imladris.AI {
         private async void watch_managed_process (Subprocess process) {
             try {
                 yield process.wait_async (null);
+                if (process.get_if_exited ()) {
+                    managed_last_exit_code = process.get_exit_status ();
+                } else {
+                    managed_last_exit_code = -1;
+                }
             } catch (GLib.Error e) {
                 warning ("Could not monitor managed llama-server: %s", e.message);
+                managed_last_exit_code = -1;
             }
             if (managed_server_process == process) {
                 managed_server_process = null;
-                managed_server_model_path = "";
+                managed_server_launch_key = "";
                 is_ready = false;
                 status_updated ("Managed llama-server exited. Check its startup logs and memory requirements.", false, 0.0);
             }
@@ -305,6 +433,7 @@ namespace Imladris.AI {
             if (find_llama_server_binary (ElrondBackend.VULKAN, out is_host_binary) == null || is_host_binary) {
                 throw new GLib.IOError.FAILED ("The llama.cpp installer completed, but llama-server was not found.");
             }
+            yield ensure_hardware_probe_async (true);
         }
 
         public static string[] build_managed_server_argv (
@@ -540,12 +669,7 @@ namespace Imladris.AI {
 
         private static async string get_agy_version_async (string agy_bin) {
             try {
-                string[] argv;
-                if (PlatformUtils.is_flatpak ()) {
-                    argv = { "flatpak-spawn", "--host", agy_bin, "--version" };
-                } else {
-                    argv = { agy_bin, "--version" };
-                }
+                string[] argv = HostBridge.wrap_command ({ agy_bin, "--version" });
 
                 var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_SILENCE);
                 var proc = launcher.spawnv (argv);
@@ -568,12 +692,7 @@ namespace Imladris.AI {
                 throw new GLib.IOError.NOT_FOUND ("Antigravity CLI (agy) not found in system or ~/.local/bin");
             }
 
-            string[] argv;
-            if (PlatformUtils.is_flatpak ()) {
-                argv = { "flatpak-spawn", "--host", agy_bin, "-p", prompt, "--disable-slash-commands" };
-            } else {
-                argv = { agy_bin, "-p", prompt, "--disable-slash-commands" };
-            }
+            string[] argv = HostBridge.wrap_command ({ agy_bin, "-p", prompt, "--disable-slash-commands" });
 
             var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE);
             var proc = launcher.spawnv (argv);
@@ -970,12 +1089,8 @@ You specialize in R (tidyverse, ggplot2, biostatistics), Python (pandas, numpy, 
 
         public static bool is_binary_runnable (string bin_path, bool on_host = false) {
             try {
-                string[] argv;
-                if (on_host && PlatformUtils.is_flatpak ()) {
-                    argv = { "flatpak-spawn", "--host", bin_path, "--version" };
-                } else {
-                    argv = { bin_path, "--version" };
-                }
+                string[] raw = { bin_path, "--version" };
+                string[] argv = on_host ? HostBridge.wrap_command (raw) : raw;
 
                 var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                 var proc = launcher.spawnv (argv);

@@ -1140,7 +1140,7 @@ namespace Imladris.Core {
             }
 
             try {
-                var ws_rx = new GLib.Regex ("  +");
+                if (ws_rx == null) ws_rx = new GLib.Regex ("  +");
                 return ws_rx.replace (out_sb.str, -1, 0, " ").strip ();
             } catch (GLib.RegexError e) {
                 return out_sb.str.strip ();
@@ -1366,7 +1366,45 @@ namespace Imladris.Core {
             s = render_one_brace_cmd_html (s, "^", "<sup>", "</sup>");
             s = render_one_brace_cmd_html (s, "_", "<sub>", "</sub>");
 
-            // Replace LaTeX symbols with Unicode symbols
+            // Simple single-character ^x and _x BEFORE symbol spans are emitted
+            try {
+                if (cached_rem_sup_rx == null) cached_rem_sup_rx = new GLib.Regex ("\\^([a-zA-Z0-9+-])");
+                s = cached_rem_sup_rx.replace (s, -1, 0, "<sup>\\1</sup>");
+                if (cached_rem_sub_rx == null) cached_rem_sub_rx = new GLib.Regex ("_([a-zA-Z0-9+-])");
+                s = cached_rem_sub_rx.replace (s, -1, 0, "<sub>\\1</sub>");
+            } catch (GLib.RegexError e) {}
+
+            // Replace LaTeX commands in a single longest-command regex pass (prevents \int -> ∈t)
+            var sym_table = get_html_symbol_table ();
+
+            try {
+                if (cached_latex_cmd_rx == null) cached_latex_cmd_rx = new GLib.Regex ("\\\\([A-Za-z]+|[,|\\(\\)\\[\\]])");
+                s = cached_latex_cmd_rx.replace_eval (s, -1, 0, 0, (mi, res) => {
+                    string full = mi.fetch (0);
+                    if (sym_table.has_key (full)) {
+                        res.append (sym_table.get (full));
+                    } else {
+                        res.append (full);
+                    }
+                    return false;
+                });
+            } catch (GLib.RegexError e) {}
+
+            if (display_block) {
+                return @"<div class=\"math-display-card\">$s</div>";
+            }
+            return @"<span class=\"math-inline\">$s</span>";
+        }
+
+        private static GLib.Regex? cached_rem_sup_rx = null;
+        private static GLib.Regex? cached_rem_sub_rx = null;
+        private static GLib.Regex? cached_latex_cmd_rx = null;
+        private static Gee.HashMap<string, string>? cached_html_sym_table = null;
+
+        private static Gee.HashMap<string, string> get_html_symbol_table () {
+            if (cached_html_sym_table != null) {
+                return cached_html_sym_table;
+            }
             string[,] sym_map = {
                 { "\\rightleftharpoons", "⇌" },
                 { "\\leftrightarrow", "↔" },
@@ -1426,53 +1464,19 @@ namespace Imladris.Core {
                 { "\\left|", "|" }, { "\\right|", "|" },
                 { "\\left(", "(" }, { "\\right)", ")" },
                 { "\\left[", "[" }, { "\\right]", "]" },
-                { "\\,", " " }
+                { "\\,", " " },
+                { "\\sim", "∼" }, { "\\cong", "≅" }, { "\\simeq", "≃" },
+                { "\\ll", "≪" }, { "\\gg", "≫" },
+                { "\\langle", "⟨" }, { "\\rangle", "⟩" },
+                { "\\dots", "…" }, { "\\cdots", "⋯" }, { "\\vdots", "⋮" },
+                { "\\Re", "ℜ" }, { "\\Im", "ℑ" }
             };
-
-            // Simple single-character ^x and _x BEFORE symbol spans are emitted
-            try {
-                var rem_sup = new GLib.Regex ("\\^([a-zA-Z0-9+-])");
-                s = rem_sup.replace (s, -1, 0, "<sup>\\1</sup>");
-                var rem_sub = new GLib.Regex ("_([a-zA-Z0-9+-])");
-                s = rem_sub.replace (s, -1, 0, "<sub>\\1</sub>");
-            } catch (GLib.RegexError e) {}
-
-            // Replace LaTeX commands in a single longest-command regex pass (prevents \int -> ∈t)
-            var sym_table = new Gee.HashMap<string, string> ();
+            var tbl = new Gee.HashMap<string, string> ();
             for (int i = 0; i < sym_map.length[0]; i++) {
-                sym_table.set (sym_map[i, 0], sym_map[i, 1]);
+                tbl.set (sym_map[i, 0], sym_map[i, 1]);
             }
-            sym_table.set ("\\sim", "∼");
-            sym_table.set ("\\cong", "≅");
-            sym_table.set ("\\simeq", "≃");
-            sym_table.set ("\\ll", "≪");
-            sym_table.set ("\\gg", "≫");
-            sym_table.set ("\\langle", "⟨");
-            sym_table.set ("\\rangle", "⟩");
-            sym_table.set ("\\dots", "…");
-            sym_table.set ("\\cdots", "⋯");
-            sym_table.set ("\\vdots", "⋮");
-            sym_table.set ("\\Re", "ℜ");
-            sym_table.set ("\\Im", "ℑ");
-            sym_table.set ("\\partial", "∂");
-
-            try {
-                var cmd_rx = new GLib.Regex ("\\\\([A-Za-z]+|[,|\\(\\)\\[\\]])");
-                s = cmd_rx.replace_eval (s, -1, 0, 0, (mi, res) => {
-                    string full = mi.fetch (0);
-                    if (sym_table.has_key (full)) {
-                        res.append (sym_table.get (full));
-                    } else {
-                        res.append (full);
-                    }
-                    return false;
-                });
-            } catch (GLib.RegexError e) {}
-
-            if (display_block) {
-                return @"<div class=\"math-display-card\">$s</div>";
-            }
-            return @"<span class=\"math-inline\">$s</span>";
+            cached_html_sym_table = tbl;
+            return cached_html_sym_table;
         }
 
         private static string render_matrix_environments_html (string input) {

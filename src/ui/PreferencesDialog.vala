@@ -12,6 +12,8 @@ namespace Imladris.UI {
 
         private ulong accent_changed_hid = 0;
         private ulong elrond_status_hid = 0;
+        private ulong elrond_hw_probe_hid = 0;
+        private ulong elrond_toast_hid = 0;
         private ulong plugins_changed_hid = 0;
         private GLib.Cancellable? community_cancellable = null;
         private Gee.ArrayList<Imladris.Plugins.CommunityPluginEntry> community_entries = new Gee.ArrayList<Imladris.Plugins.CommunityPluginEntry> ();
@@ -39,6 +41,14 @@ namespace Imladris.UI {
                 if (elrond_status_hid != 0) {
                     Imladris.AI.ElrondEngineController.get_default ().disconnect (elrond_status_hid);
                     elrond_status_hid = 0;
+                }
+                if (elrond_hw_probe_hid != 0) {
+                    Imladris.AI.ElrondEngineController.get_default ().disconnect (elrond_hw_probe_hid);
+                    elrond_hw_probe_hid = 0;
+                }
+                if (elrond_toast_hid != 0) {
+                    Imladris.AI.ElrondEngineController.get_default ().disconnect (elrond_toast_hid);
+                    elrond_toast_hid = 0;
                 }
                 if (plugins_changed_hid != 0) {
                     Imladris.Plugins.PluginManager.get_default ().disconnect (plugins_changed_hid);
@@ -488,6 +498,77 @@ namespace Imladris.UI {
 
             elrond_group.add (elrond_enable_row);
             elrond_group.add (elrond_level_row);
+
+            var auto_optimize_row = new Adw.SwitchRow () {
+                title = "Hardware Auto-Optimize",
+                subtitle = "Detect GPU/iGPU via Vulkan and apply safe, high-performance launch flags",
+                active = settings.elrond_auto_optimize
+            };
+
+            var compute_mode_strings = new Gtk.StringList (null);
+            compute_mode_strings.append ("Auto");
+            compute_mode_strings.append ("Vulkan GPU");
+            compute_mode_strings.append ("CPU Only");
+
+            var compute_mode_row = new Adw.ComboRow () {
+                title = "Manual Compute Mode",
+                subtitle = "Override compute backend when Hardware Auto-Optimize is disabled",
+                model = compute_mode_strings,
+                selected = (uint) settings.elrond_compute_mode,
+                sensitive = !settings.elrond_auto_optimize
+            };
+
+            var profile_badge_label = new Gtk.Label ("Auto-Optimized: Probing hardware…") {
+                valign = Gtk.Align.CENTER,
+                ellipsize = Pango.EllipsizeMode.END,
+                max_width_chars = 48
+            };
+            profile_badge_label.add_css_class ("caption");
+            profile_badge_label.add_css_class ("accent");
+
+            var hw_profile_row = new Adw.ActionRow () {
+                title = "Active Hardware Profile",
+                subtitle = "Hardware tier and Vulkan device selected for local llama-server"
+            };
+            hw_profile_row.add_suffix (profile_badge_label);
+
+            GLib.Func<Imladris.AI.ElrondHardwareProbeResult?> update_profile_badge = (probe_res) => {
+                if (probe_res != null) {
+                    profile_badge_label.label = probe_res.format_profile_badge (
+                        settings.elrond_auto_optimize,
+                        settings.elrond_compute_mode
+                    );
+                } else {
+                    profile_badge_label.label = "Auto-Optimized: Probing hardware…";
+                }
+            };
+            update_profile_badge (elrond_engine.hardware_probe_result);
+
+            auto_optimize_row.notify["active"].connect (() => {
+                settings.elrond_auto_optimize = auto_optimize_row.active;
+                compute_mode_row.sensitive = !auto_optimize_row.active;
+                update_profile_badge (elrond_engine.hardware_probe_result);
+            });
+
+            compute_mode_row.notify["selected"].connect (() => {
+                settings.elrond_compute_mode = (Core.ElrondComputeMode) compute_mode_row.selected;
+                update_profile_badge (elrond_engine.hardware_probe_result);
+            });
+
+            elrond_hw_probe_hid = elrond_engine.hardware_probe_updated.connect ((probe_res) => {
+                update_profile_badge (probe_res);
+            });
+            elrond_toast_hid = elrond_engine.toast_notification_requested.connect ((msg) => {
+                this.add_toast (new Adw.Toast (msg));
+            });
+
+            if (elrond_engine.hardware_probe_result == null) {
+                elrond_engine.ensure_hardware_probe_async.begin ();
+            }
+
+            elrond_group.add (auto_optimize_row);
+            elrond_group.add (compute_mode_row);
+            elrond_group.add (hw_profile_row);
 
             var inline_autocomplete_row = new Adw.SwitchRow () {
                 title = "Inline AI Autocomplete",

@@ -18,7 +18,20 @@ namespace Imladris {
 
             string[] final_argv;
             if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
-                final_argv = Core.PlatformUtils.build_host_command (argv, working_dir);
+                var probe = Core.EnvDiscovery.get_default ().get_cached (working_dir);
+                string[] sub_args = new string[argv.length - 1];
+                for (int i = 1; i < argv.length; i++) sub_args[i - 1] = argv[i];
+
+                string[] env_vars = {};
+                string[] routed = argv;
+                if (prog == "quarto") {
+                    routed = Core.ExecutionRouter.build_quarto_command (probe, sub_args, working_dir, null, out env_vars);
+                } else if (prog == "R" || prog == "Rscript") {
+                    routed = Core.ExecutionRouter.build_r_command (probe, sub_args, working_dir, null, prog == "R", out env_vars);
+                } else if (prog == "python" || prog == "python3") {
+                    routed = Core.ExecutionRouter.build_python_command (probe, sub_args, working_dir, null, out env_vars);
+                }
+                final_argv = Core.HostBridge.wrap_command (routed, working_dir, env_vars);
             } else if (source == Core.RuntimeSource.MANAGED_GLOBAL || source == Core.RuntimeSource.PROJECT_SANDBOX) {
                 Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                 final_argv = new string[argv.length];

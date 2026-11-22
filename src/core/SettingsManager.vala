@@ -104,6 +104,49 @@ namespace Imladris.Core {
         }
     }
 
+    public enum ElrondComputeMode {
+        AUTO = 0,
+        VULKAN = 1,
+        CPU = 2;
+
+        public string to_string_id () {
+            switch (this) {
+                case VULKAN: return "vulkan";
+                case CPU: return "cpu";
+                default: return "auto";
+            }
+        }
+
+        public static ElrondComputeMode from_string_id (string id) {
+            switch (id.down ()) {
+                case "vulkan": return VULKAN;
+                case "cpu": return CPU;
+                default: return AUTO;
+            }
+        }
+
+        public string get_display_name () {
+            switch (this) {
+                case VULKAN: return "Vulkan GPU";
+                case CPU: return "CPU Only";
+                default: return "Auto";
+            }
+        }
+    }
+
+    public enum RuntimeExecutionScope {
+        IN_SANDBOX_FIRST = 0,
+        PREFER_HOST = 1;
+
+        public string to_string_id () {
+            return (this == PREFER_HOST) ? "host" : "sandbox";
+        }
+
+        public static RuntimeExecutionScope from_string_id (string id) {
+            return (id.down () == "host") ? PREFER_HOST : IN_SANDBOX_FIRST;
+        }
+    }
+
     public enum PreviewBackend {
         WEBKIT_HTML = 0,
         NATIVE_GTK_PANGO = 1,
@@ -359,6 +402,11 @@ namespace Imladris.Core {
         private PreviewBackend _preview_backend = PreviewBackend.WEBKIT_HTML;
 
         private bool _elrond_enabled = false;
+        private bool _elrond_auto_optimize = true;
+        private ElrondComputeMode _elrond_compute_mode = ElrondComputeMode.AUTO;
+        private KernelOption _preferred_kernel = KernelOption.AUTO;
+        private string _preferred_env_path = "";
+        private RuntimeExecutionScope _runtime_scope = RuntimeExecutionScope.IN_SANDBOX_FIRST;
         private AiAssistanceLevel _elrond_level = AiAssistanceLevel.MEDIUM;
         private ElrondBackend _elrond_backend = ElrondBackend.VULKAN;
         private ElrondMode _elrond_mode = ElrondMode.AUTO_DETECT;
@@ -427,6 +475,81 @@ namespace Imladris.Core {
                     _elrond_enabled = value;
                     save_ini ();
                     ai_settings_changed ();
+                }
+            }
+        }
+
+        public bool elrond_auto_optimize {
+            get {
+                if (gsettings != null && gsettings.settings_schema.has_key ("elrond-auto-optimize")) {
+                    return gsettings.get_boolean ("elrond-auto-optimize");
+                }
+                return _elrond_auto_optimize;
+            }
+            set {
+                bool current = elrond_auto_optimize;
+                _elrond_auto_optimize = value;
+                if (gsettings != null && gsettings.settings_schema.has_key ("elrond-auto-optimize")) {
+                    gsettings.set_boolean ("elrond-auto-optimize", value);
+                }
+                if (current != value) {
+                    save_ini ();
+                    ai_settings_changed ();
+                }
+            }
+        }
+
+        public ElrondComputeMode elrond_compute_mode {
+            get {
+                if (gsettings != null && gsettings.settings_schema.has_key ("elrond-compute-mode")) {
+                    return ElrondComputeMode.from_string_id (gsettings.get_string ("elrond-compute-mode"));
+                }
+                return _elrond_compute_mode;
+            }
+            set {
+                ElrondComputeMode current = elrond_compute_mode;
+                _elrond_compute_mode = value;
+                if (gsettings != null && gsettings.settings_schema.has_key ("elrond-compute-mode")) {
+                    gsettings.set_string ("elrond-compute-mode", value.to_string_id ());
+                }
+                if (current != value) {
+                    save_ini ();
+                    ai_settings_changed ();
+                }
+            }
+        }
+
+        public KernelOption preferred_kernel {
+            get { return _preferred_kernel; }
+            set {
+                if (_preferred_kernel != value) {
+                    _preferred_kernel = value;
+                    save_ini ();
+                    ui_settings_changed ();
+                }
+            }
+        }
+
+        public string preferred_env_path {
+            get { return _preferred_env_path; }
+            set {
+                if (_preferred_env_path != value) {
+                    _preferred_env_path = value;
+                    save_ini ();
+                    ui_settings_changed ();
+                }
+            }
+        }
+
+        public RuntimeExecutionScope runtime_scope {
+            get { return _runtime_scope; }
+            set {
+                if (_runtime_scope != value) {
+                    _runtime_scope = value;
+                    HostBridge.prefer_host_runtimes = (value == RuntimeExecutionScope.PREFER_HOST);
+                    PlatformUtils.clear_caches ();
+                    save_ini ();
+                    ui_settings_changed ();
                 }
             }
         }
@@ -721,6 +844,16 @@ namespace Imladris.Core {
                             apply_accent_color (accent_color);
                         });
                     }
+                    if (gsettings.settings_schema.has_key ("elrond-auto-optimize")) {
+                        gsettings.changed["elrond-auto-optimize"].connect (() => {
+                            ai_settings_changed ();
+                        });
+                    }
+                    if (gsettings.settings_schema.has_key ("elrond-compute-mode")) {
+                        gsettings.changed["elrond-compute-mode"].connect (() => {
+                            ai_settings_changed ();
+                        });
+                    }
                 } else {
                     GLib.debug ("GSettings schema %s not installed; preferences will not persist.", SCHEMA_ID);
                 }
@@ -756,7 +889,7 @@ namespace Imladris.Core {
         }
 
         private string? resolve_policy_file_path () {
-            if (GLib.FileUtils.test ("/.flatpak-info", GLib.FileTest.EXISTS)) {
+            if (HostBridge.is_flatpak ()) {
                 string host_path = "/run/host/etc/imladris/policy.json";
                 if (GLib.FileUtils.test (host_path, GLib.FileTest.EXISTS)) {
                     return host_path;
@@ -837,6 +970,14 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("ElrondAI", "enabled")) {
                         _elrond_enabled = config_keyfile.get_boolean ("ElrondAI", "enabled");
                     }
+                    if (config_keyfile.has_key ("ElrondAI", "auto_optimize")) {
+                        _elrond_auto_optimize = config_keyfile.get_boolean ("ElrondAI", "auto_optimize");
+                    }
+                    if (config_keyfile.has_key ("ElrondAI", "compute_mode")) {
+                        _elrond_compute_mode = ElrondComputeMode.from_string_id (
+                            config_keyfile.get_string ("ElrondAI", "compute_mode")
+                        );
+                    }
                     if (config_keyfile.has_key ("ElrondAI", "level")) {
                         _elrond_level = (AiAssistanceLevel) config_keyfile.get_integer ("ElrondAI", "level");
                     }
@@ -905,6 +1046,20 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("Security", "phi_data_lock")) {
                         _phi_data_lock = config_keyfile.get_boolean ("Security", "phi_data_lock");
                     }
+                    if (config_keyfile.has_key ("Environment", "preferred_kernel")) {
+                        _preferred_kernel = KernelOption.from_string_id (
+                            config_keyfile.get_string ("Environment", "preferred_kernel")
+                        );
+                    }
+                    if (config_keyfile.has_key ("Environment", "preferred_env_path")) {
+                        _preferred_env_path = config_keyfile.get_string ("Environment", "preferred_env_path");
+                    }
+                    if (config_keyfile.has_key ("Environment", "runtime_scope")) {
+                        _runtime_scope = RuntimeExecutionScope.from_string_id (
+                            config_keyfile.get_string ("Environment", "runtime_scope")
+                        );
+                        HostBridge.prefer_host_runtimes = (_runtime_scope == RuntimeExecutionScope.PREFER_HOST);
+                    }
                 } catch (Error e) {}
             }
         }
@@ -917,6 +1072,8 @@ namespace Imladris.Core {
             }
             try {
                 config_keyfile.set_boolean ("ElrondAI", "enabled", _elrond_enabled);
+                config_keyfile.set_boolean ("ElrondAI", "auto_optimize", _elrond_auto_optimize);
+                config_keyfile.set_string ("ElrondAI", "compute_mode", _elrond_compute_mode.to_string_id ());
                 config_keyfile.set_integer ("ElrondAI", "level", (int) _elrond_level);
                 config_keyfile.set_integer ("ElrondAI", "backend", (int) _elrond_backend);
                 config_keyfile.set_integer ("ElrondAI", "mode", (int) _elrond_mode);
@@ -939,6 +1096,9 @@ namespace Imladris.Core {
                 config_keyfile.set_integer ("Workspace", "preview_backend", (int) _preview_backend);
                 config_keyfile.set_boolean ("Security", "airgapped_mode", _airgapped_mode);
                 config_keyfile.set_boolean ("Security", "phi_data_lock", _phi_data_lock);
+                config_keyfile.set_string ("Environment", "preferred_kernel", _preferred_kernel.to_string_id ());
+                config_keyfile.set_string ("Environment", "preferred_env_path", _preferred_env_path);
+                config_keyfile.set_string ("Environment", "runtime_scope", _runtime_scope.to_string_id ());
                 FileUtils.set_contents (config_ini_path, config_keyfile.to_data ());
             } catch (Error e) {}
         }

@@ -491,7 +491,12 @@ namespace Imladris.Services {
 
                 string[] argv;
                 if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
-                    argv = Core.PlatformUtils.build_host_command ({ "R", "--slave", "--no-restore", "--no-save", "-e", r_driver }, cwd);
+                    var probe = Core.EnvDiscovery.get_default ().get_cached (cwd);
+                    string[] env_vars;
+                    string[] routed_r = Core.ExecutionRouter.build_r_command (
+                        probe, { "--slave", "--no-restore", "--no-save", "-e", r_driver }, cwd, null, true, out env_vars
+                    );
+                    argv = Core.HostBridge.wrap_command (routed_r, cwd, env_vars);
                 } else {
                     Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                     argv = raw_argv;
@@ -593,7 +598,12 @@ for _raw in sys.stdin:
 
                 string[] argv;
                 if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
-                    argv = Core.PlatformUtils.build_host_command ({ "python3", "-u", "-c", py_driver }, cwd);
+                    var probe = Core.EnvDiscovery.get_default ().get_cached (cwd);
+                    string[] env_vars;
+                    string[] routed_py = Core.ExecutionRouter.build_python_command (
+                        probe, { "-u", "-c", py_driver }, cwd, null, out env_vars
+                    );
+                    argv = Core.HostBridge.wrap_command (routed_py, cwd, env_vars);
                 } else {
                     Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                     argv = raw_argv;

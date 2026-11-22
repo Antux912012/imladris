@@ -39,7 +39,6 @@ Requires:       curl
 Requires:       bzip2
 Requires:       tar
 Requires:       R-core
-Requires:       python3
 Requires:       python3-pip
 Requires:       pandoc
 Requires:       git

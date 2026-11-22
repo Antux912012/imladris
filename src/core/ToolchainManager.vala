@@ -470,7 +470,7 @@ namespace Imladris.Core {
             GLib.GenericArray<string> pkgs,
             ToolchainComponent comp,
             string python_ver = "3.12",
-            string r_ver = "4.4",
+            string r_ver = "latest",
             bool for_update = false
         ) {
             switch (comp) {
@@ -491,7 +491,8 @@ namespace Imladris.Core {
                     pkgs.add ("openpyxl");
                     break;
                 case ToolchainComponent.R:
-                    pkgs.add (for_update ? "r-base" : @"r-base=$r_ver");
+                    bool unpinned_r = (for_update || r_ver == "" || r_ver == "latest");
+                    pkgs.add (unpinned_r ? "r-base" : @"r-base=$r_ver");
                     pkgs.add ("r-irkernel");
                     pkgs.add ("r-remotes");
                     pkgs.add ("r-pak");
@@ -966,7 +967,7 @@ local({
                 pkgs.add ("uv");
             }
             if (include_r) {
-                pkgs.add ("r-base=4.4");
+                pkgs.add ("r-base");
                 pkgs.add ("r-irkernel");
                 pkgs.add ("r-pak");
                 pkgs.add ("compilers");

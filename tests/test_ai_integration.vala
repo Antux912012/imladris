@@ -41,6 +41,8 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/ai/copilot_json_parsing", test_copilot_json_parsing);
         GLib.Test.add_func ("/ai/chunk_edit_preserving_options", test_chunk_edit_preserving_options);
         GLib.Test.add_func ("/ai/elrond_intent_routing_and_history", test_elrond_intent_routing_and_history);
+        GLib.Test.add_func ("/ai/elrond_hardware_auto_optimizer", test_elrond_hardware_auto_optimizer);
+        GLib.Test.add_func ("/core/flatpak_host_bridge_and_router", test_flatpak_host_bridge_and_router);
         GLib.Test.add_func ("/security/airgapped_policy_and_phi_guard", test_airgapped_policy_and_phi_guard);
 
         return GLib.Test.run ();
@@ -796,5 +798,197 @@ namespace Imladris.Tests {
         var catalog = Imladris.AI.LocalModelManager.get_catalog ();
         assert (catalog.size == 10);
         assert (catalog[9].id == "lfm25-1.2b");
+    }
+
+    private static void test_elrond_hardware_auto_optimizer () {
+        // 1. Settings & ElrondComputeMode defaults
+        var settings = SettingsManager.get_default ();
+        assert (settings.elrond_auto_optimize == true);
+        assert (settings.elrond_compute_mode == ElrondComputeMode.AUTO);
+        assert (ElrondComputeMode.AUTO.to_string_id () == "auto");
+        assert (ElrondComputeMode.VULKAN.to_string_id () == "vulkan");
+        assert (ElrondComputeMode.CPU.to_string_id () == "cpu");
+        assert (ElrondComputeMode.from_string_id ("vulkan") == ElrondComputeMode.VULKAN);
+        assert (ElrondComputeMode.from_string_id ("cpu") == ElrondComputeMode.CPU);
+        assert (ElrondComputeMode.from_string_id ("unknown") == ElrondComputeMode.AUTO);
+
+        // 2. Hybrid laptop (Intel UHD + NVIDIA RTX) -> selects NVIDIA RTX (Tier 1)
+        string hybrid_out = """Available devices:
+  Vulkan0: Intel(R) UHD Graphics (TGL GT1) (15800 MiB, 15800 MiB free)
+  Vulkan1: NVIDIA GeForce RTX 4070 Laptop GPU (8188 MiB, 7800 MiB free)
+  Vulkan2: llvmpipe (LLVM 19.1.0, 256 bits) (32000 MiB, 32000 MiB free)
+""";
+        var hybrid_probe = Imladris.AI.ElrondHardwareProbe.probe_from_output (hybrid_out, 32768, 8);
+        assert (hybrid_probe.selected_device != null);
+        assert (hybrid_probe.selected_device.device_id == "Vulkan1");
+        assert (hybrid_probe.effective_tier == Imladris.AI.ElrondHardwareTier.TIER_1_NVIDIA_DGPU);
+        assert (hybrid_probe.format_profile_badge ().has_prefix ("Auto-Optimized: NVIDIA GeForce RTX 4070 Laptop GPU"));
+
+        string[] hybrid_args = Imladris.AI.ElrondOptimizer.build_optimized_argv (
+            "llama-server", "/tmp/model.gguf", null, hybrid_probe
+        );
+        assert (contains_pair (hybrid_args, "-dev", "Vulkan1"));
+        assert (contains_pair (hybrid_args, "-ngl", "auto"));
+        assert (contains_pair (hybrid_args, "--fit", "on"));
+        assert (contains_pair (hybrid_args, "--fit-target", "256"));
+        assert (contains_pair (hybrid_args, "--flash-attn", "on"));
+        assert (contains_pair (hybrid_args, "-ctk", "q8_0"));
+        assert (contains_pair (hybrid_args, "-ctv", "q8_0"));
+        assert (contains_pair (hybrid_args, "-b", "512"));
+        assert (contains_pair (hybrid_args, "-ub", "512"));
+        assert (contains_pair (hybrid_args, "-t", "4"));
+
+        // 3. Intel Iris Xe only -> selects Tier 4 profile
+        string iris_out = """Available devices:
+  Vulkan0: Intel(R) Iris(R) Xe Graphics (TGL GT2) (8192 MiB, 7900 MiB free)
+""";
+        var iris_probe = Imladris.AI.ElrondHardwareProbe.probe_from_output (iris_out, 16384, 8);
+        assert (iris_probe.selected_device != null);
+        assert (iris_probe.selected_device.device_id == "Vulkan0");
+        assert (iris_probe.effective_tier == Imladris.AI.ElrondHardwareTier.TIER_4_MODERN_IGPU);
+
+        string[] iris_args = Imladris.AI.ElrondOptimizer.build_optimized_argv (
+            "llama-server", "/tmp/model.gguf", null, iris_probe
+        );
+        assert (contains_pair (iris_args, "-dev", "Vulkan0"));
+        assert (contains_pair (iris_args, "--fit-target", "1024"));
+        assert (contains_pair (iris_args, "-b", "256"));
+        assert (contains_pair (iris_args, "-ub", "128"));
+        assert (contains_pair (iris_args, "-ctk", "q8_0"));
+        assert (contains_pair (iris_args, "-t", "4"));
+
+        // 4. Intel HD 630 only -> selects CPU fallback
+        string hd630_out = """Available devices:
+  Vulkan0: Intel(R) HD Graphics 630 (KBL GT2) (4096 MiB, 3800 MiB free)
+""";
+        var hd630_probe = Imladris.AI.ElrondHardwareProbe.probe_from_output (hd630_out, 16384, 8);
+        assert (hd630_probe.selected_device == null);
+        assert (hd630_probe.effective_tier == Imladris.AI.ElrondHardwareTier.TIER_5_LEGACY_OR_CPU);
+
+        string[] hd630_args = Imladris.AI.ElrondOptimizer.build_optimized_argv (
+            "llama-server", "/tmp/model.gguf", null, hd630_probe
+        );
+        assert (!contains_value (hd630_args, "-dev"));
+        assert (contains_pair (hd630_args, "-ngl", "0"));
+        assert (contains_pair (hd630_args, "-b", "256"));
+        assert (contains_pair (hd630_args, "-t", "7"));
+
+        // 5. AMD RX 7800 XT + Radeon 610M -> selects RX 7800 XT (Tier 2)
+        string amd_out = """Available devices:
+  Vulkan0: AMD Radeon 610M (RADV RAPHAEL_MENDOCINO) (2048 MiB, 1800 MiB free)
+  Vulkan1: AMD Radeon RX 7800 XT (RADV NAVI32) (16368 MiB, 16000 MiB free)
+""";
+        var amd_probe = Imladris.AI.ElrondHardwareProbe.probe_from_output (amd_out, 32768, 8);
+        assert (amd_probe.selected_device != null);
+        assert (amd_probe.selected_device.device_id == "Vulkan1");
+        assert (amd_probe.effective_tier == Imladris.AI.ElrondHardwareTier.TIER_2_AMD_DGPU);
+
+        string[] amd_args = Imladris.AI.ElrondOptimizer.build_optimized_argv (
+            "llama-server", "/tmp/model.gguf", null, amd_probe
+        );
+        assert (contains_pair (amd_args, "-dev", "Vulkan1"));
+        assert (contains_pair (amd_args, "--fit-target", "256"));
+        assert (!contains_value (amd_args, "-ctk"));
+
+        // 6. Intel Arc A770 -> Tier 3 profile
+        string arc_out = """Available devices:
+  Vulkan0: Intel(R) Arc(TM) A770 Graphics (16256 MiB, 15900 MiB free)
+""";
+        var arc_probe = Imladris.AI.ElrondHardwareProbe.probe_from_output (arc_out, 32768, 8);
+        assert (arc_probe.selected_device != null);
+        assert (arc_probe.effective_tier == Imladris.AI.ElrondHardwareTier.TIER_3_INTEL_ARC_DGPU);
+        string[] arc_args = Imladris.AI.ElrondOptimizer.build_optimized_argv (
+            "llama-server", "/tmp/model.gguf", null, arc_probe
+        );
+        assert (contains_pair (arc_args, "--fit-target", "512"));
+        assert (contains_pair (arc_args, "-b", "512"));
+        assert (contains_pair (arc_args, "-ub", "256"));
+        assert (contains_pair (arc_args, "-ctk", "q8_0"));
+
+        // 7. Manual CPU override & crash recovery CPU fallback
+        string[] cpu_override_args = Imladris.AI.ElrondOptimizer.build_optimized_argv (
+            "llama-server", "/tmp/model.gguf", null, hybrid_probe, false, ElrondComputeMode.CPU
+        );
+        assert (!contains_value (cpu_override_args, "-dev"));
+        assert (contains_pair (cpu_override_args, "-ngl", "0"));
+
+        assert (Imladris.AI.ElrondOptimizer.is_vulkan_failure_stderr (
+            "ggml_vulkan: failed to allocate memory (VK_ERROR_OUT_OF_DEVICE_MEMORY)"
+        ) == true);
+    }
+
+    private static void test_flatpak_host_bridge_and_router () {
+        // 1. HostBridge command wrapping (Flatpak mode)
+        string[] wrapped = HostBridge.wrap_command (
+            { "Rscript", "-e", "getwd()" },
+            "/home/user/project",
+            { "RETICULATE_PYTHON=/home/user/project/.venv/bin/python" },
+            true
+        );
+        assert (wrapped[0] == "flatpak-spawn");
+        assert (contains_value (wrapped, "--host"));
+        assert (contains_value (wrapped, "--watch-bus"));
+        assert (contains_value (wrapped, "--directory=/home/user/project"));
+        assert (contains_value (wrapped, "--env=RETICULATE_PYTHON=/home/user/project/.venv/bin/python"));
+        assert (contains_value (wrapped, "--"));
+        assert (wrapped[wrapped.length - 3] == "Rscript");
+
+        // 2. EnvDiscovery single-shot JSON parsing (including multi-version rig R selection)
+        string mock_json = """{
+            "workspace": "/home/user/proj",
+            "project": {"venv": "/home/user/proj/.venv", "renv": true, "pyproject": true, "uv_lock": true, "pixi": false},
+            "uv": {"bin": "/home/user/.local/bin/uv"},
+            "conda_bin": "/usr/bin/conda",
+            "conda": ["/home/user/.conda/envs/bio"],
+            "quarto": {"bin": "/usr/local/bin/quarto", "version": "1.6.40"},
+            "python": {"bin": "/usr/bin/python3"},
+            "r": [
+                {"path": "/opt/R/4.4.3/bin/Rscript", "version": "4.4.3"},
+                {"path": "/opt/R/4.5.0/bin/Rscript", "version": "4.5.0"}
+            ]
+        }""";
+        var probe = EnvDiscovery.parse_probe_json (mock_json, "/home/user/proj");
+        assert (probe.has_renv == true);
+        assert (probe.has_uv_lock == true);
+        assert (probe.latest_r_version == "4.5.0");
+        assert (probe.latest_r_path == "/opt/R/4.5.0/bin/Rscript");
+        assert (probe.quarto_path == "/usr/local/bin/quarto");
+
+        // 3. ExecutionRouter: uv project, Conda, venv, Host R/renv, Quarto
+        string[] py_env;
+        string[] uv_cmd = ExecutionRouter.build_python_command (probe, { "-c", "import os; print(os.getcwd())" }, "/home/user/proj", null, out py_env);
+        assert (uv_cmd[0] == "/home/user/.local/bin/uv");
+        assert (contains_pair (uv_cmd, "--project", "/home/user/proj"));
+
+        var conda_env = new DiscoveredEnv (DiscoveredEnvKind.CONDA_MAMBA, "bio", "/home/user/.conda/envs/bio");
+        string[] conda_cmd = ExecutionRouter.build_python_command (probe, { "script.py" }, "/home/user/proj", conda_env, out py_env);
+        assert (conda_cmd[0] == "/usr/bin/conda");
+        assert (contains_value (conda_cmd, "run"));
+        assert (contains_value (conda_cmd, "--no-capture-output"));
+        assert (contains_pair (conda_cmd, "-p", "/home/user/.conda/envs/bio"));
+
+        var venv_env = new DiscoveredEnv (DiscoveredEnvKind.VENV, "Project .venv", "/home/user/proj/.venv");
+        string[] venv_cmd = ExecutionRouter.build_python_command (probe, { "script.py" }, "/home/user/proj", venv_env, out py_env);
+        assert (venv_cmd[0] == "/home/user/proj/.venv/bin/python");
+
+        string[] r_env;
+        string[] r_cmd = ExecutionRouter.build_r_command (probe, { "-e", "getwd()" }, "/home/user/proj", null, false, out r_env);
+        assert (r_cmd[0] == "/opt/R/4.5.0/bin/Rscript");
+
+        string[] q_env;
+        string[] q_cmd = ExecutionRouter.build_quarto_command (probe, { "render", "report.qmd" }, "/home/user/proj", venv_env, out q_env);
+        assert (q_cmd[0] == "/usr/local/bin/quarto");
+        assert (contains_value (q_env, "QUARTO_PYTHON=/home/user/proj/.venv/bin/python"));
+        assert (contains_value (q_env, "QUARTO_R=/opt/R/4.5.0/bin/R"));
+
+        // 4. KernelOption & unpinned latest r-base
+        assert (KernelOption.QUARTO.to_string_id () == "quarto");
+        assert (KernelOption.R.to_string_id () == "r");
+        assert (KernelOption.PYTHON.to_string_id () == "python");
+        assert (KernelOption.from_string_id ("quarto") == KernelOption.QUARTO);
+
+        var r_pkgs = new GLib.GenericArray<string> ();
+        ToolchainManager.append_packages_for_component (r_pkgs, ToolchainComponent.R);
+        assert (r_pkgs[0] == "r-base");
     }
 }

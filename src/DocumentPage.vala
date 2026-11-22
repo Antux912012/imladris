@@ -240,7 +240,7 @@ namespace Imladris {
                         Gtk.TextIter end_it;
                         source_buffer.get_iter_at_mark (out end_it, mark);
                         Gtk.TextIter start_it = end_it;
-                        if (start_it.backward_char () && start_it.get_char () == '\uFFFC') {
+                        if (start_it.backward_char () && start_it.get_char () == (unichar) 0xFFFC) {
                             Gtk.TextIter nl_it = start_it;
                             if (nl_it.backward_char () && nl_it.get_char () == '\n') {
                                 start_it = nl_it;

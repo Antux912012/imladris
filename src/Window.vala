@@ -79,6 +79,7 @@ namespace Imladris {
         private ulong ui_settings_hid = 0;
         private ulong shiny_status_hid = 0;
         private ulong elrond_telemetry_hid = 0;
+        private ulong elrond_toast_hid = 0;
         private ulong ws_layout_hid = 0;
         private ulong ws_split_hid = 0;
         private ulong pm_btn_added_hid = 0;
@@ -131,6 +132,10 @@ namespace Imladris {
                 if (elrond_telemetry_hid != 0) {
                     Imladris.AI.ElrondEngineController.get_default ().disconnect (elrond_telemetry_hid);
                     elrond_telemetry_hid = 0;
+                }
+                if (elrond_toast_hid != 0) {
+                    Imladris.AI.ElrondEngineController.get_default ().disconnect (elrond_toast_hid);
+                    elrond_toast_hid = 0;
                 }
                 if (ws_layout_hid != 0) {
                     Services.WorkspaceStateManager.get_default ().disconnect (ws_layout_hid);
@@ -641,6 +646,9 @@ namespace Imladris {
                     elrond_telemetry_label.remove_css_class ("accent");
                     elrond_telemetry_label.add_css_class ("dim-label");
                 }
+            });
+            elrond_toast_hid = elrond_ctrl.toast_notification_requested.connect ((msg) => {
+                show_toast (msg);
             });
 
             status_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });

@@ -100,16 +100,20 @@ namespace Imladris {
             }
         }
 
+        private static GLib.Regex? cached_ssn_rx = null;
+        private static GLib.Regex? cached_email_rx = null;
+        private static GLib.Regex? cached_mrn_rx = null;
+
         public static string redact_phi_pii (string text) {
             if (text.length == 0) return text;
             try {
+                if (cached_ssn_rx == null) cached_ssn_rx = new GLib.Regex ("\\b\\d{3}-\\d{2}-\\d{4}\\b");
+                if (cached_email_rx == null) cached_email_rx = new GLib.Regex ("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
+                if (cached_mrn_rx == null) cached_mrn_rx = new GLib.Regex ("(?i)\\b(MRN|PATIENT[_ ]?ID|SUBJID)\\s*[:=]\\s*[A-Za-z0-9_-]{3,}");
                 string out_text = text;
-                var ssn_rx = new GLib.Regex ("\\b\\d{3}-\\d{2}-\\d{4}\\b");
-                out_text = ssn_rx.replace (out_text, -1, 0, "[REDACTED-SSN]");
-                var email_rx = new GLib.Regex ("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
-                out_text = email_rx.replace (out_text, -1, 0, "[REDACTED-EMAIL]");
-                var mrn_rx = new GLib.Regex ("(?i)\\b(MRN|PATIENT[_ ]?ID|SUBJID)\\s*[:=]\\s*[A-Za-z0-9_-]{3,}");
-                out_text = mrn_rx.replace (out_text, -1, 0, "\\1: [REDACTED-ID]");
+                out_text = cached_ssn_rx.replace (out_text, -1, 0, "[REDACTED-SSN]");
+                out_text = cached_email_rx.replace (out_text, -1, 0, "[REDACTED-EMAIL]");
+                out_text = cached_mrn_rx.replace (out_text, -1, 0, "\\1: [REDACTED-ID]");
                 return out_text;
             } catch (GLib.RegexError e) {
                 return text;

@@ -230,8 +230,8 @@ namespace Imladris.Editor {
             bool inside_brackets = (at_idx > 0 && line_prefix[at_idx - 1] == '[');
             bool inside_latex_cite = false;
             try {
-                var cite_ctx_rx = new GLib.Regex ("\\\\cite[a-zA-Z*]*\\s*(?:\\[[^\\]]*\\]\\s*)*\\{[^}]*$");
-                inside_latex_cite = cite_ctx_rx.match (line_prefix.substring (0, at_idx));
+                if (cached_cite_ctx_rx == null) cached_cite_ctx_rx = new GLib.Regex ("\\\\cite[a-zA-Z*]*\\s*(?:\\[[^\\]]*\\]\\s*)*\\{[^}]*$");
+                inside_latex_cite = cached_cite_ctx_rx.match (line_prefix.substring (0, at_idx));
             } catch (GLib.RegexError e) {}
 
             var cite_style = get_citation_style ();
@@ -300,12 +300,17 @@ namespace Imladris.Editor {
             return store;
         }
 
+        private static GLib.Regex? cached_cite_ctx_rx = null;
+        private static GLib.Regex? cached_latex_bib_rx = null;
+        private static GLib.Regex? cached_yaml_rx = null;
+        private static GLib.Regex? cached_bib_line_rx = null;
+
         private static string[] extract_latex_bib_filenames (string full_text) {
             var results = new Gee.ArrayList<string> ();
             try {
-                var reg = new GLib.Regex ("\\\\(?:bibliography|addbibresource)\\s*(?:\\[[^\\]]*\\]\\s*)?\\{([^}]+)\\}");
+                if (cached_latex_bib_rx == null) cached_latex_bib_rx = new GLib.Regex ("\\\\(?:bibliography|addbibresource)\\s*(?:\\[[^\\]]*\\]\\s*)?\\{([^}]+)\\}");
                 GLib.MatchInfo mi;
-                if (reg.match (full_text, 0, out mi)) {
+                if (cached_latex_bib_rx.match (full_text, 0, out mi)) {
                     do {
                         string group = mi.fetch (1);
                         foreach (var part in group.split (",")) {
@@ -325,17 +330,17 @@ namespace Imladris.Editor {
             buffer.get_bounds (out b_start, out b_end);
             string full_text = buffer.get_text (b_start, b_end, false);
             try {
-                var reg_yaml = new GLib.Regex ("^---\\r?\\n([\\s\\S]*?)\\r?\\n---");
+                if (cached_yaml_rx == null) cached_yaml_rx = new GLib.Regex ("^---\\r?\\n([\\s\\S]*?)\\r?\\n---");
                 GLib.MatchInfo mi;
-                if (!reg_yaml.match (full_text, 0, out mi)) {
+                if (!cached_yaml_rx.match (full_text, 0, out mi)) {
                     buffer.begin_user_action ();
                     buffer.insert (ref b_start, @"---\nbibliography: $bib_filename\n---\n\n", -1);
                     buffer.end_user_action ();
                     return;
                 }
                 string yaml_content = mi.fetch (1);
-                var reg_bib = new GLib.Regex ("^bibliography\\s*:", GLib.RegexCompileFlags.MULTILINE);
-                if (reg_bib.match (yaml_content)) {
+                if (cached_bib_line_rx == null) cached_bib_line_rx = new GLib.Regex ("^bibliography\\s*:", GLib.RegexCompileFlags.MULTILINE);
+                if (cached_bib_line_rx.match (yaml_content)) {
                     return;
                 }
                 int start_pos, end_pos;

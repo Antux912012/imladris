@@ -680,12 +680,7 @@ namespace Imladris.Core {
         }
 
         public static string bytes_to_string (GLib.Bytes bytes) {
-            size_t size = bytes.get_size ();
-            if (size == 0) return "";
-            uint8[] buf = new uint8[size + 1];
-            GLib.Memory.copy (buf, bytes.get_data (), size);
-            buf[size] = '\0';
-            return (string) buf;
+            return PlatformUtils.bytes_to_string (bytes);
         }
 
         public static void open_url (string url) {
