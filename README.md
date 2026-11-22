@@ -18,7 +18,7 @@ SPDX-License-Identifier: Apache-2.0
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
   <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
-  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.41.0"><img src="https://img.shields.io/badge/Release-v0.41.0-blue?style=flat-square" alt="Release v0.41.0"></a>
+  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.42.0"><img src="https://img.shields.io/badge/Release-v0.42.0-blue?style=flat-square" alt="Release v0.42.0"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/Vala-0.56%2B-green?style=flat-square" alt="Vala">
   <img src="https://img.shields.io/badge/License-Apache--2.0%20(Open--Core)-brightgreen?style=flat-square" alt="License">
@@ -26,7 +26,7 @@ SPDX-License-Identifier: Apache-2.0
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">🌐 Official Landing Page</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.41.0">⬇️ Download v0.41.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.42.0">⬇️ Download v0.42.0 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
   <strong><a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">📦 Install from Flatpark</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">📖 Technical Wiki</a></strong> ·
   <strong><a href="docs/paper/imladris-scientific-paper.qmd">📄 Scientific Paper</a></strong> ·
@@ -43,7 +43,7 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ### Comparative Workflow Matrix
 
-| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.41.0 Approach |
+| Dimension | Legacy Desktop IDEs (Electron / Java) | The Imladris v0.42.0 Approach |
 | :--- | :--- | :--- |
 | **Idle Memory Overhead** | 1.2–2.5 GB RAM idle | **< 120 MB RAM** (native compiled Vala/GTK4 binary) |
 | **Cold Startup Latency** | 4.0–9.0 seconds | **< 0.6 seconds** instant launch |
@@ -79,14 +79,14 @@ Modern scientific computing forces an inefficient compromise: Electron-based edi
 
 ---
 
-## What’s New in v0.41.0
+## What’s New in v0.42.0
 
 * **Apache-2.0 Hybrid Open-Core Licensing**: Relicensed the Imladris Core Desktop Studio from GPL-3.0-or-later to **Apache License 2.0** (`Apache-2.0`) with explicit patent protection, clean `JSC.Context` / `McpServer` extension boundaries, and Commercial Enterprise Pack readiness for pharma, biotech, and regulated R&D teams.
 * **VS Code & RStudio-Grade Autocompletion**: Implemented live keystroke `refilter()`, `GtkSource.Completion.fuzzy_highlight()`, Markdown/Quarto prose snippets & live document cross-references (`@fig-*`, `@tbl-*`, `@sec-*`, `@eq-*`), HTML5 tag & smart `</tag>` completion, R `library()` package & named function argument completion, Python DataFrame methods, live REPL DataFrame column discovery (`$` / `.`), paired `BackSpace` deletion, and triple-backtick chunk completion.
 * **Quick Table Picker Popover (`Ctrl+Alt+T`)**: Cursor-anchored 8×8 hover grid and custom Rows/Cols dialog with format-aware Markdown, HTML, LaTeX, and RTF table insertion from the toolbar, editor context menu, and Command Palette.
 * **Flatpak WebKitGTK 6.0 Live Preview Fix**: Resolved `WebKit.WebContext.get_default()` vs. `JSC.Context` initialization ordering so live HTML/Quarto/Markdown preview renders reliably inside Flatpak sandboxes.
 
-### Previous Highlights (v0.41.0)
+### Previous Highlights (v0.42.0)
 
 * **Apple TextEdit-Style WYSIWYG `.rtf` Editor**: Open, edit, and save standards-compliant RTF 1.x documents natively (`RtfCodec` + `RtfEditorView`).
 * **Unified Single-Package Toolchain**: Integrated scientific runtime dependencies directly into `.deb`, `.rpm`, AUR `PKGBUILD`, and Nix Flake packages.
@@ -257,7 +257,7 @@ nix build .#default
 ./result/bin/imladris
 ```
 
-Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.41.0](https://github.com/Antux912012/imladris/releases/tag/v0.41.0).
+Pre-built `.flatpak`, `.deb`, `.rpm`, and source `.tar.gz` packages are available via [Flatpark](https://flatpark.org/apps/io.github.Antux912012.Imladris/) and [GitHub Releases v0.42.0](https://github.com/Antux912012/imladris/releases/tag/v0.42.0).
 
 ### Scientific Toolchain Meta-Packages & Cross-Distro Dependencies
 To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
@@ -268,11 +268,11 @@ To eliminate missing R/Python/Pandoc/LaTeX dependencies across distributions:
   Mounts at `/app/toolchain` and is automatically added to `PATH` inside the Imladris sandbox.
 - **Debian / Ubuntu (`.deb` with integrated scientific toolchain & `postinst` verification):**
   ```bash
-  sudo apt install ./imladris_0.41.0_amd64.deb
+  sudo apt install ./imladris_0.42.0_amd64.deb
   ```
 - **Fedora / RHEL (`.rpm` with integrated scientific toolchain & `%post` verification):**
   ```bash
-  sudo dnf install ./imladris-0.41.0-1.fc44.x86_64.rpm
+  sudo dnf install ./imladris-0.42.0-1.fc44.x86_64.rpm
   ```
 - **Arch Linux:**
   ```bash
