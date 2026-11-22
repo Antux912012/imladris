@@ -66,19 +66,19 @@ namespace Imladris.AI {
             presets.add (new LocalModelPreset ("phi-4-mini", "Phi-4-Mini-Instruct",
                 "unsloth/Phi-4-mini-instruct-GGUF", { "Q4_K_M", "Q4_0", "Q3_K_M" }, "2.8–3.5 GB",
                 "Compact STEM reasoning, LaTeX, and Python or TypeScript code."));
-            presets.add (new LocalModelPreset ("qwen25-coder-15b", "Qwen2.5-Coder-1.5B-Instruct",
+            presets.add (new LocalModelPreset ("qwen25-coder-1.5b", "Qwen2.5-Coder-1.5B-Instruct",
                 "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF", { "Q4_K_M", "Q4_0", "Q3_K_M" }, "1.3-1.6 GB",
                 "Lightweight code generation across Python, R, TypeScript, HTML, and CSS.", true));
             presets.add (new LocalModelPreset ("qwen35-2b", "Qwen3.5-2B",
                 "unsloth/Qwen3.5-2B-GGUF", { "UD-Q4_K_XL", "Q4_K_M", "Q4_0" }, "1.6-1.9 GB",
                 "Efficient all-round reasoning, Markdown structure, Python, and TypeScript.", true));
-            presets.add (new LocalModelPreset ("qwen3-17b", "Qwen3-1.7B",
+            presets.add (new LocalModelPreset ("qwen3-1.7b", "Qwen3-1.7B",
                 "bartowski/Qwen_Qwen3-1.7B-GGUF", { "Q4_K_M", "Q4_0", "Q3_K_M" }, "1.4-1.7 GB",
                 "Compact coding with optional thinking-mode prompts for deeper reasoning.", true));
-            presets.add (new LocalModelPreset ("qwen25-math-15b", "Qwen2.5-Math-1.5B-Instruct",
+            presets.add (new LocalModelPreset ("qwen25-math-1.5b", "Qwen2.5-Math-1.5B-Instruct",
                 "bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF", { "Q4_K_M", "Q4_0", "Q3_K_M" }, "1.3-1.6 GB",
                 "Symbolic mathematics, statistics, scientific reasoning, and LaTeX.", true));
-            presets.add (new LocalModelPreset ("lfm25-12b", "Liquid LFM2.5-1.2B-Instruct",
+            presets.add (new LocalModelPreset ("lfm25-1.2b", "Liquid LFM2.5-1.2B-Instruct",
                 "LiquidAI/LFM2.5-1.2B-Instruct-GGUF", { "Q4_K_M", "Q4_0", "Q3_K_M" }, "0.9-1.2 GB",
                 "Very small footprint, quick CPU inference, and structured instruction following.", true));
             return presets;
@@ -89,7 +89,22 @@ namespace Imladris.AI {
         }
 
         public static string get_model_directory (LocalModelPreset preset) {
-            return GLib.Path.build_filename (get_models_directory (), preset.id);
+            string canonical = GLib.Path.build_filename (get_models_directory (), preset.id);
+            if (GLib.FileUtils.test (canonical, GLib.FileTest.IS_DIR)) {
+                return canonical;
+            }
+            string? legacy_id = null;
+            if (preset.id == "lfm25-1.2b") legacy_id = "lfm25-12b";
+            else if (preset.id == "qwen25-coder-1.5b") legacy_id = "qwen25-coder-15b";
+            else if (preset.id == "qwen3-1.7b") legacy_id = "qwen3-17b";
+            else if (preset.id == "qwen25-math-1.5b") legacy_id = "qwen25-math-15b";
+            if (legacy_id != null) {
+                string legacy_dir = GLib.Path.build_filename (get_models_directory (), legacy_id);
+                if (GLib.FileUtils.test (legacy_dir, GLib.FileTest.IS_DIR)) {
+                    return legacy_dir;
+                }
+            }
+            return canonical;
         }
 
         public static string[] select_gguf_files (string tree_json, string[] preferred_quants) throws GLib.Error {
@@ -163,6 +178,11 @@ namespace Imladris.AI {
         }
 
         public async string download_model_async (LocalModelPreset preset, Cancellable? cancellable = null) throws GLib.Error {
+            if (SettingsManager.get_default ().is_airgapped ()) {
+                throw new GLib.IOError.PERMISSION_DENIED (
+                    "Air-Gapped Mode is enabled: model downloads from Hugging Face are blocked."
+                );
+            }
             string tree_url = "https://huggingface.co/api/models/%s/tree/main?recursive=true&expand=true".printf (preset.repository);
             string tree_json = yield get_text_async (tree_url, cancellable);
             string[] filenames = select_gguf_files (tree_json, preset.preferred_quants);

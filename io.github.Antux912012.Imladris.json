@@ -27,6 +27,8 @@
         "--filesystem=xdg-download",
         "--filesystem=xdg-cache/imladris:create",
         "--filesystem=home",
+        "--filesystem=/etc/imladris:ro",
+        "--own-name=io.github.Antux912012.Imladris",
         "--env=PATH=/app/bin:/app/toolchain/bin:/usr/bin"
     ],
     "cleanup": [

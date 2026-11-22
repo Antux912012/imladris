@@ -10,8 +10,9 @@ namespace Imladris {
 
     public class Application : Adw.Application {
 
-        public const string APP_VERSION = "0.40.0";
+        public const string APP_VERSION = "0.41.0";
         private bool first_launch_toolchain_checked = false;
+        private uint mcp_dbus_id = 0;
 
         private const GLib.ActionEntry[] APP_ACTIONS = {
             { "new_project_modal", on_new_project_modal },
@@ -89,6 +90,36 @@ namespace Imladris {
                 "Erase all local user data, cache, and state (GDPR Art. 17)",
                 null
             );
+
+            add_main_option (
+                "mcp-server",
+                0,
+                GLib.OptionFlags.NONE,
+                GLib.OptionArg.NONE,
+                "Run Model Context Protocol (MCP) JSON-RPC 2.0 stdio server",
+                null
+            );
+        }
+
+        protected override bool dbus_register (GLib.DBusConnection connection, string object_path) throws GLib.Error {
+            if (!base.dbus_register (connection, object_path)) {
+                return false;
+            }
+            try {
+                var bridge = new McpDbusBridge (this);
+                mcp_dbus_id = connection.register_object (McpServer.DBUS_OBJECT_PATH, bridge);
+            } catch (GLib.IOError e) {
+                GLib.warning ("Failed to register MCP D-Bus bridge: %s", e.message);
+            }
+            return true;
+        }
+
+        protected override void dbus_unregister (GLib.DBusConnection connection, string object_path) {
+            if (mcp_dbus_id != 0) {
+                connection.unregister_object (mcp_dbus_id);
+                mcp_dbus_id = 0;
+            }
+            base.dbus_unregister (connection, object_path);
         }
 
         protected override int handle_local_options (GLib.VariantDict options) {

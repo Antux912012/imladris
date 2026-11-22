@@ -76,8 +76,49 @@ namespace Imladris {
             }
         }
 
+        public static void validate_provider_egress (AiProvider provider, string endpoint) throws GLib.Error {
+            var settings = SettingsManager.get_default ();
+            if (settings.is_airgapped ()) {
+                if (provider == AiProvider.GITHUB_COPILOT || provider == AiProvider.ANTIGRAVITY) {
+                    throw new GLib.IOError.PERMISSION_DENIED (
+                        @"Air-Gapped Mode blocks $(provider.get_display_name ()). Only localhost AI servers are permitted."
+                    );
+                }
+                if (!SettingsManager.is_local_url (endpoint)) {
+                    throw new GLib.IOError.PERMISSION_DENIED (
+                        @"Air-Gapped Mode blocks outbound AI requests to '$endpoint'. Only localhost/127.0.0.1/::1 endpoints are permitted."
+                    );
+                }
+            }
+            if (settings.phi_data_lock) {
+                if (provider == AiProvider.GITHUB_COPILOT || provider == AiProvider.ANTIGRAVITY ||
+                    !SettingsManager.is_local_url (endpoint)) {
+                    throw new GLib.IOError.PERMISSION_DENIED (
+                        @"PHI Data Lock blocks sending clinical/patient data to non-local AI provider '$(provider.get_display_name ())'."
+                    );
+                }
+            }
+        }
+
+        public static string redact_phi_pii (string text) {
+            if (text.length == 0) return text;
+            try {
+                string out_text = text;
+                var ssn_rx = new GLib.Regex ("\\b\\d{3}-\\d{2}-\\d{4}\\b");
+                out_text = ssn_rx.replace (out_text, -1, 0, "[REDACTED-SSN]");
+                var email_rx = new GLib.Regex ("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
+                out_text = email_rx.replace (out_text, -1, 0, "[REDACTED-EMAIL]");
+                var mrn_rx = new GLib.Regex ("(?i)\\b(MRN|PATIENT[_ ]?ID|SUBJID)\\s*[:=]\\s*[A-Za-z0-9_-]{3,}");
+                out_text = mrn_rx.replace (out_text, -1, 0, "\\1: [REDACTED-ID]");
+                return out_text;
+            } catch (GLib.RegexError e) {
+                return text;
+            }
+        }
+
         public async string[] list_models_async (AiProvider provider, Cancellable? cancellable = null) throws GLib.Error {
             string endpoint = config_mgr.get_endpoint_for (provider);
+            validate_provider_egress (provider, endpoint);
             string models_url;
             if (provider == AiProvider.GEMINI) {
                 while (endpoint.has_suffix ("/")) {
@@ -196,7 +237,9 @@ namespace Imladris {
             try {
                 return yield dispatch_provider_request_async (provider, detail_prompt, user_prompt, req_cancellable);
             } catch (GLib.Error primary_err) {
-                if (!config_mgr.auto_failover_enabled || req_cancellable.is_cancelled () || !is_failover_eligible_error (primary_err)) {
+                var sec_settings = SettingsManager.get_default ();
+                if (sec_settings.is_airgapped () || sec_settings.phi_data_lock ||
+                    !config_mgr.auto_failover_enabled || req_cancellable.is_cancelled () || !is_failover_eligible_error (primary_err)) {
                     throw primary_err;
                 }
 
@@ -235,6 +278,12 @@ namespace Imladris {
                 model = provider.get_default_model ();
             }
             string base_endpoint = config_mgr.get_endpoint_for (provider);
+            validate_provider_egress (provider, base_endpoint);
+
+            string safe_user_prompt = SettingsManager.get_default ().phi_data_lock
+                ? redact_phi_pii (user_prompt) : user_prompt;
+            string safe_system_prompt = SettingsManager.get_default ().phi_data_lock
+                ? redact_phi_pii (system_prompt) : system_prompt;
 
             // 1. Validation
             if (provider == AiProvider.GITHUB_COPILOT) {
@@ -249,13 +298,13 @@ namespace Imladris {
 
             // Antigravity (agy Agent Harness)
             if (provider == AiProvider.ANTIGRAVITY) {
-                string full_p = system_prompt.length > 0 ? (system_prompt + "\n\n" + user_prompt) : user_prompt;
+                string full_p = safe_system_prompt.length > 0 ? (safe_system_prompt + "\n\n" + safe_user_prompt) : safe_user_prompt;
                 return yield Imladris.AI.ElrondEngineController.run_agy_prompt_async (full_p, req_cancellable);
             }
 
             // Claude / Anthropic uses /v1/messages API with custom headers and body format
             if (provider == AiProvider.CLAUDE) {
-                return yield send_anthropic_message_async (base_endpoint, key, model, system_prompt, user_prompt, req_cancellable);
+                return yield send_anthropic_message_async (base_endpoint, key, model, safe_system_prompt, safe_user_prompt, req_cancellable);
             }
 
             // 2. Prepare JSON Payload
@@ -271,12 +320,12 @@ namespace Imladris {
             builder.begin_array ();
 
             // System Message
-            if (system_prompt.length > 0) {
+            if (safe_system_prompt.length > 0) {
                 builder.begin_object ();
                 builder.set_member_name ("role");
                 builder.add_string_value ("system");
                 builder.set_member_name ("content");
-                builder.add_string_value (system_prompt);
+                builder.add_string_value (safe_system_prompt);
                 builder.end_object ();
             }
 
@@ -285,7 +334,7 @@ namespace Imladris {
             builder.set_member_name ("role");
             builder.add_string_value ("user");
             builder.set_member_name ("content");
-            builder.add_string_value (user_prompt);
+            builder.add_string_value (safe_user_prompt);
             builder.end_object ();
 
             builder.end_array ();

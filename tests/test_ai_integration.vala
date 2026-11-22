@@ -41,6 +41,7 @@ namespace Imladris.Tests {
         GLib.Test.add_func ("/ai/copilot_json_parsing", test_copilot_json_parsing);
         GLib.Test.add_func ("/ai/chunk_edit_preserving_options", test_chunk_edit_preserving_options);
         GLib.Test.add_func ("/ai/elrond_intent_routing_and_history", test_elrond_intent_routing_and_history);
+        GLib.Test.add_func ("/security/airgapped_policy_and_phi_guard", test_airgapped_policy_and_phi_guard);
 
         return GLib.Test.run ();
     }
@@ -735,5 +736,65 @@ namespace Imladris.Tests {
         var turn = new Imladris.AI.ElrondChatTurn ("user", "hello");
         assert (turn.role == "user");
         assert (turn.content == "hello");
+    }
+
+    private static void test_airgapped_policy_and_phi_guard () {
+        // 1. Localhost URL validation (rejects userinfo bypasses & remote hosts)
+        assert (Imladris.Core.SettingsManager.is_local_url ("http://127.0.0.1:8080/v1") == true);
+        assert (Imladris.Core.SettingsManager.is_local_url ("http://localhost:11434/v1") == true);
+        assert (Imladris.Core.SettingsManager.is_local_url ("http://localhost@evil.com/v1") == false);
+        assert (Imladris.Core.SettingsManager.is_local_url ("https://api.openai.com/v1") == false);
+
+        // 2. Enterprise policy.json lock enforcement via IMLADRIS_POLICY_FILE
+        string policy_path = GLib.Path.build_filename (GLib.Environment.get_user_config_dir (), "imladris-test-policy.json");
+        GLib.DirUtils.create_with_parents (GLib.Environment.get_user_config_dir (), 0700);
+        try {
+            GLib.FileUtils.set_contents (policy_path, "{\"airgapped_mode\":true,\"phi_data_lock\":true}");
+            GLib.Environment.set_variable ("IMLADRIS_POLICY_FILE", policy_path, true);
+            var settings = Imladris.Core.SettingsManager.get_default ();
+            settings.reload_policy ();
+            assert (settings.airgapped_mode == true);
+            assert (settings.airgapped_policy_locked == true);
+            assert (settings.phi_data_lock == true);
+
+            // Attempt to disable must be ignored when policy-locked
+            settings.airgapped_mode = false;
+            assert (settings.airgapped_mode == true);
+
+            // Cloud provider egress must be blocked
+            bool blocked = false;
+            try {
+                Imladris.AiClient.validate_provider_egress (Imladris.Core.AiProvider.OPENAI, "https://api.openai.com/v1");
+            } catch (GLib.Error e) {
+                blocked = true;
+            }
+            assert (blocked == true);
+
+            // Localhost Ollama must still be allowed
+            try {
+                Imladris.AiClient.validate_provider_egress (Imladris.Core.AiProvider.OLLAMA, "http://127.0.0.1:11434/v1");
+            } catch (GLib.Error e) {
+                assert_not_reached ();
+            }
+
+            // PHI/PII redaction preserves DOIs while redacting SSNs/emails/MRNs
+            string raw = "Patient MRN: P99123 SSN 123-45-6789 email alice@hospital.org doi:10.1038/s41586-020-2649-2";
+            string clean = Imladris.AiClient.redact_phi_pii (raw);
+            assert (!clean.contains ("123-45-6789"));
+            assert (!clean.contains ("alice@hospital.org"));
+            assert (!clean.contains ("P99123"));
+            assert (clean.contains ("10.1038/s41586-020-2649-2"));
+        } catch (GLib.Error e) {
+            error ("Policy test failed: %s", e.message);
+        } finally {
+            GLib.FileUtils.remove (policy_path);
+            GLib.Environment.unset_variable ("IMLADRIS_POLICY_FILE");
+            Imladris.Core.SettingsManager.get_default ().reload_policy ();
+        }
+
+        // 3. LocalModelManager lfm25-1.2b naming fix
+        var catalog = Imladris.AI.LocalModelManager.get_catalog ();
+        assert (catalog.size == 10);
+        assert (catalog[9].id == "lfm25-1.2b");
     }
 }

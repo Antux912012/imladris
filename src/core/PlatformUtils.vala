@@ -235,8 +235,12 @@ namespace Imladris.Core {
                     launcher.setenv ("VIRTUAL_ENV", env_prefix, true);
                 } else {
                     launcher.setenv ("CONDA_PREFIX", env_prefix, true);
-                    launcher.setenv ("PKG_CONFIG_PATH", pkg_dir, true);
-                    launcher.setenv ("R_HOME", r_home, true);
+                    if (GLib.FileUtils.test (pkg_dir, GLib.FileTest.IS_DIR)) {
+                        launcher.setenv ("PKG_CONFIG_PATH", pkg_dir, true);
+                    }
+                    if (GLib.FileUtils.test (r_home, GLib.FileTest.IS_DIR)) {
+                        launcher.setenv ("R_HOME", r_home, true);
+                    }
                     string r_bin = GLib.Path.build_filename (bin_dir, "R");
                     if (GLib.FileUtils.test (r_bin, GLib.FileTest.EXISTS)) {
                         launcher.setenv ("QUARTO_R", r_bin, true);
@@ -246,6 +250,38 @@ namespace Imladris.Core {
                 string py_bin = GLib.Path.build_filename (bin_dir, "python3");
                 if (GLib.FileUtils.test (py_bin, GLib.FileTest.EXISTS)) {
                     launcher.setenv ("QUARTO_PYTHON", py_bin, true);
+                }
+            }
+
+            // Override stale conda activate.d Quarto paths (e.g. build-machine QUARTO_DENO_DOM)
+            string? quarto_prefix = null;
+            if (has_prefix && (
+                    GLib.FileUtils.test (GLib.Path.build_filename (env_prefix, "lib", "deno_dom.so"), GLib.FileTest.EXISTS) ||
+                    GLib.FileUtils.test (GLib.Path.build_filename (env_prefix, "share", "quarto"), GLib.FileTest.IS_DIR))) {
+                quarto_prefix = env_prefix;
+            } else {
+                string managed_default = ToolchainManager.get_default ().default_env;
+                if (GLib.FileUtils.test (managed_default, GLib.FileTest.IS_DIR)) {
+                    quarto_prefix = managed_default;
+                }
+            }
+
+            if (quarto_prefix != null) {
+                string deno_dom = GLib.Path.build_filename (quarto_prefix, "lib", "deno_dom.so");
+                if (GLib.FileUtils.test (deno_dom, GLib.FileTest.EXISTS)) {
+                    launcher.setenv ("QUARTO_DENO_DOM", deno_dom, true);
+                }
+                string q_share = GLib.Path.build_filename (quarto_prefix, "share", "quarto");
+                if (GLib.FileUtils.test (q_share, GLib.FileTest.IS_DIR)) {
+                    launcher.setenv ("QUARTO_SHARE_PATH", q_share, true);
+                }
+                string q_bin = GLib.Path.build_filename (quarto_prefix, "bin");
+                if (GLib.FileUtils.test (GLib.Path.build_filename (q_bin, "quarto"), GLib.FileTest.IS_EXECUTABLE)) {
+                    launcher.setenv ("QUARTO_BIN_PATH", q_bin, true);
+                }
+                string deno_bin = GLib.Path.build_filename (q_bin, "deno");
+                if (GLib.FileUtils.test (deno_bin, GLib.FileTest.IS_EXECUTABLE)) {
+                    launcher.setenv ("QUARTO_DENO", deno_bin, true);
                 }
             }
 
@@ -386,6 +422,18 @@ namespace Imladris.Core {
                     if (kv != null && kv.contains ("=")) {
                         cmd.add ("--env=" + kv);
                     }
+                }
+            }
+
+            string[] proxy_ca_vars = {
+                "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY",
+                "https_proxy", "http_proxy", "no_proxy",
+                "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"
+            };
+            foreach (string var_name in proxy_ca_vars) {
+                string? val = GLib.Environment.get_variable (var_name);
+                if (val != null && val != "") {
+                    cmd.add (@"--env=$var_name=$val");
                 }
             }
 

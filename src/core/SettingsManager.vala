@@ -377,8 +377,48 @@ namespace Imladris.Core {
         private bool _show_status_bar = true;
         private int _default_zoom_percent = 100;
         private bool _onboarding_tour_completed = false;
+        private bool _airgapped_mode = false;
+        private bool _phi_data_lock = false;
+        private bool _airgapped_policy_locked = false;
+        private bool _phi_policy_locked = false;
         private KeyFile config_keyfile = new KeyFile ();
         private string config_ini_path = "";
+
+        public bool airgapped_policy_locked {
+            get { return _airgapped_policy_locked; }
+        }
+
+        public bool phi_policy_locked {
+            get { return _phi_policy_locked; }
+        }
+
+        public bool airgapped_mode {
+            get { return _airgapped_policy_locked ? true : _airgapped_mode; }
+            set {
+                if (_airgapped_policy_locked) {
+                    return;
+                }
+                if (_airgapped_mode != value) {
+                    _airgapped_mode = value;
+                    save_ini ();
+                    ai_settings_changed ();
+                }
+            }
+        }
+
+        public bool phi_data_lock {
+            get { return _phi_policy_locked ? true : _phi_data_lock; }
+            set {
+                if (_phi_policy_locked) {
+                    return;
+                }
+                if (_phi_data_lock != value) {
+                    _phi_data_lock = value;
+                    save_ini ();
+                    ai_settings_changed ();
+                }
+            }
+        }
 
         public bool elrond_enabled {
             get { return _elrond_enabled; }
@@ -704,6 +744,86 @@ namespace Imladris.Core {
             }
 
             load_ini ();
+            load_enterprise_policy ();
+        }
+
+        public void reload_policy () {
+            load_enterprise_policy ();
+        }
+
+        public bool is_airgapped () {
+            return airgapped_mode || GLib.Environment.get_variable ("IMLADRIS_AIRGAPPED") == "1";
+        }
+
+        private string? resolve_policy_file_path () {
+            if (GLib.FileUtils.test ("/.flatpak-info", GLib.FileTest.EXISTS)) {
+                string host_path = "/run/host/etc/imladris/policy.json";
+                if (GLib.FileUtils.test (host_path, GLib.FileTest.EXISTS)) {
+                    return host_path;
+                }
+            }
+            string sys_path = "/etc/imladris/policy.json";
+            if (GLib.FileUtils.test (sys_path, GLib.FileTest.EXISTS)) {
+                return sys_path;
+            }
+            string? env_path = GLib.Environment.get_variable ("IMLADRIS_POLICY_FILE");
+            if (env_path != null && env_path.strip () != "") {
+                return env_path.strip ();
+            }
+            return null;
+        }
+
+        private void load_enterprise_policy () {
+            _airgapped_policy_locked = false;
+            _phi_policy_locked = false;
+            string? path = resolve_policy_file_path ();
+            if (path == null || !GLib.FileUtils.test (path, GLib.FileTest.EXISTS)) {
+                return;
+            }
+            try {
+                var parser = new Json.Parser ();
+                parser.load_from_file (path);
+                var root = parser.get_root ();
+                if (root == null || root.get_node_type () != Json.NodeType.OBJECT) {
+                    return;
+                }
+                var obj = root.get_object ();
+                if (obj.has_member ("airgapped_mode") && obj.get_boolean_member ("airgapped_mode")) {
+                    _airgapped_mode = true;
+                    _airgapped_policy_locked = true;
+                    GLib.Environment.set_variable ("IMLADRIS_AIRGAPPED", "1", true);
+                }
+                if (obj.has_member ("phi_data_lock") && obj.get_boolean_member ("phi_data_lock")) {
+                    _phi_data_lock = true;
+                    _phi_policy_locked = true;
+                }
+            } catch (GLib.Error e) {
+                GLib.warning ("Failed to parse enterprise policy %s: %s", path, e.message);
+            }
+            if (airgapped_mode) {
+                GLib.Environment.set_variable ("IMLADRIS_AIRGAPPED", "1", true);
+            }
+        }
+
+        /**
+         * Strictly checks whether a URL targets localhost / loopback (no userinfo bypass).
+         */
+        public static bool is_local_url (string url) {
+            try {
+                var uri = GLib.Uri.parse (url.strip (), GLib.UriFlags.NONE);
+                string? userinfo = uri.get_userinfo ();
+                if (userinfo != null && userinfo.length > 0) {
+                    return false;
+                }
+                string? host = uri.get_host ();
+                if (host == null || host.length == 0) {
+                    return false;
+                }
+                string h = host.down ();
+                return h == "localhost" || h == "127.0.0.1" || h == "::1";
+            } catch (GLib.Error e) {
+                return false;
+            }
         }
 
         private void load_ini () {
@@ -779,6 +899,12 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("Hardware", "steady_cursor")) {
                         _steady_cursor = config_keyfile.get_boolean ("Hardware", "steady_cursor");
                     }
+                    if (config_keyfile.has_key ("Security", "airgapped_mode")) {
+                        _airgapped_mode = config_keyfile.get_boolean ("Security", "airgapped_mode");
+                    }
+                    if (config_keyfile.has_key ("Security", "phi_data_lock")) {
+                        _phi_data_lock = config_keyfile.get_boolean ("Security", "phi_data_lock");
+                    }
                 } catch (Error e) {}
             }
         }
@@ -811,6 +937,8 @@ namespace Imladris.Core {
                 config_keyfile.set_integer ("Workspace", "default_zoom_percent", _default_zoom_percent);
                 config_keyfile.set_boolean ("Workspace", "onboarding_tour_completed", _onboarding_tour_completed);
                 config_keyfile.set_integer ("Workspace", "preview_backend", (int) _preview_backend);
+                config_keyfile.set_boolean ("Security", "airgapped_mode", _airgapped_mode);
+                config_keyfile.set_boolean ("Security", "phi_data_lock", _phi_data_lock);
                 FileUtils.set_contents (config_ini_path, config_keyfile.to_data ());
             } catch (Error e) {}
         }

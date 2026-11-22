@@ -13,7 +13,7 @@ namespace Imladris {
 
         if ("--mcp-server" in args) {
             var loop = new GLib.MainLoop ();
-            McpServer.run_stdio_server_async.begin (null);
+            McpServer.run_stdio_server_async.begin (null, loop);
             loop.run ();
             return 0;
         }

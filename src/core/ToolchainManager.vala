@@ -41,6 +41,38 @@ namespace Imladris.Core {
         }
     }
 
+    public enum ToolchainProfile {
+        QUANT_FINANCE,
+        ECOLOGY_SPATIAL,
+        CLINICAL_BIOSTATS,
+        BIOINFORMATICS;
+
+        public string get_display_name () {
+            switch (this) {
+                case QUANT_FINANCE: return "Quant Finance (Python/R Time-Series, DuckDB, Arrow)";
+                case ECOLOGY_SPATIAL: return "Ecology & Spatial (vegan, sf/terra, GDAL/PROJ/GEOS)";
+                case CLINICAL_BIOSTATS: return "Clinical Biostatistics & TLG (survival, gtsummary, officer)";
+                case BIOINFORMATICS: return "Bioinformatics (Biopython, anndata, scanpy, biotite)";
+                default: return "Unknown Profile";
+            }
+        }
+
+        public string[] get_packages () {
+            switch (this) {
+                case QUANT_FINANCE:
+                    return { "numpy", "pandas", "polars", "scipy", "statsmodels", "duckdb", "pyarrow", "matplotlib", "r-xts", "r-zoo", "r-duckdb", "r-arrow" };
+                case ECOLOGY_SPATIAL:
+                    return { "gdal", "proj", "geos", "geopandas", "rasterio", "r-vegan", "r-lme4", "r-sf", "r-terra" };
+                case CLINICAL_BIOSTATS:
+                    return { "r-survival", "r-survminer", "r-gtsummary", "r-gt", "r-flextable", "r-officer", "r-lme4", "r-emmeans" };
+                case BIOINFORMATICS:
+                    return { "numpy", "pandas", "scipy", "matplotlib", "biopython", "anndata", "scanpy", "biotite", "nbformat", "ipywidgets" };
+                default:
+                    return {};
+            }
+        }
+    }
+
     public class PythonEnvInfo : GLib.Object {
         public string name { get; set; default = ""; }
         public string path { get; set; default = ""; }
@@ -357,6 +389,10 @@ namespace Imladris.Core {
             if (is_micromamba_installed ()) {
                 return true;
             }
+            if (GLib.Environment.get_variable ("IMLADRIS_AIRGAPPED") == "1") {
+                log_output ("✖ Air-Gapped Mode blocks downloading micromamba.");
+                return false;
+            }
 
             progress_changed ("Preparing toolchain directory...", 0.05, "Creating directories");
             GLib.DirUtils.create_with_parents (bin_dir, 0755);
@@ -446,7 +482,13 @@ namespace Imladris.Core {
                     pkgs.add ("uv");
                     pkgs.add ("numpy");
                     pkgs.add ("pandas");
+                    pkgs.add ("scipy");
                     pkgs.add ("matplotlib");
+                    pkgs.add ("duckdb");
+                    pkgs.add ("pyarrow");
+                    pkgs.add ("nbformat");
+                    pkgs.add ("ipywidgets");
+                    pkgs.add ("openpyxl");
                     break;
                 case ToolchainComponent.R:
                     pkgs.add (for_update ? "r-base" : @"r-base=$r_ver");
@@ -456,6 +498,10 @@ namespace Imladris.Core {
                     pkgs.add ("r-rmarkdown");
                     pkgs.add ("r-knitr");
                     pkgs.add ("r-shiny");
+                    pkgs.add ("r-rsqlite");
+                    pkgs.add ("r-duckdb");
+                    pkgs.add ("r-arrow");
+                    pkgs.add ("r-openxlsx");
                     pkgs.add ("compilers");
                     pkgs.add ("make");
                     pkgs.add ("pkg-config");
@@ -605,6 +651,10 @@ namespace Imladris.Core {
 
             if (req.install_r && has_r ()) {
                 configure_rprofile_site (default_env);
+            }
+
+            if (req.install_latex && has_latex ()) {
+                yield warmup_tectonic_async (cancellable);
             }
 
             if (!save_state ()) {
@@ -798,6 +848,7 @@ namespace Imladris.Core {
             string env_label,
             GLib.Cancellable? cancellable
         ) {
+            ulong cancel_id = 0;
             try {
                 var launcher = new GLib.SubprocessLauncher (
                     GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE
@@ -805,7 +856,6 @@ namespace Imladris.Core {
                 launcher.setenv ("MAMBA_ROOT_PREFIX", mamba_root, true);
 
                 var proc = launcher.spawnv (argv);
-                ulong cancel_id = 0;
                 if (cancellable != null) {
                     cancel_id = cancellable.cancelled.connect (() => { proc.force_exit (); });
                 }
@@ -836,14 +886,16 @@ namespace Imladris.Core {
                 }
 
                 yield proc.wait_check_async (cancellable);
-                if (cancellable != null && cancel_id != 0) {
-                    cancellable.disconnect (cancel_id);
-                }
                 return true;
             } catch (GLib.Error e) {
                 log_output (@"✖ Micromamba operation failed ($env_label): $(e.message)");
                 progress_changed ("Operation failed", 0.0, e.message);
                 return false;
+            } finally {
+                if (cancellable != null && cancel_id != 0) {
+                    cancellable.disconnect (cancel_id);
+                    cancel_id = 0;
+                }
             }
         }
 
@@ -967,6 +1019,162 @@ local({
             } catch (GLib.Error e) {}
         }
 
+        public bool has_tectonic_cache () {
+            string cache_dir = GLib.Path.build_filename (GLib.Environment.get_user_cache_dir (), "Tectonic");
+            if (!GLib.FileUtils.test (cache_dir, GLib.FileTest.IS_DIR)) {
+                return false;
+            }
+            try {
+                var dir = GLib.Dir.open (cache_dir);
+                return dir.read_name () != null;
+            } catch (GLib.FileError e) {
+                return false;
+            }
+        }
+
+        /**
+         * Pre-warms Tectonic's local TeX bundle cache (article + booktabs/longtable/beamer/tikz)
+         * during online toolchain setup so offline PDF/LaTeX builds succeed without network access.
+         */
+        public async bool warmup_tectonic_async (GLib.Cancellable? cancellable = null) {
+            if (!has_latex ()) {
+                return false;
+            }
+            if (GLib.Environment.get_variable ("IMLADRIS_AIRGAPPED") == "1") {
+                log_output ("ℹ Skipping Tectonic online bundle warmup in air-gapped mode.");
+                return has_tectonic_cache ();
+            }
+
+            string tectonic_bin = GLib.Path.build_filename (default_env, "bin", "tectonic");
+            string tmp_dir = "";
+            try {
+                tmp_dir = GLib.DirUtils.make_tmp ("imladris-tex-warmup-XXXXXX");
+                string article_tex = GLib.Path.build_filename (tmp_dir, "warmup_article.tex");
+                string beamer_tex = GLib.Path.build_filename (tmp_dir, "warmup_beamer.tex");
+
+                GLib.FileUtils.set_contents (
+                    article_tex,
+                    "\\documentclass{article}\n\\usepackage{booktabs}\n\\usepackage{longtable}\n\\begin{document}\nok\n\\end{document}\n"
+                );
+                GLib.FileUtils.set_contents (
+                    beamer_tex,
+                    "\\documentclass{beamer}\n\\usepackage{tikz}\n\\begin{document}\n\\begin{frame}ok\\end{frame}\n\\end{document}\n"
+                );
+
+                log_output ("▶ Pre-warming Tectonic TeX bundle cache (article + beamer/tikz)...");
+                string[] docs = { article_tex, beamer_tex };
+                foreach (string tex_path in docs) {
+                    var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
+                    launcher.set_cwd (tmp_dir);
+                    PlatformUtils.configure_managed_env (launcher, default_env);
+                    var proc = launcher.spawnv ({ tectonic_bin, tex_path, "--outdir", tmp_dir });
+                    yield proc.wait_check_async (cancellable);
+                }
+                log_output ("✔ Tectonic local TeX bundle cache pre-warmed.");
+                return true;
+            } catch (GLib.Error e) {
+                log_output (@"⚠ Tectonic cache warmup did not complete: $(e.message)");
+                return false;
+            } finally {
+                if (tmp_dir != "") {
+                    PlatformUtils.delete_directory_recursive (GLib.File.new_for_path (tmp_dir));
+                }
+            }
+        }
+
+        /**
+         * Installs an opt-in domain toolchain profile into base-ds via micromamba.
+         */
+        public async bool install_profile_async (ToolchainProfile profile, GLib.Cancellable? cancellable = null) {
+            if (GLib.Environment.get_variable ("IMLADRIS_AIRGAPPED") == "1") {
+                log_output ("✖ Air-Gapped Mode blocks installing remote conda-forge profiles.");
+                return false;
+            }
+            bool mamba_ok = yield ensure_micromamba_async (cancellable);
+            if (!mamba_ok) {
+                return false;
+            }
+            string[] raw = profile.get_packages ();
+            var pkgs = new GLib.GenericArray<string> ();
+            foreach (string p in raw) {
+                pkgs.add (p);
+            }
+            log_output (@"▶ Installing domain profile: $(profile.get_display_name ())...");
+            bool env_exists = GLib.FileUtils.test (default_env, GLib.FileTest.IS_DIR);
+            var cmd = build_mamba_env_cmd (env_exists ? "install" : "create", "base-ds", false, pkgs);
+            return yield run_micromamba_command_async (cmd, 0.1, 0.95, "base-ds", cancellable);
+        }
+
+        /**
+         * Discovers managed and external host Conda/Mamba Python environments.
+         */
+        public Gee.ArrayList<PythonEnvInfo> discover_external_conda_envs (string[]? extra_roots = null) {
+            var results = new Gee.ArrayList<PythonEnvInfo> ();
+            var seen = new Gee.HashSet<string> ();
+
+            foreach (var managed in list_installed_python_envs ()) {
+                if (!seen.contains (managed.path)) {
+                    seen.add (managed.path);
+                    results.add (managed);
+                }
+            }
+
+            var candidate_roots = new Gee.ArrayList<string> ();
+            if (extra_roots != null) {
+                foreach (string r in extra_roots) {
+                    candidate_roots.add (r);
+                }
+            } else {
+                string home = GLib.Environment.get_home_dir ();
+                candidate_roots.add (GLib.Path.build_filename (home, ".conda", "envs"));
+                candidate_roots.add (GLib.Path.build_filename (home, "miniconda3", "envs"));
+                candidate_roots.add (GLib.Path.build_filename (home, "miniforge3", "envs"));
+                candidate_roots.add (GLib.Path.build_filename (home, "mambaforge", "envs"));
+                candidate_roots.add (GLib.Path.build_filename (home, "anaconda3", "envs"));
+                candidate_roots.add ("/opt/conda/envs");
+            }
+
+            foreach (string root in candidate_roots) {
+                if (!GLib.FileUtils.test (root, GLib.FileTest.IS_DIR)) {
+                    continue;
+                }
+                string[] env_paths = imladris_toolchain_list_python_envs (root);
+                foreach (string env_path in env_paths) {
+                    if (seen.contains (env_path)) {
+                        continue;
+                    }
+                    seen.add (env_path);
+                    var info = new PythonEnvInfo ();
+                    info.path = env_path;
+                    info.name = GLib.Path.get_basename (env_path);
+                    info.version = imladris_toolchain_detect_pkg_version (env_path, "python") ?? "unknown";
+                    info.is_active = (env_path == _active_python_env);
+                    results.add (info);
+                }
+            }
+            return results;
+        }
+
+        /**
+         * Verifies offline readiness of managed/host scientific runtimes and caches.
+         */
+        public string verify_offline_readiness () {
+            var lines = new Gee.ArrayList<string> ();
+            string[] tools = { "python3", "R", "quarto", "tectonic", "typst" };
+            foreach (string tool in tools) {
+                string? resolved = null;
+                string? env_pfx = null;
+                var src = PlatformUtils.resolve_runtime (tool, null, out resolved, out env_pfx);
+                string status = (src != RuntimeSource.MISSING && resolved != null) ? @"OK ($(src.to_display_string ()): $resolved)" : "MISSING";
+                lines.add (@"$tool: $status");
+            }
+
+            string deno_dom = GLib.Path.build_filename (default_env, "lib", "deno_dom.so");
+            lines.add (@"quarto_deno_dom: $(GLib.FileUtils.test (deno_dom, GLib.FileTest.EXISTS) ? "OK (" + deno_dom + ")" : "MISSING")");
+            lines.add (@"tectonic_cache: $(has_tectonic_cache () ? "WARMED" : "NOT WARMED")");
+            return string.joinv ("\n", lines.to_array ());
+        }
+
         private bool has_tidyverse () {
             return imladris_toolchain_detect_pkg_version (default_env, "r-tidyverse") != null;
         }
@@ -1005,6 +1213,8 @@ local({
                 builder.add_boolean_value (has_typescript ());
                 builder.set_member_name ("latex");
                 builder.add_boolean_value (has_latex ());
+                builder.set_member_name ("latex_warmed_up");
+                builder.add_boolean_value (has_tectonic_cache ());
                 builder.end_object ();
 
                 builder.end_object ();

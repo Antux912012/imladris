@@ -75,6 +75,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.41.0" date="2026-11-22" type="stable">
+      <description>
+        <p>Release 0.41.0 improves MCP automation, offline LaTeX and Quarto builds, scientific toolchains, and enterprise security controls:</p>
+        <ul>
+          <li>CLI and MCP D-Bus Bridge: Added --mcp-server to --help and connected stdio MCP clients to active GUI windows over D-Bus.</li>
+          <li>Headless MCP Tools: Added file_path support, compile_latex, get_environment_summary, read-only mode, and canonical path checks.</li>
+          <li>Quarto and Tectonic Offline Readiness: Fixed QUARTO_DENO_DOM paths, added Tectonic bundle warmup during setup, and added an offline readiness check in Preferences.</li>
+          <li>Scientific Packages and Profiles: Expanded default Python and R packages, added domain profiles, and added external Conda environment discovery.</li>
+          <li>Security Guardrails: Added Air-Gapped Mode, PHI/PII Data Lock, policy.json administrator locks, Free LLM RAM control, and lfm25-1.2b model naming.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.40.0" date="2026-11-20" type="stable">
       <description>
         <p>Most Stable Release (v0.40.0): Transitions Imladris Core to the Apache-2.0 Hybrid Open-Core license for frictionless Academic &amp; Enterprise R&amp;D adoption, and delivers major editor and Flatpak stability upgrades:</p>

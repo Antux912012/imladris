@@ -569,6 +569,16 @@ namespace Imladris.UI {
             elrond_group.add (mode_row);
             elrond_group.add (custom_endpoint_row);
 
+            var btn_free_ram = new Gtk.Button.with_label ("Free LLM RAM") {
+                valign = Gtk.Align.CENTER,
+                tooltip_text = "Stop managed local llama-server to reclaim RAM"
+            };
+            btn_free_ram.clicked.connect (() => {
+                elrond_engine.stop_daemon ();
+                elrond_engine.probe_servers_async.begin ();
+            });
+            elrond_status_row.add_suffix (btn_free_ram);
+
             var btn_probe = new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
                 valign = Gtk.Align.CENTER,
                 tooltip_text = "Probe and refresh local AI servers"
@@ -697,6 +707,55 @@ namespace Imladris.UI {
             ai_general_group.add (config_row);
 
             ai_page.add (ai_general_group);
+
+            var security_group = new Adw.PreferencesGroup () {
+                title = "Security, Air-Gapped Policy & Offline Readiness",
+                description = "Enterprise compliance guardrails and offline toolchain verification"
+            };
+
+            var airgap_row = new Adw.SwitchRow () {
+                title = "Air-Gapped Mode",
+                subtitle = settings.airgapped_policy_locked
+                    ? "Locked by administrator policy (/etc/imladris/policy.json)"
+                    : "Block all cloud AI providers and remote downloads; allow localhost only",
+                active = settings.airgapped_mode,
+                sensitive = !settings.airgapped_policy_locked
+            };
+            airgap_row.notify["active"].connect (() => {
+                settings.airgapped_mode = airgap_row.active;
+            });
+            security_group.add (airgap_row);
+
+            var phi_row = new Adw.SwitchRow () {
+                title = "PHI / PII Data Lock",
+                subtitle = settings.phi_policy_locked
+                    ? "Locked by administrator policy (/etc/imladris/policy.json)"
+                    : "Block non-local AI providers and redact SSN/MRN/email identifiers before inference",
+                active = settings.phi_data_lock,
+                sensitive = !settings.phi_policy_locked
+            };
+            phi_row.notify["active"].connect (() => {
+                settings.phi_data_lock = phi_row.active;
+            });
+            security_group.add (phi_row);
+
+            var offline_check_row = new Adw.ActionRow () {
+                title = "Verify Offline Readiness",
+                subtitle = "Check Python, R, Quarto (deno_dom.so), Typst, and pre-warmed Tectonic cache"
+            };
+            var btn_verify_offline = new Gtk.Button.with_label ("Verify...") {
+                valign = Gtk.Align.CENTER
+            };
+            btn_verify_offline.clicked.connect (() => {
+                string report = Core.ToolchainManager.get_default ().verify_offline_readiness ();
+                var dlg = new Adw.AlertDialog ("Offline Toolchain Readiness", report);
+                dlg.add_response ("ok", "Close");
+                dlg.present (this);
+            });
+            offline_check_row.add_suffix (btn_verify_offline);
+            security_group.add (offline_check_row);
+
+            ai_page.add (security_group);
 
             // Cloud API Keys Quick Links Group
             var keys_group = new Adw.PreferencesGroup () {
@@ -963,6 +1022,9 @@ namespace Imladris.UI {
 
         private void load_community_registry (bool force_refresh) {
             if (community_group == null) return;
+            if (Core.SettingsManager.get_default ().is_airgapped ()) {
+                return;
+            }
             if (community_cancellable != null) {
                 community_cancellable.cancel ();
             }

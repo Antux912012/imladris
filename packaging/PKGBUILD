@@ -1,6 +1,6 @@
 # Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 pkgname=imladris
-pkgver=0.40.0
+pkgver=0.41.0
 pkgrel=1
 pkgdesc="Native scientific notebook IDE for Quarto, R, Python & Jupyter with GTK4 and AI"
 arch=('x86_64')
@@ -46,7 +46,7 @@ makedepends=(
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v$pkgver.tar.gz")
 # Maintainer note: run `updpkgsums` after tagging v$pkgver
-sha256sums=('7626e817f250d87e52387144a7d2a642be000e2f5366aad3c92f4c96da42a017')
+sha256sums=('da89a3090ec3c33f8e936653953a2f5ec3be506f4ad8fef46471591630aad82c')
 
 build() {
     cd "$srcdir/imladris-$pkgver"

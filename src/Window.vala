@@ -3,7 +3,7 @@
 
 namespace Imladris {
 
-    public class Window : Adw.ApplicationWindow, Imladris.Plugins.PluginHostWindow {
+    public class Window : Adw.ApplicationWindow, Imladris.Plugins.PluginHostWindow, McpHost {
 
         private Gtk.Stack ribbon_stack;
         private Gtk.ScrolledWindow ribbon_scroller;
@@ -1872,6 +1872,72 @@ namespace Imladris {
 
         public void trigger_render (string target_format) {
             export_document_dialog_async.begin (target_format);
+        }
+
+        public string get_open_tabs_json () {
+            var b = new Json.Builder ();
+            b.begin_object ();
+            b.set_member_name ("tabs");
+            b.begin_array ();
+            if (tab_view != null) {
+                var selected = tab_view.selected_page;
+                for (int i = 0; i < tab_view.n_pages; i++) {
+                    var page = tab_view.get_nth_page (i);
+                    var doc = page.child as DocumentPage;
+                    b.begin_object ();
+                    b.set_member_name ("title");
+                    b.add_string_value (page.title ?? "Untitled");
+                    b.set_member_name ("active");
+                    b.add_boolean_value (page == selected);
+                    b.set_member_name ("language");
+                    b.add_string_value (doc != null ? doc.doc_type : "unknown");
+                    b.set_member_name ("file_path");
+                    b.add_string_value (doc != null && doc.file_location != null ? (doc.file_location.get_path () ?? "") : "");
+                    b.end_object ();
+                }
+            }
+            b.end_array ();
+            b.end_object ();
+            var gen = new Json.Generator ();
+            gen.set_root (b.get_root ());
+            return gen.to_data (null);
+        }
+
+        public string get_active_document_json () {
+            var doc = get_active_document ();
+            if (doc == null) {
+                return "No active document open.";
+            }
+            string path = (doc.file_location != null && doc.file_location.get_path () != null) ? doc.file_location.get_path () : "";
+            return @"File: $path\nLanguage: $(doc.doc_type)\nLines: $(doc.source_buffer.get_line_count ())\n\nContent:\n$(doc.get_clean_source_text ())";
+        }
+
+        public bool insert_text_in_active (string text) {
+            var doc = get_active_document ();
+            if (doc == null || doc.source_buffer == null) return false;
+            doc.source_buffer.begin_user_action ();
+            doc.source_buffer.insert_at_cursor (text, -1);
+            doc.source_buffer.end_user_action ();
+            return true;
+        }
+
+        public bool insert_code_chunk_in_active (string engine, string options) {
+            var doc = get_active_document ();
+            if (doc == null) return false;
+            doc.insert_code_chunk (engine, options);
+            return true;
+        }
+
+        public string trigger_render_from_mcp (string format) {
+            trigger_render (format);
+            return @"▶ Render pipeline triggered for target: $format";
+        }
+
+        public string execute_command_from_mcp (string[] parts) {
+            var doc = get_active_document ();
+            if (doc == null) return "No active document open.";
+            ExecutionEngine.run_command_async.begin (parts, doc);
+            return @"▶ Executing command asynchronously: $(string.joinv (" ", parts))";
         }
 
         public void trigger_selected_scientific_render () {

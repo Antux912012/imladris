@@ -2,6 +2,19 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.41.0] - 2026-11-22
+
+### Added
+- **CLI and MCP Bridge:** Added `--mcp-server` to `imladris --help`. Added a D-Bus bridge (`io.github.Antux912012.Imladris.McpBridge`) so `--mcp-server` connects to open GUI windows.
+- **Headless MCP Tools:** Added `file_path` support to `get_active_document`, `insert_text`, and `render_document`. Added `compile_latex` and `get_environment_summary` tools.
+- **MCP Security and Audit Controls:** Added `IMLADRIS_MCP_READONLY=1`, `IMLADRIS_MCP_AUDIT=1` metadata-only JSONL logging, and `realpath()` workspace boundary checks.
+- **Science Packages and Profiles:** Added `scipy`, `duckdb`, `pyarrow`, `nbformat`, `ipywidgets`, and `openpyxl` to the Python toolchain, and `r-rsqlite`, `r-duckdb`, `r-arrow`, and `r-openxlsx` to R. Added domain profiles (`QUANT_FINANCE`, `ECOLOGY_SPATIAL`, `CLINICAL_BIOSTATS`, `BIOINFORMATICS`) and external Conda environment discovery.
+- **Air-Gapped Policy and PHI Lock:** Added Air-Gapped Mode, PHI/PII Data Lock, `/etc/imladris/policy.json` administrator lock support, Verify Offline Readiness check, and Free LLM RAM control in Preferences.
+
+### Fixed
+- **Quarto and Tectonic Toolchain:** Fixed `QUARTO_DENO_DOM` and `QUARTO_SHARE_PATH` in `configure_managed_env`. Added Tectonic bundle warmup during LaTeX setup for offline PDF and Beamer builds.
+- **Local Model Naming:** Renamed `lfm25-12b` to `lfm25-1.2b` (and `1.5b`/`1.7b` IDs) with fallback lookup for existing model folders.
+
 ## [0.40.0] - 2026-11-20
 
 ### Changed

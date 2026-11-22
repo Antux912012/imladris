@@ -5,6 +5,15 @@ SPDX-License-Identifier: Apache-2.0
 
 # FlatPark Release Changelog (`io.github.Antux912012.Imladris`)
 
+## [0.41.0] - 2026-11-22 — Stable Release (`stable` branch)
+
+- **CLI and MCP Bridge:** Added `--mcp-server` to `imladris --help`. Added a D-Bus bridge (`io.github.Antux912012.Imladris.McpBridge`) so `--mcp-server` connects to open GUI windows.
+- **Headless MCP Tools:** Added `file_path` support to `get_active_document`, `insert_text`, and `render_document`. Added `compile_latex` and `get_environment_summary` tools with `IMLADRIS_MCP_READONLY=1` and canonical path checks.
+- **Quarto and Tectonic Toolchain:** Fixed `QUARTO_DENO_DOM` and `QUARTO_SHARE_PATH` in `configure_managed_env`. Added Tectonic bundle warmup during LaTeX setup and added a Verify Offline Readiness check in Preferences.
+- **Science Packages and Profiles:** Added `scipy`, `duckdb`, `pyarrow`, `nbformat`, `ipywidgets`, and `openpyxl` to Python, and `r-rsqlite`, `r-duckdb`, `r-arrow`, and `r-openxlsx` to R. Added domain profiles and external Conda environment discovery.
+- **Security and Model Controls:** Added Air-Gapped Mode, PHI/PII Data Lock, `/etc/imladris/policy.json` lock support, a Free LLM RAM button, and the `lfm25-1.2b` model directory fix.
+- **Verified:** All 10/10 Meson test suites pass.
+
 ## [0.40.0] - 2026-11-20 — Most Stable Release (`stable` branch)
 
 - **License Upgrade (`Apache-2.0` Hybrid Open-Core):** Relicensed Imladris Core Desktop Studio from `GPL-3.0-or-later` to `Apache-2.0` (`LICENSE`, `NOTICE`) with explicit patent protection, clean `JSC.Context`/`McpServer` extension boundaries, and Commercial Enterprise Pack readiness for pharma, biotech, and academic R&D.

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 project('imladris', 'vala', 'c',
-  version: '0.40.0',
+  version: '0.41.0',
   default_options: ['warning_level=1']
 )
 
@@ -439,6 +439,7 @@ test('native_rendering_tests', native_rendering_test_exe, timeout: 30)
 exec_sec_test_exe = executable('test_execution_and_security',
   files(
     'tests/test_execution_and_security.vala',
+    'src/McpServer.vala',
     'src/core/PlatformUtils.vala',
     'src/core/ToolchainManager.vala',
   'src/core/toolchain_native.c',

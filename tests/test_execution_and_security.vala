@@ -411,6 +411,87 @@ def summarize(n):
         }
     }
 
+    private static void test_mcp_schema_headless_and_security () {
+        // 1. tools/list schema includes headless file_path, compile_latex, and get_environment_summary
+        string list_req = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}";
+        string list_resp = McpServer.handle_json_rpc (list_req, null);
+        assert (list_resp.contains ("\"compile_latex\""));
+        assert (list_resp.contains ("\"get_environment_summary\""));
+        assert (list_resp.contains ("\"file_path\""));
+
+        // 2. D-Bus fallback returns actionable error when no GUI window is active
+        string tabs_req = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"get_open_tabs\"}}";
+        string tabs_resp = McpServer.handle_json_rpc (tabs_req, null);
+        assert (tabs_resp.contains ("No active Imladris window"));
+
+        // 3. Headless path traversal & sensitive directory rejection
+        GLib.Environment.set_variable ("IMLADRIS_MCP_WORKSPACE", _test_tmp_root, true);
+        string? path_err = null;
+        assert (McpServer.validate_headless_path ("/etc/passwd", true, out path_err) == null);
+        assert (path_err != null && path_err.contains ("Security Error"));
+
+        string outside_dir = GLib.Path.build_filename (GLib.Environment.get_home_dir (), ".ssh", "id_rsa");
+        assert (McpServer.validate_headless_path (outside_dir, false, out path_err) == null);
+        string netrc_file = GLib.Path.build_filename (_test_tmp_root, ".netrc");
+        assert (McpServer.validate_headless_path (netrc_file, false, out path_err) == null);
+
+        // 4. Headless insert_text + get_active_document on workspace file
+        string ws_file = GLib.Path.build_filename (_test_tmp_root, "mcp_notes.md");
+        string ins_req = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"insert_text\",\"arguments\":{\"file_path\":\"" + ws_file.replace ("\\", "\\\\") + "\",\"text\":\"Hello MCP\\n\"}}}";
+        string ins_resp = McpServer.handle_json_rpc (ins_req, null);
+        assert (ins_resp.contains ("Text inserted into"));
+
+        string read_req = "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"get_active_document\",\"arguments\":{\"file_path\":\"" + ws_file.replace ("\\", "\\\\") + "\"}}}";
+        string read_resp = McpServer.handle_json_rpc (read_req, null);
+        assert (read_resp.contains ("Hello MCP"));
+
+        // 5. IMLADRIS_MCP_READONLY=1 blocks mutating tools (including render_document & compile_latex) and writes audit log
+        GLib.Environment.set_variable ("IMLADRIS_MCP_READONLY", "1", true);
+        string ro_resp = McpServer.handle_json_rpc (ins_req, null);
+        assert (ro_resp.contains ("read-only mode"));
+        string render_req = "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"render_document\",\"arguments\":{\"file_path\":\"" + ws_file.replace ("\\", "\\\\") + "\",\"format\":\"html\"}}}";
+        string ro_render_resp = McpServer.handle_json_rpc (render_req, null);
+        assert (ro_render_resp.contains ("read-only mode"));
+        string tex_req = "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"compile_latex\",\"arguments\":{\"file_path\":\"" + ws_file.replace ("\\", "\\\\") + "\"}}}";
+        string ro_tex_resp = McpServer.handle_json_rpc (tex_req, null);
+        assert (ro_tex_resp.contains ("read-only mode"));
+        string audit_file = GLib.Path.build_filename (GLib.Environment.get_user_data_dir (), "imladris", "mcp-audit.jsonl");
+        assert (GLib.FileUtils.test (audit_file, GLib.FileTest.EXISTS));
+        GLib.Environment.unset_variable ("IMLADRIS_MCP_READONLY");
+        GLib.Environment.unset_variable ("IMLADRIS_MCP_WORKSPACE");
+    }
+
+    private static void test_quarto_env_and_toolchain_profiles () {
+        // Verify ToolchainProfile package lists & external conda env discovery
+        var qf_pkgs = ToolchainProfile.QUANT_FINANCE.get_packages ();
+        bool has_duckdb = false;
+        foreach (string p in qf_pkgs) {
+            if (p == "duckdb") has_duckdb = true;
+        }
+        assert (has_duckdb);
+
+        // Create a mock managed conda prefix with deno_dom.so and verify QUARTO_DENO_DOM override
+        string mock_env = GLib.Path.build_filename (_test_tmp_root, "mock-base-ds");
+        string mock_lib = GLib.Path.build_filename (mock_env, "lib");
+        string mock_bin = GLib.Path.build_filename (mock_env, "bin");
+        GLib.DirUtils.create_with_parents (mock_lib, 0755);
+        GLib.DirUtils.create_with_parents (mock_bin, 0755);
+        try {
+            GLib.FileUtils.set_contents (GLib.Path.build_filename (mock_lib, "deno_dom.so"), "");
+            var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE);
+            PlatformUtils.configure_managed_env (launcher, mock_env);
+            var proc = launcher.spawnv ({ "/usr/bin/env" });
+            string env_out = "";
+            string env_err = "";
+            proc.communicate_utf8 (null, null, out env_out, out env_err);
+            assert (env_out.contains ("QUARTO_DENO_DOM=" + GLib.Path.build_filename (mock_lib, "deno_dom.so")));
+            string readiness = ToolchainManager.get_default ().verify_offline_readiness ();
+            assert (readiness.contains ("tectonic_cache:"));
+        } catch (GLib.Error e) {
+            error ("Toolchain env test failed: %s", e.message);
+        }
+    }
+
     public static int main (string[] args) {
         setup_isolated_xdg ();
         Test.init (ref args);
@@ -425,6 +506,8 @@ def summarize(n):
         Test.add_func ("/export/error_propagation", test_export_service_error_propagation);
         Test.add_func ("/export/builtin_pdf_odt_rtf", test_builtin_pdf_odt_rtf_export);
         Test.add_func ("/export/rtf_and_all_formats_html_pdf", test_rtf_and_all_formats_html_pdf);
+        Test.add_func ("/mcp/schema_headless_and_security", test_mcp_schema_headless_and_security);
+        Test.add_func ("/toolchain/quarto_env_and_profiles", test_quarto_env_and_toolchain_profiles);
 
         int rc = Test.run ();
         if (_test_tmp_root != "") {
