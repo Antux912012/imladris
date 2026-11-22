@@ -16,7 +16,7 @@
 
 set -euo pipefail
 
-VERSION="0.40.0"
+VERSION="0.41.0"
 REPO="Antux912012/imladris"
 FLATPARK_REPO="https://dl.flatpark.org/flatpark.flatpakrepo"
 APP_ID="io.github.Antux912012.Imladris"
