@@ -94,7 +94,13 @@ imladris_toolchain_get_dir_usage (const char *path,
                 *owned = probe;
                 g_hash_table_add (seen_inodes, owned);
             }
-            total += (gint64) ent->fts_statp->st_size;
+            guint64 next_total = 0;
+            if (ent->fts_statp->st_size > 0 &&
+                g_uint64_checked_add (&next_total, (guint64) total, (guint64) ent->fts_statp->st_size)) {
+                total = (next_total <= (guint64) G_MAXINT64) ? (gint64) next_total : G_MAXINT64;
+            } else if (ent->fts_statp->st_size > 0) {
+                total = G_MAXINT64;
+            }
         }
     }
 
@@ -127,7 +133,11 @@ imladris_toolchain_get_free_space (const char *path)
         return -1;
     }
 
-    return (gint64) st.f_bavail * (gint64) st.f_frsize;
+    guint64 avail_bytes = 0;
+    if (!g_uint64_checked_mul (&avail_bytes, (guint64) st.f_bavail, (guint64) st.f_frsize)) {
+        return G_MAXINT64;
+    }
+    return (avail_bytes <= (guint64) G_MAXINT64) ? (gint64) avail_bytes : G_MAXINT64;
 }
 
 static char *

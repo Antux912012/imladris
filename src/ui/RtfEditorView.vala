@@ -304,6 +304,8 @@ namespace Imladris.UI {
             buffer.notify["cursor-position"].connect (() => {
                 if (!in_text_insert) {
                     pending_attrs_active = false;
+                    pending_fg_hex = null;
+                    pending_bg_hex = null;
                 }
                 sync_toolbar_from_cursor ();
             });

@@ -39,6 +39,58 @@ namespace Imladris.Adapters {
         private static GLib.Regex? inline_math_regex = null;
         private static GLib.Regex? inline_ce_regex = null;
         private static GLib.Regex? ordered_list_regex = null;
+        private static GLib.Regex? html_head_close_regex = null;
+        private static GLib.Mutex regex_mutex;
+
+        private static string make_nonce () {
+            return GLib.Uuid.string_random ().replace ("-", "");
+        }
+
+        private static void ensure_regexes () throws GLib.RegexError {
+            regex_mutex.lock ();
+            try {
+                if (chunk_regex == null) chunk_regex = new GLib.Regex ("```\\{([A-Za-z0-9_+-]+)([^\\}]*)\\}([\\s\\S]*?)```");
+                if (plain_mermaid_regex == null) plain_mermaid_regex = new GLib.Regex ("```mermaid\\s*\\n([\\s\\S]*?)```");
+                if (video_regex == null) video_regex = new GLib.Regex ("\\{\\{<\\s*video\\s+([^\\s>]+)[^>]*>\\}\\}");
+                if (img_regex == null) img_regex = new GLib.Regex ("!\\[([^\\]]*)\\]\\(([^\\)]+)\\)");
+                if (display_math_regex == null) display_math_regex = new GLib.Regex ("\\$\\$([\\s\\S]*?)\\$\\$");
+                if (equation_env_regex == null) equation_env_regex = new GLib.Regex ("\\\\begin\\{equation\\}([\\s\\S]*?)\\\\end\\{equation\\}");
+                if (latex_title_regex == null) latex_title_regex = new GLib.Regex ("\\\\title\\{([^\\}]*)\\}");
+                if (latex_author_regex == null) latex_author_regex = new GLib.Regex ("\\\\author\\{([^\\}]*)\\}");
+                if (latex_date_regex == null) latex_date_regex = new GLib.Regex ("\\\\date\\{([^\\}]*)\\}");
+                if (latex_verb_regex == null) latex_verb_regex = new GLib.Regex ("\\\\begin\\{(verbatim|lstlisting)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
+                if (latex_bracket_math_regex == null) latex_bracket_math_regex = new GLib.Regex ("\\\\\\[([\\s\\S]*?)\\\\\\]");
+                if (latex_env_math_regex == null) latex_env_math_regex = new GLib.Regex ("\\\\begin\\{(equation|equation\\*|align|align\\*|gather|gather\\*)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
+                if (latex_dd_math_regex == null) latex_dd_math_regex = new GLib.Regex ("\\$\\$([\\s\\S]*?)\\$\\$");
+                if (latex_paren_math_regex == null) latex_paren_math_regex = new GLib.Regex ("\\\\\\(([\\s\\S]*?)\\\\\\)");
+                if (latex_ce_regex == null) latex_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
+                if (latex_inline_dollar_regex == null) latex_inline_dollar_regex = new GLib.Regex ("(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)");
+                if (latex_maketitle_regex == null) latex_maketitle_regex = new GLib.Regex ("\\\\maketitle");
+                if (latex_sec_regex == null) latex_sec_regex = new GLib.Regex ("\\\\section\\*?\\{([^\\}]*)\\}");
+                if (latex_subsec_regex == null) latex_subsec_regex = new GLib.Regex ("\\\\subsection\\*?\\{([^\\}]*)\\}");
+                if (latex_subsubsec_regex == null) latex_subsubsec_regex = new GLib.Regex ("\\\\subsubsection\\*?\\{([^\\}]*)\\}");
+                if (latex_textbf_regex == null) latex_textbf_regex = new GLib.Regex ("\\\\textbf\\{([^\\}]*)\\}");
+                if (latex_emph_regex == null) latex_emph_regex = new GLib.Regex ("\\\\(?:textit|emph)\\{([^\\}]*)\\}");
+                if (latex_texttt_regex == null) latex_texttt_regex = new GLib.Regex ("\\\\texttt\\{([^\\}]*)\\}");
+                if (latex_cite_regex == null) latex_cite_regex = new GLib.Regex ("\\\\cite\\{([^\\}]*)\\}");
+                if (inline_code_regex == null) inline_code_regex = new GLib.Regex ("`([^`]+)`");
+                if (inline_bold_regex == null) inline_bold_regex = new GLib.Regex ("\\*\\*([^\\*]+)\\*\\*");
+                if (inline_italic_regex == null) inline_italic_regex = new GLib.Regex ("(?<!\\*)\\*([^\\*]+)\\*(?!\\*)");
+                if (inline_strike_regex == null) inline_strike_regex = new GLib.Regex ("~~([^~]+)~~");
+                if (inline_sub_regex == null) inline_sub_regex = new GLib.Regex ("(?<!~)~([^~\\s]+)~(?!~)");
+                if (inline_sup_regex == null) inline_sup_regex = new GLib.Regex ("\\^([^\\^\\s]+)\\^");
+                if (inline_link_regex == null) inline_link_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
+                if (inline_ce_regex == null) inline_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
+                if (inline_math_regex == null) inline_math_regex = new GLib.Regex ("(?<!\\$)(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)(?!\\$)");
+                if (ordered_list_regex == null) ordered_list_regex = new GLib.Regex ("^[0-9]+\\.\\s+(.+)$");
+                if (html_protected_tag_regex == null) html_protected_tag_regex = new GLib.Regex ("<(style|script|pre|code)(\\s[^>]*)?>[\\s\\S]*?</\\1>", GLib.RegexCompileFlags.CASELESS);
+                if (html_ce_regex == null) html_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
+                if (html_inline_math_regex == null) html_inline_math_regex = new GLib.Regex ("(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)");
+                if (html_head_close_regex == null) html_head_close_regex = new GLib.Regex ("</head>", GLib.RegexCompileFlags.CASELESS);
+            } finally {
+                regex_mutex.unlock ();
+            }
+        }
 
         public static Imladris.DocumentFormat detect_format (string? filename) {
             if (filename == null || filename == "") return Imladris.DocumentFormat.MD;
@@ -95,10 +147,14 @@ namespace Imladris.Adapters {
                 builder.append (meta.to_html ());
             }
 
-            string processed_body = transform_code_chunks (body);
-            processed_body = transform_display_math (processed_body);
-            processed_body = transform_media_tags (processed_body);
-            builder.append (basic_markdown_to_html (processed_body));
+            string nonce = make_nonce ();
+            var internal_blocks = new Gee.ArrayList<string> ();
+            string processed_body = transform_code_chunks (body, nonce, internal_blocks);
+            processed_body = transform_display_math (processed_body, nonce, internal_blocks);
+            processed_body = transform_media_tags (processed_body, nonce, internal_blocks);
+
+            string html_body = basic_markdown_to_html (processed_body, nonce, internal_blocks);
+            builder.append (html_body);
             return builder.str;
         }
 
@@ -118,9 +174,7 @@ namespace Imladris.Adapters {
                 string author = "";
                 string date = "";
                 try {
-                    if (latex_title_regex == null) latex_title_regex = new GLib.Regex ("\\\\title\\{([^\\}]*)\\}");
-                    if (latex_author_regex == null) latex_author_regex = new GLib.Regex ("\\\\author\\{([^\\}]*)\\}");
-                    if (latex_date_regex == null) latex_date_regex = new GLib.Regex ("\\\\date\\{([^\\}]*)\\}");
+                    ensure_regexes ();
                     GLib.MatchInfo mi;
                     if (latex_title_regex.match (preamble, 0, out mi) || latex_title_regex.match (body, 0, out mi)) {
                         title = mi.fetch (1).strip ();
@@ -150,71 +204,59 @@ namespace Imladris.Adapters {
             }
 
             var prot = new Gee.ArrayList<string> ();
+            string tex_nonce = make_nonce ();
             string working = body;
             try {
-                if (latex_verb_regex == null) latex_verb_regex = new GLib.Regex ("\\\\begin\\{(verbatim|lstlisting)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
+                ensure_regexes ();
                 working = latex_verb_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add ("<pre><code>" + GLib.Markup.escape_text (mi.fetch (2)) + "</code></pre>");
-                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%s_%d__", tex_nonce, idx);
                     return false;
                 });
 
-                if (latex_bracket_math_regex == null) latex_bracket_math_regex = new GLib.Regex ("\\\\\\[([\\s\\S]*?)\\\\\\]");
                 working = latex_bracket_math_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), true));
-                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%s_%d__", tex_nonce, idx);
                     return false;
                 });
-                if (latex_env_math_regex == null) latex_env_math_regex = new GLib.Regex ("\\\\begin\\{(equation|equation\\*|align|align\\*|gather|gather\\*)\\}([\\s\\S]*?)\\\\end\\{\\1\\}");
                 working = latex_env_math_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (2).strip (), true));
-                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%s_%d__", tex_nonce, idx);
                     return false;
                 });
-                if (latex_dd_math_regex == null) latex_dd_math_regex = new GLib.Regex ("\\$\\$([\\s\\S]*?)\\$\\$");
                 working = latex_dd_math_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), true));
-                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%s_%d__", tex_nonce, idx);
                     return false;
                 });
 
-                if (latex_paren_math_regex == null) latex_paren_math_regex = new GLib.Regex ("\\\\\\(([\\s\\S]*?)\\\\\\)");
                 working = latex_paren_math_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), false));
-                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%s_%d__", tex_nonce, idx);
                     return false;
                 });
-                if (latex_ce_regex == null) latex_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
                 working = latex_ce_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html ("\\ce{" + mi.fetch (1) + "}", false));
-                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%s_%d__", tex_nonce, idx);
                     return false;
                 });
-                if (latex_inline_dollar_regex == null) latex_inline_dollar_regex = new GLib.Regex ("(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)");
                 working = latex_inline_dollar_regex.replace_eval (working, -1, 0, 0, (mi, res) => {
                     int idx = prot.size;
                     prot.add (Core.MathChemEngine.render_latex_to_html (mi.fetch (1).strip (), false));
-                    res.append_printf ("__IMLADRIS_TEX_PROT_%d__", idx);
+                    res.append_printf ("__IMLADRIS_TEX_PROT_%s_%d__", tex_nonce, idx);
                     return false;
                 });
             } catch (GLib.RegexError e) {}
 
             working = GLib.Markup.escape_text (working);
             try {
-                if (latex_maketitle_regex == null) latex_maketitle_regex = new GLib.Regex ("\\\\maketitle");
-                if (latex_sec_regex == null) latex_sec_regex = new GLib.Regex ("\\\\section\\*?\\{([^\\}]*)\\}");
-                if (latex_subsec_regex == null) latex_subsec_regex = new GLib.Regex ("\\\\subsection\\*?\\{([^\\}]*)\\}");
-                if (latex_subsubsec_regex == null) latex_subsubsec_regex = new GLib.Regex ("\\\\subsubsection\\*?\\{([^\\}]*)\\}");
-                if (latex_textbf_regex == null) latex_textbf_regex = new GLib.Regex ("\\\\textbf\\{([^\\}]*)\\}");
-                if (latex_emph_regex == null) latex_emph_regex = new GLib.Regex ("\\\\(?:textit|emph)\\{([^\\}]*)\\}");
-                if (latex_texttt_regex == null) latex_texttt_regex = new GLib.Regex ("\\\\texttt\\{([^\\}]*)\\}");
-                if (latex_cite_regex == null) latex_cite_regex = new GLib.Regex ("\\\\cite\\{([^\\}]*)\\}");
+                ensure_regexes ();
                 working = latex_maketitle_regex.replace (working, -1, 0, "");
                 working = latex_sec_regex.replace (working, -1, 0, "<h2>\\1</h2>");
                 working = latex_subsec_regex.replace (working, -1, 0, "<h3>\\1</h3>");
@@ -227,11 +269,12 @@ namespace Imladris.Adapters {
 
             var lines = working.split ("\n");
             var body_out = new StringBuilder ();
+            string tex_prefix = @"__IMLADRIS_TEX_PROT_$(tex_nonce)_";
             foreach (var ln in lines) {
                 string t = ln.strip ();
                 if (t == "") {
                     body_out.append ("<br/>\n");
-                } else if (t.has_prefix ("<h") || t.has_prefix ("__IMLADRIS_TEX_PROT_")) {
+                } else if (t.has_prefix ("<h") || t.has_prefix (tex_prefix)) {
                     body_out.append (t);
                     body_out.append ("\n");
                 } else {
@@ -243,7 +286,7 @@ namespace Imladris.Adapters {
 
             string final_body = body_out.str;
             for (int i = 0; i < prot.size; i++) {
-                final_body = final_body.replace (@"__IMLADRIS_TEX_PROT_$(i)__", prot[i]);
+                final_body = final_body.replace (@"__IMLADRIS_TEX_PROT_$(tex_nonce)_$(i)__", prot[i]);
             }
             builder.append (final_body);
             return builder.str;
@@ -298,16 +341,15 @@ namespace Imladris.Adapters {
             }
 
             var protected_blocks = new Gee.ArrayList<string> ();
+            string html_nonce = make_nonce ();
             string working = raw_html;
 
             try {
-                if (html_protected_tag_regex == null) {
-                    html_protected_tag_regex = new GLib.Regex ("<(style|script|pre|code)(\\s[^>]*)?>[\\s\\S]*?</\\1>", GLib.RegexCompileFlags.CASELESS);
-                }
+                ensure_regexes ();
                 working = html_protected_tag_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
                     int idx = protected_blocks.size;
                     protected_blocks.add (match_info.fetch (0));
-                    res.append_printf ("__IMLADRIS_HTML_PROT_%d__", idx);
+                    res.append_printf ("__IMLADRIS_HTML_PROT_%s_%d__", html_nonce, idx);
                     return false;
                 });
             } catch (GLib.RegexError e) {}
@@ -315,18 +357,12 @@ namespace Imladris.Adapters {
             working = transform_display_math (working);
 
             try {
-                if (html_ce_regex == null) {
-                    html_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
-                }
+                ensure_regexes ();
                 working = html_ce_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
                     res.append (Core.MathChemEngine.render_latex_to_html ("\\ce{" + match_info.fetch (1) + "}", false));
                     return false;
                 });
 
-                if (html_inline_math_regex == null) {
-                    // Pandoc currency guard: no space after opening $, no space before closing $, no digit after closing $
-                    html_inline_math_regex = new GLib.Regex ("(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)");
-                }
                 working = html_inline_math_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
                     string expr = match_info.fetch (1).strip ();
                     if (expr.length == 0) {
@@ -339,12 +375,20 @@ namespace Imladris.Adapters {
             } catch (GLib.RegexError e) {}
 
             for (int i = 0; i < protected_blocks.size; i++) {
-                working = working.replace (@"__IMLADRIS_HTML_PROT_$(i)__", protected_blocks[i]);
+                working = working.replace (@"__IMLADRIS_HTML_PROT_$(html_nonce)_$(i)__", protected_blocks[i]);
             }
 
             if (!working.contains (".math-display-card")) {
                 string math_css = "<style id=\"imladris-math-css\">\n" + Core.MathChemEngine.get_math_chem_css () + "\n</style>\n";
-                int head_close = working.down ().index_of ("</head>");
+                int head_close = -1;
+                try {
+                    ensure_regexes ();
+                    GLib.MatchInfo hmi;
+                    if (html_head_close_regex.match (working, 0, out hmi)) {
+                        int end_pos;
+                        hmi.fetch_pos (0, out head_close, out end_pos);
+                    }
+                } catch (GLib.RegexError e) {}
                 if (head_close >= 0) {
                     working = working.substring (0, head_close) + math_css + working.substring (head_close);
                 } else {
@@ -355,25 +399,29 @@ namespace Imladris.Adapters {
             return working;
         }
 
-        private static string transform_display_math (string text) {
+        private static string emit_or_protect_block (string html, string? nonce, Gee.ArrayList<string>? internal_blocks) {
+            if (nonce != null && internal_blocks != null) {
+                int idx = internal_blocks.size;
+                internal_blocks.add (html);
+                return @"\n@@IMLBLK_$(nonce)_$(idx)@@\n";
+            }
+            return html;
+        }
+
+        private static string transform_display_math (string text, string? nonce = null, Gee.ArrayList<string>? internal_blocks = null) {
             string result = text;
             try {
-                if (display_math_regex == null) {
-                    display_math_regex = new GLib.Regex ("\\$\\$([\\s\\S]*?)\\$\\$");
-                }
+                ensure_regexes ();
                 result = display_math_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
                     string expr = match_info.fetch (1).strip ();
-                    res.append (Core.MathChemEngine.render_latex_to_html (expr, true));
+                    res.append (emit_or_protect_block (Core.MathChemEngine.render_latex_to_html (expr, true), nonce, internal_blocks));
                     res.append ("\n");
                     return false;
                 });
 
-                if (equation_env_regex == null) {
-                    equation_env_regex = new GLib.Regex ("\\\\begin\\{equation\\}([\\s\\S]*?)\\\\end\\{equation\\}");
-                }
                 result = equation_env_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
                     string expr = match_info.fetch (1).strip ();
-                    res.append (Core.MathChemEngine.render_latex_to_html (expr, true));
+                    res.append (emit_or_protect_block (Core.MathChemEngine.render_latex_to_html (expr, true), nonce, internal_blocks));
                     res.append ("\n");
                     return false;
                 });
@@ -408,40 +456,37 @@ namespace Imladris.Adapters {
                    (!value.has_prefix ("//") && !value.contains (":"));
         }
 
-        private static string transform_media_tags (string text) {
+        private static string transform_media_tags (string text, string? nonce = null, Gee.ArrayList<string>? internal_blocks = null) {
             string result = text;
             try {
-                if (video_regex == null) {
-                    video_regex = new GLib.Regex ("\\{\\{<\\s*video\\s+([^\\s>]+)[^>]*>\\}\\}");
-                }
+                ensure_regexes ();
                 result = video_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
                     string path = match_info.fetch (1);
                     if (is_safe_link (path)) {
-                        res.append_printf (
-                            "<div class=\"media-video-container\"><video src=\"%s\" controls></video></div>",
+                        string html = "<div class=\"media-video-container\"><video src=\"%s\" controls></video></div>".printf (
                             GLib.Markup.escape_text (path)
                         );
+                        res.append (emit_or_protect_block (html, nonce, internal_blocks));
                     } else {
                         res.append (GLib.Markup.escape_text (match_info.fetch (0)));
                     }
                     return false;
                 });
-                if (img_regex == null) {
-                    img_regex = new GLib.Regex ("!\\[([^\\]]*)\\]\\(([^\\)]+)\\)");
-                }
                 result = img_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
                     string alt = match_info.fetch (1);
                     string path = match_info.fetch (2);
                     if (is_safe_link (path)) {
-                        res.append_printf (
+                        var fig = new StringBuilder ();
+                        fig.append_printf (
                             "<figure><img src=\"%s\" alt=\"%s\" style=\"max-width:100%%;height:auto\"/>",
                             GLib.Markup.escape_text (path),
                             GLib.Markup.escape_text (alt)
                         );
                         if (alt.strip () != "") {
-                            res.append_printf ("<figcaption>%s</figcaption>", GLib.Markup.escape_text (alt));
+                            fig.append_printf ("<figcaption>%s</figcaption>", GLib.Markup.escape_text (alt));
                         }
-                        res.append ("</figure>");
+                        fig.append ("</figure>");
+                        res.append (emit_or_protect_block (fig.str, nonce, internal_blocks));
                     } else {
                         res.append (GLib.Markup.escape_text (alt));
                     }
@@ -453,38 +498,35 @@ namespace Imladris.Adapters {
             return result;
         }
 
-        private static string transform_code_chunks (string text) {
+        private static string transform_code_chunks (string text, string? nonce = null, Gee.ArrayList<string>? internal_blocks = null) {
             string result = text;
             try {
-                if (chunk_regex == null) {
-                    chunk_regex = new GLib.Regex ("```\\{([A-Za-z0-9_+-]+)([^\\}]*)\\}([\\s\\S]*?)```");
-                }
+                ensure_regexes ();
                 result = chunk_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
                     string language = match_info.fetch (1).down ();
                     string options = match_info.fetch (2).strip ();
                     string code = match_info.fetch (3);
                     if (language == "mermaid") {
-                        res.append (render_mermaid_svg_inline (code));
+                        res.append (emit_or_protect_block (render_mermaid_svg_inline (code), nonce, internal_blocks));
                     } else {
-                        res.append ("<div class=\"code-chunk-card\">");
-                        res.append_printf (
+                        var card = new StringBuilder ();
+                        card.append ("<div class=\"code-chunk-card\">");
+                        card.append_printf (
                             "<div class=\"code-chunk-header\"><span class=\"badge\">%s</span>%s</div>",
                             GLib.Markup.escape_text (language.up ()),
                             options != "" ? " <span class=\"chunk-opts\">" + GLib.Markup.escape_text (options) + "</span>" : ""
                         );
-                        res.append_printf (
+                        card.append_printf (
                             "<pre><code class=\"language-%s\">%s</code></pre></div>",
                             GLib.Markup.escape_text (language),
                             GLib.Markup.escape_text (code)
                         );
+                        res.append (emit_or_protect_block (card.str, nonce, internal_blocks));
                     }
                     return false;
                 });
-                if (plain_mermaid_regex == null) {
-                    plain_mermaid_regex = new GLib.Regex ("```mermaid\\s*\\n([\\s\\S]*?)```");
-                }
                 result = plain_mermaid_regex.replace_eval (result, -1, 0, 0, (match_info, res) => {
-                    res.append (render_mermaid_svg_inline (match_info.fetch (1)));
+                    res.append (emit_or_protect_block (render_mermaid_svg_inline (match_info.fetch (1)), nonce, internal_blocks));
                     return false;
                 });
             } catch (GLib.RegexError e) {
@@ -495,23 +537,16 @@ namespace Imladris.Adapters {
 
         private static string format_inline_markdown (string line) {
             string working = line;
+            string span_nonce = make_nonce ();
             var protected_spans = new Gee.ArrayList<string> ();
             try {
-                if (inline_code_regex == null) inline_code_regex = new GLib.Regex ("`([^`]+)`");
-                if (inline_bold_regex == null) inline_bold_regex = new GLib.Regex ("\\*\\*([^\\*]+)\\*\\*");
-                if (inline_italic_regex == null) inline_italic_regex = new GLib.Regex ("(?<!\\*)\\*([^\\*]+)\\*(?!\\*)");
-                if (inline_strike_regex == null) inline_strike_regex = new GLib.Regex ("~~([^~]+)~~");
-                if (inline_sub_regex == null) inline_sub_regex = new GLib.Regex ("(?<!~)~([^~\\s]+)~(?!~)");
-                if (inline_sup_regex == null) inline_sup_regex = new GLib.Regex ("\\^([^\\^\\s]+)\\^");
-                if (inline_link_regex == null) inline_link_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
-                if (inline_ce_regex == null) inline_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
-                if (inline_math_regex == null) inline_math_regex = new GLib.Regex ("(?<!\\$)(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)(?!\\$)");
+                ensure_regexes ();
 
                 // 1. Protect inline code spans first so `$...$` or `\ce{...}` inside backticks are never mangled
                 working = inline_code_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
                     int idx = protected_spans.size;
                     protected_spans.add ("<code>" + GLib.Markup.escape_text (match_info.fetch (1)) + "</code>");
-                    res.append_printf ("@@IMLSPAN_%d@@", idx);
+                    res.append_printf ("@@IMLSPAN_%s_%d@@", span_nonce, idx);
                     return false;
                 });
 
@@ -519,7 +554,7 @@ namespace Imladris.Adapters {
                 working = inline_ce_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
                     int idx = protected_spans.size;
                     protected_spans.add (Core.MathChemEngine.render_latex_to_html ("\\ce{" + match_info.fetch (1) + "}", false));
-                    res.append_printf ("@@IMLSPAN_%d@@", idx);
+                    res.append_printf ("@@IMLSPAN_%s_%d@@", span_nonce, idx);
                     return false;
                 });
                 working = inline_math_regex.replace_eval (working, -1, 0, 0, (match_info, res) => {
@@ -529,7 +564,7 @@ namespace Imladris.Adapters {
                     } else {
                         int idx = protected_spans.size;
                         protected_spans.add (Core.MathChemEngine.render_latex_to_html (expr, false));
-                        res.append_printf ("@@IMLSPAN_%d@@", idx);
+                        res.append_printf ("@@IMLSPAN_%s_%d@@", span_nonce, idx);
                     }
                     return false;
                 });
@@ -544,9 +579,10 @@ namespace Imladris.Adapters {
                 escaped = inline_link_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
                     string href = match_info.fetch (2);
                     if (is_safe_link (href)) {
+                        // href is already HTML-escaped from step 3 above; do not double-escape
                         res.append_printf (
                             "<a href=\"%s\">%s</a>",
-                            GLib.Markup.escape_text (href),
+                            href,
                             match_info.fetch (1)
                         );
                     } else {
@@ -557,7 +593,7 @@ namespace Imladris.Adapters {
 
                 // 4. Restore protected code/math/chem HTML spans
                 for (int i = 0; i < protected_spans.size; i++) {
-                    escaped = escaped.replace ("@@IMLSPAN_%d@@".printf (i), protected_spans.get (i));
+                    escaped = escaped.replace ("@@IMLSPAN_%s_%d@@".printf (span_nonce, i), protected_spans.get (i));
                 }
                 return escaped;
             } catch (GLib.RegexError e) {
@@ -566,34 +602,28 @@ namespace Imladris.Adapters {
             }
         }
 
-        private static string basic_markdown_to_html (string text) {
+        private static string basic_markdown_to_html (string text, string nonce, Gee.ArrayList<string> internal_blocks) {
             var result = new StringBuilder ();
             bool in_ul = false;
             bool in_ol = false;
             bool in_table = false;
             bool in_pre = false;
-            bool in_html_pre = false;
+            string blk_prefix = @"@@IMLBLK_$(nonce)_";
 
             foreach (string line in text.split ("\n")) {
                 string trimmed = line.strip ();
-                if (in_html_pre) {
-                    result.append (line + "\n");
-                    if (line.contains ("</pre>")) in_html_pre = false;
-                    continue;
-                }
 
-                if (trimmed.has_prefix ("<div") || trimmed.has_prefix ("</div") ||
-                    trimmed.has_prefix ("<pre") || trimmed.has_prefix ("</pre") ||
-                    trimmed.has_prefix ("<figure") || trimmed.has_prefix ("</figure") ||
-                    trimmed.has_prefix ("<video") || trimmed.has_prefix ("</video") ||
-                    trimmed.has_prefix ("<img") || trimmed.has_prefix ("<figcaption")) {
+                if (trimmed.has_prefix (blk_prefix) && trimmed.has_suffix ("@@")) {
                     close_markdown_lists (result, ref in_ul, ref in_ol);
                     if (in_table) {
                         result.append ("</tbody></table>\n");
                         in_table = false;
                     }
-                    result.append (line + "\n");
-                    if (line.contains ("<pre") && !line.contains ("</pre>")) in_html_pre = true;
+                    string idx_str = trimmed.substring (blk_prefix.length, trimmed.length - blk_prefix.length - 2);
+                    int idx = int.parse (idx_str);
+                    if (idx >= 0 && idx < internal_blocks.size) {
+                        result.append (internal_blocks.get (idx)).append_c ('\n');
+                    }
                     continue;
                 }
 
@@ -698,9 +728,7 @@ namespace Imladris.Adapters {
         private static bool is_ordered_list_item (string line, out string item) {
             item = "";
             try {
-                if (ordered_list_regex == null) {
-                    ordered_list_regex = new GLib.Regex ("^[0-9]+\\.\\s+(.+)$");
-                }
+                ensure_regexes ();
                 GLib.MatchInfo match_info;
                 if (ordered_list_regex.match (line, 0, out match_info)) {
                     item = match_info.fetch (1);

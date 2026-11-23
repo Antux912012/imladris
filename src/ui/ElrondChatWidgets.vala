@@ -243,7 +243,7 @@ namespace Imladris.UI {
     public class ElrondAssistantMessage : Gtk.Box {
         private Gtk.Expander thinking_expander;
         private Gtk.Box thinking_header_box;
-        private Adw.Spinner thinking_spinner;
+        private Gtk.Spinner thinking_spinner;
         private Gtk.Image thinking_done_icon;
         private Gtk.Label thinking_label;
         private Gtk.Label thinking_detail_label;
@@ -271,7 +271,8 @@ namespace Imladris.UI {
 
             // Collapsible Thinking / Tool Row
             thinking_header_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
-            thinking_spinner = new Adw.Spinner () {
+            thinking_spinner = new Gtk.Spinner () {
+                spinning = true,
                 visible = true
             };
             thinking_done_icon = new Gtk.Image.from_icon_name ("emblem-ok-symbolic") {

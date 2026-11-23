@@ -494,11 +494,21 @@ namespace Imladris.Core {
                         continue;
                     }
                     unichar uc = rtf_text.get_char (i);
-                    if (uc != 0) {
+                    if (uc != (unichar) (-1) && uc != 0 && uc.validate ()) {
                         buf.append_unichar (uc);
-                        i = rtf_text.index_of_nth_char (0) >= 0 ? i + uc.to_string ().length : i + 1;
+                        int next_i = i;
+                        if (rtf_text.get_next_char (ref next_i, out uc)) {
+                            i = next_i;
+                        } else {
+                            i++;
+                        }
                     } else {
-                        buf.append_c (c);
+                        uint8 raw_b = (uint8) rtf_text[i];
+                        if (raw_b >= 0x80) {
+                            buf.append (decode_cp1252_byte (raw_b));
+                        } else if (raw_b != 0) {
+                            buf.append_c ((char) raw_b);
+                        }
                         i++;
                     }
                 } else {
@@ -640,9 +650,17 @@ namespace Imladris.Core {
             } else if (c >= 0x20 && c <= 0x7E) {
                 sb.append_unichar (c);
             } else {
-                int code = (int) c;
-                if (code > 32767) code -= 65536;
-                sb.append_printf ("\\u%d?", code);
+                uint32 code = (uint32) c;
+                if (code <= 0xFFFF) {
+                    int16 signed_code = (int16) code;
+                    sb.append_printf ("\\u%d?", (int) signed_code);
+                } else {
+                    // Encode non-BMP characters (e.g. emoji) as UTF-16 surrogate pair
+                    uint32 v = code - 0x10000;
+                    int16 hi = (int16) (0xD800 + (v >> 10));
+                    int16 lo = (int16) (0xDC00 + (v & 0x3FF));
+                    sb.append_printf ("\\u%d?\\u%d?", (int) hi, (int) lo);
+                }
             }
         }
 

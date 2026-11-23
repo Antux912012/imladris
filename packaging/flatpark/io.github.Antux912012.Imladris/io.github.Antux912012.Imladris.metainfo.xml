@@ -75,6 +75,28 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.42.1" date="2026-11-23" type="stable">
+      <description>
+        <p>Release 0.42.1 fixes the Rich Text (.rtf) creation crash and delivers comprehensive security, thread-safety, and packaging hardening:</p>
+        <ul>
+          <li>RTF Creation Crash &amp; Editor Fixes: Fixed null GtkSource.Language SIGSEGV when creating .rtf/.txt/.csv/.tsv files, added native RTF scaffolding, UTF-8/non-BMP codec fixes, crash-recovery snapshotting, and full RTF ribbon/PDF/ODT parity.</li>
+          <li>Security &amp; Sandbox Hardening: Hardened PluginManager archive/community-registry consent checks and asset confinement, blocked Markdown raw-HTML XSS passthrough in DocumentAdapter, required explicit workspace and output validation in McpServer, and isolated ExportService subprocess environments.</li>
+          <li>Thread &amp; C Memory Safety: Added per-call PangoFontMap in export_native.c, mutex-guarded static regex caches, and overflow-safe 64-bit disk calculations in toolchain_native.c.</li>
+          <li>License &amp; Distribution Coherence: Unified Apache-2.0 license metadata across AppStream, NixOS flake, and FlatPark changelogs.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.42.0" date="2026-11-22" type="stable">
+      <description>
+        <p>Release 0.42.0 introduces Elrond AI Hardware Auto-Optimization, the Flatpak Host Bridge with Quarto/R/Python kernel routing, and a redesigned native GTK4/Libadwaita Elrond AI chat panel:</p>
+        <ul>
+          <li>Elrond AI Hardware Auto-Optimizer: Automatic 5-tier Vulkan GPU/iGPU/CPU probing via llama-server --list-devices, tailored launch profiles, 15s /health startup monitoring with automatic CPU fallback, and Preferences profile badge.</li>
+          <li>Flatpak Host Bridge &amp; Kernel Routing: Added HostBridge (--watch-bus orphan prevention), single-shot EnvDiscovery (uv, Conda, venv, multi-version rig R, Quarto), ExecutionRouter with Quarto/R/Python kernel selector, Host/Sandbox scope toggle, and latest unpinned R/CRAN support.</li>
+          <li>Redesigned Elrond AI Chat UI: Native Adw.ToolbarView layout, searchable past sessions, Adw.StatusPage empty state, tactile floating composer with context chips and @ mentions, 30ms throttled streaming Markdown, collapsible reasoning row, and syntax-highlighted GtkSourceView code blocks.</li>
+          <li>Codebase Audit &amp; Optimization: Unified Flatpak/bytes helpers, cached compiled regular expressions, and added HTTP session timeouts.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.41.0" date="2026-11-22" type="stable">
       <description>
         <p>Release 0.41.0 improves MCP automation, offline LaTeX and Quarto builds, scientific toolchains, and enterprise security controls:</p>
@@ -92,7 +114,7 @@
         <p>Most Stable Release (v0.40.0): Transitions Imladris Core to the Apache-2.0 Hybrid Open-Core license for frictionless Academic &amp; Enterprise R&amp;D adoption, and delivers major editor and Flatpak stability upgrades:</p>
         <ul>
           <li>Apache-2.0 Hybrid Open-Core Licensing: Relicensed core studio from GPL-3.0-or-later to Apache-2.0 with explicit patent protection, clean JSC.Context/MCP extension boundaries, and Commercial Enterprise Pack readiness.</li>
-          <li>VS Code &amp; RStudio-Grade Autocompletion: Live keystroke refiltering, fuzzy match highlighting, Markdown/Quarto prose snippets &amp; cross-references, HTML5 tag completion, R library()/parameter completions, Python DataFrame methods, live REPL column discovery, and paired BackSpace/triple-backtick handling.</li>
+          <li>VS Code &amp; RStudio-Grade Autocompletion: Live keystroke refiltering, fuzzy match highlighting, Markdown/Quarto prose snippets &amp; cross-references (@fig-*, @tbl-*, @sec-*), HTML5 tag &amp; smart closing tag completion, R library()/parameter completions, Python DataFrame methods, live REPL DataFrame column discovery, and paired BackSpace/triple-backtick handling.</li>
           <li>Quick Table Picker Popover: Cursor-anchored 8x8 hover grid and custom Rows/Cols dialog (Ctrl+Alt+T) with format-aware Markdown, HTML, LaTeX, and RTF table generation.</li>
           <li>Flatpak WebKitGTK 6.0 Live Preview Fix: Fixed WebKitWebContext vs. JSC.Context initialization order so live preview renders reliably in Flatpak sandboxes.</li>
         </ul>

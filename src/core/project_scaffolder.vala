@@ -513,6 +513,20 @@ if __name__ == "__main__":
     main()
 """.printf (cfg.project_name, author_name, date_str, rel_data, rel_img);
 
+                case DocumentFormat.RTF:
+                    return """{\rtf1\ansi\ansicpg1252\deff0\nouicompat
+{\fonttbl{\f0\fnil\fcharset0 Sans;}}
+\viewkind4\uc1\pard\ql\sa120\sl276\slmult1\f0\fs24
+\b\fs32 %s\b0\fs24\par
+Author: %s | Date: %s\par
+Start writing formatted rich text here.\par
+}
+""".printf (
+                        cfg.project_name.replace ("\\", "\\\\").replace ("{", "\\{").replace ("}", "\\}"),
+                        author_name.replace ("\\", "\\\\").replace ("{", "\\{").replace ("}", "\\}"),
+                        date_str
+                    );
+
                 case DocumentFormat.MD:
                 default:
                     return """---

@@ -5,6 +5,18 @@ SPDX-License-Identifier: Apache-2.0
 
 # FlatPark Release Changelog (`io.github.Antux912012.Imladris`)
 
+## [0.42.1] - 2026-11-23 — Stable Release (`stable` branch, `Apache-2.0`)
+
+- **RTF Creation Crash Fix & Editor Parity:** Fixed deterministic `SIGSEGV` when creating `.rtf` (and `.txt`/`.csv`/`.tsv`) documents due to `null` `GtkSource.Language`, added RTF project scaffolding, UTF-8/non-BMP codec fixes, crash-recovery snapshotting, and PDF/ODT export button parity.
+- **Security & Concurrency Hardening:** Closed plugin archive/community-installer consent bypasses and `readAsset` symlink escapes, eliminated Markdown raw-HTML XSS passthrough in `DocumentAdapter`, hardened `McpServer` workspace/output-path/D-Bus controls, removed credential propagation from `ExportService`, switched `export_native.c` PDF rendering to a thread-safe per-call `PangoFontMap`, and added mutex-protected static regexes and overflow-safe 64-bit disk helpers.
+- **License Coherence:** Unified `Apache-2.0` licensing across `NativePreviewView.vala`, AppStream metainfo, NixOS `flake.nix`, and FlatPark metadata.
+
+## [0.42.0] - 2026-11-22 — Stable Release (`stable` branch)
+
+- **Elrond AI Hardware Auto-Optimizer:** 5-tier Vulkan GPU/iGPU/CPU probing via `llama-server --list-devices`, tailored launch profiles, 15s `/health` crash recovery with CPU fallback, and Preferences profile badge.
+- **Flatpak Host Bridge & Kernel Routing:** Added `HostBridge` (`--watch-bus`), `EnvDiscovery` (`uv`, Conda, venv, `rig` R, Quarto), `ExecutionRouter` with Quarto/R/Python kernel selector, Host/Sandbox scope toggle, and unpinned latest R/CRAN support.
+- **Redesigned Elrond AI Chat UI:** Native `Adw.ToolbarView`, searchable sessions, `Adw.StatusPage` empty state, floating composer with `@` mentions, 30ms streaming Markdown, collapsible reasoning row, and syntax-highlighted code blocks.
+
 ## [0.41.0] - 2026-11-22 — Stable Release (`stable` branch)
 
 - **CLI and MCP Bridge:** Added `--mcp-server` to `imladris --help`. Added a D-Bus bridge (`io.github.Antux912012.Imladris.McpBridge`) so `--mcp-server` connects to open GUI windows.

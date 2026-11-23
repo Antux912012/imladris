@@ -20,7 +20,7 @@
         {
           default = pkgs.stdenv.mkDerivation {
             pname = "imladris";
-            version = "0.40.0";
+            version = "0.42.1";
 
             src = self;
 
@@ -66,7 +66,7 @@
             meta = with pkgs.lib; {
               description = "Native scientific notebook studio for Quarto, R, Python, and Jupyter";
               homepage = "https://antux912012.github.io/imladris/";
-              license = licenses.gpl3Plus;
+              license = licenses.asl20;
               mainProgram = "imladris";
               platforms = platforms.linux;
             };

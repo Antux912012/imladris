@@ -75,6 +75,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.42.1" date="2026-11-23" type="stable">
+      <description>
+        <p>Release 0.42.1 fixes the Rich Text (.rtf) creation crash and delivers comprehensive security, thread-safety, and packaging hardening:</p>
+        <ul>
+          <li>RTF Creation Crash &amp; Editor Fixes: Fixed null GtkSource.Language SIGSEGV when creating .rtf/.txt/.csv/.tsv files, added native RTF scaffolding, UTF-8/non-BMP codec fixes, crash-recovery snapshotting, and full RTF ribbon/PDF/ODT parity.</li>
+          <li>Security &amp; Sandbox Hardening: Hardened PluginManager archive/community-registry consent checks and asset confinement, blocked Markdown raw-HTML XSS passthrough in DocumentAdapter, required explicit workspace and output validation in McpServer, and isolated ExportService subprocess environments.</li>
+          <li>Thread &amp; C Memory Safety: Added per-call PangoFontMap in export_native.c, mutex-guarded static regex caches, and overflow-safe 64-bit disk calculations in toolchain_native.c.</li>
+          <li>License &amp; Distribution Coherence: Unified Apache-2.0 license metadata across AppStream, NixOS flake, and FlatPark changelogs.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.42.0" date="2026-11-22" type="stable">
       <description>
         <p>Release 0.42.0 introduces Elrond AI Hardware Auto-Optimization, the Flatpak Host Bridge with Quarto/R/Python kernel routing, and a redesigned native GTK4/Libadwaita Elrond AI chat panel:</p>

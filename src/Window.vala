@@ -868,11 +868,8 @@ namespace Imladris {
 
         public string get_active_selected_text () {
             var doc = get_active_document ();
-            if (doc != null && doc.source_buffer != null) {
-                Gtk.TextIter start, end;
-                if (doc.source_buffer.get_selection_bounds (out start, out end)) {
-                    return doc.source_buffer.get_text (start, end, false);
-                }
+            if (doc != null) {
+                return doc.get_selected_text ();
             }
             return "";
         }
@@ -883,10 +880,11 @@ namespace Imladris {
                 add_document_tab ("Analysis.qmd", "markdown");
                 doc = get_active_document ();
             }
-            if (doc != null && doc.source_buffer != null) {
-                doc.source_buffer.begin_user_action ();
-                doc.source_buffer.insert_at_cursor (text, -1);
-                doc.source_buffer.end_user_action ();
+            if (doc != null) {
+                Gtk.TextBuffer buf = (doc.rtf_editor != null) ? doc.rtf_editor.buffer : (Gtk.TextBuffer) doc.source_buffer;
+                buf.begin_user_action ();
+                buf.insert_at_cursor (text, -1);
+                buf.end_user_action ();
             }
         }
 
@@ -1917,15 +1915,17 @@ namespace Imladris {
                 return "No active document open.";
             }
             string path = (doc.file_location != null && doc.file_location.get_path () != null) ? doc.file_location.get_path () : "";
-            return @"File: $path\nLanguage: $(doc.doc_type)\nLines: $(doc.source_buffer.get_line_count ())\n\nContent:\n$(doc.get_clean_source_text ())";
+            int lines = (doc.rtf_editor != null) ? doc.rtf_editor.buffer.get_line_count () : doc.source_buffer.get_line_count ();
+            return @"File: $path\nLanguage: $(doc.doc_type)\nLines: $lines\n\nContent:\n$(doc.get_clean_source_text ())";
         }
 
         public bool insert_text_in_active (string text) {
             var doc = get_active_document ();
-            if (doc == null || doc.source_buffer == null) return false;
-            doc.source_buffer.begin_user_action ();
-            doc.source_buffer.insert_at_cursor (text, -1);
-            doc.source_buffer.end_user_action ();
+            if (doc == null) return false;
+            Gtk.TextBuffer buf = (doc.rtf_editor != null) ? doc.rtf_editor.buffer : (Gtk.TextBuffer) doc.source_buffer;
+            buf.begin_user_action ();
+            buf.insert_at_cursor (text, -1);
+            buf.end_user_action ();
             return true;
         }
 
@@ -2571,14 +2571,12 @@ namespace Imladris {
 
             // Group 4: Symbols, Diagrams & Visuals
             var sym_popover = SmartRibbonHelpers.create_symbols_popover ((sym) => {
-                var d = get_active_document ();
-                if (d != null) d.source_buffer.insert_at_cursor (sym, -1);
+                insert_text_in_active (sym);
             });
             var btn_sym = RibbonFactory.create_tool_button ("character-map-symbolic", "Symbols", "Insert Math / Special Symbol", false, false, true, null, null, sym_popover);
 
             var emoji_popover = SmartRibbonHelpers.create_emoji_popover ((em) => {
-                var d = get_active_document ();
-                if (d != null) d.source_buffer.insert_at_cursor (em, -1);
+                insert_text_in_active (em);
             });
             var btn_emoji = RibbonFactory.create_tool_button ("face-smile-symbolic", "Emoji", "Insert Emoji", false, false, true, null, null, emoji_popover);
 
@@ -2882,12 +2880,12 @@ namespace Imladris {
                 btn_render_html.sensitive = profile.supports_live_preview || is_tex;
             }
             if (btn_render_pdf != null) {
-                btn_render_pdf.visible = is_notebook || is_md || is_tex || is_html;
+                btn_render_pdf.visible = is_notebook || is_md || is_tex || is_html || fmt == DocumentFormat.RTF;
                 btn_render_pdf.sensitive = btn_render_pdf.visible;
             }
             if (btn_export_odt != null) {
-                btn_export_odt.visible = is_md || is_notebook;
-                btn_export_odt.sensitive = is_md || is_notebook;
+                btn_export_odt.visible = is_md || is_notebook || fmt == DocumentFormat.RTF;
+                btn_export_odt.sensitive = btn_export_odt.visible;
             }
             if (btn_export_odp != null) {
                 btn_export_odp.visible = is_md || is_notebook;
@@ -3369,15 +3367,16 @@ namespace Imladris {
                     doc = get_active_document ();
                 }
                 if (doc != null) {
-                    doc.source_buffer.begin_user_action ();
+                    Gtk.TextBuffer buf = (doc.rtf_editor != null) ? doc.rtf_editor.buffer : (Gtk.TextBuffer) doc.source_buffer;
+                    buf.begin_user_action ();
                     Gtk.TextIter start, end;
-                    if (doc.source_buffer.get_selection_bounds (out start, out end)) {
-                        doc.source_buffer.delete (ref start, ref end);
-                        doc.source_buffer.insert (ref start, formatted_output, formatted_output.length);
+                    if (buf.get_selection_bounds (out start, out end)) {
+                        buf.delete (ref start, ref end);
+                        buf.insert (ref start, formatted_output, formatted_output.length);
                     } else {
-                        doc.source_buffer.insert_at_cursor (formatted_output, formatted_output.length);
+                        buf.insert_at_cursor (formatted_output, formatted_output.length);
                     }
-                    doc.source_buffer.end_user_action ();
+                    buf.end_user_action ();
                     doc.refresh_live_preview ();
                     show_toast ("Inserted formula into document");
                     if (save_document) {
@@ -3398,15 +3397,16 @@ namespace Imladris {
                     doc = get_active_document ();
                 }
                 if (doc != null) {
-                    doc.source_buffer.begin_user_action ();
+                    Gtk.TextBuffer buf = (doc.rtf_editor != null) ? doc.rtf_editor.buffer : (Gtk.TextBuffer) doc.source_buffer;
+                    buf.begin_user_action ();
                     Gtk.TextIter start, end;
-                    if (doc.source_buffer.get_selection_bounds (out start, out end)) {
-                        doc.source_buffer.delete (ref start, ref end);
-                        doc.source_buffer.insert (ref start, formatted_mermaid, formatted_mermaid.length);
+                    if (buf.get_selection_bounds (out start, out end)) {
+                        buf.delete (ref start, ref end);
+                        buf.insert (ref start, formatted_mermaid, formatted_mermaid.length);
                     } else {
-                        doc.source_buffer.insert_at_cursor (formatted_mermaid, formatted_mermaid.length);
+                        buf.insert_at_cursor (formatted_mermaid, formatted_mermaid.length);
                     }
-                    doc.source_buffer.end_user_action ();
+                    buf.end_user_action ();
                     doc.refresh_live_preview ();
                     show_toast ("Inserted Mermaid diagram into document");
                     if (save_document) {

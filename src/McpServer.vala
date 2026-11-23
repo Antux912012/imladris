@@ -69,23 +69,41 @@ namespace Imladris {
         }
 
         public bool insert_text (string text) throws GLib.DBusError, GLib.IOError {
+            if (GLib.Environment.get_variable ("IMLADRIS_MCP_READONLY") == "1") {
+                McpServer.append_audit_log ("dbus.insert_text", "", "Security Error: read-only");
+                return false;
+            }
             var host = get_host ();
             if (host == null) return false;
-            return host.insert_text_in_active (text);
+            bool ok = host.insert_text_in_active (text);
+            McpServer.append_audit_log ("dbus.insert_text", "", ok ? "ok" : "error");
+            return ok;
         }
 
         public bool insert_code_chunk (string engine, string options) throws GLib.DBusError, GLib.IOError {
+            if (GLib.Environment.get_variable ("IMLADRIS_MCP_READONLY") == "1") {
+                McpServer.append_audit_log ("dbus.insert_code_chunk", "", "Security Error: read-only");
+                return false;
+            }
             var host = get_host ();
             if (host == null) return false;
-            return host.insert_code_chunk_in_active (engine, options);
+            bool ok = host.insert_code_chunk_in_active (engine, options);
+            McpServer.append_audit_log ("dbus.insert_code_chunk", "", ok ? "ok" : "error");
+            return ok;
         }
 
         public string render_document (string format) throws GLib.DBusError, GLib.IOError {
+            if (GLib.Environment.get_variable ("IMLADRIS_MCP_READONLY") == "1") {
+                McpServer.append_audit_log ("dbus.render_document", "", "Security Error: read-only");
+                return "Security Error: Tool 'render_document' is blocked in read-only mode (IMLADRIS_MCP_READONLY=1).";
+            }
             var host = get_host ();
             if (host == null) {
                 return "Error: No active Imladris window.";
             }
-            return host.trigger_render_from_mcp (format);
+            string res = host.trigger_render_from_mcp (format);
+            McpServer.append_audit_log ("dbus.render_document", "", res);
+            return res;
         }
     }
 
@@ -98,7 +116,7 @@ namespace Imladris {
 
     public class McpServer : GLib.Object {
 
-        public const string MCP_VERSION = "0.42.0";
+        public const string MCP_VERSION = "0.42.1";
         public const string DBUS_BUS_NAME = "io.github.Antux912012.Imladris";
         public const string DBUS_OBJECT_PATH = "/io/github/Antux912012/Imladris/McpBridge";
 
@@ -308,8 +326,13 @@ namespace Imladris {
         }
 
         private static string dispatch_tool (string name, Json.Object? args, McpHost? host) {
+            string file_path = get_opt_string (args, "file_path", "");
+            bool is_headless_tool = (file_path != "") &&
+                (name == "get_active_document" || name == "insert_text" || name == "render_document");
+            bool needs_gui_thread = (host != null) && !is_headless_tool &&
+                (name != "compile_latex") && (name != "get_environment_summary");
             string result;
-            if (host != null) {
+            if (needs_gui_thread) {
                 var main_context = GLib.MainContext.default ();
                 if (main_context.is_owner ()) {
                     result = execute_tool (name, args, host);
@@ -336,14 +359,14 @@ namespace Imladris {
                     state.mutex.unlock ();
                 }
             } else {
-                result = execute_tool (name, args, null);
+                result = execute_tool (name, args, host);
             }
 
-            append_audit_log (name, get_opt_string (args, "file_path", ""), result);
+            append_audit_log (name, file_path, result);
             return result;
         }
 
-        private static void append_audit_log (string tool_name, string file_path, string result) {
+        internal static void append_audit_log (string tool_name, string file_path, string result) {
             bool audit_on = GLib.Environment.get_variable ("IMLADRIS_MCP_AUDIT") == "1" ||
                             GLib.Environment.get_variable ("IMLADRIS_MCP_READONLY") == "1";
             if (!audit_on) {
@@ -450,9 +473,11 @@ namespace Imladris {
             }
 
             string? env_ws = GLib.Environment.get_variable ("IMLADRIS_MCP_WORKSPACE");
-            string raw_root = (env_ws != null && env_ws.strip () != "")
-                ? env_ws.strip ()
-                : GLib.Environment.get_home_dir ();
+            if (env_ws == null || env_ws.strip () == "") {
+                error_msg = "Security Error: IMLADRIS_MCP_WORKSPACE must be set for headless file access (refusing default $HOME root).";
+                return null;
+            }
+            string raw_root = env_ws.strip ();
             string? root = mcp_c_realpath (raw_root) ?? raw_root;
 
             bool inside = (resolved == root) ||
@@ -464,7 +489,7 @@ namespace Imladris {
 
             string[] blocked_segments = {
                 "/.ssh/", "/.gnupg/", "/.aws/", "/.config/",
-                "/.local/share/keyrings/", "/.local/share/imladris/",
+                "/.local/share/keyrings/", "/.local/share/imladris/", "/.local/bin/",
                 "/.docker/", "/.kube/", "/.pki/"
             };
             foreach (string seg in blocked_segments) {
@@ -475,7 +500,9 @@ namespace Imladris {
             }
 
             string[] blocked_files = {
-                "/.git-credentials", "/.netrc", "/.npmrc", "/.pypirc", "/.env"
+                "/.git-credentials", "/.gitconfig", "/.netrc", "/.npmrc", "/.pypirc",
+                "/.env", "/.bashrc", "/.bash_profile", "/.bash_login", "/.profile",
+                "/.zshrc", "/.zprofile", "/.zshenv"
             };
             foreach (string bf in blocked_files) {
                 if (resolved.has_suffix (bf)) {
@@ -652,12 +679,21 @@ namespace Imladris {
                         if (last_dot > last_slash) {
                             out_path = safe_path.substring (0, last_dot) + dot_ext;
                         }
-                        if (fmt == "pdf") {
-                            ExportService.export_to_pdf (safe_path, out_path, content);
-                        } else {
-                            ExportService.export_to_html (safe_path, out_path, content);
+                        string? out_err = null;
+                        string? safe_out = validate_headless_path (out_path, false, out out_err);
+                        if (safe_out == null) return out_err ?? "Security Error: Invalid output path.";
+
+                        string low_src = safe_path.down ();
+                        if ((low_src.has_suffix (".qmd") || low_src.has_suffix (".rmd") || low_src.has_suffix (".ipynb")) &&
+                            GLib.Environment.get_variable ("IMLADRIS_MCP_ALLOW_EXEC") != "1") {
+                            return "Security Error: Rendering executable notebooks (.qmd/.Rmd/.ipynb) via MCP requires IMLADRIS_MCP_ALLOW_EXEC=1.";
                         }
-                        return @"✔ Rendered $safe_path to $out_path";
+                        if (fmt == "pdf") {
+                            ExportService.export_to_pdf (safe_path, safe_out, content);
+                        } else {
+                            ExportService.export_to_html (safe_path, safe_out, content);
+                        }
+                        return @"✔ Rendered $safe_path to $safe_out";
                     } catch (GLib.Error e) {
                         return @"Error rendering document: $(e.message)";
                     }

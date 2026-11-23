@@ -2,6 +2,14 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.42.1] - 2026-11-23
+
+### Fixed
+- **RTF Creation Crash (`SIGSEGV`) & Editor Parity:** Guarded `GtkSource.Buffer` construction when `GtkSource.LanguageManager` returns `null` (fixing crashes when creating `.rtf`, `.txt`, `.csv`, and `.tsv` documents), added `DocumentFormat.RTF` template generation in `ProjectScaffolder`, fixed non-UTF-8 CP1252 byte handling and non-BMP UTF-16 surrogate serialization in `RtfCodec`, cleared stale pending text/highlight colors on cursor movement in `RtfEditorView`, wired RTF crash-recovery snapshotting, routed ribbon/MCP/Math/Mermaid/AI insertions through `rtf_editor`, and enabled PDF/ODT export buttons for `.rtf` files.
+- **Security & Sandbox Hardening (EGM Audit):** Closed plugin permission consent bypasses in `PluginManager` (archive duplicate-manifest/zip-bomb checks, post-download permission subset verification, `realpath()` confinement on `readAsset`, removal of CWD registry fallback, safe JSC value passing, and JSON type validation), eliminated raw-HTML XSS passthrough and sentinel collisions in `DocumentAdapter`, required explicit `IMLADRIS_MCP_WORKSPACE` and output-path validation in `McpServer`, enforced `IMLADRIS_MCP_READONLY` and audit logging on `McpDbusBridge`, and removed `GALAXY_API_KEY` injection and unprompted `tinytex` installs from `ExportService`.
+- **Thread Safety & C Memory Safety:** Switched `imladris_export_render_pdf` in `export_native.c` to a per-call `PangoFontMap`/`PangoContext` with UTF-8 validation and partial-ZIP cleanup on error, protected static `GLib.Regex` caches with `GLib.Mutex` in `DocumentAdapter` and `ExportService`, and used checked 64-bit arithmetic in `toolchain_native.c`.
+- **License & Packaging Alignment:** Aligned `NativePreviewView.vala` SPDX header and `flake.nix` metadata to `Apache-2.0`, and synchronized version `0.42.1` across Flatpak/FlatPark, `.deb`, `.rpm`, AUR `PKGBUILD`, and NixOS `flake.nix`.
+
 ## [0.42.0] - 2026-11-22
 
 ### Added

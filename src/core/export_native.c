@@ -6,6 +6,7 @@
 #include <cairo.h>
 #include <cairo-pdf.h>
 #include <gio/gio.h>
+#include <glib/gstdio.h>
 #include <pango/pangocairo.h>
 #include <stdio.h>
 #include <string.h>
@@ -228,6 +229,7 @@ imladris_export_write_oasis_zip (const char  *output_path,
     }
 
     if (!ok) {
+        g_unlink (output_path);
         g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
                      "Failed to write OASIS OpenDocument ZIP container to %s", output_path);
     }
@@ -249,14 +251,23 @@ imladris_export_write_oasis_zip (const char  *output_path,
 typedef struct {
     cairo_surface_t *surface;
     cairo_t         *cr;
+    PangoContext    *pango_ctx;
     double           y;
     int              page_num;
 } PdfRenderCtx;
 
+static PangoLayout *
+pdf_create_layout (PdfRenderCtx *ctx)
+{
+    PangoLayout *layout = pango_layout_new (ctx->pango_ctx);
+    pango_cairo_update_layout (ctx->cr, layout);
+    return layout;
+}
+
 static void
 pdf_draw_page_footer (PdfRenderCtx *ctx)
 {
-    PangoLayout *layout = pango_cairo_create_layout (ctx->cr);
+    PangoLayout *layout = pdf_create_layout (ctx);
     PangoFontDescription *fd = pango_font_description_from_string ("Sans 8.5");
     pango_layout_set_font_description (layout, fd);
     g_autofree char *label = g_strdup_printf ("Page %d", ctx->page_num);
@@ -381,7 +392,7 @@ pdf_render_text_block (PdfRenderCtx *ctx,
                        gboolean      use_markup,
                        gboolean      draw_quote_bar)
 {
-    PangoLayout *layout = pango_cairo_create_layout (ctx->cr);
+    PangoLayout *layout = pdf_create_layout (ctx);
     PangoFontDescription *fd = pango_font_description_from_string (font_desc);
     pango_layout_set_font_description (layout, fd);
     pango_layout_set_width (layout, (int) (width * PANGO_SCALE));
@@ -392,7 +403,13 @@ pdf_render_text_block (PdfRenderCtx *ctx,
         g_autofree char *markup = markdown_inline_to_pango (text);
         pango_layout_set_markup (layout, markup, -1);
     } else {
-        pango_layout_set_text (layout, text != NULL ? text : "", -1);
+        const char *safe = text != NULL ? text : "";
+        g_autofree char *owned = NULL;
+        if (!g_utf8_validate (safe, -1, NULL)) {
+            owned = g_utf8_make_valid (safe, -1);
+            safe = owned;
+        }
+        pango_layout_set_text (layout, safe, -1);
     }
 
     int pw = 0, ph = 0;
@@ -429,12 +446,18 @@ pdf_render_code_block (PdfRenderCtx *ctx, const char *code_text)
         return;
     }
 
-    PangoLayout *layout = pango_cairo_create_layout (ctx->cr);
+    PangoLayout *layout = pdf_create_layout (ctx);
     PangoFontDescription *fd = pango_font_description_from_string ("Monospace 9");
     pango_layout_set_font_description (layout, fd);
     pango_layout_set_width (layout, (int) ((PDF_CONTENT_W - 16.0) * PANGO_SCALE));
     pango_layout_set_wrap (layout, PANGO_WRAP_WORD_CHAR);
-    pango_layout_set_text (layout, code_text, -1);
+    g_autofree char *owned_code = NULL;
+    const char *safe_code = code_text;
+    if (!g_utf8_validate (code_text, -1, NULL)) {
+        owned_code = g_utf8_make_valid (code_text, -1);
+        safe_code = owned_code;
+    }
+    pango_layout_set_text (layout, safe_code, -1);
 
     int pw = 0, ph = 0;
     pango_layout_get_pixel_size (layout, &pw, &ph);
@@ -500,9 +523,13 @@ imladris_export_render_pdf (const char  *output_path,
     }
 
     cairo_t *cr = cairo_create (surface);
+    /* Use a dedicated per-call PangoFontMap/PangoContext for thread safety off the GTK main thread */
+    PangoFontMap *fontmap = pango_cairo_font_map_new ();
+    PangoContext *pango_ctx = pango_font_map_create_context (fontmap);
     PdfRenderCtx ctx = {
         .surface = surface,
         .cr = cr,
+        .pango_ctx = pango_ctx,
         .y = PDF_MARGIN_TOP,
         .page_num = 1
     };
@@ -598,6 +625,8 @@ imladris_export_render_pdf (const char  *output_path,
     cairo_surface_finish (surface);
     st = cairo_surface_status (surface);
 
+    g_object_unref (pango_ctx);
+    g_object_unref (fontmap);
     cairo_destroy (cr);
     cairo_surface_destroy (surface);
 

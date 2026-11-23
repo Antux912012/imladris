@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Antonio De Gaetano <antux912012@users.noreply.github.com>
 # SPDX-License-Identifier: Apache-2.0
 name       : imladris
-version    : 0.41.0
+version    : 0.42.1
 release    : 1
 source     :
-    - https://github.com/Antux912012/imladris/archive/refs/tags/v0.41.0.tar.gz : da89a3090ec3c33f8e936653953a2f5ec3be506f4ad8fef46471591630aad82c
+    - https://github.com/Antux912012/imladris/archive/refs/tags/v0.42.1.tar.gz : UPDATE_SHA256_AFTER_TAG
 homepage   : https://antux912012.github.io/imladris/
 license    : Apache-2.0
 component  : editor

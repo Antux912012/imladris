@@ -18,6 +18,9 @@ using Soup;
 
 namespace Imladris.Plugins {
 
+    [CCode (cname = "realpath", cheader_filename = "stdlib.h")]
+    internal extern string? plugin_c_realpath (string path, char* resolved_path = null);
+
     public interface PluginHostWindow : GLib.Object {
         public abstract void show_toast (string message);
         public abstract string get_active_editor_text ();
@@ -103,19 +106,29 @@ namespace Imladris.Plugins {
                 var obj = root.get_object ();
 
                 var m = new PluginManifest ();
-                m.id = obj.has_member ("id") ? obj.get_string_member ("id").strip () : "";
-                m.name = obj.has_member ("name") ? obj.get_string_member ("name") : m.id;
-                m.version = obj.has_member ("version") ? obj.get_string_member ("version") : "1.0.0";
-                m.author = obj.has_member ("author") ? obj.get_string_member ("author") : "Unknown";
-                m.description = obj.has_member ("description") ? obj.get_string_member ("description") : "";
-                m.license = obj.has_member ("license") ? obj.get_string_member ("license") : "Apache-2.0";
-                m.icon = obj.has_member ("icon") ? obj.get_string_member ("icon") : "application-x-addon-symbolic";
+                m.id = (obj.has_member ("id") && obj.get_member ("id").get_node_type () == Json.NodeType.VALUE && obj.get_member ("id").get_value_type () == typeof (string))
+                    ? obj.get_string_member ("id").strip () : "";
+                m.name = (obj.has_member ("name") && obj.get_member ("name").get_node_type () == Json.NodeType.VALUE && obj.get_member ("name").get_value_type () == typeof (string))
+                    ? obj.get_string_member ("name") : m.id;
+                m.version = (obj.has_member ("version") && obj.get_member ("version").get_node_type () == Json.NodeType.VALUE && obj.get_member ("version").get_value_type () == typeof (string))
+                    ? obj.get_string_member ("version") : "1.0.0";
+                m.author = (obj.has_member ("author") && obj.get_member ("author").get_node_type () == Json.NodeType.VALUE && obj.get_member ("author").get_value_type () == typeof (string))
+                    ? obj.get_string_member ("author") : "Unknown";
+                m.description = (obj.has_member ("description") && obj.get_member ("description").get_node_type () == Json.NodeType.VALUE && obj.get_member ("description").get_value_type () == typeof (string))
+                    ? obj.get_string_member ("description") : "";
+                m.license = (obj.has_member ("license") && obj.get_member ("license").get_node_type () == Json.NodeType.VALUE && obj.get_member ("license").get_value_type () == typeof (string))
+                    ? obj.get_string_member ("license") : "Apache-2.0";
+                m.icon = (obj.has_member ("icon") && obj.get_member ("icon").get_node_type () == Json.NodeType.VALUE && obj.get_member ("icon").get_value_type () == typeof (string))
+                    ? obj.get_string_member ("icon") : "application-x-addon-symbolic";
 
-                if (obj.has_member ("permissions")) {
+                if (obj.has_member ("permissions") && obj.get_member ("permissions").get_node_type () == Json.NodeType.ARRAY) {
                     var perm_arr = obj.get_array_member ("permissions");
                     if (perm_arr != null) {
                         for (uint i = 0; i < perm_arr.get_length (); i++) {
-                            m.permissions.add (perm_arr.get_string_element (i));
+                            var elem = perm_arr.get_element (i);
+                            if (elem != null && elem.get_node_type () == Json.NodeType.VALUE && elem.get_value_type () == typeof (string)) {
+                                m.permissions.add (elem.get_string ());
+                            }
                         }
                     }
                 }
@@ -288,7 +301,7 @@ namespace Imladris.Plugins {
                     var gen = new Json.Generator ();
                     gen.set_root (builder.get_root ());
                     string json_str = gen.to_data (null);
-                    return plugin.context.evaluate (json_str, -1);
+                    return new JSC.Value.from_json (plugin.context, json_str);
                 }, typeof (JSC.Value));
 
                 jsc_class.add_method ("readFile", (instance, jsc_args) => {
@@ -356,10 +369,14 @@ namespace Imladris.Plugins {
                         string asset_rel = jsc_args.get (0).to_string ();
                         if (!asset_rel.has_prefix ("/") && !asset_rel.contains ("..")) {
                             string asset_path = Path.build_filename (plugin.dir_path, asset_rel);
-                            if (FileUtils.test (asset_path, FileTest.EXISTS)) {
+                            string? real_root = plugin_c_realpath (plugin.dir_path);
+                            string? real_asset = plugin_c_realpath (asset_path);
+                            if (real_root != null && real_asset != null &&
+                                real_asset.has_prefix (real_root + "/") &&
+                                FileUtils.test (real_asset, FileTest.IS_REGULAR)) {
                                 try {
                                     string content;
-                                    FileUtils.get_contents (asset_path, out content);
+                                    FileUtils.get_contents (real_asset, out content);
                                     return new JSC.Value.string (plugin.context, content);
                                 } catch (GLib.Error e) {
                                     debug ("Error reading plugin asset: %s", e.message);
@@ -440,8 +457,9 @@ namespace Imladris.Plugins {
 
         public void trigger_ribbon_button (string button_id) {
             if (context != null && is_enabled) {
-                string safe_id = button_id.replace ("\\", "\\\\").replace ("'", "\\'");
-                context.evaluate (@"if (imladris._callbacks && typeof imladris._callbacks['$safe_id'] === 'function') { imladris._callbacks['$safe_id'](); }", -1);
+                var id_val = new JSC.Value.string (context, button_id);
+                context.set_value ("_imladris_tmp_btn_id", id_val);
+                context.evaluate ("if (imladris._callbacks && typeof imladris._callbacks[_imladris_tmp_btn_id] === 'function') { imladris._callbacks[_imladris_tmp_btn_id](); } _imladris_tmp_btn_id = undefined;", -1);
             }
         }
 
@@ -587,6 +605,11 @@ function onunload() {
         }
 
         public void load_all_plugins () {
+            foreach (var existing in plugins.values) {
+                if (existing.is_enabled) {
+                    existing.unload ();
+                }
+            }
             plugins.clear ();
             var enabled_set = load_enabled_set ();
 
@@ -899,20 +922,30 @@ function onunload() {
                 var dest_file = File.new_for_path (local_archive);
                 src_file.copy (dest_file, FileCopyFlags.OVERWRITE);
 
-                // 1. Inspect zip entries for path traversal/symlinks and read manifest.json BEFORE extracting to disk
+                // 1. Inspect zip entries for path traversal/symlinks/zip-bombs/duplicate manifests BEFORE extracting
                 string inspect_py = "import sys, zipfile, stat\n"
                     + "manifest_data = None\n"
+                    + "total_uncompressed = 0\n"
+                    + "MAX_BYTES = 50 * 1024 * 1024\n"
+                    + "MAX_FILES = 500\n"
                     + "with zipfile.ZipFile(sys.argv[1], 'r') as zf:\n"
-                    + "    for zi in zf.infolist():\n"
+                    + "    infos = zf.infolist()\n"
+                    + "    if len(infos) > MAX_FILES:\n"
+                    + "        raise ValueError('Plugin archive exceeds maximum file count')\n"
+                    + "    for zi in infos:\n"
                     + "        name = zi.filename.replace('\\\\', '/')\n"
                     + "        if name.startswith('/') or '..' in name.split('/'):\n"
                     + "            raise ValueError('Unsafe path in plugin archive: ' + zi.filename)\n"
                     + "        mode = (zi.external_attr >> 16) & 0o170000\n"
                     + "        if mode == stat.S_IFLNK:\n"
                     + "            raise ValueError('Symlinks are forbidden in plugin archives: ' + zi.filename)\n"
+                    + "        total_uncompressed += zi.file_size\n"
+                    + "        if total_uncompressed > MAX_BYTES:\n"
+                    + "            raise ValueError('Plugin archive exceeds uncompressed size limit')\n"
                     + "        if name == 'manifest.json' or name.endswith('/manifest.json'):\n"
-                    + "            if manifest_data is None:\n"
-                    + "                manifest_data = zf.read(zi.filename).decode('utf-8')\n"
+                    + "            if manifest_data is not None:\n"
+                    + "                raise ValueError('Multiple manifest.json entries in plugin archive')\n"
+                    + "            manifest_data = zf.read(zi.filename).decode('utf-8')\n"
                     + "if manifest_data is None:\n"
                     + "    raise ValueError('manifest.json not found in plugin archive')\n"
                     + "sys.stdout.write(manifest_data)\n";
@@ -957,10 +990,15 @@ function onunload() {
                 var subp = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
                 yield subp.wait_check_async ();
 
-                // Search for manifest.json and main.js
+                // Search for manifest.json and main.js, verifying it matches the inspected manifest
                 string? found_manifest_path = find_manifest_file (tmp_dir);
                 if (found_manifest_path == null) {
                     throw new IOError.INVALID_DATA ("Invalid plugin archive: manifest.json not found in package.");
+                }
+                string extracted_manifest_json;
+                FileUtils.get_contents (found_manifest_path, out extracted_manifest_json);
+                if (extracted_manifest_json != manifest_json) {
+                    throw new IOError.INVALID_DATA ("Security Error: Extracted manifest.json does not match inspected archive manifest.");
                 }
 
                 string plugin_root_extracted = Path.get_dirname (found_manifest_path);
@@ -1085,7 +1123,7 @@ function onunload() {
             if (community_session == null) {
                 community_session = new Soup.Session () {
                     timeout = 20,
-                    user_agent = "Imladris/0.40.0 (https://github.com/Antux912012/imladris)"
+                    user_agent = "Imladris/0.42.1 (https://github.com/Antux912012/imladris)"
                 };
             }
             return community_session;
@@ -1134,14 +1172,6 @@ function onunload() {
                     try {
                         FileUtils.get_contents (cache_path, out raw_json);
                     } catch (GLib.Error re) {}
-                }
-                if (raw_json == null || raw_json.strip ().length == 0) {
-                    string local_repo_reg = Path.build_filename (Environment.get_current_dir (), "community-plugins", "registry.json");
-                    if (FileUtils.test (local_repo_reg, FileTest.EXISTS)) {
-                        try {
-                            FileUtils.get_contents (local_repo_reg, out raw_json);
-                        } catch (GLib.Error le) {}
-                    }
                 }
                 if (raw_json == null || raw_json.strip ().length == 0) {
                     throw net_err;
@@ -1208,6 +1238,11 @@ function onunload() {
             var parsed_manifest = PluginManifest.from_json (manifest_json);
             if (parsed_manifest == null || parsed_manifest.id != entry.id) {
                 throw new IOError.INVALID_DATA (@"Downloaded manifest.json for '$(entry.id)' is invalid or ID mismatch.");
+            }
+            foreach (string perm in parsed_manifest.permissions) {
+                if (!entry.permissions.contains (perm)) {
+                    throw new IOError.PERMISSION_DENIED (@"Security Error: Downloaded manifest.json requests unconsented permission '$perm'.");
+                }
             }
 
             var main_bytes = yield download_https_bytes_async (entry.main_url, cancellable);

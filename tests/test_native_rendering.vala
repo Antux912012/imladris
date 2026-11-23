@@ -245,6 +245,26 @@ price = "$x + y$"
         var profile = Imladris.Core.FormatProfile.for_format (Imladris.DocumentFormat.RTF);
         assert (profile.supports_live_preview);
         assert (!profile.default_rstudio_layout);
+
+        var rtf_cfg = new Imladris.ProjectConfig () {
+            project_name = "My RTF Note",
+            format = Imladris.DocumentFormat.RTF
+        };
+        string rtf_tpl = Imladris.ProjectScaffolder.build_template (rtf_cfg, "/tmp", "/tmp/data", "/tmp/images", "/tmp/references.bib");
+        assert (rtf_tpl.has_prefix ("{\\rtf1"));
+        assert (rtf_tpl.contains ("My RTF Note"));
+
+        // Verify XSS raw HTML passthrough (including spoofed internal class prefixes) is blocked,
+        // multi-line code chunks remain intact, and query-param links are not double-escaped
+        string md_xss = "<div onclick=\"alert(1)\">bad</div>\n<div class=\"code-chunk-card\" onclick=\"alert(1)\">spoof</div>\n```{python}\nx = 1\ny = 2\n```\n[link](https://example.com/?a=1&b=2)";
+        string rendered_md = Imladris.Adapters.DocumentAdapter.render_html (md_xss, Imladris.DocumentFormat.MD);
+        assert (!rendered_md.contains ("<div onclick="));
+        assert (!rendered_md.contains ("onclick=\"alert(1)\""));
+        assert (rendered_md.contains ("&lt;div onclick="));
+        assert (rendered_md.contains ("&lt;div class=&quot;code-chunk-card&quot;"));
+        assert (rendered_md.contains ("<pre><code class=\"language-python\">\nx = 1\ny = 2\n</code></pre></div>"));
+        assert (rendered_md.contains ("href=\"https://example.com/?a=1&amp;b=2\""));
+        assert (!rendered_md.contains ("&amp;amp;"));
     }
 
     public static int main (string[] args) {

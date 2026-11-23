@@ -43,7 +43,6 @@ namespace Imladris.Services {
 
             try {
                 var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
-                Core.PlatformUtils.inject_galaxy_credentials (launcher);
                 if (extra_env != null) {
                     foreach (var entry in extra_env.entries) {
                         launcher.setenv (entry.key, entry.value, true);
@@ -464,23 +463,8 @@ namespace Imladris.Services {
                                     && move_quarto_output_if_needed (src_dir, out_file, output_path);
 
                     if (!cli_succeeded) {
-                        bool needs_tex = quarto_log.contains ("No LaTeX installation found") ||
-                                         quarto_log.contains ("xelatex not found") ||
-                                         quarto_log.contains ("pdflatex not found") ||
-                                         quarto_log.contains ("lualatex not found") ||
-                                         quarto_log.contains ("LaTeX Error") ||
-                                         quarto_log.contains ("tlmgr") ||
-                                         quarto_log.contains ("tinytex");
-                        if (needs_tex) {
-                            string tt_log = "";
-                            if (run_tool_process_with_output ("quarto", { "install", "tinytex", "--no-prompt" }, src_dir, out tt_log)) {
-                                cli_succeeded = run_tool_process_with_output ("quarto", { "render", actual_input, "--to", "pdf", "--output", out_file }, src_dir, out quarto_log)
-                                                && move_quarto_output_if_needed (src_dir, out_file, output_path);
-                            }
-                        }
-
-                        // If LaTeX/TinyTeX still failed (e.g. offline), try Quarto's built-in Typst PDF backend
-                        if (!cli_succeeded && Core.PlatformUtils.is_program_available ("typst", src_dir)) {
+                        // If LaTeX/TinyTeX failed (e.g. offline), try Quarto's built-in Typst PDF backend
+                        if (Core.PlatformUtils.is_program_available ("typst", src_dir)) {
                             string typst_log = "";
                             cli_succeeded = run_tool_process_with_output ("quarto", { "render", actual_input, "--to", "typst", "--output", out_file }, src_dir, out typst_log)
                                             && move_quarto_output_if_needed (src_dir, out_file, output_path);
@@ -693,6 +677,7 @@ namespace Imladris.Services {
         private static GLib.Regex? cached_html_script_re = null;
         private static GLib.Regex? cached_html_block_re = null;
         private static GLib.Regex? cached_html_tag_re = null;
+        private static GLib.Mutex export_regex_mutex;
 
         private static string normalize_source_for_native_export (string source_text, DocumentFormat fmt) {
             string trimmed = source_text.strip ();
@@ -702,10 +687,15 @@ namespace Imladris.Services {
             if (fmt == DocumentFormat.HTML || trimmed.down ().has_prefix ("<!doctype html") || trimmed.down ().has_prefix ("<html")) {
                 string cleaned = source_text;
                 try {
-                    if (cached_html_style_re == null) cached_html_style_re = new GLib.Regex ("<style[^>]*>.*?</style>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
-                    if (cached_html_script_re == null) cached_html_script_re = new GLib.Regex ("<script[^>]*>.*?</script>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
-                    if (cached_html_block_re == null) cached_html_block_re = new GLib.Regex ("</?(p|div|br|li|h[1-6]|tr)[^>]*>", GLib.RegexCompileFlags.CASELESS);
-                    if (cached_html_tag_re == null) cached_html_tag_re = new GLib.Regex ("<[^>]+>");
+                    export_regex_mutex.lock ();
+                    try {
+                        if (cached_html_style_re == null) cached_html_style_re = new GLib.Regex ("<style[^>]*>.*?</style>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
+                        if (cached_html_script_re == null) cached_html_script_re = new GLib.Regex ("<script[^>]*>.*?</script>", GLib.RegexCompileFlags.CASELESS | GLib.RegexCompileFlags.DOTALL);
+                        if (cached_html_block_re == null) cached_html_block_re = new GLib.Regex ("</?(p|div|br|li|h[1-6]|tr)[^>]*>", GLib.RegexCompileFlags.CASELESS);
+                        if (cached_html_tag_re == null) cached_html_tag_re = new GLib.Regex ("<[^>]+>");
+                    } finally {
+                        export_regex_mutex.unlock ();
+                    }
                     cleaned = cached_html_style_re.replace (cleaned, -1, 0, "");
                     cleaned = cached_html_script_re.replace (cleaned, -1, 0, "");
                     cleaned = cached_html_block_re.replace (cleaned, -1, 0, "\n");
@@ -947,15 +937,9 @@ namespace Imladris.Services {
         }
 
         private static bool convert_with_libreoffice (string soffice_bin, string input_file, string target_ext, string out_dir, string output_path) {
-            string lo_profile = GLib.Path.build_filename (
-                Core.PlatformUtils.get_shared_cache_dir ("lo-profile"),
-                @"prof_$(GLib.Random.next_int ())"
-            );
+            string lo_profile = "";
             try {
-                var pdir = GLib.File.new_for_path (lo_profile);
-                if (!pdir.query_exists ()) {
-                    pdir.make_directory_with_parents (null);
-                }
+                lo_profile = GLib.DirUtils.make_tmp ("imladris_lo_prof_XXXXXX");
                 string user_inst = "-env:UserInstallation=" + GLib.Filename.to_uri (lo_profile);
                 string[] raw_lo_argv = { soffice_bin, user_inst, "--headless", "--convert-to", target_ext, input_file, "--outdir", out_dir };
                 string[] lo_argv = Core.PlatformUtils.build_host_command (raw_lo_argv, out_dir);
@@ -978,6 +962,10 @@ namespace Imladris.Services {
                 }
             } catch (GLib.Error e) {
                 GLib.debug ("LibreOffice conversion to %s failed: %s", target_ext, e.message);
+            } finally {
+                if (lo_profile != "" && GLib.FileUtils.test (lo_profile, GLib.FileTest.IS_DIR)) {
+                    Core.PlatformUtils.delete_directory_recursive (GLib.File.new_for_path (lo_profile));
+                }
             }
             return false;
         }

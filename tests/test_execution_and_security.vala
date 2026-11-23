@@ -419,12 +419,17 @@ def summarize(n):
         assert (list_resp.contains ("\"get_environment_summary\""));
         assert (list_resp.contains ("\"file_path\""));
 
-        // 2. D-Bus fallback returns actionable error when no GUI window is active
+        // 2. D-Bus fallback returns actionable error when no GUI window is active (or live tabs JSON if GUI is open)
         string tabs_req = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"get_open_tabs\"}}";
         string tabs_resp = McpServer.handle_json_rpc (tabs_req, null);
-        assert (tabs_resp.contains ("No active Imladris window"));
+        assert (tabs_resp.contains ("No active Imladris window") || tabs_resp.contains ("\\\"tabs\\\""));
 
-        // 3. Headless path traversal & sensitive directory rejection
+        // 3. Headless path traversal, unset workspace rejection & sensitive directory/rc rejection
+        GLib.Environment.unset_variable ("IMLADRIS_MCP_WORKSPACE");
+        string? unset_err = null;
+        assert (McpServer.validate_headless_path ("/tmp/test.md", false, out unset_err) == null);
+        assert (unset_err != null && unset_err.contains ("IMLADRIS_MCP_WORKSPACE"));
+
         GLib.Environment.set_variable ("IMLADRIS_MCP_WORKSPACE", _test_tmp_root, true);
         string? path_err = null;
         assert (McpServer.validate_headless_path ("/etc/passwd", true, out path_err) == null);
@@ -434,6 +439,8 @@ def summarize(n):
         assert (McpServer.validate_headless_path (outside_dir, false, out path_err) == null);
         string netrc_file = GLib.Path.build_filename (_test_tmp_root, ".netrc");
         assert (McpServer.validate_headless_path (netrc_file, false, out path_err) == null);
+        string bashrc_file = GLib.Path.build_filename (_test_tmp_root, ".bashrc");
+        assert (McpServer.validate_headless_path (bashrc_file, false, out path_err) == null);
 
         // 4. Headless insert_text + get_active_document on workspace file
         string ws_file = GLib.Path.build_filename (_test_tmp_root, "mcp_notes.md");

@@ -288,8 +288,10 @@ namespace Imladris {
                     language = lang_manager.get_language ("js");
                 }
             }
-            source_buffer = new GtkSource.Buffer.with_language (language);
-            source_buffer.highlight_syntax = true;
+            source_buffer = (language != null)
+                ? new GtkSource.Buffer.with_language (language)
+                : new GtkSource.Buffer (null);
+            source_buffer.highlight_syntax = (language != null);
 
             update_style_scheme ();
 
@@ -350,6 +352,27 @@ namespace Imladris {
                         string doc_text = get_clean_source_text ();
                         emit_buffer_stats (doc_text);
                         refresh_live_preview (doc_text);
+                        panel_registry.refresh_environment_and_outline (doc_text);
+
+                        if (!rtf_editor.buffer.get_modified () && !source_buffer.get_modified ()) {
+                            return GLib.Source.REMOVE;
+                        }
+
+                        Gtk.TextIter insert_iter;
+                        rtf_editor.buffer.get_iter_at_mark (out insert_iter, rtf_editor.buffer.get_insert ());
+                        int line = insert_iter.get_line ();
+                        int col = insert_iter.get_line_offset ();
+                        string? path = file_location != null ? file_location.get_path () : null;
+
+                        Services.RecoveryService.get_default ().snapshot_async.begin (
+                            doc_id,
+                            path,
+                            doc_type,
+                            doc_text,
+                            line,
+                            col,
+                            true
+                        );
                         return GLib.Source.REMOVE;
                     });
                 });
@@ -1535,27 +1558,29 @@ Start writing formatted text here.\par
 
         public void insert_ai_code_at_cursor (string code) {
             string cleaned = code.strip ();
-            source_buffer.begin_user_action ();
+            Gtk.TextBuffer buf = (rtf_editor != null) ? rtf_editor.buffer : (Gtk.TextBuffer) source_buffer;
+            buf.begin_user_action ();
             Gtk.TextIter start, end;
-            if (source_buffer.get_selection_bounds (out start, out end)) {
-                source_buffer.delete (ref start, ref end);
-                source_buffer.insert (ref start, cleaned, -1);
+            if (buf.get_selection_bounds (out start, out end)) {
+                buf.delete (ref start, ref end);
+                buf.insert (ref start, cleaned, -1);
             } else {
-                source_buffer.insert_at_cursor ("\n" + cleaned + "\n", -1);
+                buf.insert_at_cursor ("\n" + cleaned + "\n", -1);
             }
-            source_buffer.end_user_action ();
+            buf.end_user_action ();
         }
 
         public void insert_media_snippet (string snippet) {
-            source_buffer.begin_user_action ();
+            Gtk.TextBuffer buf = (rtf_editor != null) ? rtf_editor.buffer : (Gtk.TextBuffer) source_buffer;
+            buf.begin_user_action ();
             Gtk.TextIter start, end;
-            if (source_buffer.get_selection_bounds (out start, out end)) {
-                source_buffer.delete (ref start, ref end);
-                source_buffer.insert (ref start, snippet, -1);
+            if (buf.get_selection_bounds (out start, out end)) {
+                buf.delete (ref start, ref end);
+                buf.insert (ref start, snippet, -1);
             } else {
-                source_buffer.insert_at_cursor (snippet, -1);
+                buf.insert_at_cursor (snippet, -1);
             }
-            source_buffer.end_user_action ();
+            buf.end_user_action ();
             refresh_live_preview ();
         }
 
