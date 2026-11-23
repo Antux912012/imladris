@@ -4,7 +4,7 @@ name       : imladris
 version    : 0.42.1
 release    : 1
 source     :
-    - https://github.com/Antux912012/imladris/archive/refs/tags/v0.42.1.tar.gz : UPDATE_SHA256_AFTER_TAG
+    - https://github.com/Antux912012/imladris/archive/refs/tags/v0.42.1.tar.gz : fd9f5816c46477bb8082e7973eeb22fa9b20c9001ba5f236760752c43e64b67c
 homepage   : https://antux912012.github.io/imladris/
 license    : Apache-2.0
 component  : editor
