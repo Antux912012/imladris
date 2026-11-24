@@ -46,7 +46,7 @@ makedepends=(
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v$pkgver.tar.gz")
 # Maintainer note: run `updpkgsums` after tagging v$pkgver
-sha256sums=('fd9f5816c46477bb8082e7973eeb22fa9b20c9001ba5f236760752c43e64b67c')
+sha256sums=('670ff69b37a6348e64d5087902b0ebe7c4f3bc01774714e62e8988a783c513e8')
 
 build() {
     cd "$srcdir/imladris-$pkgver"
