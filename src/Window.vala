@@ -1456,6 +1456,10 @@ namespace Imladris {
             add_shortcut_row (docs_group, "Open File or Project", "<Control>o");
             add_shortcut_row (docs_group, "Save Document", "<Control>s");
             add_shortcut_row (docs_group, "Command Palette", "<Control>k");
+            add_shortcut_row (docs_group, "Manage Panels & Popouts", "<Control><Shift>l");
+            add_shortcut_row (docs_group, "6-Quadrant Ultrawide Layout", "<Control><Alt>6");
+            add_shortcut_row (docs_group, "Imladris on Web Sync", "<Control><Shift>w");
+            add_shortcut_row (docs_group, "Toggle Ribbon Deck", "F1");
             add_shortcut_row (docs_group, "Focus Editor", "<Control>1");
             add_shortcut_row (docs_group, "Focus Console", "<Control>2");
             add_shortcut_row (docs_group, "Preferences", "<Control>comma");
@@ -2353,6 +2357,11 @@ namespace Imladris {
             action_focus_editor.activate.connect (() => {
                 var d = get_active_document ();
                 if (d != null) {
+                    if (d.rstudio_dock_grid != null && d.rstudio_dock_grid.dock_manager.is_panel_undocked (Core.Layout.PanelId.SOURCE_EDITOR)) {
+                        d.rstudio_dock_grid.dock_manager.focus_undocked_panel (Core.Layout.PanelId.SOURCE_EDITOR);
+                    } else if (d.dock_layout_state != null) {
+                        d.dock_layout_state.activate_panel (Core.Layout.PanelId.SOURCE_EDITOR);
+                    }
                     if (d.rtf_editor != null) d.rtf_editor.text_view.grab_focus ();
                     else if (d.source_view != null) d.source_view.grab_focus ();
                 }
@@ -2363,6 +2372,11 @@ namespace Imladris {
             action_focus_console.activate.connect (() => {
                 var d = get_active_document ();
                 if (d != null && d.panel_registry != null && d.panel_registry.repl_entry != null) {
+                    if (d.rstudio_dock_grid != null && d.rstudio_dock_grid.dock_manager.is_panel_undocked (Core.Layout.PanelId.CONSOLE)) {
+                        d.rstudio_dock_grid.dock_manager.focus_undocked_panel (Core.Layout.PanelId.CONSOLE);
+                    } else if (d.dock_layout_state != null) {
+                        d.dock_layout_state.activate_panel (Core.Layout.PanelId.CONSOLE);
+                    }
                     d.panel_registry.repl_entry.grab_focus ();
                 }
             });
@@ -3284,7 +3298,7 @@ namespace Imladris {
             dialog.add_link ("Architecture Blueprint", "https://github.com/Antux912012/imladris/blob/main/docs/ARCHITECTURE.md");
             dialog.add_link ("Project Documentation", "https://github.com/Antux912012/imladris#readme");
             dialog.add_link ("Technical Wiki", "https://github.com/Antux912012/imladris/wiki");
-            dialog.add_link ("Flatpark Package", "https://flatpark.org/apps/io.github.Antux912012.Imladris/");
+            dialog.add_link ("Flatpak Package (FlatPark)", "https://flatpark.org/apps/io.github.Antux912012.Imladris/");
             dialog.add_link ("Author GitHub Profile (@Antux912012)", "https://github.com/Antux912012");
             dialog.add_link ("Imladris Repository on GitHub", "https://github.com/Antux912012/imladris");
 

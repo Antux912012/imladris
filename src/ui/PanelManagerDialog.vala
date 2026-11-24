@@ -181,13 +181,10 @@ namespace Imladris.UI {
                 title = "Saved Presets"
             };
             var save_entry_row = new Adw.EntryRow () {
-                title = "New Preset Name"
+                title = "New Preset Name",
+                show_apply_button = true
             };
-            var btn_save_preset = new Gtk.Button.with_label ("Save") {
-                valign = Gtk.Align.CENTER,
-                css_classes = { "suggested-action" }
-            };
-            btn_save_preset.clicked.connect (() => {
+            save_entry_row.apply.connect (() => {
                 string name = save_entry_row.text.strip ();
                 if (name.length == 0) return;
                 try {
@@ -199,7 +196,6 @@ namespace Imladris.UI {
                     if (parent_window != null) parent_window.show_toast (@"Failed to save preset: $(e.message)");
                 }
             });
-            save_entry_row.add_suffix (btn_save_preset);
             presets_group.add (save_entry_row);
             page.add (presets_group);
 

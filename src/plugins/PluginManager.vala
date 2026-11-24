@@ -1123,7 +1123,7 @@ function onunload() {
             if (community_session == null) {
                 community_session = new Soup.Session () {
                     timeout = 20,
-                    user_agent = "Imladris/0.43.0 (https://github.com/Antux912012/imladris)"
+                    user_agent = "Imladris/0.43.1 (https://github.com/Antux912012/imladris)"
                 };
             }
             return community_session;

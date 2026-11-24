@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.43.0
+Version:        0.43.1
 Release:        1%{?dist}
 Summary:        Native scientific notebook studio for Quarto, R, Python, and Jupyter
 
@@ -91,8 +91,8 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
-* Mon Nov 23 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.43.0-1
-- Release 0.43.0: RTF creation crash fix, EGM security & thread-safety audit fixes, and Apache-2.0 packaging alignment.
+* Mon Nov 23 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.43.1-1
+- Release 0.43.1: RTF creation crash fix, EGM security & thread-safety audit fixes, and Apache-2.0 packaging alignment.
 
 * Sun Nov 22 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.42.0-1
 - Release 0.42.0: Elrond AI Hardware Auto-Optimizer, Flatpak Host Bridge & Kernel Routing, and Redesigned Native Chat UI:

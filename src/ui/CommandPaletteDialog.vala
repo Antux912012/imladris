@@ -45,11 +45,12 @@ namespace Imladris.UI {
         private void build_command_catalog () {
             // Document and Execution
             all_items.add (new CommandPaletteItem ("Run Active Chunk", "Execute current code chunk (Ctrl+Shift+Enter)", "media-playback-start-symbolic", "app.run_cell", "Execution"));
-            all_items.add (new CommandPaletteItem ("Run All Chunks", "Execute all notebook code cells sequentially", "media-seek-forward-symbolic", "app.run_all_cells", "Execution"));
+            all_items.add (new CommandPaletteItem ("Run All Chunks", "Execute all notebook code cells sequentially (Ctrl+Alt+R)", "media-seek-forward-symbolic", "app.run_all_cells", "Execution"));
             all_items.add (new CommandPaletteItem ("Run Line or Selection", "Execute active line in persistent REPL console (Ctrl+Enter)", "go-next-symbolic", "app.run_line_selection", "Execution"));
-            all_items.add (new CommandPaletteItem ("Restart Execution Kernel", "Clear persistent session states for R and Python", "view-refresh-symbolic", "app.restart_kernel", "Execution"));
+            all_items.add (new CommandPaletteItem ("Restart Execution Kernel", "Clear persistent session states for R and Python (Ctrl+Shift+F10)", "view-refresh-symbolic", "app.restart_kernel", "Execution"));
             all_items.add (new CommandPaletteItem ("Interrupt Execution", "Send SIGINT to active background worker", "process-stop-symbolic", "app.interrupt_execution", "Execution"));
-            all_items.add (new CommandPaletteItem ("Clear Console and Outputs", "Purge all cell outputs and terminal logs", "edit-clear-symbolic", "win.clear_console", "Execution"));
+            all_items.add (new CommandPaletteItem ("Clear Console and Outputs", "Purge all cell outputs and terminal logs (Ctrl+L)", "edit-clear-symbolic", "win.clear_console", "Execution"));
+            all_items.add (new CommandPaletteItem ("Render / Compile Scientific Document", "Compile active Quarto, RMarkdown, or LaTeX document (Ctrl+Shift+K)", "media-playback-start-symbolic", "app.render_scientific", "Execution"));
 
             // Publishing & Export
             all_items.add (new CommandPaletteItem ("Render to HTML", "Compile document to HTML5 via Quarto or DocumentAdapter", "applications-internet-symbolic", "app.export_html", "Publish"));
@@ -66,12 +67,17 @@ namespace Imladris.UI {
             // Panel & Multi-Screen Workspace Management
             all_items.add (new CommandPaletteItem ("Manage Panels & Independent Windows…", "Rearrange panels across quadrants, pop out to 2-3 screens, or switch layouts (Ctrl+Shift+L)", "view-grid-symbolic", "win.manage_panels", "Workspace"));
             all_items.add (new CommandPaletteItem ("6-Quadrant Ultrawide Layout (21:9 / 34:9)", "Switch workbench to 3×2 six-quadrant grid for ultrawide displays (Ctrl+Alt+6)", "view-grid-symbolic", "win.layout_ultrawide_6", "Workspace"));
+            all_items.add (new CommandPaletteItem ("2×2 Quad Layout", "Switch workbench to standard four-quadrant layout", "view-grid-symbolic", "win.layout_quad_4", "Workspace"));
+            all_items.add (new CommandPaletteItem ("Focus Mode (Single-Pane Writer)", "Toggle distraction-free single-pane writing layout", "edit-find-replace-symbolic", "win.toggle_focus_mode", "Workspace"));
             all_items.add (new CommandPaletteItem ("Re-dock All Floating Panel Windows", "Return all independent multi-screen panels back into the main window", "view-restore-symbolic", "win.redock_all_panels", "Workspace"));
 
             // Scientific Studios & Bridges
             all_items.add (new CommandPaletteItem ("Elbereth Clinical Biostatistics", "ICH E9 sample size, power curves, ADSL Table 1, and survival analysis", "view-statistics-symbolic", "bridge.elbereth", "Scientific"));
             all_items.add (new CommandPaletteItem ("Taniquetil AlphaFold Structural Bridge", "Macromolecular structures, pLDDT metrics, and Bio3D coordinates", "network-cellular-symbolic", "bridge.taniquetil", "Scientific"));
             all_items.add (new CommandPaletteItem ("Yavanna Bio-Entity Inspector", "NCBI Taxonomy, Ensembl genes, and RT-qPCR oligo melting curves", "applications-science-symbolic", "bridge.yavanna", "Scientific"));
+            all_items.add (new CommandPaletteItem ("Elrond AI Assistant", "Open AI editing and research assistant (Ctrl+Shift+E)", "system-run-symbolic", "app.elrond_assist", "Scientific"));
+            all_items.add (new CommandPaletteItem ("Insert Code Chunk", "Insert executable R or Python code chunk at cursor (Ctrl+Alt+I)", "list-add-symbolic", "win.insert_chunk", "Editing"));
+            all_items.add (new CommandPaletteItem ("Toggle Line Comment", "Comment or uncomment active line or selection (Ctrl+Shift+C)", "edit-copy-symbolic", "win.toggle_comment", "Editing"));
             all_items.add (new CommandPaletteItem ("Math and Chemical Reaction Studio", "Natural scientific notation to LaTeX and Markdown formulas (Ctrl+M)", "accessories-text-editor-symbolic", "app.math_chem_editor", "Scientific"));
             all_items.add (new CommandPaletteItem ("Insert Table...", "Quickly insert a table by choosing rows and columns (Ctrl+Alt+T)", "view-grid-symbolic", "win.insert_table", "Editing"));
             all_items.add (new CommandPaletteItem ("Visual Flow and Mermaid Studio", "Mindmaps, flowcharts, and sequence diagrams studio", "view-grid-symbolic", "app.mermaid_studio", "Scientific"));

@@ -383,7 +383,7 @@ namespace Imladris.Core.Layout {
             } else {
                 geom.width = width.clamp (360, 4096);
                 geom.height = height.clamp (280, 2160);
-                if (monitor_index >= -1) {
+                if (monitor_index >= 0) {
                     geom.monitor_index = monitor_index;
                 }
             }

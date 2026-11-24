@@ -29,7 +29,6 @@ menubutton.imladris-brand-btn > button {
     padding: 4px 14px;
     font-weight: 700;
     box-shadow: none;
-    outline: none;
     transition: all 150ms ease;
 }
 
@@ -386,11 +385,10 @@ menubutton.imladris-brand-btn > button:active {
     min-height: 15px;
     border-radius: 9999px;
     background-color: @accent_bg_color;
-    color: #ffffff;
+    color: @accent_fg_color;
     padding: 2px;
     margin-bottom: -2px;
     margin-right: -2px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 /* GNOME Accent Color Swatches (Normal GNOME Settings Appearance Style) */
@@ -425,8 +423,7 @@ menubutton.imladris-brand-btn > button:active {
 }
 
 .accent-check-icon {
-    color: #ffffff;
-    filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.5));
+    color: @accent_fg_color;
 }
 
 .accent-circle-blue   { background-color: #3584e4; }
@@ -494,15 +491,16 @@ window.eye-friendly,
     color: #383431;
 }
 
-/* ========================================================================= */
-/* Libadwaita 1.5+ and elementary OS Pantheon HIG Harmonized Design Tokens   */
-/* ========================================================================= */
-:root {
-    --window-radius: 12px;
-    --card-radius: 12px;
-    --control-radius: 6px;
-    --pill-radius: 9999px;
-    --headerbar-height: 48px;
+.eye-friendly .rstudio-quadrant {
+    background-color: #faf5ee;
+    border-color: #dcd0c2;
+}
+
+.eye-friendly .rstudio-quadrant-header,
+.eye-friendly .dock-subtoolbar {
+    background-color: #ebe2d8;
+    color: #383431;
+    border-bottom-color: #dcd0c2;
 }
 
 /* Floating status pill indicator */

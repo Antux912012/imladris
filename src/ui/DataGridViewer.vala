@@ -403,7 +403,11 @@ namespace Imladris.UI {
             if (total_df_rows > 0) {
                 int start_row = current_offset + 1;
                 int end_row = int.min (current_offset + page_size, total_df_rows);
-                dim_badge.label = @"Rows $start_row–$end_row of $total_df_rows • $total_cols cols";
+                if (search_entry.text.strip ().length > 0) {
+                    dim_badge.label = @"Rows $start_row–$end_row of $total_df_rows ($visible_count shown) • $total_cols cols";
+                } else {
+                    dim_badge.label = @"Rows $start_row–$end_row of $total_df_rows • $total_cols cols";
+                }
             } else {
                 dim_badge.label = @"$(visible_count) rows • $total_cols cols";
             }
@@ -680,10 +684,13 @@ except Exception as e:
             string[] lines = stream_text.split ("\n");
             string[] cols = new string[0];
             var rows = new Gee.ArrayList<DataRow> ();
+            string? err_msg = null;
 
             foreach (var line in lines) {
                 string trimmed = line.strip ();
-                if (trimmed.has_prefix ("__COLS__\t")) {
+                if (trimmed.has_prefix ("__ERROR__\t")) {
+                    err_msg = trimmed.substring ("__ERROR__\t".length);
+                } else if (trimmed.has_prefix ("__COLS__\t")) {
                     string cdata = trimmed.substring ("__COLS__\t".length);
                     cols = cdata.split ("\t");
                 } else if (trimmed.has_prefix ("__ROW__\t")) {
@@ -705,7 +712,11 @@ except Exception as e:
                 }
             }
 
-            if (cols.length == 0 && rows.size == 0) {
+            if (err_msg != null && cols.length == 0 && rows.size == 0) {
+                cols = { "Error", "Details" };
+                rows.add (new DataRow (1, new string[] { "Execution Error", err_msg }));
+                this.total_df_rows = 0;
+            } else if (cols.length == 0 && rows.size == 0) {
                 cols = { "Status", "Details" };
                 rows.add (new DataRow (1, new string[] { "No Data", @"Object '$obj_name' is empty or not loaded in active session." }));
                 this.total_df_rows = 0;

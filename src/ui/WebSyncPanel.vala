@@ -39,6 +39,7 @@ namespace Imladris.UI {
         private Adw.ActionRow linked_ws_row;
         private Gtk.Label linked_status_pill;
         private Adw.Banner conflict_banner;
+        private Adw.Banner error_banner;
         private Adw.EntryRow commit_msg_row;
         private Gtk.Label diff_summary_lbl;
         private Gtk.Button btn_commit;
@@ -158,11 +159,12 @@ namespace Imladris.UI {
             top_bar.append (btn_logout);
             this.append (top_bar);
 
-            // 2. Body Stack: "share" (unlinked) vs "linked"
+            // 2. Body Stack: "unauth" vs "share" (unlinked) vs "linked"
             body_stack = new Gtk.Stack () {
                 hexpand = true,
                 vexpand = true
             };
+            body_stack.add_named (build_unauth_view (), "unauth");
             body_stack.add_named (build_share_view (), "share");
             body_stack.add_named (build_linked_view (), "linked");
 
@@ -174,6 +176,21 @@ namespace Imladris.UI {
                 vexpand = true
             };
             this.append (scroller);
+        }
+
+        private Gtk.Widget build_unauth_view () {
+            var status = new Adw.StatusPage () {
+                icon_name = "network-server-symbolic",
+                title = "Connect to Imladris on Web",
+                description = "Sign in to share documents, work offline with git-style commits, and sync when back online."
+            };
+            var btn = new Gtk.Button.with_label ("Connect…") {
+                halign = Gtk.Align.CENTER,
+                css_classes = { "suggested-action", "pill" }
+            };
+            btn.clicked.connect (open_auth_dialog);
+            status.set_child (btn);
+            return status;
         }
 
         private Gtk.Widget build_share_view () {
@@ -246,11 +263,18 @@ namespace Imladris.UI {
             var outer = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
 
             conflict_banner = new Adw.Banner ("Remote document changed while offline.") {
-                button_label = "Pull Remote",
+                button_label = "Resolve…",
                 revealed = false
             };
             conflict_banner.button_clicked.connect (on_pull_clicked);
             outer.append (conflict_banner);
+
+            error_banner = new Adw.Banner ("") {
+                button_label = "Reconnect…",
+                revealed = false
+            };
+            error_banner.button_clicked.connect (open_auth_dialog);
+            outer.append (error_banner);
 
             var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 12) {
                 margin_start = 12, margin_end = 12, margin_top = 10, margin_bottom = 14
@@ -272,11 +296,15 @@ namespace Imladris.UI {
             };
             var act_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) { valign = Gtk.Align.CENTER };
 
-            var btn_invite = new Gtk.Button.with_label ("Copy Invite");
+            var btn_invite = new Gtk.Button.from_icon_name ("edit-copy-symbolic") {
+                tooltip_text = "Copy Collaborator Invite Link"
+            };
             btn_invite.add_css_class ("flat");
             btn_invite.clicked.connect (on_copy_invite_clicked);
 
-            var btn_open_web = new Gtk.Button.with_label ("Open Web");
+            var btn_open_web = new Gtk.Button.from_icon_name ("web-browser-symbolic") {
+                tooltip_text = "Open in Imladris on Web"
+            };
             btn_open_web.add_css_class ("flat");
             btn_open_web.clicked.connect (() => {
                 var link = sync_service.get_link (get_doc_key ());
@@ -289,8 +317,11 @@ namespace Imladris.UI {
                 }
             });
 
-            var btn_unlink = new Gtk.Button.with_label ("Unlink");
+            var btn_unlink = new Gtk.Button.from_icon_name ("edit-delete-symbolic") {
+                tooltip_text = "Unlink Document from Web"
+            };
             btn_unlink.add_css_class ("flat");
+            btn_unlink.add_css_class ("destructive-action");
             btn_unlink.clicked.connect (() => {
                 sync_service.unlink_document (get_doc_key ());
                 toast ("Unlinked document from Imladris on Web");
@@ -403,6 +434,10 @@ namespace Imladris.UI {
             string key = get_doc_key ();
             var link = sync_service.get_link (key);
             if (link == null) {
+                if (!client.is_authenticated) {
+                    body_stack.visible_child_name = "unauth";
+                    return;
+                }
                 body_stack.visible_child_name = "share";
                 if (remote_path_row.text.strip ().length == 0) {
                     remote_path_row.text = get_default_remote_filename ();
@@ -423,6 +458,12 @@ namespace Imladris.UI {
             linked_status_pill.add_css_class (status.to_css_class ());
 
             conflict_banner.revealed = link.has_conflict;
+            if (link.last_error != null && link.last_error.strip ().length > 0) {
+                error_banner.title = link.last_error;
+                error_banner.revealed = true;
+            } else {
+                error_banner.revealed = false;
+            }
 
             syncing_switch = true;
             auto_commit_row.active = link.auto_commit_on_reconnect;
@@ -587,6 +628,46 @@ namespace Imladris.UI {
         }
 
         private void on_pull_clicked () {
+            var link = sync_service.get_link (get_doc_key ());
+            if (link != null && (link.pending_commits.size > 0 || link.has_conflict || doc_page.source_buffer.get_modified ())) {
+                var dlg = new Adw.AlertDialog (
+                    "Resolve Remote Changes?",
+                    "Pulling the remote version will overwrite unsynced local changes and clear pending offline commits."
+                );
+                dlg.add_response ("cancel", "Cancel");
+                dlg.add_response ("force_push", "Force Push Local");
+                dlg.add_response ("pull", "Pull Remote");
+                dlg.set_response_appearance ("pull", Adw.ResponseAppearance.DESTRUCTIVE);
+                dlg.set_default_response ("cancel");
+                dlg.set_close_response ("cancel");
+                dlg.response.connect ((resp) => {
+                    if (resp == "pull") {
+                        perform_pull ();
+                    } else if (resp == "force_push") {
+                        btn_commit.sensitive = false;
+                        sync_service.sync_pending_commits_async.begin (get_doc_key (), null, true, (obj, res) => {
+                            btn_commit.sensitive = true;
+                            try {
+                                sync_service.sync_pending_commits_async.end (res);
+                                toast ("Force-pushed local changes to Imladris on Web");
+                                refresh_ui ();
+                                refresh_remote_history_async.begin ();
+                            } catch (GLib.Error e) {
+                                toast (@"Force push failed: $(e.message)");
+                                refresh_ui ();
+                            }
+                        });
+                    }
+                });
+                if (main_window != null) {
+                    dlg.present (main_window);
+                    return;
+                }
+            }
+            perform_pull ();
+        }
+
+        private void perform_pull () {
             btn_pull.sensitive = false;
             sync_service.pull_remote_document_async.begin (get_doc_key (), (obj, res) => {
                 btn_pull.sensitive = true;

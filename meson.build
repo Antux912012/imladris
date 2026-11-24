@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 project('imladris', 'vala', 'c',
-  version: '0.43.0',
+  version: '0.43.1',
   default_options: ['warning_level=1']
 )
 

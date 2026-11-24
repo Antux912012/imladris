@@ -506,6 +506,18 @@ To achieve **%.0f%% statistical power** ($1 - \beta = %.2f$) at a two-sided Type
             double alpha = get_selected_alpha ();
             double power = power_spin.value;
             if (endpoint_selector.selected == 0) {
+                double k = param2_spin.value;
+                if ((k - 1.0).abs () > 1e-6) {
+                    return """```{r elbereth-power-ttest-unequal}
+# ELBERETH ICH E9 POWER VERIFICATION: Two-Sample Unequal Allocation (k = n2/n1 = %.2f)
+alpha <- %.3f; power <- %.2f; d <- %.2f; k <- %.2f
+z_alpha <- qnorm(1 - alpha / 2); z_beta <- qnorm(power)
+n1 <- ceiling(((1 + 1 / k) * (z_alpha + z_beta)^2) / (d^2))
+n2 <- ceiling(n1 * k)
+cat(sprintf("Arm 1: %%d | Arm 2: %%d | Total Evaluable N: %%d\n", n1, n2, n1 + n2))
+```
+""".printf (k, alpha, power, param1_spin.value, k);
+                }
                 return """```{r elbereth-power-ttest}
 # ELBERETH ICH E9 POWER VERIFICATION: Two-Sample t-Test
 power_res <- stats::power.t.test(delta = %.2f, sd = 1.0, sig.level = %.3f, power = %.2f, type = "two.sample", alternative = "two.sided")

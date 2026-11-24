@@ -544,6 +544,12 @@ namespace Imladris {
 
             panel_registry = new PersistentPanelRegistry (this, parent_window);
             rstudio_dock_grid = new RStudioDockGrid (dock_layout_state, panel_registry, parent_window);
+            GLib.Idle.add (() => {
+                if (current_layout_mode == Services.LayoutMode.RSTUDIO && dock_layout_state.popped_out_panels.size > 0) {
+                    rstudio_dock_grid.dock_manager.sync_windows_with_state ();
+                }
+                return false;
+            });
             dock_layout_state.state_updated.connect (() => {
                 if (current_layout_mode == Services.LayoutMode.RSTUDIO) {
                     refresh_pending_preview_if_visible ();
@@ -820,6 +826,12 @@ namespace Imladris {
             current_layout_mode = mode;
 
             if (mode == Services.LayoutMode.APOSTROPHE) {
+                if (rstudio_dock_grid.dock_manager.is_panel_undocked (PanelId.SOURCE_EDITOR)) {
+                    rstudio_dock_grid.dock_manager.redock_panel (PanelId.SOURCE_EDITOR);
+                }
+                if (rstudio_dock_grid.dock_manager.is_panel_undocked (PanelId.LIVE_PREVIEW)) {
+                    rstudio_dock_grid.dock_manager.redock_panel (PanelId.LIVE_PREVIEW);
+                }
                 rstudio_dock_grid.visible = false;
                 paned.visible = true;
 
@@ -1106,23 +1118,14 @@ Start writing formatted text here.\par
 <style>
   body {
     font-family: 'Inter', 'Cantarell', system-ui, -apple-system, sans-serif;
-    line-height: 1.6;
+    line-height: 1.65;
     color: %s;
     background: %s;
-    padding: 24px 32px;
-    margin: 0;
+    max-width: 78ch;
+    padding: 28px 32px;
+    margin: 0 auto;
   }
-  .badge {
-    display: inline-block;
-    background: #e8f0fe;
-    color: #1967d2;
-    font-weight: 700;
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    margin-bottom: 12px;
-    text-transform: uppercase;
-  }
+  .badge { display: none; }
   .code-chunk-card {
     background: %s;
     border: 1px solid %s;

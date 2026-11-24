@@ -16,6 +16,7 @@ namespace Imladris.UI {
 
         private Gtk.Box header_box;
         private Gtk.Box tab_list_box;
+        private Gtk.Button popout_quick_btn;
         private Gtk.Popover options_popover;
         private Gtk.Box options_pop_box;
         private Gtk.Overlay body_overlay;
@@ -55,7 +56,7 @@ namespace Imladris.UI {
             // Streamlined Quadrant Controls: Pop Out + Maximize + Dynamic Move/Swap Menu
             var controls_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 2);
 
-            var popout_quick_btn = new Gtk.Button.from_icon_name ("window-new-symbolic") {
+            popout_quick_btn = new Gtk.Button.from_icon_name ("window-new-symbolic") {
                 tooltip_text = "Pop Out Active Panel to Independent Window (Multi-Screen)"
             };
             popout_quick_btn.add_css_class ("flat");
@@ -414,6 +415,7 @@ namespace Imladris.UI {
             }
 
             // Check minimized, empty, or popped-out state
+            popout_quick_btn.sensitive = (qconfig.active_tab != null && !dock_state.popped_out_panels.contains (qconfig.active_tab));
             if (qconfig.size_state == QuadrantSizeState.MINIMIZED || qconfig.tabs.size == 0 || qconfig.active_tab == null || dock_state.popped_out_panels.contains (qconfig.active_tab)) {
                 Gtk.Widget? vp_child = viewport_box.get_first_child ();
                 while (vp_child != null) {
@@ -759,9 +761,9 @@ namespace Imladris.UI {
         private void apply_vpaned_ratio (Gtk.Paned vpaned, QuadrantId top_id, QuadrantId bot_id, double ratio, int total_h) {
             var q_top = dock_state.quadrants.get (top_id);
             var q_bot = dock_state.quadrants.get (bot_id);
-            if (q_bot != null && (q_bot.size_state == QuadrantSizeState.MINIMIZED || q_bot.tabs.size == 0)) {
+            if (q_bot != null && (q_bot.size_state == QuadrantSizeState.MINIMIZED || q_bot.tabs.size == 0 || q_bot.active_tab == null)) {
                 vpaned.position = total_h - 38;
-            } else if (q_top != null && (q_top.size_state == QuadrantSizeState.MINIMIZED || q_top.tabs.size == 0)) {
+            } else if (q_top != null && (q_top.size_state == QuadrantSizeState.MINIMIZED || q_top.tabs.size == 0 || q_top.active_tab == null)) {
                 vpaned.position = 38;
             } else {
                 vpaned.position = (int) (ratio * total_h);

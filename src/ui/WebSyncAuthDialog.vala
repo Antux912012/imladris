@@ -49,8 +49,10 @@ namespace Imladris.UI {
 
             url_row = new Adw.EntryRow () {
                 title = "Instance URL",
-                text = client.instance_url
+                text = client.instance_url,
+                input_purpose = Gtk.InputPurpose.URL
             };
+            url_row.entry_activated.connect (on_submit_clicked);
             inst_group.add (url_row);
 
             var preset_row = new Adw.ActionRow () {
@@ -60,9 +62,9 @@ namespace Imladris.UI {
             var preset_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
                 valign = Gtk.Align.CENTER
             };
-            var btn_local_api = new Gtk.Button.with_label ("localhost:8787") { css_classes = { "pill", "flat" } };
+            var btn_local_api = new Gtk.Button.with_label ("localhost:8787") { css_classes = { "pill" } };
             btn_local_api.clicked.connect (() => { url_row.text = "http://localhost:8787"; });
-            var btn_local_web = new Gtk.Button.with_label ("localhost:8080") { css_classes = { "pill", "flat" } };
+            var btn_local_web = new Gtk.Button.with_label ("localhost:8080") { css_classes = { "pill" } };
             btn_local_web.clicked.connect (() => { url_row.text = "http://localhost:8080"; });
             preset_box.append (btn_local_api);
             preset_box.append (btn_local_web);
@@ -110,8 +112,10 @@ namespace Imladris.UI {
 
             email_row = new Adw.EntryRow () {
                 title = "Email Address",
-                text = (client.current_user != null) ? client.current_user.email : ""
+                text = (client.current_user != null) ? client.current_user.email : "",
+                input_purpose = Gtk.InputPurpose.EMAIL
             };
+            email_row.entry_activated.connect (on_submit_clicked);
             auth_group.add (email_row);
 
             display_name_row = new Adw.EntryRow () {
@@ -124,6 +128,7 @@ namespace Imladris.UI {
             password_row = new Adw.PasswordEntryRow () {
                 title = "Password"
             };
+            password_row.entry_activated.connect (on_submit_clicked);
             auth_group.add (password_row);
 
             invite_row = new Adw.EntryRow () {
