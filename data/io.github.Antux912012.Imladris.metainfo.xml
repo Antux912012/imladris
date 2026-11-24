@@ -11,10 +11,11 @@
       Imladris is a scientific workbench and polyglot IDE that unifies interactive R, Python, and Julia execution, Quarto publishing, biostatistics, and AI-assisted research into a single studio for researchers, biostatisticians, and data scientists.
     </p>
     <p>
-      Imladris provides dual-mode operation: a distraction-free single-pane writer for Markdown and HTML, and an RStudio-style 4-quadrant workbench for computational documents (.qmd, .Rmd, .ipynb, .R, .py) with real-time KaTeX mathematics, live charts, and interactive REPL consoles.
+      Imladris provides adaptive dual-mode operation: a distraction-free single-pane writer for Markdown and HTML, and an RStudio-style 4-quadrant or 6-quadrant ultrawide workbench with multi-screen independent panel popouts for computational documents (.qmd, .Rmd, .ipynb, .R, .py), real-time KaTeX mathematics, live charts, and interactive REPL consoles.
     </p>
     <ul>
-      <li>4-Quadrant Scientific Workbench: Integrated source editor, interactive R/Python/Julia REPL consoles, variable inspector, and live document preview.</li>
+      <li>4-Quadrant &amp; 6-Quadrant Ultrawide Workbench: Integrated source editor, interactive R/Python/Julia REPL consoles, variable inspector, live preview, Panel Manager, and independent multi-screen popout windows.</li>
+      <li>Imladris on Web Offline-First Sync: Share documents to Imladris on Web, work offline, and reconcile changes with git-style commits on reconnect.</li>
       <li>Positron/RStudio-Style Direct Editor Writing: In-place code generation and chunk replacement preserving Quarto cell options (#|) and single-step Ctrl+Z undo.</li>
       <li>Multi-Tier AI Orchestration: Offline local LLMs via local llama.cpp, Ollama, or LM Studio servers, GitHub Copilot OAuth Device Flow, and automatic HTTP 429 quota failover across Groq, Cerebras, OpenRouter, and GitHub Models.</li>
       <li>Reproducible Sandboxes &amp; .mallorn Format: Isolated renv and venv project environments with 1:1 bidirectional RStudio compatibility and portable archive bundles.</li>
