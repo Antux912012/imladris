@@ -11,6 +11,8 @@ namespace Imladris.UI {
      * LayoutSerializer
      * Handles saving, loading, and managing custom dock layout presets
      * in ~/.config/imladris/layouts/<name>.json.
+     * Supports 4-quadrant, 3-pane tall, 6-quadrant ultrawide (21:9 / 34:9),
+     * and multi-screen popped-out independent window presets.
      */
     public class LayoutSerializer : GLib.Object {
 
@@ -34,7 +36,17 @@ namespace Imladris.UI {
             } catch (GLib.Error e) {
                 // Directory might be empty
             }
+            list.sort ((a, b) => strcmp (a, b));
             return list.to_array ();
+        }
+
+        public static void delete_layout (string name) {
+            string sanitized = name.strip ().replace ("/", "_").replace ("\\", "_");
+            if (sanitized.length == 0) return;
+            string file_path = GLib.Path.build_filename (get_layouts_dir (), sanitized + ".json");
+            if (GLib.FileUtils.test (file_path, GLib.FileTest.EXISTS)) {
+                GLib.FileUtils.unlink (file_path);
+            }
         }
 
         public static void save_layout (string name, RStudioDockLayoutState state) throws GLib.Error {
@@ -58,6 +70,32 @@ namespace Imladris.UI {
             builder.add_double_value (state.ratios.left_horizontal);
             builder.set_member_name ("rightHorizontal");
             builder.add_double_value (state.ratios.right_horizontal);
+            builder.set_member_name ("centerVertical");
+            builder.add_double_value (state.ratios.center_vertical);
+            builder.set_member_name ("centerHorizontal");
+            builder.add_double_value (state.ratios.center_horizontal);
+            builder.end_object ();
+
+            builder.set_member_name ("poppedOutPanels");
+            builder.begin_array ();
+            foreach (var pid in state.popped_out_panels) {
+                builder.add_string_value (pid.to_id_string ());
+            }
+            builder.end_array ();
+
+            builder.set_member_name ("floatingGeometries");
+            builder.begin_object ();
+            foreach (var entry in state.floating_geometries.entries) {
+                builder.set_member_name (entry.key.to_id_string ());
+                builder.begin_object ();
+                builder.set_member_name ("width");
+                builder.add_int_value (entry.value.width);
+                builder.set_member_name ("height");
+                builder.add_int_value (entry.value.height);
+                builder.set_member_name ("monitorIndex");
+                builder.add_int_value (entry.value.monitor_index);
+                builder.end_object ();
+            }
             builder.end_object ();
 
             builder.set_member_name ("quadrants");
@@ -115,7 +153,34 @@ namespace Imladris.UI {
                     double mv = r_obj.has_member ("mainVertical") ? r_obj.get_double_member ("mainVertical") : 0.55;
                     double lh = r_obj.has_member ("leftHorizontal") ? r_obj.get_double_member ("leftHorizontal") : 0.68;
                     double rh = r_obj.has_member ("rightHorizontal") ? r_obj.get_double_member ("rightHorizontal") : 0.45;
-                    state.ratios.set_clamped (mv, lh, rh);
+                    double cv = r_obj.has_member ("centerVertical") ? r_obj.get_double_member ("centerVertical") : 0.50;
+                    double ch = r_obj.has_member ("centerHorizontal") ? r_obj.get_double_member ("centerHorizontal") : 0.55;
+                    state.ratios.set_clamped_all (mv, lh, rh, cv, ch);
+                }
+
+                state.popped_out_panels.clear ();
+                if (obj.has_member ("poppedOutPanels")) {
+                    var p_arr = obj.get_array_member ("poppedOutPanels");
+                    for (uint i = 0; i < p_arr.get_length (); i++) {
+                        PanelId? pid = PanelId.from_id_string (p_arr.get_string_element (i));
+                        if (pid != null) {
+                            state.popped_out_panels.add (pid);
+                        }
+                    }
+                }
+
+                state.floating_geometries.clear ();
+                if (obj.has_member ("floatingGeometries")) {
+                    var fg_obj = obj.get_object_member ("floatingGeometries");
+                    foreach (var key in fg_obj.get_members ()) {
+                        PanelId? pid = PanelId.from_id_string (key);
+                        if (pid == null) continue;
+                        var g_item = fg_obj.get_object_member (key);
+                        int w = g_item.has_member ("width") ? (int) g_item.get_int_member ("width") : 840;
+                        int h = g_item.has_member ("height") ? (int) g_item.get_int_member ("height") : 600;
+                        int m = g_item.has_member ("monitorIndex") ? (int) g_item.get_int_member ("monitorIndex") : -1;
+                        state.floating_geometries.set (pid, new FloatingWindowGeometry (w, h, m));
+                    }
                 }
 
                 if (obj.has_member ("quadrants")) {
@@ -144,12 +209,15 @@ namespace Imladris.UI {
 
                         if (q_item.has_member ("activeTab") && !q_item.get_null_member ("activeTab")) {
                             qc.active_tab = PanelId.from_id_string (q_item.get_string_member ("activeTab"));
+                        } else if (qc.tabs.size > 0) {
+                            qc.active_tab = qc.tabs.get (0);
                         } else {
-                            qc.active_tab = qc.tabs.size > 0 ? qc.tabs.get (0) : (PanelId?) null;
+                            qc.active_tab = null;
                         }
                     }
                 }
 
+                state.ensure_panel_present (PanelId.WEB_SYNC, QuadrantId.Q3_TOP_RIGHT);
                 state.save_to_disk ();
                 state.state_updated ();
                 return true;
@@ -159,12 +227,67 @@ namespace Imladris.UI {
             }
         }
 
+        private static void migrate_center_quadrants_to_quad4 (RStudioDockLayoutState state) {
+            var q5 = state.quadrants.get (QuadrantId.Q5_TOP_CENTER);
+            var q6 = state.quadrants.get (QuadrantId.Q6_BOTTOM_CENTER);
+            var q2 = state.quadrants.get (QuadrantId.Q2_BOTTOM_LEFT);
+            var q4 = state.quadrants.get (QuadrantId.Q4_BOTTOM_RIGHT);
+
+            if (q5 != null && q4 != null) {
+                var moved = new Gee.ArrayList<PanelId> ();
+                foreach (var pid in q5.tabs) moved.add (pid);
+                foreach (var pid in moved) {
+                    q5.tabs.remove (pid);
+                    if (!q4.tabs.contains (pid)) {
+                        q4.tabs.add (pid);
+                    }
+                }
+                q5.active_tab = null;
+                q5.size_state = QuadrantSizeState.MINIMIZED;
+            }
+
+            if (q6 != null && q2 != null && q4 != null) {
+                var moved = new Gee.ArrayList<PanelId> ();
+                foreach (var pid in q6.tabs) moved.add (pid);
+                foreach (var pid in moved) {
+                    q6.tabs.remove (pid);
+                    var dest = (pid == PanelId.ELROND_AI || pid == PanelId.CONSOLE || pid == PanelId.TERMINAL) ? q2 : q4;
+                    if (!dest.tabs.contains (pid)) {
+                        dest.tabs.add (pid);
+                    }
+                }
+                q6.active_tab = null;
+                q6.size_state = QuadrantSizeState.MINIMIZED;
+            }
+        }
+
         public static void apply_topology_preset (LayoutTopology topo, RStudioDockLayoutState state) {
             state.topology = topo;
             state.maximized_quadrant = null;
 
             switch (topo) {
+                case LayoutTopology.QUAD_6_ULTRAWIDE:
+                    var q5 = state.quadrants.get (QuadrantId.Q5_TOP_CENTER);
+                    var q6 = state.quadrants.get (QuadrantId.Q6_BOTTOM_CENTER);
+                    bool center_empty = (q5 == null || q5.tabs.size == 0) && (q6 == null || q6.tabs.size == 0);
+                    if (center_empty) {
+                        state.apply_ultrawide_6_defaults ();
+                        return;
+                    }
+                    state.ratios.set_clamped_all (0.36, 0.65, 0.48, 0.52, 0.58);
+                    foreach (var qid in QuadrantId.all ()) {
+                        var q = state.quadrants.get (qid);
+                        if (q != null) {
+                            q.size_state = (q.tabs.size > 0) ? QuadrantSizeState.NORMAL : QuadrantSizeState.MINIMIZED;
+                            if (q.active_tab == null && q.tabs.size > 0) {
+                                q.active_tab = q.tabs.get (0);
+                            }
+                        }
+                    }
+                    break;
+
                 case LayoutTopology.LEFT_TALL_3:
+                    migrate_center_quadrants_to_quad4 (state);
                     // Q1 tall on left (migrate Q2 tabs into Q1 so Console/Terminal stay accessible)
                     state.ratios.set_clamped (0.60, 0.70, 0.50);
                     var q1 = state.quadrants.get (QuadrantId.Q1_TOP_LEFT);
@@ -181,6 +304,7 @@ namespace Imladris.UI {
                     break;
 
                 case LayoutTopology.RIGHT_TALL_3:
+                    migrate_center_quadrants_to_quad4 (state);
                     // Q1 and Q2 stacked on left, Q4 tall on right (migrate Q3 tabs into Q4)
                     state.ratios.set_clamped (0.45, 0.50, 0.70);
                     var q3 = state.quadrants.get (QuadrantId.Q3_TOP_RIGHT);
@@ -198,6 +322,7 @@ namespace Imladris.UI {
 
                 case LayoutTopology.QUAD_4:
                 default:
+                    migrate_center_quadrants_to_quad4 (state);
                     state.ratios.set_clamped (0.55, 0.68, 0.45);
                     var q1_rest = state.quadrants.get (QuadrantId.Q1_TOP_LEFT);
                     var q2_rest = state.quadrants.get (QuadrantId.Q2_BOTTOM_LEFT);
@@ -213,9 +338,20 @@ namespace Imladris.UI {
                             q4_rest.tabs.remove (pid);
                         }
                     }
-                    foreach (var qid in QuadrantId.all ()) {
+                    QuadrantId[] q4_ids = {
+                        QuadrantId.Q1_TOP_LEFT,
+                        QuadrantId.Q2_BOTTOM_LEFT,
+                        QuadrantId.Q3_TOP_RIGHT,
+                        QuadrantId.Q4_BOTTOM_RIGHT
+                    };
+                    foreach (var qid in q4_ids) {
                         var q = state.quadrants.get (qid);
-                        if (q != null) q.size_state = QuadrantSizeState.NORMAL;
+                        if (q != null) {
+                            q.size_state = QuadrantSizeState.NORMAL;
+                            if (q.active_tab == null && q.tabs.size > 0) {
+                                q.active_tab = q.tabs.get (0);
+                            }
+                        }
                     }
                     break;
             }

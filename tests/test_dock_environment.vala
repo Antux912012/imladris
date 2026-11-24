@@ -13,6 +13,8 @@ namespace Imladris.Tests {
         public static void register_tests (bool has_display) {
             Test.add_func ("/dock/panel_id_metadata", test_panel_id_metadata);
             Test.add_func ("/dock/layout_topology_states", test_layout_topology_states);
+            Test.add_func ("/dock/ultrawide_6_quadrant_layout", test_ultrawide_6_quadrant_layout);
+            Test.add_func ("/dock/quadrant_swap_and_redock_to", test_quadrant_swap_and_redock_to);
             Test.add_func ("/dock/layout_persistence", test_layout_persistence);
             Test.add_func ("/dock/undock_redock_flow", test_undock_redock_flow);
             Test.add_func ("/dock/layout_serializer_presets", test_layout_serializer_presets);
@@ -48,6 +50,73 @@ namespace Imladris.Tests {
             assert (p_pkgs.to_title () == "Packages");
             assert (p_pkgs.to_icon_name () == "application-x-addon-symbolic");
             assert (PanelId.from_id_string ("packages") == PanelId.PACKAGES);
+
+            var p_web = PanelId.WEB_SYNC;
+            assert (p_web.to_id_string () == "web-sync");
+            assert (p_web.to_title () == "Imladris Web");
+            assert (p_web.to_icon_name () == "network-server-symbolic");
+            assert (PanelId.from_id_string ("web-sync") == PanelId.WEB_SYNC);
+        }
+
+        private static void test_ultrawide_6_quadrant_layout () {
+            assert (LayoutTopology.QUAD_6_ULTRAWIDE.to_id_string () == "QUAD_6_ULTRAWIDE");
+            assert (LayoutTopology.from_id_string ("QUAD_6_ULTRAWIDE") == LayoutTopology.QUAD_6_ULTRAWIDE);
+
+            var active6 = QuadrantId.active_for_topology (LayoutTopology.QUAD_6_ULTRAWIDE);
+            assert (active6.length == 6);
+
+            var state = new RStudioDockLayoutState ();
+            LayoutSerializer.apply_topology_preset (LayoutTopology.QUAD_6_ULTRAWIDE, state);
+            assert (state.topology == LayoutTopology.QUAD_6_ULTRAWIDE);
+
+            var q5 = state.quadrants.get (QuadrantId.Q5_TOP_CENTER);
+            var q6 = state.quadrants.get (QuadrantId.Q6_BOTTOM_CENTER);
+            assert (q5 != null && q5.tabs.contains (PanelId.LIVE_PREVIEW));
+            assert (q6 != null && q6.tabs.contains (PanelId.ELROND_AI));
+
+            // Save and reload 6-quadrant layout including center ratios
+            state.ratios.set_clamped_all (0.34, 0.62, 0.48, 0.51, 0.59);
+            state.save_to_disk ();
+
+            var reloaded = new RStudioDockLayoutState ();
+            reloaded.load_from_disk ();
+            assert (reloaded.topology == LayoutTopology.QUAD_6_ULTRAWIDE);
+            assert (reloaded.quadrants.get (QuadrantId.Q5_TOP_CENTER).tabs.contains (PanelId.LIVE_PREVIEW));
+            assert (reloaded.quadrants.get (QuadrantId.Q6_BOTTOM_CENTER).tabs.contains (PanelId.ELROND_AI));
+
+            // Migrate back to 4-quadrant without losing any center panel
+            LayoutSerializer.apply_topology_preset (LayoutTopology.QUAD_4, reloaded);
+            assert (reloaded.topology == LayoutTopology.QUAD_4);
+            assert (reloaded.find_panel_quadrant (PanelId.LIVE_PREVIEW) != null);
+            assert (reloaded.find_panel_quadrant (PanelId.ELROND_AI) != null);
+            assert (reloaded.find_panel_quadrant (PanelId.LIVE_PREVIEW) != QuadrantId.Q5_TOP_CENTER);
+            assert (reloaded.find_panel_quadrant (PanelId.ELROND_AI) != QuadrantId.Q6_BOTTOM_CENTER);
+
+            reloaded.reset_to_default ();
+            reloaded.save_to_disk ();
+        }
+
+        private static void test_quadrant_swap_and_redock_to () {
+            var state = new RStudioDockLayoutState ();
+            assert (state.find_panel_quadrant (PanelId.SOURCE_EDITOR) == QuadrantId.Q1_TOP_LEFT);
+            assert (state.find_panel_quadrant (PanelId.ENVIRONMENT) == QuadrantId.Q3_TOP_RIGHT);
+
+            // Swap Q1 and Q3
+            state.swap_quadrants (QuadrantId.Q1_TOP_LEFT, QuadrantId.Q3_TOP_RIGHT);
+            assert (state.find_panel_quadrant (PanelId.SOURCE_EDITOR) == QuadrantId.Q3_TOP_RIGHT);
+            assert (state.find_panel_quadrant (PanelId.ENVIRONMENT) == QuadrantId.Q1_TOP_LEFT);
+
+            // Undock panel with geometry and redock directly into Q2
+            state.set_floating_geometry (PanelId.PLOTS, 1200, 800, 1);
+            state.undock_panel (PanelId.PLOTS);
+            assert (state.popped_out_panels.contains (PanelId.PLOTS));
+            assert (state.get_floating_geometry (PanelId.PLOTS).width == 1200);
+            assert (state.get_floating_geometry (PanelId.PLOTS).monitor_index == 1);
+
+            state.redock_panel_to (PanelId.PLOTS, QuadrantId.Q2_BOTTOM_LEFT);
+            assert (!state.popped_out_panels.contains (PanelId.PLOTS));
+            assert (state.find_panel_quadrant (PanelId.PLOTS) == QuadrantId.Q2_BOTTOM_LEFT);
+            assert (state.quadrants.get (QuadrantId.Q2_BOTTOM_LEFT).active_tab == PanelId.PLOTS);
         }
 
         private static void test_layout_topology_states () {

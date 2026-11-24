@@ -7,7 +7,9 @@ namespace Imladris.Core.Layout {
         Q1_TOP_LEFT,
         Q2_BOTTOM_LEFT,
         Q3_TOP_RIGHT,
-        Q4_BOTTOM_RIGHT;
+        Q4_BOTTOM_RIGHT,
+        Q5_TOP_CENTER,
+        Q6_BOTTOM_CENTER;
 
         public string to_id_string () {
             switch (this) {
@@ -15,7 +17,21 @@ namespace Imladris.Core.Layout {
                 case Q2_BOTTOM_LEFT: return "Q2_BOTTOM_LEFT";
                 case Q3_TOP_RIGHT: return "Q3_TOP_RIGHT";
                 case Q4_BOTTOM_RIGHT: return "Q4_BOTTOM_RIGHT";
+                case Q5_TOP_CENTER: return "Q5_TOP_CENTER";
+                case Q6_BOTTOM_CENTER: return "Q6_BOTTOM_CENTER";
                 default: return "Q1_TOP_LEFT";
+            }
+        }
+
+        public string to_display_name () {
+            switch (this) {
+                case Q1_TOP_LEFT: return "Top-Left (Editor)";
+                case Q2_BOTTOM_LEFT: return "Bottom-Left (Console)";
+                case Q5_TOP_CENTER: return "Top-Center (Preview)";
+                case Q6_BOTTOM_CENTER: return "Bottom-Center (AI / Plots)";
+                case Q3_TOP_RIGHT: return "Top-Right (Environment)";
+                case Q4_BOTTOM_RIGHT: return "Bottom-Right (Outputs)";
+                default: return "Quadrant";
             }
         }
 
@@ -24,13 +40,43 @@ namespace Imladris.Core.Layout {
                 case "Q2_BOTTOM_LEFT": return Q2_BOTTOM_LEFT;
                 case "Q3_TOP_RIGHT": return Q3_TOP_RIGHT;
                 case "Q4_BOTTOM_RIGHT": return Q4_BOTTOM_RIGHT;
+                case "Q5_TOP_CENTER": return Q5_TOP_CENTER;
+                case "Q6_BOTTOM_CENTER": return Q6_BOTTOM_CENTER;
                 case "Q1_TOP_LEFT":
                 default: return Q1_TOP_LEFT;
             }
         }
 
         public static QuadrantId[] all () {
-            return { Q1_TOP_LEFT, Q2_BOTTOM_LEFT, Q3_TOP_RIGHT, Q4_BOTTOM_RIGHT };
+            return {
+                Q1_TOP_LEFT,
+                Q2_BOTTOM_LEFT,
+                Q5_TOP_CENTER,
+                Q6_BOTTOM_CENTER,
+                Q3_TOP_RIGHT,
+                Q4_BOTTOM_RIGHT
+            };
+        }
+
+        public static QuadrantId[] active_for_topology (LayoutTopology topo) {
+            switch (topo) {
+                case LayoutTopology.QUAD_6_ULTRAWIDE:
+                    return {
+                        Q1_TOP_LEFT,
+                        Q2_BOTTOM_LEFT,
+                        Q5_TOP_CENTER,
+                        Q6_BOTTOM_CENTER,
+                        Q3_TOP_RIGHT,
+                        Q4_BOTTOM_RIGHT
+                    };
+                case LayoutTopology.LEFT_TALL_3:
+                    return { Q1_TOP_LEFT, Q3_TOP_RIGHT, Q4_BOTTOM_RIGHT };
+                case LayoutTopology.RIGHT_TALL_3:
+                    return { Q1_TOP_LEFT, Q2_BOTTOM_LEFT, Q4_BOTTOM_RIGHT };
+                case LayoutTopology.QUAD_4:
+                default:
+                    return { Q1_TOP_LEFT, Q2_BOTTOM_LEFT, Q3_TOP_RIGHT, Q4_BOTTOM_RIGHT };
+            }
         }
     }
 
@@ -50,7 +96,8 @@ namespace Imladris.Core.Layout {
         PACKAGES,
         HELP,
         SHINY_VIEWER,
-        GALAXY;
+        GALAXY,
+        WEB_SYNC;
 
         public string to_id_string () {
             switch (this) {
@@ -70,6 +117,7 @@ namespace Imladris.Core.Layout {
                 case HELP: return "help";
                 case SHINY_VIEWER: return "shiny-viewer";
                 case GALAXY: return "galaxy";
+                case WEB_SYNC: return "web-sync";
                 default: return "source-editor";
             }
         }
@@ -92,6 +140,7 @@ namespace Imladris.Core.Layout {
                 case "help": return HELP;
                 case "shiny-viewer": return SHINY_VIEWER;
                 case "galaxy": return GALAXY;
+                case "web-sync": return WEB_SYNC;
                 default: return null;
             }
         }
@@ -114,6 +163,7 @@ namespace Imladris.Core.Layout {
                 case HELP: return "Help";
                 case SHINY_VIEWER: return "Viewer";
                 case GALAXY: return "Arekyer Bridge";
+                case WEB_SYNC: return "Imladris Web";
                 default: return "Panel";
             }
         }
@@ -136,20 +186,45 @@ namespace Imladris.Core.Layout {
                 case HELP: return "help-browser-symbolic";
                 case SHINY_VIEWER: return "applications-internet-symbolic";
                 case GALAXY: return "applications-internet-symbolic";
+                case WEB_SYNC: return "network-server-symbolic";
                 default: return "application-x-addon-symbolic";
             }
+        }
+
+        public static PanelId[] all () {
+            return {
+                SOURCE_EDITOR,
+                DATA_VIEWER,
+                LIVE_PREVIEW,
+                CONSOLE,
+                TERMINAL,
+                ELROND_AI,
+                ENVIRONMENT,
+                HISTORY,
+                OUTLINE,
+                CITATIONS,
+                PLOTS,
+                FILES,
+                PACKAGES,
+                HELP,
+                SHINY_VIEWER,
+                GALAXY,
+                WEB_SYNC
+            };
         }
     }
 
     public enum LayoutTopology {
         QUAD_4,
         LEFT_TALL_3,
-        RIGHT_TALL_3;
+        RIGHT_TALL_3,
+        QUAD_6_ULTRAWIDE;
 
         public string to_id_string () {
             switch (this) {
                 case LEFT_TALL_3: return "LEFT_TALL_3";
                 case RIGHT_TALL_3: return "RIGHT_TALL_3";
+                case QUAD_6_ULTRAWIDE: return "QUAD_6_ULTRAWIDE";
                 case QUAD_4:
                 default: return "QUAD_4";
             }
@@ -159,6 +234,7 @@ namespace Imladris.Core.Layout {
             switch (str) {
                 case "LEFT_TALL_3": return LEFT_TALL_3;
                 case "RIGHT_TALL_3": return RIGHT_TALL_3;
+                case "QUAD_6_ULTRAWIDE": return QUAD_6_ULTRAWIDE;
                 case "QUAD_4":
                 default: return QUAD_4;
             }
@@ -168,6 +244,7 @@ namespace Imladris.Core.Layout {
             switch (this) {
                 case LEFT_TALL_3: return "Left Editor Full-Height (3 Panels)";
                 case RIGHT_TALL_3: return "Right Side Full-Height (3 Panels)";
+                case QUAD_6_ULTRAWIDE: return "3×2 Ultrawide Grid (6 Panels — 21:9 / 34:9)";
                 case QUAD_4:
                 default: return "2×2 Quadrant Grid (4 Panels)";
             }
@@ -220,10 +297,24 @@ namespace Imladris.Core.Layout {
         }
     }
 
+    public class FloatingWindowGeometry : GLib.Object {
+        public int width { get; set; default = 840; }
+        public int height { get; set; default = 600; }
+        public int monitor_index { get; set; default = -1; }
+
+        public FloatingWindowGeometry (int w = 840, int h = 600, int mon = -1) {
+            this.width = w.clamp (360, 4096);
+            this.height = h.clamp (280, 2160);
+            this.monitor_index = mon;
+        }
+    }
+
     public class SplitterRatios : GLib.Object {
         public double main_vertical { get; set; default = 0.55; }
         public double left_horizontal { get; set; default = 0.68; }
         public double right_horizontal { get; set; default = 0.45; }
+        public double center_vertical { get; set; default = 0.50; }
+        public double center_horizontal { get; set; default = 0.55; }
 
         public static double clamp_ratio (double val) {
             if (val < 0.15) return 0.15;
@@ -236,6 +327,14 @@ namespace Imladris.Core.Layout {
             left_horizontal = clamp_ratio (left_h);
             right_horizontal = clamp_ratio (right_h);
         }
+
+        public void set_clamped_all (double main_v, double left_h, double right_h, double center_v, double center_h) {
+            main_vertical = clamp_ratio (main_v);
+            left_horizontal = clamp_ratio (left_h);
+            right_horizontal = clamp_ratio (right_h);
+            center_vertical = clamp_ratio (center_v);
+            center_horizontal = clamp_ratio (center_h);
+        }
     }
 
     public class RStudioDockLayoutState : GLib.Object {
@@ -246,6 +345,7 @@ namespace Imladris.Core.Layout {
         public SplitterRatios ratios { get; owned set; }
         public Gee.HashMap<QuadrantId, QuadrantConfig> quadrants { get; owned set; }
         public Gee.HashSet<PanelId> popped_out_panels { get; private set; }
+        public Gee.HashMap<PanelId, FloatingWindowGeometry> floating_geometries { get; private set; }
 
         public signal void state_updated ();
         public signal void panel_undocked (PanelId pid);
@@ -255,6 +355,7 @@ namespace Imladris.Core.Layout {
             ratios = new SplitterRatios ();
             quadrants = new Gee.HashMap<QuadrantId, QuadrantConfig> ();
             popped_out_panels = new Gee.HashSet<PanelId> ();
+            floating_geometries = new Gee.HashMap<PanelId, FloatingWindowGeometry> ();
             reset_to_default ();
         }
 
@@ -262,6 +363,36 @@ namespace Imladris.Core.Layout {
             this.topology = top;
             save_to_disk ();
             state_updated ();
+        }
+
+        public QuadrantId? find_panel_quadrant (PanelId pid) {
+            foreach (var qid in QuadrantId.all ()) {
+                var qc = quadrants.get (qid);
+                if (qc != null && qc.tabs.contains (pid)) {
+                    return qid;
+                }
+            }
+            return null;
+        }
+
+        public void set_floating_geometry (PanelId pid, int width, int height, int monitor_index = -1) {
+            var geom = floating_geometries.get (pid);
+            if (geom == null) {
+                geom = new FloatingWindowGeometry (width, height, monitor_index);
+                floating_geometries.set (pid, geom);
+            } else {
+                geom.width = width.clamp (360, 4096);
+                geom.height = height.clamp (280, 2160);
+                if (monitor_index >= -1) {
+                    geom.monitor_index = monitor_index;
+                }
+            }
+        }
+
+        public FloatingWindowGeometry get_floating_geometry (PanelId pid) {
+            var geom = floating_geometries.get (pid);
+            if (geom != null) return geom;
+            return new FloatingWindowGeometry (860, 620, -1);
         }
 
         public void undock_panel (PanelId pid) {
@@ -278,6 +409,7 @@ namespace Imladris.Core.Layout {
                     qc.active_tab = next_tab;
                 }
             }
+            save_to_disk ();
             panel_undocked (pid);
             state_updated ();
         }
@@ -285,8 +417,46 @@ namespace Imladris.Core.Layout {
         public void redock_panel (PanelId pid) {
             if (popped_out_panels.contains (pid)) {
                 popped_out_panels.remove (pid);
+                QuadrantId? owner = find_panel_quadrant (pid);
+                if (owner != null) {
+                    var qc = quadrants.get (owner);
+                    if (qc != null) {
+                        qc.active_tab = pid;
+                        if (qc.size_state == QuadrantSizeState.MINIMIZED) {
+                            qc.size_state = QuadrantSizeState.NORMAL;
+                        }
+                    }
+                }
+                save_to_disk ();
                 panel_redocked (pid);
                 state_updated ();
+            }
+        }
+
+        public void redock_panel_to (PanelId pid, QuadrantId target_quad) {
+            QuadrantId? current_quad = find_panel_quadrant (pid);
+            bool was_popped = popped_out_panels.contains (pid);
+            if (was_popped) {
+                popped_out_panels.remove (pid);
+            }
+            if (current_quad != null && current_quad != target_quad) {
+                move_tab (current_quad, target_quad, pid);
+            } else {
+                var dst = quadrants.get (target_quad);
+                if (dst != null) {
+                    if (!dst.tabs.contains (pid)) {
+                        dst.tabs.add (pid);
+                    }
+                    dst.active_tab = pid;
+                    if (dst.size_state == QuadrantSizeState.MINIMIZED) {
+                        dst.size_state = QuadrantSizeState.NORMAL;
+                    }
+                }
+                save_to_disk ();
+                state_updated ();
+            }
+            if (was_popped) {
+                panel_redocked (pid);
             }
         }
 
@@ -295,7 +465,7 @@ namespace Imladris.Core.Layout {
             user_locked_mode = false;
             topology = LayoutTopology.QUAD_4;
             maximized_quadrant = null;
-            ratios.set_clamped (0.55, 0.68, 0.45);
+            ratios.set_clamped_all (0.55, 0.68, 0.45, 0.50, 0.55);
             quadrants.clear ();
             popped_out_panels.clear ();
 
@@ -309,12 +479,57 @@ namespace Imladris.Core.Layout {
             );
             quadrants.set (
                 QuadrantId.Q3_TOP_RIGHT,
-                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS, PanelId.GALAXY }, PanelId.ENVIRONMENT)
+                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS, PanelId.GALAXY, PanelId.WEB_SYNC }, PanelId.ENVIRONMENT)
             );
             quadrants.set (
                 QuadrantId.Q4_BOTTOM_RIGHT,
                 new QuadrantConfig (QuadrantId.Q4_BOTTOM_RIGHT, { PanelId.FILES, PanelId.PLOTS, PanelId.PACKAGES, PanelId.HELP, PanelId.SHINY_VIEWER, PanelId.LIVE_PREVIEW }, PanelId.FILES)
             );
+            quadrants.set (
+                QuadrantId.Q5_TOP_CENTER,
+                new QuadrantConfig (QuadrantId.Q5_TOP_CENTER, {}, null)
+            );
+            quadrants.set (
+                QuadrantId.Q6_BOTTOM_CENTER,
+                new QuadrantConfig (QuadrantId.Q6_BOTTOM_CENTER, {}, null)
+            );
+            state_updated ();
+        }
+
+        /**
+         * Configures a balanced 6-Quadrant (3x2) layout optimized for 21:9, 32:9, and 34:9 ultrawide displays.
+         */
+        public void apply_ultrawide_6_defaults () {
+            topology = LayoutTopology.QUAD_6_ULTRAWIDE;
+            maximized_quadrant = null;
+            ratios.set_clamped_all (0.36, 0.65, 0.48, 0.52, 0.58);
+
+            // Preserve any custom panel presence while distributing panels cleanly across 6 slots
+            quadrants.set (
+                QuadrantId.Q1_TOP_LEFT,
+                new QuadrantConfig (QuadrantId.Q1_TOP_LEFT, { PanelId.SOURCE_EDITOR, PanelId.DATA_VIEWER }, PanelId.SOURCE_EDITOR)
+            );
+            quadrants.set (
+                QuadrantId.Q2_BOTTOM_LEFT,
+                new QuadrantConfig (QuadrantId.Q2_BOTTOM_LEFT, { PanelId.CONSOLE, PanelId.TERMINAL }, PanelId.CONSOLE)
+            );
+            quadrants.set (
+                QuadrantId.Q5_TOP_CENTER,
+                new QuadrantConfig (QuadrantId.Q5_TOP_CENTER, { PanelId.LIVE_PREVIEW, PanelId.SHINY_VIEWER }, PanelId.LIVE_PREVIEW)
+            );
+            quadrants.set (
+                QuadrantId.Q6_BOTTOM_CENTER,
+                new QuadrantConfig (QuadrantId.Q6_BOTTOM_CENTER, { PanelId.ELROND_AI, PanelId.PLOTS }, PanelId.ELROND_AI)
+            );
+            quadrants.set (
+                QuadrantId.Q3_TOP_RIGHT,
+                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS, PanelId.GALAXY, PanelId.WEB_SYNC }, PanelId.ENVIRONMENT)
+            );
+            quadrants.set (
+                QuadrantId.Q4_BOTTOM_RIGHT,
+                new QuadrantConfig (QuadrantId.Q4_BOTTOM_RIGHT, { PanelId.FILES, PanelId.PACKAGES, PanelId.HELP }, PanelId.FILES)
+            );
+            save_to_disk ();
             state_updated ();
         }
 
@@ -349,9 +564,22 @@ namespace Imladris.Core.Layout {
             // 1. Remove PanelId from sourceQuadrant.tabs
             src.tabs.remove (panel_id);
 
-            // 2. If sourceQuadrant.activeTab === panelId, fallback to sourceQuadrant.tabs[0] ?? null
+            // 2. If sourceQuadrant.activeTab === panelId, fallback to first docked tab
             if (src.active_tab == panel_id) {
-                src.active_tab = src.tabs.size > 0 ? src.tabs.get (0) : (PanelId?) null;
+                PanelId? next_active = null;
+                foreach (var t in src.tabs) {
+                    if (!popped_out_panels.contains (t)) {
+                        next_active = t;
+                        break;
+                    }
+                }
+                if (next_active != null) {
+                    src.active_tab = next_active;
+                } else if (src.tabs.size > 0) {
+                    src.active_tab = src.tabs.get (0);
+                } else {
+                    src.active_tab = null;
+                }
             }
 
             // Empty Quadrant Auto-Collapse: automatically set sourceQuadrant.sizeState = 'MINIMIZED'
@@ -373,6 +601,38 @@ namespace Imladris.Core.Layout {
             dst.active_tab = panel_id;
             if (dst.size_state == QuadrantSizeState.MINIMIZED) {
                 dst.size_state = QuadrantSizeState.NORMAL;
+            }
+
+            save_to_disk ();
+            state_updated ();
+        }
+
+        // 3. Whole-Quadrant Swap (move all tabs & active selection between two quadrants)
+        public void swap_quadrants (QuadrantId a_id, QuadrantId b_id) {
+            if (a_id == b_id) return;
+            var qa = quadrants.get (a_id);
+            var qb = quadrants.get (b_id);
+            if (qa == null || qb == null) return;
+
+            var tmp_tabs = new Gee.ArrayList<PanelId> ();
+            foreach (var p in qa.tabs) tmp_tabs.add (p);
+            PanelId? tmp_active = qa.active_tab;
+            QuadrantSizeState tmp_state = qa.size_state;
+
+            qa.tabs.clear ();
+            foreach (var p in qb.tabs) qa.tabs.add (p);
+            qa.active_tab = qb.active_tab;
+            qa.size_state = qb.size_state;
+
+            qb.tabs.clear ();
+            foreach (var p in tmp_tabs) qb.tabs.add (p);
+            qb.active_tab = tmp_active;
+            qb.size_state = tmp_state;
+
+            if (maximized_quadrant == a_id) {
+                maximized_quadrant = b_id;
+            } else if (maximized_quadrant == b_id) {
+                maximized_quadrant = a_id;
             }
 
             save_to_disk ();
@@ -463,6 +723,32 @@ namespace Imladris.Core.Layout {
                 builder.add_double_value (ratios.left_horizontal);
                 builder.set_member_name ("rightHorizontal");
                 builder.add_double_value (ratios.right_horizontal);
+                builder.set_member_name ("centerVertical");
+                builder.add_double_value (ratios.center_vertical);
+                builder.set_member_name ("centerHorizontal");
+                builder.add_double_value (ratios.center_horizontal);
+                builder.end_object ();
+
+                builder.set_member_name ("poppedOutPanels");
+                builder.begin_array ();
+                foreach (var pid in popped_out_panels) {
+                    builder.add_string_value (pid.to_id_string ());
+                }
+                builder.end_array ();
+
+                builder.set_member_name ("floatingGeometries");
+                builder.begin_object ();
+                foreach (var entry in floating_geometries.entries) {
+                    builder.set_member_name (entry.key.to_id_string ());
+                    builder.begin_object ();
+                    builder.set_member_name ("width");
+                    builder.add_int_value (entry.value.width);
+                    builder.set_member_name ("height");
+                    builder.add_int_value (entry.value.height);
+                    builder.set_member_name ("monitorIndex");
+                    builder.add_int_value (entry.value.monitor_index);
+                    builder.end_object ();
+                }
                 builder.end_object ();
 
                 builder.set_member_name ("quadrants");
@@ -527,13 +813,40 @@ namespace Imladris.Core.Layout {
                     double mv = r_obj.has_member ("mainVertical") ? r_obj.get_double_member ("mainVertical") : 0.55;
                     double lh = r_obj.has_member ("leftHorizontal") ? r_obj.get_double_member ("leftHorizontal") : 0.68;
                     double rh = r_obj.has_member ("rightHorizontal") ? r_obj.get_double_member ("rightHorizontal") : 0.45;
-                    ratios.set_clamped (mv, lh, rh);
+                    double cv = r_obj.has_member ("centerVertical") ? r_obj.get_double_member ("centerVertical") : 0.50;
+                    double ch = r_obj.has_member ("centerHorizontal") ? r_obj.get_double_member ("centerHorizontal") : 0.55;
+                    ratios.set_clamped_all (mv, lh, rh, cv, ch);
                 }
 
                 if (obj.has_member ("maximizedQuadrant") && !obj.get_null_member ("maximizedQuadrant")) {
                     maximized_quadrant = QuadrantId.from_id_string (obj.get_string_member ("maximizedQuadrant"));
                 } else {
                     maximized_quadrant = null;
+                }
+
+                popped_out_panels.clear ();
+                if (obj.has_member ("poppedOutPanels")) {
+                    var p_arr = obj.get_array_member ("poppedOutPanels");
+                    for (uint i = 0; i < p_arr.get_length (); i++) {
+                        PanelId? pid = PanelId.from_id_string (p_arr.get_string_element (i));
+                        if (pid != null) {
+                            popped_out_panels.add (pid);
+                        }
+                    }
+                }
+
+                floating_geometries.clear ();
+                if (obj.has_member ("floatingGeometries")) {
+                    var fg_obj = obj.get_object_member ("floatingGeometries");
+                    foreach (var key in fg_obj.get_members ()) {
+                        PanelId? pid = PanelId.from_id_string (key);
+                        if (pid == null) continue;
+                        var g_item = fg_obj.get_object_member (key);
+                        int w = g_item.has_member ("width") ? (int) g_item.get_int_member ("width") : 840;
+                        int h = g_item.has_member ("height") ? (int) g_item.get_int_member ("height") : 600;
+                        int m = g_item.has_member ("monitorIndex") ? (int) g_item.get_int_member ("monitorIndex") : -1;
+                        floating_geometries.set (pid, new FloatingWindowGeometry (w, h, m));
+                    }
                 }
 
                 if (obj.has_member ("quadrants")) {
@@ -562,21 +875,24 @@ namespace Imladris.Core.Layout {
 
                         if (q_item.has_member ("activeTab") && !q_item.get_null_member ("activeTab")) {
                             qc.active_tab = PanelId.from_id_string (q_item.get_string_member ("activeTab"));
+                        } else if (qc.tabs.size > 0) {
+                            qc.active_tab = qc.tabs.get (0);
                         } else {
-                            qc.active_tab = qc.tabs.size > 0 ? qc.tabs.get (0) : (PanelId?) null;
+                            qc.active_tab = null;
                         }
                     }
                 }
 
-                // Reconcile newly introduced panels (e.g., LIVE_PREVIEW) into older saved layouts
+                // Reconcile newly introduced panels into older saved layouts
                 ensure_panel_present (PanelId.LIVE_PREVIEW, QuadrantId.Q4_BOTTOM_RIGHT);
                 ensure_panel_present (PanelId.SHINY_VIEWER, QuadrantId.Q4_BOTTOM_RIGHT);
+                ensure_panel_present (PanelId.WEB_SYNC, QuadrantId.Q3_TOP_RIGHT);
             } catch (GLib.Error e) {
                 warning ("Failed to load RStudio dock layout state: %s", e.message);
             }
         }
 
-        private void ensure_panel_present (PanelId pid, QuadrantId fallback_quad) {
+        public void ensure_panel_present (PanelId pid, QuadrantId fallback_quad) {
             foreach (var qid in QuadrantId.all ()) {
                 var q = quadrants.get (qid);
                 if (q != null && q.tabs.contains (pid)) {

@@ -60,6 +60,13 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Export .mallorn Reproducible Bundle", "Package project with lockfile and data into single archive", "package-x-generic-symbolic", "app.export_mallorn", "Publish"));
             all_items.add (new CommandPaletteItem ("Export for RStudio", "Generate .Rproj and renv lockfile manifest", "utilities-terminal-symbolic", "app.export_rstudio", "Publish"));
             all_items.add (new CommandPaletteItem ("Export for Jupyter", "Convert document to .ipynb notebook JSON", "applications-science-symbolic", "app.export_jupyter", "Publish"));
+            all_items.add (new CommandPaletteItem ("Share / Sync with Imladris on Web", "Share document, work offline with git-style commits, and sync on reconnect (Ctrl+Shift+W)", "network-server-symbolic", "win.open_web_sync", "Publish"));
+            all_items.add (new CommandPaletteItem ("Commit & Sync to Imladris on Web", "Create a git-style commit checkpoint and push or queue offline", "document-send-symbolic", "win.web_sync_commit", "Publish"));
+
+            // Panel & Multi-Screen Workspace Management
+            all_items.add (new CommandPaletteItem ("Manage Panels & Independent Windows…", "Rearrange panels across quadrants, pop out to 2-3 screens, or switch layouts (Ctrl+Shift+L)", "view-grid-symbolic", "win.manage_panels", "Workspace"));
+            all_items.add (new CommandPaletteItem ("6-Quadrant Ultrawide Layout (21:9 / 34:9)", "Switch workbench to 3×2 six-quadrant grid for ultrawide displays (Ctrl+Alt+6)", "view-grid-symbolic", "win.layout_ultrawide_6", "Workspace"));
+            all_items.add (new CommandPaletteItem ("Re-dock All Floating Panel Windows", "Return all independent multi-screen panels back into the main window", "view-restore-symbolic", "win.redock_all_panels", "Workspace"));
 
             // Scientific Studios & Bridges
             all_items.add (new CommandPaletteItem ("Elbereth Clinical Biostatistics", "ICH E9 sample size, power curves, ADSL Table 1, and survival analysis", "view-statistics-symbolic", "bridge.elbereth", "Scientific"));

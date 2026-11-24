@@ -42,6 +42,7 @@ namespace Imladris.UI {
         public WebKit.WebView help_view { get; private set; }
         public WebKit.WebView shiny_webview { get; private set; }
         public GalaxyPanel galaxy_panel { get; private set; }
+        public WebSyncPanel web_sync_panel { get; private set; }
 
         private Gtk.Label? shiny_status_lbl = null;
         private Gtk.Button? btn_shiny_refresh = null;
@@ -169,6 +170,9 @@ namespace Imladris.UI {
             if (active_shiny_window != null) {
                 active_shiny_window.destroy ();
                 active_shiny_window = null;
+            }
+            if (web_sync_panel != null) {
+                web_sync_panel.cleanup ();
             }
             detach_all ();
             panels.clear ();
@@ -1402,6 +1406,10 @@ namespace Imladris.UI {
                 }
             });
             panels.set (PanelId.GALAXY, galaxy_panel);
+
+            // 17. IMLADRIS ON WEB SYNC PANEL (Offline-First Git-Style Collaboration Bridge)
+            web_sync_panel = new WebSyncPanel (doc_page, main_window);
+            panels.set (PanelId.WEB_SYNC, web_sync_panel);
 
             // Initial AST & Environment scan
             refresh_environment_and_outline ();

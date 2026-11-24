@@ -188,6 +188,9 @@ namespace Imladris {
             this.set_accels_for_action ("win.focus_console", { "<Control>2" });
             this.set_accels_for_action ("win.zotero_picker", { "<Control><Shift>i" });
             this.set_accels_for_action ("win.doi_bib_manager", { "<Control><Shift>b" });
+            this.set_accels_for_action ("win.manage_panels", { "<Control><Shift>l" });
+            this.set_accels_for_action ("win.open_web_sync", { "<Control><Shift>w" });
+            this.set_accels_for_action ("win.layout_ultrawide_6", { "<Control><Alt>6" });
             this.set_accels_for_action ("app.insert_video", { "<Control><Shift>v" });
             this.set_accels_for_action ("app.quit", { "<Control>q" });
             this.set_accels_for_action ("win.undo", { "<Control>z" });

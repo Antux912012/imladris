@@ -88,6 +88,9 @@ sources = files(
   'src/bridges/galaxy_models.vala',
   'src/bridges/galaxy_client.vala',
   'src/bridges/galaxy_chunk_generator.vala',
+  'src/bridges/WebSyncModels.vala',
+  'src/bridges/WebSyncClient.vala',
+  'src/services/WebSyncService.vala',
   'src/bridges/ArekyerBridge.vala',
   'src/bridges/yavanna/BioEntityPopover.vala',
   'src/bridges/taniquetil/AlphaFoldBridgePopover.vala',
@@ -95,6 +98,9 @@ sources = files(
   'src/core/ProvenanceAttestationService.vala',
   'src/ui/galaxy_auth_dialog.vala',
   'src/ui/galaxy_panel.vala',
+  'src/ui/WebSyncAuthDialog.vala',
+  'src/ui/WebSyncPanel.vala',
+  'src/ui/PanelManagerDialog.vala',
   'src/core/layout/DockTypes.vala',
   'src/ui/PersistentPanelRegistry.vala',
   'src/ui/ShinyWindow.vala',
@@ -509,6 +515,27 @@ exec_sec_test_exe = executable('test_execution_and_security',
 )
 
 test('execution_and_security_tests', exec_sec_test_exe, timeout: 30)
+
+web_sync_test_exe = executable('test_web_sync',
+  files(
+    'tests/test_web_sync.vala',
+    'src/bridges/WebSyncModels.vala',
+    'src/bridges/WebSyncClient.vala',
+    'src/services/WebSyncService.vala',
+    'src/core/SettingsManager.vala',
+    'src/core/PlatformUtils.vala',
+    'src/core/HostBridge.vala',
+    'src/core/EnvDiscovery.vala',
+    'src/core/ExecutionRouter.vala',
+    'src/core/ToolchainManager.vala',
+    'src/core/toolchain_native.c',
+  ),
+  dependencies: deps,
+  include_directories: core_inc,
+  vala_args: ['--target-glib=2.76'],
+)
+
+test('web_sync_tests', web_sync_test_exe, timeout: 30)
 
 
 

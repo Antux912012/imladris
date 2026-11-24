@@ -66,6 +66,15 @@ namespace Imladris {
         private Gtk.CheckButton? chk_console = null;
         private Gtk.ToggleButton? btn_mode_apostrophe = null;
         private Gtk.ToggleButton? btn_mode_rstudio = null;
+        private Gtk.ToggleButton? btn_topo_quad = null;
+        private Gtk.ToggleButton? btn_topo_quad6 = null;
+        private Gtk.ToggleButton? btn_topo_left_tall = null;
+        private Gtk.ToggleButton? btn_topo_right_tall = null;
+        private Gtk.Widget? view_rstudio_group = null;
+        private Gtk.Widget? view_rstudio_sep = null;
+        private Gtk.Widget? view_focus_split_group = null;
+        private Gtk.Widget? view_focus_split_sep = null;
+        private Gtk.Button? web_sync_status_btn = null;
         private bool syncing_ui_toggles = false;
 
         // Plugin Extension Ribbon Tracking
@@ -85,6 +94,9 @@ namespace Imladris {
         private ulong pm_btn_added_hid = 0;
         private ulong pm_btn_removed_hid = 0;
         private ulong pm_toast_hid = 0;
+        private ulong web_sync_link_hid = 0;
+        private ulong web_sync_toast_hid = 0;
+        private ulong web_sync_conn_hid = 0;
         private static Regex? zotero_cite_regex = null;
         private static Regex? pandoc_part_regex = null;
 
@@ -157,6 +169,19 @@ namespace Imladris {
                 if (pm_toast_hid != 0) {
                     pm_cleanup.disconnect (pm_toast_hid);
                     pm_toast_hid = 0;
+                }
+                var ws_svc_cleanup = Services.WebSyncService.get_default ();
+                if (web_sync_link_hid != 0) {
+                    ws_svc_cleanup.disconnect (web_sync_link_hid);
+                    web_sync_link_hid = 0;
+                }
+                if (web_sync_toast_hid != 0) {
+                    ws_svc_cleanup.disconnect (web_sync_toast_hid);
+                    web_sync_toast_hid = 0;
+                }
+                if (web_sync_conn_hid != 0) {
+                    ws_svc_cleanup.disconnect (web_sync_conn_hid);
+                    web_sync_conn_hid = 0;
                 }
                 for (int i = 0; i < tab_view.n_pages; i++) {
                     var page = tab_view.get_nth_page (i);
@@ -652,6 +677,29 @@ namespace Imladris {
             });
 
             status_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
+
+            web_sync_status_btn = new Gtk.Button.with_label ("Imladris Web") {
+                tooltip_text = "Imladris on Web Sync & Offline Git-Style Commits (Ctrl+Shift+W)",
+                valign = Gtk.Align.CENTER
+            };
+            web_sync_status_btn.add_css_class ("flat");
+            web_sync_status_btn.add_css_class ("web-sync-pill");
+            web_sync_status_btn.add_css_class ("offline");
+            web_sync_status_btn.clicked.connect (() => {
+                open_web_sync_panel ();
+            });
+            status_bar.append (web_sync_status_btn);
+
+            var web_sync_svc = Services.WebSyncService.get_default ();
+            web_sync_link_hid = web_sync_svc.link_updated.connect ((k) => {
+                update_web_sync_status_badge ();
+            });
+            web_sync_toast_hid = web_sync_svc.toast_requested.connect ((msg) => {
+                show_toast (msg);
+            });
+            web_sync_conn_hid = web_sync_svc.connectivity_changed.connect ((avail) => {
+                update_web_sync_status_badge ();
+            });
 
             var zoom_pop_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
                 margin_top = 4, margin_bottom = 4, margin_start = 4, margin_end = 4
@@ -1613,6 +1661,7 @@ namespace Imladris {
                     }
                     Services.RecoveryService.get_default ().purge_document_cache (doc.doc_id);
                     doc.append_console_log (@"✔ Saved $(doc.file_location.get_basename ())");
+                    notify_web_sync_on_save (doc, editor_content);
                 } catch (GLib.Error e) {
                     doc.append_console_log (@"✖ Save failed: $(e.message)");
                 }
@@ -1651,6 +1700,7 @@ namespace Imladris {
                             tab_view.selected_page.title = file.get_basename ();
                         }
                         doc.append_console_log (@"✔ Saved $(file.get_basename ())");
+                        notify_web_sync_on_save (doc, editor_content);
                     }
                 } catch (GLib.Error e) {
                     doc.append_console_log (@"✖ Save failed: $(e.message)");
@@ -2329,6 +2379,166 @@ namespace Imladris {
                 open_doi_bib_manager ();
             });
             this.add_action (action_doi_bib);
+
+            var action_manage_panels = new GLib.SimpleAction ("manage_panels", null);
+            action_manage_panels.activate.connect (() => {
+                open_panel_manager ();
+            });
+            this.add_action (action_manage_panels);
+
+            var action_ultrawide_6 = new GLib.SimpleAction ("layout_ultrawide_6", null);
+            action_ultrawide_6.activate.connect (() => {
+                switch_to_ultrawide_6 ();
+            });
+            this.add_action (action_ultrawide_6);
+
+            var action_redock_all = new GLib.SimpleAction ("redock_all_panels", null);
+            action_redock_all.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null && d.rstudio_dock_grid != null) {
+                    d.rstudio_dock_grid.dock_manager.redock_all_panels ();
+                    show_toast ("Re-docked all independent floating panels");
+                }
+            });
+            this.add_action (action_redock_all);
+
+            var action_open_web_sync = new GLib.SimpleAction ("open_web_sync", null);
+            action_open_web_sync.activate.connect (() => {
+                open_web_sync_panel ();
+            });
+            this.add_action (action_open_web_sync);
+
+            var action_web_sync_commit = new GLib.SimpleAction ("web_sync_commit", null);
+            action_web_sync_commit.activate.connect (() => {
+                trigger_web_sync_quick_commit ();
+            });
+            this.add_action (action_web_sync_commit);
+        }
+
+        private void notify_web_sync_on_save (DocumentPage doc, string editor_content) {
+            if (doc.panel_registry == null || doc.panel_registry.web_sync_panel == null) return;
+            string key = doc.panel_registry.web_sync_panel.get_doc_key ();
+            Services.WebSyncService.get_default ().on_document_saved (key, editor_content);
+            doc.panel_registry.web_sync_panel.refresh_ui ();
+            update_web_sync_status_badge ();
+        }
+
+        public void update_web_sync_status_badge () {
+            if (web_sync_status_btn == null) return;
+            var d = get_active_document ();
+            web_sync_status_btn.remove_css_class ("synced");
+            web_sync_status_btn.remove_css_class ("pending");
+            web_sync_status_btn.remove_css_class ("conflict");
+            web_sync_status_btn.remove_css_class ("offline");
+
+            if (d == null || d.panel_registry == null || d.panel_registry.web_sync_panel == null) {
+                web_sync_status_btn.label = "Imladris Web";
+                web_sync_status_btn.add_css_class ("offline");
+                return;
+            }
+            string key = d.panel_registry.web_sync_panel.get_doc_key ();
+            var svc = Services.WebSyncService.get_default ();
+            var link = svc.get_link (key);
+            var st = svc.get_status_for_doc (key);
+            int pending = (link != null) ? link.pending_commits.size : 0;
+            web_sync_status_btn.label = st.to_badge_label (pending);
+            web_sync_status_btn.add_css_class (st.to_css_class ());
+        }
+
+        public void open_panel_manager () {
+            var d = get_active_document ();
+            if (d == null) {
+                show_toast ("Open or create a document first to manage workbench panels");
+                return;
+            }
+            if (d.get_workbench_mode () != Services.LayoutMode.RSTUDIO) {
+                Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+            }
+            var dlg = new UI.PanelManagerDialog (d.dock_layout_state, d.rstudio_dock_grid.dock_manager, this);
+            dlg.present (this);
+        }
+
+        public void switch_to_ultrawide_6 () {
+            var d = get_active_document ();
+            if (d == null) {
+                show_toast ("Open or create a document first to switch to 6-Quadrant Ultrawide layout");
+                return;
+            }
+            Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+            UI.LayoutSerializer.apply_topology_preset (Imladris.Core.Layout.LayoutTopology.QUAD_6_ULTRAWIDE, d.dock_layout_state);
+            sync_document_ui_toggles (d);
+            show_toast ("Switched to 6-Quadrant Ultrawide (3×2) layout for 21:9 / 34:9 displays");
+        }
+
+        public void open_web_sync_panel () {
+            var d = get_active_document ();
+            if (d == null) {
+                var auth_dlg = new UI.WebSyncAuthDialog ();
+                auth_dlg.present (this);
+                return;
+            }
+            if (d.get_workbench_mode () != Services.LayoutMode.RSTUDIO) {
+                Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+            }
+            if (d.rstudio_dock_grid.dock_manager.is_panel_undocked (Imladris.Core.Layout.PanelId.WEB_SYNC)) {
+                d.rstudio_dock_grid.dock_manager.focus_undocked_panel (Imladris.Core.Layout.PanelId.WEB_SYNC);
+            } else {
+                d.dock_layout_state.activate_panel (Imladris.Core.Layout.PanelId.WEB_SYNC);
+            }
+            if (d.panel_registry != null && d.panel_registry.web_sync_panel != null) {
+                d.panel_registry.web_sync_panel.refresh_ui ();
+            }
+        }
+
+        public void trigger_web_sync_quick_commit () {
+            var d = get_active_document ();
+            if (d == null || d.panel_registry == null || d.panel_registry.web_sync_panel == null) {
+                show_toast ("No active document to commit");
+                return;
+            }
+            string key = d.panel_registry.web_sync_panel.get_doc_key ();
+            var svc = Services.WebSyncService.get_default ();
+            if (svc.get_link (key) == null) {
+                open_web_sync_panel ();
+                show_toast ("Share this document to an Imladris on Web workspace first");
+                return;
+            }
+            var dlg = new Adw.AlertDialog (
+                "Commit & Sync to Imladris on Web",
+                "Enter a git-style commit message (or leave blank to auto-generate). If offline, the commit is queued locally and synced automatically when back online."
+            );
+            var entry = new Gtk.Entry () {
+                placeholder_text = "e.g. feat(analysis): update regression model results",
+                margin_start = 12, margin_end = 12, margin_top = 8, margin_bottom = 8
+            };
+            dlg.set_extra_child (entry);
+            dlg.add_response ("cancel", "Cancel");
+            dlg.add_response ("commit", "Commit & Sync");
+            dlg.set_response_appearance ("commit", Adw.ResponseAppearance.SUGGESTED);
+            dlg.set_default_response ("commit");
+            dlg.set_close_response ("cancel");
+            dlg.response.connect ((resp) => {
+                if (resp == "commit") {
+                    string msg = entry.text.strip ();
+                    svc.commit_document_async.begin (
+                        key,
+                        d.get_clean_source_text (),
+                        msg.length > 0 ? msg : null,
+                        false,
+                        false,
+                        (obj, res) => {
+                            try {
+                                svc.commit_document_async.end (res);
+                                d.panel_registry.web_sync_panel.refresh_ui ();
+                                update_web_sync_status_badge ();
+                            } catch (GLib.Error e) {
+                                show_toast (@"Web commit failed: $(e.message)");
+                            }
+                        }
+                    );
+                }
+            });
+            dlg.present (this);
         }
 
         public void toggle_ribbon_visibility () {
@@ -2752,7 +2962,7 @@ namespace Imladris {
             });
             box.append (btn_live_preview);
 
-            btn_preview = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-dual-symbolic", "Console", "Toggle Output Console Panel", true, true, true);
+            btn_preview = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-dual-symbolic", "Side Panel", "Toggle Focus Mode Side Panel (Preview / Elrond)", true, true, true);
             btn_preview.toggled.connect (() => {
                 if (syncing_ui_toggles) return;
                 var d = get_active_document ();
@@ -2765,7 +2975,29 @@ namespace Imladris {
             });
             box.append (btn_preview);
             box.append (RibbonFactory.create_vseparator ());
-            // Group 4 removed: Elrond Assistance is in the top tab bar and Ctrl+Shift+E
+
+            // Group 4: Imladris on Web Integration (Share, Offline Git-Style Commits & Auto-Sync)
+            var btn_web_share = RibbonFactory.create_tool_button (
+                "network-server-symbolic",
+                "Imladris Web",
+                "Share document to Imladris on Web & manage offline git-style sync (Ctrl+Shift+W)",
+                false,
+                false,
+                true,
+                null,
+                "win.open_web_sync"
+            );
+            var btn_web_commit = RibbonFactory.create_tool_button (
+                "document-send-symbolic",
+                "Commit & Sync",
+                "Create a git-style commit checkpoint and push to Imladris on Web (or queue offline)",
+                false,
+                false,
+                true,
+                null,
+                "win.web_sync_commit"
+            );
+            box.append (RibbonFactory.create_linked_group ({ btn_web_share, btn_web_commit }));
 
             return box;
         }
@@ -3713,39 +3945,80 @@ namespace Imladris {
             box.append (RibbonFactory.create_linked_group ({ btn_mode_apostrophe, btn_mode_rstudio }));
             box.append (RibbonFactory.create_vseparator ());
 
-            // Group 2: Workbench Layout Topologies (QUAD_4, LEFT_TALL_3, RIGHT_TALL_3)
-            var btn_topo_quad = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-grid-symbolic", "2×2 Quad", "2×2 Quadrant Grid Topology", true, true, true);
-            var btn_topo_left_tall = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-column-symbolic", "Left Tall", "Editor Full-Height on Left, Stacked Right", true, false, true);
-            var btn_topo_right_tall = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-paged-symbolic", "Right Tall", "Outputs Full-Height on Right, Stacked Left", true, false, true);
+            // Group 2: Workbench Layout Topologies (shown in RStudio Workbench mode)
+            var rstudio_ctrls = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
+            btn_topo_quad = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-grid-symbolic", "2×2 Quad", "2×2 Quadrant Grid (4 Panels)", true, true, true);
+            btn_topo_quad6 = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-grid-symbolic", "3×2 (6)", "6-Quadrant Ultrawide Grid for 21:9 / 34:9 Displays (Ctrl+Alt+6)", true, false, true);
+            btn_topo_left_tall = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-column-symbolic", "Left Tall", "Editor Full-Height on Left, Stacked Right", true, false, true);
+            btn_topo_right_tall = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-paged-symbolic", "Right Tall", "Outputs Full-Height on Right, Stacked Left", true, false, true);
+            btn_topo_quad6.set_group (btn_topo_quad);
             btn_topo_left_tall.set_group (btn_topo_quad);
             btn_topo_right_tall.set_group (btn_topo_quad);
 
             btn_topo_quad.toggled.connect (() => {
+                if (syncing_ui_toggles) return;
                 if (btn_topo_quad.active) {
                     var d = get_active_document ();
                     if (d != null) {
+                        Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
                         UI.LayoutSerializer.apply_topology_preset (Imladris.Core.Layout.LayoutTopology.QUAD_4, d.dock_layout_state);
                     }
                 }
             });
+            btn_topo_quad6.toggled.connect (() => {
+                if (syncing_ui_toggles) return;
+                if (btn_topo_quad6.active) {
+                    var d = get_active_document ();
+                    if (d != null) {
+                        Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+                        UI.LayoutSerializer.apply_topology_preset (Imladris.Core.Layout.LayoutTopology.QUAD_6_ULTRAWIDE, d.dock_layout_state);
+                    }
+                }
+            });
             btn_topo_left_tall.toggled.connect (() => {
+                if (syncing_ui_toggles) return;
                 if (btn_topo_left_tall.active) {
                     var d = get_active_document ();
                     if (d != null) {
+                        Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
                         UI.LayoutSerializer.apply_topology_preset (Imladris.Core.Layout.LayoutTopology.LEFT_TALL_3, d.dock_layout_state);
                     }
                 }
             });
             btn_topo_right_tall.toggled.connect (() => {
+                if (syncing_ui_toggles) return;
                 if (btn_topo_right_tall.active) {
                     var d = get_active_document ();
                     if (d != null) {
+                        Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
                         UI.LayoutSerializer.apply_topology_preset (Imladris.Core.Layout.LayoutTopology.RIGHT_TALL_3, d.dock_layout_state);
                     }
                 }
             });
 
-            box.append (RibbonFactory.create_linked_group ({ btn_topo_quad, btn_topo_left_tall, btn_topo_right_tall }));
+            rstudio_ctrls.append (RibbonFactory.create_linked_group ({ btn_topo_quad, btn_topo_quad6, btn_topo_left_tall, btn_topo_right_tall }));
+
+            var btn_manage_panels = RibbonFactory.create_tool_button (
+                "window-new-symbolic",
+                "Manage Panels",
+                "Rearrange panels across quadrants, pop out to 2-3 screens, or apply 6-Quadrant presets (Ctrl+Shift+L)",
+                false,
+                false,
+                true,
+                null,
+                "win.manage_panels"
+            );
+            var btn_redock_all = RibbonFactory.create_tool_button (
+                "view-restore-symbolic",
+                "Re-dock All",
+                "Return all independent floating panels back into the main window",
+                false,
+                false,
+                true,
+                null,
+                "win.redock_all_panels"
+            );
+            rstudio_ctrls.append (RibbonFactory.create_linked_group ({ btn_manage_panels, btn_redock_all }));
 
             var btn_layout_presets = new Gtk.MenuButton () {
                 icon_name = "view-more-symbolic",
@@ -3758,34 +4031,72 @@ namespace Imladris {
             var lpop_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
                 margin_start = 6, margin_end = 6, margin_top = 6, margin_bottom = 6
             };
-            lpop_box.append (new Gtk.Label ("Layout Presets") { css_classes = { "dim-label", "caption" }, xalign = 0 });
-
-            var b_save_layout = new Gtk.Button.with_label ("Save Current Layout...") { halign = Gtk.Align.START };
-            b_save_layout.add_css_class ("flat");
-            b_save_layout.clicked.connect (() => {
-                layout_pop.popdown ();
-                prompt_save_layout ();
-            });
-            lpop_box.append (b_save_layout);
-
-            var b_reset_layout = new Gtk.Button.with_label ("Reset to Default Layout") { halign = Gtk.Align.START };
-            b_reset_layout.add_css_class ("flat");
-            b_reset_layout.clicked.connect (() => {
-                layout_pop.popdown ();
-                var d = get_active_document ();
-                if (d != null) {
-                    d.dock_layout_state.reset_to_default ();
-                    show_toast ("Reset workbench to default 4-quadrant layout");
-                }
-            });
-            lpop_box.append (b_reset_layout);
-
             layout_pop.set_child (lpop_box);
-            btn_layout_presets.set_popover (layout_pop);
-            box.append (btn_layout_presets);
-            box.append (RibbonFactory.create_vseparator ());
+            layout_pop.map.connect (() => {
+                Gtk.Widget? ch = lpop_box.get_first_child ();
+                while (ch != null) {
+                    var next = ch.get_next_sibling ();
+                    lpop_box.remove (ch);
+                    ch = next;
+                }
 
-            // Group 2: Split Mode Switcher
+                lpop_box.append (new Gtk.Label ("Layout Presets") { css_classes = { "dim-label", "caption" }, xalign = 0 });
+
+                var b_save_layout = new Gtk.Button.with_label ("Save Current Layout...") { halign = Gtk.Align.START };
+                b_save_layout.add_css_class ("flat");
+                b_save_layout.clicked.connect (() => {
+                    layout_pop.popdown ();
+                    prompt_save_layout ();
+                });
+                lpop_box.append (b_save_layout);
+
+                string[] saved_presets = UI.LayoutSerializer.list_saved_layouts ();
+                if (saved_presets.length > 0) {
+                    lpop_box.append (new Gtk.Separator (Gtk.Orientation.HORIZONTAL));
+                    lpop_box.append (new Gtk.Label ("Load Saved Preset:") { css_classes = { "dim-label", "caption" }, xalign = 0 });
+                    foreach (string preset_name in saved_presets) {
+                        string target_preset = preset_name;
+                        var b_load = new Gtk.Button.with_label (target_preset) { halign = Gtk.Align.START };
+                        b_load.add_css_class ("flat");
+                        b_load.clicked.connect (() => {
+                            layout_pop.popdown ();
+                            var d = get_active_document ();
+                            if (d != null && UI.LayoutSerializer.load_layout (target_preset, d.dock_layout_state)) {
+                                Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+                                d.rstudio_dock_grid.dock_manager.sync_windows_with_state ();
+                                sync_document_ui_toggles (d);
+                                show_toast (@"Loaded layout preset '$target_preset'");
+                            }
+                        });
+                        lpop_box.append (b_load);
+                    }
+                }
+
+                lpop_box.append (new Gtk.Separator (Gtk.Orientation.HORIZONTAL));
+                var b_reset_layout = new Gtk.Button.with_label ("Reset to Default Layout") { halign = Gtk.Align.START };
+                b_reset_layout.add_css_class ("flat");
+                b_reset_layout.clicked.connect (() => {
+                    layout_pop.popdown ();
+                    var d = get_active_document ();
+                    if (d != null) {
+                        d.rstudio_dock_grid.dock_manager.redock_all_panels ();
+                        d.dock_layout_state.reset_to_default ();
+                        d.dock_layout_state.save_to_disk ();
+                        sync_document_ui_toggles (d);
+                        show_toast ("Reset workbench to default 4-quadrant layout");
+                    }
+                });
+                lpop_box.append (b_reset_layout);
+            });
+
+            btn_layout_presets.set_popover (layout_pop);
+            rstudio_ctrls.append (btn_layout_presets);
+            view_rstudio_group = rstudio_ctrls;
+            view_rstudio_sep = RibbonFactory.create_vseparator ();
+            box.append (view_rstudio_group);
+            box.append (view_rstudio_sep);
+
+            // Group 3: Focus Mode Split Switcher (shown only in Focus Mode)
             var btn_split_v = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-column-symbolic", "Vertical", "Side-by-Side Split", true, true, true);
             var btn_split_h = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("view-paged-symbolic", "Horizontal", "Top-and-Bottom Split", true, false, true);
             var btn_edit_only = (Gtk.ToggleButton) RibbonFactory.create_tool_button ("x-office-document-symbolic", "Editor Only", "Editor-Only Mode", true, false, true);
@@ -3808,8 +4119,10 @@ namespace Imladris {
                 if (btn_prev_only.active) Services.WorkspaceStateManager.get_default ().set_split_mode (Services.SplitMode.PREVIEW_ONLY);
             });
 
-            box.append (RibbonFactory.create_linked_group ({ btn_split_v, btn_split_h, btn_edit_only, btn_prev_only }));
-            box.append (RibbonFactory.create_vseparator ());
+            view_focus_split_group = RibbonFactory.create_linked_group ({ btn_split_v, btn_split_h, btn_edit_only, btn_prev_only });
+            view_focus_split_sep = RibbonFactory.create_vseparator ();
+            box.append (view_focus_split_group);
+            box.append (view_focus_split_sep);
 
             // Group 3: Zoom Controls
             var btn_zoom_out = RibbonFactory.create_tool_button ("zoom-out-symbolic", null, "Zoom Out (Ctrl+-)", false, false, true, null, "win.zoom_out");
@@ -3836,7 +4149,8 @@ namespace Imladris {
                 var d = get_active_document ();
                 if (d != null) d.source_view.wrap_mode = chk_wrap.active ? Gtk.WrapMode.WORD_CHAR : Gtk.WrapMode.NONE;
             });
-            chk_console = new Gtk.CheckButton.with_label ("Console");
+            chk_console = new Gtk.CheckButton.with_label ("Side Panel");
+            chk_console.tooltip_text = "Show or hide Focus Mode side panel";
             chk_console.toggled.connect (() => {
                 if (syncing_ui_toggles) return;
                 var d = get_active_document ();
@@ -3869,7 +4183,8 @@ namespace Imladris {
                     chk_console.active = panel_open;
                 }
                 var mode = d.get_workbench_mode ();
-                if (mode == Services.LayoutMode.RSTUDIO) {
+                bool is_rstudio = (mode == Services.LayoutMode.RSTUDIO);
+                if (is_rstudio) {
                     if (btn_mode_rstudio != null && !btn_mode_rstudio.active) {
                         btn_mode_rstudio.active = true;
                     }
@@ -3878,6 +4193,30 @@ namespace Imladris {
                         btn_mode_apostrophe.active = true;
                     }
                 }
+                if (view_rstudio_group != null) view_rstudio_group.visible = is_rstudio;
+                if (view_rstudio_sep != null) view_rstudio_sep.visible = is_rstudio;
+                if (view_focus_split_group != null) view_focus_split_group.visible = !is_rstudio;
+                if (view_focus_split_sep != null) view_focus_split_sep.visible = !is_rstudio;
+                if (btn_preview != null) btn_preview.visible = !is_rstudio;
+                if (chk_console != null) chk_console.visible = !is_rstudio;
+                if (d.dock_layout_state != null) {
+                    switch (d.dock_layout_state.topology) {
+                        case Imladris.Core.Layout.LayoutTopology.QUAD_6_ULTRAWIDE:
+                            if (btn_topo_quad6 != null && !btn_topo_quad6.active) btn_topo_quad6.active = true;
+                            break;
+                        case Imladris.Core.Layout.LayoutTopology.LEFT_TALL_3:
+                            if (btn_topo_left_tall != null && !btn_topo_left_tall.active) btn_topo_left_tall.active = true;
+                            break;
+                        case Imladris.Core.Layout.LayoutTopology.RIGHT_TALL_3:
+                            if (btn_topo_right_tall != null && !btn_topo_right_tall.active) btn_topo_right_tall.active = true;
+                            break;
+                        case Imladris.Core.Layout.LayoutTopology.QUAD_4:
+                        default:
+                            if (btn_topo_quad != null && !btn_topo_quad.active) btn_topo_quad.active = true;
+                            break;
+                    }
+                }
+                update_web_sync_status_badge ();
             } finally {
                 syncing_ui_toggles = false;
             }
