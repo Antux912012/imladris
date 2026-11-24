@@ -213,6 +213,90 @@
       .split-2, .test-grid { grid-template-columns: 1fr; }
     }
 
+    /* Desktop vs Web Comparison & Use Cases */
+    .usecase-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .usecase-card {
+      padding: 22px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .usecase-card.web {
+      border-color: color-mix(in srgb, var(--frost) 40%, var(--border));
+    }
+
+    .usecase-card h3 {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 13.5px;
+      color: var(--ink-dim);
+      margin-bottom: 12px;
+    }
+
+    .usecase-list {
+      list-style: none;
+      display: grid;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+
+    .usecase-list li::before {
+      content: "• ";
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      overflow-x: auto;
+    }
+
+    table.vs-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    table.vs-table th,
+    table.vs-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    table.vs-table thead th {
+      background: var(--bg-elev);
+      font-family: var(--mono);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--gold);
+    }
+
+    table.vs-table tbody tr:last-child td { border-bottom: none; }
+    table.vs-table td:first-child { font-weight: 600; color: var(--ink); white-space: nowrap; }
+    table.vs-table td { color: var(--ink-dim); }
+    table.vs-table td strong { color: var(--ink); }
+
+    @media (max-width: 920px) {
+      .usecase-grid { grid-template-columns: 1fr; }
+    }
+
     /* Hero + 3D Astrolabe Backdrop */
     .hero {
       position: relative;
@@ -613,6 +697,7 @@
 
       <nav class="nav-links">
         <a href="#workbench">Workbench</a>
+        <a href="#web-edition">Desktop vs Web</a>
         <a href="#examples">Examples</a>
         <a href="#tests">Tests</a>
         <a href="#fellowship">Modules</a>
@@ -658,6 +743,7 @@
 
           <div class="hero-cta">
             <a class="btn primary" href="#install">Install v0.42.1</a>
+            <a class="btn" href="#web-edition">Imladris on Web</a>
             <a class="btn" href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">FlatPark</a>
             <a class="btn" href="https://github.com/Antux912012/imladris">Source on GitHub</a>
           </div>
@@ -716,6 +802,102 @@
           <div id="gallery-card" class="gallery-card">
             <img id="gallery-img" src="assets/screenshots/imladris-screenshot.png" alt="Imladris workbench preview">
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="web-edition">
+      <div class="wrap">
+        <div class="sec-head">
+          <div>
+            <h2>One Sanctuary, Two Deployments</h2>
+          </div>
+          <p>Run <strong>Imladris</strong> natively on a Linux workstation for maximum hardware efficiency, or deploy <strong>Imladris on Web</strong> on a lab or university server for browser-based co-authoring and peer review.</p>
+        </div>
+
+        <div class="usecase-grid">
+          <article class="usecase-card">
+            <div class="lore-tag">Native Desktop · v0.42.1</div>
+            <h3>Imladris (Linux Workstation)</h3>
+            <p>Built for individual researchers, biostatisticians, and bioinformaticians who need local hardware performance, offline governance, and domain-specific scientific studios.</p>
+            <ul class="usecase-list">
+              <li><strong>Regulated &amp; Air-Gapped R&amp;D:</strong> Elbereth ICH E9 / CDISC biostatistics, SHA-256 provenance lockfiles, PHI/PII Data Lock, and <code>/etc/imladris/policy.json</code>.</li>
+              <li><strong>Cloud Genomics &amp; Structures:</strong> Arekyer Galaxy Project bridge, Taniquetil AlphaFold/PDB viewer, and Yavanna UniProt/Ensembl/RT-qPCR studio.</li>
+              <li><strong>Local AI &amp; Low Overhead:</strong> &lt; 120 MB idle RAM, hardware-probed <code>llama-server</code> GGUF execution, and native Cairo/Pango PDF &amp; ODT export.</li>
+            </ul>
+            <a class="btn primary" href="#install">Install Desktop v0.42.1</a>
+          </article>
+
+          <article class="usecase-card web">
+            <div class="lore-tag" style="color:var(--frost);">Self-Hosted Collaborative · v0.1.0</div>
+            <h3>Imladris on Web (Lab &amp; University Server)</h3>
+            <p>Built for research groups, multi-author manuscripts, and university courses that need zero client installation, institutional data sovereignty, and structured peer review.</p>
+            <ul class="usecase-list">
+              <li><strong>Real-Time Co-Authoring:</strong> Yjs CRDT + Hocuspocus WebSockets with live presence avatars and CodeMirror 6—no manual Git merge conflicts on <code>.qmd</code> or <code>.ipynb</code>.</li>
+              <li><strong>Peer Review &amp; History:</strong> Line-anchored inline comment threads, git-like revision checkpoints with line diffs and 1-click restore, and RBAC invite tokens (<code>OWNER</code>, <code>EDITOR</code>, <code>REVIEWER</code>, <code>VIEWER</code>).</li>
+              <li><strong>Container &amp; K8s Ready:</strong> Deploy on Docker Compose, rootless Podman, or Kubernetes with <code>SHARED</code> vs <code>PERSONAL</code> execution kernels and <code>AIR_GAPPED_MODE</code>.</li>
+            </ul>
+            <a class="btn" href="https://github.com/Antux912012/imladris-on-web">Imladris on Web on GitHub</a>
+          </article>
+        </div>
+
+        <div class="table-wrap">
+          <table class="vs-table">
+            <thead>
+              <tr>
+                <th>Specification</th>
+                <th>Imladris (Native Desktop v0.42.1)</th>
+                <th>Imladris on Web (Self-Hosted v0.1.0)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Core Stack</td>
+                <td>Compiled <strong>Vala, C, GTK4, Libadwaita, WebKitGTK 6.0</strong></td>
+                <td><strong>React 19, CodeMirror 6, Fastify 5, Yjs CRDT, FastAPI</strong></td>
+              </tr>
+              <tr>
+                <td>Deployment Target</td>
+                <td>Linux desktop (Flatpak, <code>.deb</code>, <code>.rpm</code>, AUR, NixOS)</td>
+                <td><strong>Docker Compose, rootless Podman, Kubernetes</strong> (<code>deploy/k8s/</code>)</td>
+              </tr>
+              <tr>
+                <td>Memory &amp; Startup</td>
+                <td><strong>&lt; 120 MB RAM</strong> idle, &lt; 0.6 s cold launch</td>
+                <td>Browser client (zero local toolchain install); isolated server containers</td>
+              </tr>
+              <tr>
+                <td>Collaboration &amp; Access</td>
+                <td>Single-user local buffer + MCP D-Bus bridge</td>
+                <td>Multi-user Yjs CRDT, RBAC invite tokens, <code>REGISTRATION_MODE=invite|closed</code></td>
+              </tr>
+              <tr>
+                <td>Review &amp; Revision History</td>
+                <td>Git CLI / crash-recovery <code>.shadow</code> snapshots</td>
+                <td><strong>Line-anchored inline comments</strong> + git-like checkpoints, line diffs &amp; restore</td>
+              </tr>
+              <tr>
+                <td>Compute Kernels</td>
+                <td>Host / Flatpak-bridge R, Python, Julia, SQL, Bash, R Shiny</td>
+                <td>Containerized Python 3.12 + <code>matplotlib</code> (<code>SHARED</code> or <code>PERSONAL</code> mode)</td>
+              </tr>
+              <tr>
+                <td>Domain Studios</td>
+                <td><strong>Elbereth, Arekyer, Taniquetil, Yavanna</strong>, Math/Chem, Mermaid, WYSIWYG <code>.rtf</code></td>
+                <td>Core <code>FormatProfile</code> &amp; <code>nbformat 4.5</code> parity, DOI/arXiv citations, 8×8 Table Picker</td>
+              </tr>
+              <tr>
+                <td>AI Copilot (Elrond)</td>
+                <td>Managed <code>llama-server</code> GGUFs, Ollama, LM Studio, Cloud HTTP 429 failover</td>
+                <td>Self-hosted Ollama profile (<code>AI_LOCAL_URL</code>) with <code>AIR_GAPPED_MODE</code></td>
+              </tr>
+              <tr>
+                <td>License</td>
+                <td>Apache-2.0 Open-Core</td>
+                <td>Apache-2.0 Open-Core</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -869,6 +1051,7 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
     <div class="wrap footer-inner">
       <span>Imladris v0.42.1 · Apache-2.0 (Open-Core) · Antonio De Gaetano</span>
       <div class="footer-links">
+        <a href="https://github.com/Antux912012/imladris-on-web">Imladris on Web</a>
         <a href="https://github.com/Antux912012/imladris/releases/tag/v0.42.1">Releases</a>
         <a href="https://github.com/Antux912012/imladris/wiki">Wiki</a>
         <a href="https://github.com/Antux912012/imladris/blob/main/docs/paper/imladris-scientific-paper.qmd">Paper</a>
