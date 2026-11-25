@@ -674,6 +674,63 @@
           </article>
         </div>
 
+        <div id="web-mock-studio" style="margin-top:26px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface-2);">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <strong style="font-size:13px;">Imladris on Web — Interactive Mock</strong>
+              <button type="button" class="tab-pill active web-mock-file" data-file="main.qmd" style="padding:3px 9px;font-size:12px;">main.qmd</button>
+              <button type="button" class="tab-pill web-mock-file" data-file="analysis.py" style="padding:3px 9px;font-size:12px;">analysis.py</button>
+              <button type="button" class="tab-pill web-mock-file" data-file="references.bib" style="padding:3px 9px;font-size:12px;">references.bib</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="tab-pill web-mock-insert" data-snippet="&#10;```{python}&#10;print(&quot;Hello from Imladris&quot;)&#10;```&#10;" style="padding:3px 8px;font-size:11px;">+Python</button>
+              <button type="button" class="tab-pill web-mock-insert" data-snippet="&#10;```{r}&#10;summary(cars)&#10;```&#10;" style="padding:3px 8px;font-size:11px;">+R</button>
+              <button type="button" class="tab-pill web-mock-insert" data-snippet="&#10;$$&#10;E = mc^2&#10;$$&#10;" style="padding:3px 8px;font-size:11px;">+Math</button>
+              <button type="button" id="web-mock-run" class="btn primary" style="padding:4px 12px;font-size:12px;">Run / Export</button>
+              <a class="btn" href="https://antux912012.github.io/imladris-on-web/" target="_blank" rel="noopener noreferrer" style="padding:4px 10px;font-size:12px;">Full-Screen Mock</a>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));min-height:240px;">
+            <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;">
+              <div style="padding:6px 12px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);">Editor (Try typing or clicking +Python / +R / +Math)</div>
+              <textarea id="web-mock-editor" aria-label="Imladris on Web interactive mock editor" style="flex:1;min-height:200px;width:100%;border:0;resize:vertical;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5;background:transparent;color:var(--text);outline:none;"></textarea>
+            </div>
+            <div style="display:flex;flex-direction:column;">
+              <div style="padding:6px 12px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);">Live Preview</div>
+              <div id="web-mock-preview" style="flex:1;padding:12px 16px;font-size:13px;line-height:1.6;overflow:auto;"></div>
+            </div>
+          </div>
+        </div>
+
+        <dialog id="web-mock-modal" aria-labelledby="web-mock-modal-title" style="max-width:680px;width:92%;border:1px solid var(--border);border-radius:14px;padding:22px;background:var(--surface);color:var(--text);box-shadow:0 24px 60px rgba(0,0,0,0.45);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+            <div>
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);">Continue with Full Execution</span>
+              <h3 id="web-mock-modal-title" style="margin:4px 0 6px;">Download Imladris Offline or Self-Host Imladris on Web</h3>
+              <p style="margin:0;font-size:13px;color:var(--muted);">This browser preview is a static mock. To execute real R, Python, and Quarto kernels or export PDF/ODT/ODP manuscripts, choose one of the options below:</p>
+            </div>
+            <button type="button" id="web-mock-close" aria-label="Close popup" class="btn" style="padding:4px 10px;">✕</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:16px;">
+            <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface-2);">
+              <strong style="font-size:14px;">1. Imladris Desktop (Offline)</strong>
+              <p style="font-size:12px;color:var(--muted);margin:6px 0 12px;">Native GTK4 + Vala workbench with isolated in-sandbox R/Python/Quarto toolchains (.flatpak, .deb, .rpm, FlatPark).</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a class="btn primary" href="#install" id="web-mock-go-install" style="font-size:12px;padding:6px 12px;">Install Offline</a>
+                <a class="btn" href="https://github.com/Antux912012/imladris/releases/latest" target="_blank" rel="noopener noreferrer" style="font-size:12px;padding:6px 12px;">Releases</a>
+              </div>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface-2);">
+              <strong style="font-size:14px;">2. Imladris on Web (Self-Host)</strong>
+              <p style="font-size:12px;color:var(--muted);margin:6px 0 8px;">Deploy on your own machine or cluster with Docker, Podman, or Kubernetes:</p>
+              <pre style="margin:0 0 10px;padding:8px;border-radius:6px;font-size:11px;overflow-x:auto;background:var(--bg);">docker compose up -d
+# or: podman compose up -d
+# or: kubectl apply -k deploy/k8s</pre>
+              <a class="btn" href="https://github.com/Antux912012/imladris-on-web" target="_blank" rel="noopener noreferrer" style="font-size:12px;padding:6px 12px;">Deploy Guide (GitHub)</a>
+            </div>
+          </div>
+        </dialog>
+
         <div class="table-wrap">
           <table class="vs-table">
             <thead>
@@ -1015,6 +1072,85 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
           }
         });
       });
+
+      var MOCK_FILES = {
+        'main.qmd': "---\ntitle: \"Cohort Analysis\"\nformat: html\n---\n\n# Results\n\nEdit this document or click **+Python / +R / +Math**.\n\n```{python}\nvalues = [12.4, 15.1, 14.8]\nprint(\"Mean:\", round(sum(values)/len(values), 2))\n```",
+        'analysis.py': "import statistics\n\nsamples = [12.4, 15.1, 14.8, 16.2]\nprint(\"Mean:\", statistics.mean(samples))",
+        'references.bib': "@article{knuth1984literate,\n  title={Literate Programming},\n  author={Knuth, Donald E.},\n  year={1984}\n}"
+      };
+      var mockEditor = document.getElementById('web-mock-editor');
+      var mockPreview = document.getElementById('web-mock-preview');
+      var mockModal = document.getElementById('web-mock-modal');
+      var mockPromptShown = false;
+      var mockTimer = null;
+
+      function renderMockPreview(src) {
+        if (!mockPreview) return;
+        var safe = (src || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        var html = safe
+          .replace(/^# (.+)$/gm, '<h4 style="margin:6px 0;">$1</h4>')
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/```\{?(\w*)\}?\n([\s\S]*?)```/g, '<pre style="padding:8px;border-radius:6px;background:var(--surface-2);overflow-x:auto;"><code>$2</code></pre>')
+          .replace(/\n/g, '<br>');
+        mockPreview.innerHTML = html;
+      }
+
+      function openMockModal() {
+        if (mockModal && typeof mockModal.showModal === 'function' && !mockModal.open) {
+          mockModal.showModal();
+        }
+      }
+
+      if (mockEditor) {
+        mockEditor.value = MOCK_FILES['main.qmd'];
+        renderMockPreview(mockEditor.value);
+        mockEditor.addEventListener('input', function () {
+          renderMockPreview(mockEditor.value);
+          if (!mockPromptShown) {
+            if (mockTimer) clearTimeout(mockTimer);
+            mockTimer = setTimeout(function () {
+              mockPromptShown = true;
+              openMockModal();
+            }, 900);
+          }
+        });
+      }
+
+      document.querySelectorAll('.web-mock-file').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.web-mock-file').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          var fname = btn.getAttribute('data-file');
+          if (mockEditor && MOCK_FILES[fname]) {
+            mockEditor.value = MOCK_FILES[fname];
+            renderMockPreview(mockEditor.value);
+          }
+        });
+      });
+
+      document.querySelectorAll('.web-mock-insert').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (!mockEditor) return;
+          mockEditor.value += btn.getAttribute('data-snippet') || '';
+          renderMockPreview(mockEditor.value);
+        });
+      });
+
+      var mockRunBtn = document.getElementById('web-mock-run');
+      if (mockRunBtn) {
+        mockRunBtn.addEventListener('click', function () {
+          mockPromptShown = true;
+          openMockModal();
+        });
+      }
+      var mockCloseBtn = document.getElementById('web-mock-close');
+      if (mockCloseBtn && mockModal) {
+        mockCloseBtn.addEventListener('click', function () { mockModal.close(); });
+      }
+      var mockGoInstall = document.getElementById('web-mock-go-install');
+      if (mockGoInstall && mockModal) {
+        mockGoInstall.addEventListener('click', function () { mockModal.close(); });
+      }
     })();
   </script>
 </body>
