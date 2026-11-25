@@ -131,15 +131,8 @@ namespace Imladris.Core {
             }
 
             // Tier 2.5: Flatpak SDK Extension /app/toolchain, /app/bin, or /usr/lib/sdk/texlive
+            // Strictly in-sandbox: never resolve or spawn host binaries from Flatpak.
             if (is_flatpak ()) {
-                if (HostBridge.prefer_host_runtimes) {
-                    string? host_first = resolve_host_program_path (binary_name);
-                    if (host_first != null) {
-                        resolved_path = host_first;
-                        return RuntimeSource.HOST_FLATPAK_SPAWN;
-                    }
-                }
-
                 string[] ext_bins = {
                     GLib.Path.build_filename ("/app/toolchain/bin", binary_name),
                     GLib.Path.build_filename ("/usr/lib/sdk/texlive/bin/x86_64-linux", binary_name),
@@ -152,13 +145,7 @@ namespace Imladris.Core {
                         return RuntimeSource.FLATPAK_EXTENSION;
                     }
                 }
-
-                // Check host system via flatpak-spawn BEFORE container /usr/bin/*
-                string? host_path = resolve_host_program_path (binary_name);
-                if (host_path != null) {
-                    resolved_path = host_path;
-                    return RuntimeSource.HOST_FLATPAK_SPAWN;
-                }
+                return RuntimeSource.MISSING;
             }
 
             // Tier 3: Native / Container System Environment Fallback

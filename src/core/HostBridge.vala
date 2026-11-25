@@ -39,7 +39,9 @@ namespace Imladris.Core {
             string[]? env_vars = null,
             bool? force_flatpak = null
         ) {
-            bool use_flatpak = force_flatpak ?? is_flatpak ();
+            /* In Flatpak, Imladris runs strictly in-sandbox (no flatpak-spawn --host escape).
+             * Only wrap when explicitly requested via force_flatpak == true (e.g. unit tests). */
+            bool use_flatpak = (force_flatpak == true);
             if (!use_flatpak || argv.length == 0) {
                 return argv;
             }
@@ -97,29 +99,22 @@ namespace Imladris.Core {
             SubprocessFlags flags = SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE
         ) throws GLib.Error {
             var launcher = new SubprocessLauncher (flags);
-            string[] final_argv;
-
-            if (is_flatpak ()) {
-                final_argv = wrap_command (argv, project_dir, env_vars, true);
-            } else {
-                if (project_dir != null && project_dir.length > 0 &&
-                    FileUtils.test (project_dir, FileTest.IS_DIR)) {
-                    launcher.set_cwd (project_dir);
-                }
-                if (env_vars != null) {
-                    foreach (string kv in env_vars) {
-                        int eq = kv.index_of_char ('=');
-                        if (eq > 0) {
-                            string k = kv.substring (0, eq);
-                            string v = kv.substring (eq + 1);
-                            launcher.setenv (k, v, true);
-                        }
+            if (project_dir != null && project_dir.length > 0 &&
+                FileUtils.test (project_dir, FileTest.IS_DIR)) {
+                launcher.set_cwd (project_dir);
+            }
+            if (env_vars != null) {
+                foreach (string kv in env_vars) {
+                    int eq = kv.index_of_char ('=');
+                    if (eq > 0) {
+                        string k = kv.substring (0, eq);
+                        string v = kv.substring (eq + 1);
+                        launcher.setenv (k, v, true);
                     }
                 }
-                final_argv = argv;
             }
 
-            return launcher.spawnv (final_argv);
+            return launcher.spawnv (argv);
         }
 
         /**

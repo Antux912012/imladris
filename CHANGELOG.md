@@ -2,6 +2,11 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.43.2] - 2026-11-25
+
+### Changed & Fixed (Flatpak Isolation)
+- **Strict In-Sandbox Flatpak Mode (`HostBridge`, `PlatformUtils`, `SettingsManager`, `EnvironmentController`):** Removed `--talk-name=org.freedesktop.Flatpak` from Flatpak manifests (`io.github.Antux912012.Imladris.json`, `io.github.Antux912012.Imladris.yml`, `packaging/flatpark/...`, and `build-packages.sh`). When running inside Flatpak, Imladris no longer resolves or spawns host toolchains via `flatpak-spawn --host`, hides the `Host` scope toggle, and runs exclusively against bundled `/app/toolchain/bin` and isolated user-created `micromamba`/`uv` environments (supporting multiple R & Python versions in `$XDG_DATA_HOME/imladris/toolchains`). Native `.deb`/`.rpm`/AppImage builds remain unchanged.
+
 ## [0.42.1] - 2026-11-23
 
 ### Fixed

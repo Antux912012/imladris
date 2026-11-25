@@ -1,6 +1,6 @@
 # Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
 pkgname=imladris
-pkgver=0.43.1
+pkgver=0.43.2
 pkgrel=1
 pkgdesc="Native scientific notebook IDE for Quarto, R, Python & Jupyter with GTK4 and AI"
 arch=('x86_64')

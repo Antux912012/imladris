@@ -176,6 +176,16 @@ PYEOF
     glib-compile-schemas "build-flatpak-app/files/share/glib-2.0/schemas"
   fi
 
+  # Bundle micromamba and uv inside /app/toolchain/bin for out-of-box isolated R/Python envs
+  mkdir -p build-flatpak-app/files/toolchain/bin
+  for tool_bin in micromamba uv quarto pandoc; do
+    if [ -x "${HOME}/.local/share/imladris/toolchains/bin/${tool_bin}" ]; then
+      cp -f "${HOME}/.local/share/imladris/toolchains/bin/${tool_bin}" build-flatpak-app/files/toolchain/bin/
+    elif command -v "${tool_bin}" >/dev/null 2>&1; then
+      cp -f "$(command -v "${tool_bin}")" build-flatpak-app/files/toolchain/bin/
+    fi
+  done
+
   flatpak build-finish build-flatpak-app \
     --command=imladris \
     --share=ipc \
@@ -185,7 +195,6 @@ PYEOF
     --device=dri \
     --filesystem=home \
     --filesystem=/etc/imladris:ro \
-    --talk-name=org.freedesktop.Flatpak \
     --env=PATH=/app/bin:/app/toolchain/bin:/usr/bin
 
   flatpak build-export --disable-sandbox repo build-flatpak-app master

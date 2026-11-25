@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.43.1
+Version:        0.43.2
 Release:        1%{?dist}
 Summary:        Native scientific notebook studio for Quarto, R, Python, and Jupyter
 
@@ -91,6 +91,9 @@ export GSETTINGS_BACKEND=memory
 %{_datadir}/imladris/
 
 %changelog
+* Wed Nov 25 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.43.2-1
+- Release 0.43.2: Strict in-sandbox Flatpak toolchain isolation (no host flatpak-spawn escape, bundled micromamba/uv/quarto/pandoc, hidden Host toggle in Flatpak).
+
 * Mon Nov 23 2026 Antonio De Gaetano <antux912012@users.noreply.github.com> - 0.43.1-1
 - Release 0.43.1: RTF creation crash fix, EGM security & thread-safety audit fixes, and Apache-2.0 packaging alignment.
 

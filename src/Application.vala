@@ -572,32 +572,27 @@ namespace Imladris {
         }
 
         private void setup_papirus_icon_theme () {
-            // Respect the user's desktop icon theme per GNOME HIG; only register bundled icons as fallback.
+            // Always use the shipped-in Papirus symbolic icons instead of the user's system icon theme
+            // so interface symbols never break across different GNOME icon themes.
+            var gtk_settings = Gtk.Settings.get_default ();
+            if (gtk_settings != null) {
+                gtk_settings.gtk_icon_theme_name = "Papirus";
+            }
+
             var display = Gdk.Display.get_default ();
             if (display != null) {
                 var icon_theme = Gtk.IconTheme.get_for_display (display);
-
-                // Add bundled Papirus SVG resource path as a guaranteed fallback
+                icon_theme.set_search_path ({});
                 icon_theme.add_resource_path ("/org/imladris/icons/papirus");
-
-                // If system has Papirus installed in standard XDG data dirs, prioritize it
-                string[]? search_path = icon_theme.get_search_path ();
-                bool has_usr_share = false;
-                if (search_path != null) {
-                    foreach (var p in search_path) {
-                        if (p == "/usr/share/icons") {
-                            has_usr_share = true;
-                            break;
-                        }
-                    }
-                }
-                if (!has_usr_share) {
-                    icon_theme.add_search_path ("/usr/share/icons");
-                }
 
                 // Also add local project data/icons path if running in development mode
                 var cur_dir = GLib.Environment.get_current_dir ();
                 var local_icon_path = GLib.Path.build_filename (cur_dir, "data", "icons", "hicolor");
+                if (GLib.FileUtils.test (local_icon_path, GLib.FileTest.IS_DIR)) {
+                    icon_theme.add_search_path (GLib.Path.build_filename (cur_dir, "data", "icons"));
+                }
+                icon_theme.add_search_path ("/app/share/icons");
+                icon_theme.add_search_path ("/usr/share/icons/hicolor");
                 if (GLib.FileUtils.test (local_icon_path, GLib.FileTest.IS_DIR)) {
                     icon_theme.add_search_path (local_icon_path);
                 }

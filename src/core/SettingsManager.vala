@@ -546,7 +546,7 @@ namespace Imladris.Core {
             set {
                 if (_runtime_scope != value) {
                     _runtime_scope = value;
-                    HostBridge.prefer_host_runtimes = (value == RuntimeExecutionScope.PREFER_HOST);
+                    HostBridge.prefer_host_runtimes = !HostBridge.is_flatpak () && (value == RuntimeExecutionScope.PREFER_HOST);
                     PlatformUtils.clear_caches ();
                     save_ini ();
                     ui_settings_changed ();
@@ -1058,7 +1058,7 @@ namespace Imladris.Core {
                         _runtime_scope = RuntimeExecutionScope.from_string_id (
                             config_keyfile.get_string ("Environment", "runtime_scope")
                         );
-                        HostBridge.prefer_host_runtimes = (_runtime_scope == RuntimeExecutionScope.PREFER_HOST);
+                        HostBridge.prefer_host_runtimes = !HostBridge.is_flatpak () && (_runtime_scope == RuntimeExecutionScope.PREFER_HOST);
                     }
                 } catch (Error e) {}
             }

@@ -109,8 +109,9 @@ namespace Imladris.UI {
             toolbar.append (kernel_drop);
 
             var btn_host_scope = new Gtk.ToggleButton.with_label ("Host") {
-                tooltip_text = "Switch between bundled Flatpak out-of-box toolchain (off) and host R/Python/Quarto via flatpak-spawn (on)",
-                active = (Core.SettingsManager.get_default ().runtime_scope == Core.RuntimeExecutionScope.PREFER_HOST)
+                tooltip_text = "Switch between bundled/managed toolchain (off) and host R/Python/Quarto (on)",
+                active = (Core.SettingsManager.get_default ().runtime_scope == Core.RuntimeExecutionScope.PREFER_HOST),
+                visible = !Core.HostBridge.is_flatpak ()
             };
             btn_host_scope.add_css_class ("flat");
             btn_host_scope.toggled.connect (() => {

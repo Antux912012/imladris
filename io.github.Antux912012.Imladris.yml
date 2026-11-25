@@ -20,7 +20,6 @@ finish-args:
   - --device=dri
   - --filesystem=home
   - --filesystem=/etc/imladris:ro
-  - --talk-name=org.freedesktop.Flatpak
   - --env=PATH=/app/bin:/app/toolchain/bin:/usr/bin
 cleanup:
   - /include

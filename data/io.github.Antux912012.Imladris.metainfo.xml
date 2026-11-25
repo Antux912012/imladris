@@ -76,6 +76,16 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.43.2" date="2026-11-25" type="stable">
+      <description>
+        <p>Release 0.43.2 enforces strict in-sandbox toolchain isolation for Flatpak builds:</p>
+        <ul>
+          <li>Zero Host Toolchain Access in Flatpak: Removed org.freedesktop.Flatpak host-spawn permission and disabled host runtime fallback inside Flatpak so the sandboxed app never accesses preinstalled host R, Python, or Quarto binaries.</li>
+          <li>Out-of-the-Box &amp; Multi-Version Environments: Bundles micromamba, uv, quarto, and pandoc inside /app/toolchain/bin so users can create isolated environments with different R and Python versions purely inside the Flatpak sandbox.</li>
+          <li>Native Builds Unchanged: Debian (.deb), Fedora/openSUSE (.rpm), and local native installs continue to support host environments normally.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.43.1" date="2026-11-24" type="stable">
       <description>
         <p>Release 0.43.1 addresses 4-persona beta-testing feedback: persistent multi-screen popout restoration, DataGrid error surfacing, Elbereth unequal-allocation R verification, WebSync conflict resolution &amp; Adw.StatusPage, expanded Command Palette/Shortcuts, and HIG accessibility fixes.</p>
