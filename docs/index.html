@@ -536,6 +536,117 @@
     .footer-links a { color: var(--ink-dim); text-decoration: none; }
     .footer-links a:hover { color: var(--ink); }
 
+    /* Interactive Imladris on Web Mock & Upgrade Dialog */
+    .web-mock-studio {
+      margin-top: 26px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--bg-panel);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+    .web-mock-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-elev);
+    }
+    .web-mock-panes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      min-height: 240px;
+    }
+    .web-mock-pane {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-panel);
+    }
+    .web-mock-pane:first-child {
+      border-right: 1px solid var(--border);
+    }
+    .web-mock-pane-head {
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--ink-dim);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-elev);
+    }
+    .web-mock-editor {
+      flex: 1;
+      min-height: 200px;
+      width: 100%;
+      border: 0;
+      resize: vertical;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.55;
+      background: var(--bg-panel);
+      color: var(--ink);
+      outline: none;
+    }
+    .web-mock-preview {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink);
+      overflow: auto;
+    }
+    dialog#web-mock-modal {
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      width: min(680px, calc(100vw - 32px));
+      max-height: 90dvh;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      background: var(--bg-panel);
+      color: var(--ink);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.48);
+    }
+    dialog#web-mock-modal:not([open]) {
+      display: none;
+    }
+    dialog#web-mock-modal::backdrop {
+      background: rgba(10, 14, 22, 0.68);
+      backdrop-filter: blur(4px);
+    }
+    .web-mock-modal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .web-mock-modal-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      background: var(--bg-elev);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .web-mock-modal-code {
+      margin: 0;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.5;
+      overflow-x: auto;
+      background: var(--code-bg);
+      color: var(--ink);
+    }
+
     @media (max-width: 920px) {
       .hero-grid,
       .usecase-grid,
@@ -674,10 +785,10 @@
           </article>
         </div>
 
-        <div id="web-mock-studio" style="margin-top:26px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface-2);">
+        <div id="web-mock-studio" class="web-mock-studio">
+          <div class="web-mock-toolbar">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <strong style="font-size:13px;">Imladris on Web — Interactive Mock</strong>
+              <strong style="font-size:13px;color:var(--ink);">Imladris on Web — Interactive Mock</strong>
               <button type="button" class="tab-pill active web-mock-file" data-file="main.qmd" style="padding:3px 9px;font-size:12px;">main.qmd</button>
               <button type="button" class="tab-pill web-mock-file" data-file="analysis.py" style="padding:3px 9px;font-size:12px;">analysis.py</button>
               <button type="button" class="tab-pill web-mock-file" data-file="references.bib" style="padding:3px 9px;font-size:12px;">references.bib</button>
@@ -686,48 +797,59 @@
               <button type="button" class="tab-pill web-mock-insert" data-snippet="&#10;```{python}&#10;print(&quot;Hello from Imladris&quot;)&#10;```&#10;" style="padding:3px 8px;font-size:11px;">+Python</button>
               <button type="button" class="tab-pill web-mock-insert" data-snippet="&#10;```{r}&#10;summary(cars)&#10;```&#10;" style="padding:3px 8px;font-size:11px;">+R</button>
               <button type="button" class="tab-pill web-mock-insert" data-snippet="&#10;$$&#10;E = mc^2&#10;$$&#10;" style="padding:3px 8px;font-size:11px;">+Math</button>
-              <button type="button" id="web-mock-run" class="btn primary" style="padding:4px 12px;font-size:12px;">Run / Export</button>
-              <a class="btn" href="https://antux912012.github.io/imladris-on-web/" target="_blank" rel="noopener noreferrer" style="padding:4px 10px;font-size:12px;">Full-Screen Mock</a>
+              <button type="button" id="web-mock-run" class="btn primary" style="height:30px;padding:0 12px;font-size:12px;">Run / Export</button>
+              <a class="btn" href="https://antux912012.github.io/imladris-on-web/" target="_blank" rel="noopener noreferrer" style="height:30px;padding:0 10px;font-size:12px;">Open Full Mock</a>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));min-height:240px;">
-            <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;">
-              <div style="padding:6px 12px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);">Editor (Try typing or clicking +Python / +R / +Math)</div>
-              <textarea id="web-mock-editor" aria-label="Imladris on Web interactive mock editor" style="flex:1;min-height:200px;width:100%;border:0;resize:vertical;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5;background:transparent;color:var(--text);outline:none;"></textarea>
+          <div class="web-mock-panes">
+            <div class="web-mock-pane">
+              <div class="web-mock-pane-head">Editor — type here or click +Python / +R / +Math</div>
+              <textarea id="web-mock-editor" class="web-mock-editor" aria-label="Imladris on Web interactive mock editor"></textarea>
             </div>
-            <div style="display:flex;flex-direction:column;">
-              <div style="padding:6px 12px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);">Live Preview</div>
-              <div id="web-mock-preview" style="flex:1;padding:12px 16px;font-size:13px;line-height:1.6;overflow:auto;"></div>
+            <div class="web-mock-pane">
+              <div class="web-mock-pane-head">Live Preview</div>
+              <div id="web-mock-preview" class="web-mock-preview"></div>
             </div>
           </div>
         </div>
 
-        <dialog id="web-mock-modal" aria-labelledby="web-mock-modal-title" style="max-width:680px;width:92%;border:1px solid var(--border);border-radius:14px;padding:22px;background:var(--surface);color:var(--text);box-shadow:0 24px 60px rgba(0,0,0,0.45);">
+        <dialog id="web-mock-modal" aria-labelledby="web-mock-modal-title">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
             <div>
-              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);">Continue with Full Execution</span>
-              <h3 id="web-mock-modal-title" style="margin:4px 0 6px;">Download Imladris Offline or Self-Host Imladris on Web</h3>
-              <p style="margin:0;font-size:13px;color:var(--muted);">This browser preview is a static mock. To execute real R, Python, and Quarto kernels or export PDF/ODT/ODP manuscripts, choose one of the options below:</p>
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);">Interactive Browser Mock</span>
+              <h3 id="web-mock-modal-title" style="margin:4px 0 6px;font-size:18px;color:var(--ink);">Continue with Imladris Offline or Self-Hosted Web</h3>
+              <p style="margin:0;font-size:13px;color:var(--ink-dim);">This static browser preview lets you explore the editor. To execute real R, Python, and Quarto kernels or export PDF/ODT/ODP manuscripts, download Imladris Desktop for offline usage or deploy Imladris on Web on your own machine:</p>
             </div>
-            <button type="button" id="web-mock-close" aria-label="Close popup" class="btn" style="padding:4px 10px;">✕</button>
+            <button type="button" id="web-mock-close" aria-label="Close popup" class="btn" style="height:32px;padding:0 10px;flex-shrink:0;">✕</button>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:16px;">
-            <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface-2);">
-              <strong style="font-size:14px;">1. Imladris Desktop (Offline)</strong>
-              <p style="font-size:12px;color:var(--muted);margin:6px 0 12px;">Native GTK4 + Vala workbench with isolated in-sandbox R/Python/Quarto toolchains (.flatpak, .deb, .rpm, FlatPark).</p>
+          <div class="web-mock-modal-grid">
+            <div class="web-mock-modal-card">
+              <div>
+                <strong style="font-size:14px;color:var(--ink);">1. Imladris Desktop (Offline)</strong>
+                <p style="font-size:12.5px;color:var(--ink-dim);margin:6px 0 0;">Native GTK4 + Vala workbench with isolated in-sandbox R/Python/Quarto toolchains (.flatpak, .deb, .rpm, FlatPark).</p>
+              </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a class="btn primary" href="#install" id="web-mock-go-install" style="font-size:12px;padding:6px 12px;">Install Offline</a>
-                <a class="btn" href="https://github.com/Antux912012/imladris/releases/latest" target="_blank" rel="noopener noreferrer" style="font-size:12px;padding:6px 12px;">Releases</a>
+                <a class="btn primary" href="#install" id="web-mock-go-install" style="height:32px;font-size:12px;padding:0 12px;">Download Offline</a>
+                <a class="btn" href="https://github.com/Antux912012/imladris/releases/latest" target="_blank" rel="noopener noreferrer" style="height:32px;font-size:12px;padding:0 12px;">GitHub Releases</a>
               </div>
             </div>
-            <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface-2);">
-              <strong style="font-size:14px;">2. Imladris on Web (Self-Host)</strong>
-              <p style="font-size:12px;color:var(--muted);margin:6px 0 8px;">Deploy on your own machine or cluster with Docker, Podman, or Kubernetes:</p>
-              <pre style="margin:0 0 10px;padding:8px;border-radius:6px;font-size:11px;overflow-x:auto;background:var(--bg);">docker compose up -d
-# or: podman compose up -d
-# or: kubectl apply -k deploy/k8s</pre>
-              <a class="btn" href="https://github.com/Antux912012/imladris-on-web" target="_blank" rel="noopener noreferrer" style="font-size:12px;padding:6px 12px;">Deploy Guide (GitHub)</a>
+            <div class="web-mock-modal-card">
+              <div>
+                <strong style="font-size:14px;color:var(--ink);">2. Imladris on Web (Self-Host)</strong>
+                <p style="font-size:12.5px;color:var(--ink-dim);margin:6px 0 8px;">Deploy on your own machine or cluster via Docker, Podman, or Kubernetes:</p>
+                <pre class="web-mock-modal-code">docker compose up -d
+# Podman:
+podman compose up -d
+# Kubernetes:
+kubectl apply -k deploy/k8s</pre>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a class="btn" href="https://github.com/Antux912012/imladris-on-web" target="_blank" rel="noopener noreferrer" style="height:32px;font-size:12px;padding:0 12px;">Docker / Podman / K8s Repo</a>
+              </div>
             </div>
+          </div>
+          <div style="margin-top:16px;display:flex;justify-content:flex-end;">
+            <button type="button" id="web-mock-continue" class="btn" style="height:32px;font-size:12px;padding:0 14px;">Continue Exploring Mock</button>
           </div>
         </dialog>
 
@@ -1005,7 +1127,7 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
           note: "Unified .deb package with R, Python, pip/venv, and Pandoc runtime dependencies."
         },
         fedora: {
-          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.43.2/imladris-0.43.2-1.fc41.x86_64.rpm\nsudo dnf install ./imladris-0.43.2-1.fc41.x86_64.rpm",
+          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.43.2/imladris-0.43.2-1.fc45.x86_64.rpm\nsudo dnf install ./imladris-0.43.2-1.fc45.x86_64.rpm",
           note: "Unified .rpm package with R-core, python3, and pandoc."
         },
         arch: {
@@ -1088,9 +1210,9 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
         if (!mockPreview) return;
         var safe = (src || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         var html = safe
-          .replace(/^# (.+)$/gm, '<h4 style="margin:6px 0;">$1</h4>')
+          .replace(/^# (.+)$/gm, '<h4 style="margin:6px 0;color:var(--ink);">$1</h4>')
           .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-          .replace(/```\{?(\w*)\}?\n([\s\S]*?)```/g, '<pre style="padding:8px;border-radius:6px;background:var(--surface-2);overflow-x:auto;"><code>$2</code></pre>')
+          .replace(/```\{?(\w*)\}?\n([\s\S]*?)```/g, '<pre style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--code-bg);color:var(--ink);overflow-x:auto;font-family:var(--mono);font-size:12px;"><code>$2</code></pre>')
           .replace(/\n/g, '<br>');
         mockPreview.innerHTML = html;
       }
@@ -1147,9 +1269,18 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
       if (mockCloseBtn && mockModal) {
         mockCloseBtn.addEventListener('click', function () { mockModal.close(); });
       }
+      var mockContinueBtn = document.getElementById('web-mock-continue');
+      if (mockContinueBtn && mockModal) {
+        mockContinueBtn.addEventListener('click', function () { mockModal.close(); });
+      }
       var mockGoInstall = document.getElementById('web-mock-go-install');
       if (mockGoInstall && mockModal) {
         mockGoInstall.addEventListener('click', function () { mockModal.close(); });
+      }
+      if (mockModal) {
+        mockModal.addEventListener('click', function (e) {
+          if (e.target === mockModal) mockModal.close();
+        });
       }
     })();
   </script>
