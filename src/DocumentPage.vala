@@ -43,7 +43,12 @@ namespace Imladris {
         public Gtk.Paned paned { get; private set; }
         public Gtk.Box apostrophe_editor_host { get; private set; }
         public Gtk.Box apostrophe_preview_host { get; private set; }
+        public Gtk.Box apostrophe_ai_host { get; private set; }
         public Gtk.ScrolledWindow editor_scroller { get; private set; }
+        public Services.ReviewCommentService review_service { get; private set; }
+        public UI.ReviewCommentsPanel review_panel { get; private set; }
+        public Gtk.Revealer review_sidebar_revealer { get; private set; }
+        private Gtk.Box editor_and_review_row;
         public Gtk.Box right_box { get; private set; }
         public string doc_id { get; private set; }
         public string initial_title { get; private set; default = ""; }
@@ -83,7 +88,7 @@ namespace Imladris {
             if (rtf_editor != null) {
                 return rtf_editor.serialize_rtf ();
             }
-            return source_buffer.text.replace ("\xef\xbf\xbc", "");
+            return source_buffer.text.replace ("\n\xef\xbf\xbc", "").replace ("\xef\xbf\xbc", "");
         }
 
         public void set_initial_content (string text, bool mark_unmodified = true) {
@@ -326,10 +331,40 @@ namespace Imladris {
             setup_cell_execution_shortcut ();
 
             var editor_context_menu = new GLib.Menu ();
+            editor_context_menu.append ("Add Review Comment…", "win.add_review_comment");
+            editor_context_menu.append ("Toggle Review Notes Sidebar", "win.toggle_review_comments");
             editor_context_menu.append ("Insert Table...", "win.insert_table");
             editor_context_menu.append ("Write with Elrond Assistance (AI)", "app.elrond_assist");
             editor_context_menu.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
             source_view.extra_menu = editor_context_menu;
+
+            review_service = new Services.ReviewCommentService (source_view, source_buffer);
+            review_panel = new UI.ReviewCommentsPanel (review_service, parent_window);
+            review_sidebar_revealer = new Gtk.Revealer () {
+                transition_type = Gtk.RevealerTransitionType.SLIDE_LEFT,
+                transition_duration = 180,
+                reveal_child = false,
+                visible = false,
+                hexpand = false,
+                vexpand = true
+            };
+            review_sidebar_revealer.set_child (review_panel);
+            review_sidebar_revealer.notify["child-revealed"].connect (() => {
+                if (!review_sidebar_revealer.reveal_child && !review_sidebar_revealer.child_revealed) {
+                    review_sidebar_revealer.visible = false;
+                }
+            });
+            review_panel.flip_side_requested.connect (() => {
+                var sm = Core.SettingsManager.get_default ();
+                sm.review_sidebar_on_left = !sm.review_sidebar_on_left;
+                apply_review_sidebar_side ();
+            });
+            review_panel.close_requested.connect (() => {
+                review_sidebar_revealer.reveal_child = false;
+            });
+            review_panel.add_comment_requested.connect (() => {
+                prompt_add_review_comment ();
+            });
 
             editor_scroller = new Gtk.ScrolledWindow () {
                 child = source_view,
@@ -384,6 +419,7 @@ namespace Imladris {
             source_buffer.notify["cursor-position"].connect (() => {
                 if (source_view.has_focus) {
                     schedule_preview_scroll_sync ();
+                    review_service.sync_cursor_to_thread ();
                 }
             });
 
@@ -630,10 +666,11 @@ namespace Imladris {
             };
             right_stack.add_titled (apostrophe_preview_host, "preview", "Live Preview");
 
-            if (parent_window != null) {
-                assistant_panel = new AssistantPanel (parent_window);
-                right_stack.add_titled (assistant_panel, "assistant", "Elrond Assistance");
-            }
+            apostrophe_ai_host = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+                hexpand = true,
+                vexpand = true
+            };
+            right_stack.add_titled (apostrophe_ai_host, "assistant", "Elrond AI");
             right_stack.visible_child_name = "preview";
             right_stack.notify["visible-child-name"].connect (() => {
                 if (right_stack.visible_child_name == "preview") {
@@ -665,8 +702,21 @@ namespace Imladris {
             apply_panel_position ();
             ai_settings_handler_id = Core.SettingsManager.get_default ().ai_settings_changed.connect (apply_panel_position);
 
-            this.append (paned);
-            this.append (rstudio_dock_grid);
+            var workspace_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+                hexpand = true,
+                vexpand = true
+            };
+            workspace_box.append (paned);
+            workspace_box.append (rstudio_dock_grid);
+
+            editor_and_review_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {
+                hexpand = true,
+                vexpand = true
+            };
+            editor_and_review_row.append (workspace_box);
+            editor_and_review_row.append (review_sidebar_revealer);
+            this.append (editor_and_review_row);
+            apply_review_sidebar_side ();
 
             // Mount initial layout based on FormatProfile
             var initial_profile = Core.FormatProfile.for_format (get_document_format ());
@@ -832,6 +882,9 @@ namespace Imladris {
                 if (rstudio_dock_grid.dock_manager.is_panel_undocked (PanelId.LIVE_PREVIEW)) {
                     rstudio_dock_grid.dock_manager.redock_panel (PanelId.LIVE_PREVIEW);
                 }
+                if (rstudio_dock_grid.dock_manager.is_panel_undocked (PanelId.ELROND_AI)) {
+                    rstudio_dock_grid.dock_manager.redock_panel (PanelId.ELROND_AI);
+                }
                 rstudio_dock_grid.visible = false;
                 paned.visible = true;
 
@@ -841,6 +894,7 @@ namespace Imladris {
 
                 panel_registry.mount_panel (PanelId.SOURCE_EDITOR, apostrophe_editor_host);
                 panel_registry.mount_panel (PanelId.LIVE_PREVIEW, apostrophe_preview_host);
+                panel_registry.mount_panel (PanelId.ELROND_AI, apostrophe_ai_host);
             } else {
                 paned.visible = false;
                 rstudio_dock_grid.visible = true;
@@ -1516,9 +1570,90 @@ Start writing formatted text here.\par
             console_revealer.visible = true;
             console_revealer.reveal_child = true;
             right_stack.visible_child_name = "assistant";
-            if (assistant_panel != null) {
-                assistant_panel.focus_input ();
+            if (panel_registry != null && panel_registry.elrond_chat_panel != null) {
+                panel_registry.elrond_chat_panel.focus_input ();
             }
+        }
+
+        public void apply_review_sidebar_side () {
+            if (editor_and_review_row == null || review_sidebar_revealer == null) return;
+            bool on_left = Core.SettingsManager.get_default ().review_sidebar_on_left;
+            if (on_left) {
+                review_sidebar_revealer.transition_type = Gtk.RevealerTransitionType.SLIDE_RIGHT;
+                editor_and_review_row.reorder_child_after (review_sidebar_revealer, null);
+            } else {
+                review_sidebar_revealer.transition_type = Gtk.RevealerTransitionType.SLIDE_LEFT;
+                var first = editor_and_review_row.get_first_child ();
+                if (first == review_sidebar_revealer) {
+                    var second = first.get_next_sibling ();
+                    if (second != null) {
+                        editor_and_review_row.reorder_child_after (review_sidebar_revealer, second);
+                    }
+                }
+            }
+        }
+
+        public void set_review_sidebar_visible (bool visible) {
+            if (review_sidebar_revealer == null) return;
+            apply_review_sidebar_side ();
+            if (visible) {
+                review_sidebar_revealer.visible = true;
+                review_sidebar_revealer.reveal_child = true;
+            } else {
+                review_sidebar_revealer.reveal_child = false;
+            }
+        }
+
+        public void toggle_review_comments_sidebar () {
+            if (review_sidebar_revealer == null) return;
+            set_review_sidebar_visible (!review_sidebar_revealer.reveal_child);
+        }
+
+        public void prompt_add_review_comment () {
+            set_review_sidebar_visible (true);
+            var dlg = new Adw.AlertDialog (
+                "Add Review Comment",
+                "Attach a reviewer note to the selected lines (or current line):"
+            );
+            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) {
+                width_request = 380
+            };
+            var cat_dd = new Gtk.DropDown (new Gtk.StringList ({
+                "General", "Statistics", "Methodology", "Code", "Writing", "Revision"
+            }), null) { selected = 0 };
+            var tv = new Gtk.TextView () {
+                wrap_mode = Gtk.WrapMode.WORD_CHAR
+            };
+            var sc = new Gtk.ScrolledWindow () {
+                min_content_height = 100,
+                max_content_height = 200,
+                child = tv
+            };
+            box.append (cat_dd);
+            box.append (sc);
+            dlg.set_extra_child (box);
+            dlg.add_response ("cancel", "Cancel");
+            dlg.add_response ("add", "Add Comment");
+            dlg.set_default_response ("add");
+            dlg.set_response_appearance ("add", Adw.ResponseAppearance.SUGGESTED);
+            dlg.response.connect ((resp) => {
+                if (resp == "add") {
+                    Gtk.TextIter s, e;
+                    tv.buffer.get_bounds (out s, out e);
+                    string body = tv.buffer.get_text (s, e, false).strip ();
+                    if (body.length > 0) {
+                        var item = cat_dd.selected_item as Gtk.StringObject;
+                        string cat = item != null ? item.string : "General";
+                        review_service.create_thread_from_selection (
+                            review_panel.get_current_author (),
+                            review_panel.get_current_role (),
+                            cat,
+                            body
+                        );
+                    }
+                }
+            });
+            dlg.present ((Gtk.Widget?) parent_window ?? this);
         }
 
         private void setup_completion () {
@@ -1612,7 +1747,9 @@ Start writing formatted text here.\par
         public void insert_code_chunk (string engine, string options = "") {
             string opt_line = options.length > 0 ? @"#| $options\n" : "";
             string snippet = @"\n```{$engine}\n$opt_line\n```\n";
+            source_buffer.begin_user_action ();
             source_buffer.insert_at_cursor (snippet, -1);
+            source_buffer.end_user_action ();
         }
 
         /**
@@ -1620,7 +1757,9 @@ Start writing formatted text here.\par
          */
         public void insert_markdown_cell (string placeholder = "New Section") {
             string snippet = @"\n\n### $placeholder\n\nEnter markdown notes, formulas, or equations here.\n\n";
+            source_buffer.begin_user_action ();
             source_buffer.insert_at_cursor (snippet, -1);
+            source_buffer.end_user_action ();
         }
 
         /**
@@ -1628,7 +1767,9 @@ Start writing formatted text here.\par
          */
         public void insert_raw_cell (string content = "") {
             string snippet = @"\n```{raw}\n$content\n```\n";
+            source_buffer.begin_user_action ();
             source_buffer.insert_at_cursor (snippet, -1);
+            source_buffer.end_user_action ();
         }
 
         public void show_table_picker_popover () {
@@ -1707,12 +1848,12 @@ Start writing formatted text here.\par
                 }
                 sb.append ("  </tbody>\n</table>\n");
             } else if (fmt == DocumentFormat.TEX) {
-                string col_spec = "|";
+                var spec_sb = new GLib.StringBuilder ("|");
                 for (int c = 1; c <= safe_cols; c++) {
-                    col_spec += "l|";
+                    spec_sb.append ("l|");
                 }
                 sb.append ("\n\\begin{table}[htbp]\n  \\centering\n");
-                sb.append (@"  \\begin{tabular}{$col_spec}\n    \\hline\n    ");
+                sb.append (@"  \\begin{tabular}{$(spec_sb.str)}\n    \\hline\n    ");
                 for (int c = 1; c <= safe_cols; c++) {
                     if (c > 1) sb.append (" & ");
                     sb.append (@"\\textbf{Header $c}");
@@ -1821,7 +1962,9 @@ Start writing formatted text here.\par
             Gtk.TextIter insert_iter;
             source_buffer.get_iter_at_mark (out insert_iter, source_buffer.get_insert ());
             insert_iter.set_line_offset (0);
+            source_buffer.begin_user_action ();
             source_buffer.insert (ref insert_iter, prefix, -1);
+            source_buffer.end_user_action ();
         }
 
         public void insert_list_item (string prefix) {
@@ -1830,13 +1973,17 @@ Start writing formatted text here.\par
                 rtf_editor.buffer.get_iter_at_mark (out it, rtf_editor.buffer.get_insert ());
                 it.set_line_offset (0);
                 string rtf_prefix = prefix.has_prefix ("- ") ? "• " : prefix;
+                rtf_editor.buffer.begin_user_action ();
                 rtf_editor.buffer.insert (ref it, rtf_prefix, -1);
+                rtf_editor.buffer.end_user_action ();
                 return;
             }
             Gtk.TextIter insert_iter;
             source_buffer.get_iter_at_mark (out insert_iter, source_buffer.get_insert ());
             insert_iter.set_line_offset (0);
+            source_buffer.begin_user_action ();
             source_buffer.insert (ref insert_iter, prefix, -1);
+            source_buffer.end_user_action ();
         }
     }
 }

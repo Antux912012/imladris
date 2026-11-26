@@ -274,7 +274,9 @@ namespace Imladris.Services {
                     }
                 }
 
-                string cite_key = @"$(first_author)$(year)_pmid$(pmid)";
+                string safe_author = sanitize_key_token (first_author);
+                if (safe_author.length == 0) safe_author = "author";
+                string cite_key = @"$(safe_author)$(year)_pmid$(pmid)";
                 var sb = new StringBuilder ();
                 sb.append_printf ("@article{%s,\n", cite_key);
                 if (authors_list.len > 0) sb.append_printf ("  author = {%s},\n", escape_bib_value (authors_list.str));
@@ -516,7 +518,8 @@ namespace Imladris.Services {
 
         private static string? find_citekey_by_doi (string bib_content, string target_doi) {
             string lower_target = target_doi.strip ().down ();
-            string[] chunks = bib_content.split ("@");
+            string normalized = "\n" + bib_content.replace ("\r\n", "\n");
+            string[] chunks = normalized.split ("\n@");
             foreach (string raw_chunk in chunks) {
                 string chunk = "@" + raw_chunk.strip ();
                 if (chunk.length < 3) continue;
@@ -535,6 +538,8 @@ namespace Imladris.Services {
                 case "book":                return "book";
                 case "book-chapter":        return "incollection";
                 case "posted-content":      return "misc";
+                case "report":
+                case "working-paper":       return "techreport";
                 default:                    return "article";
             }
         }

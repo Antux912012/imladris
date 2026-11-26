@@ -1,5 +1,5 @@
 Name:           imladris
-Version:        0.43.2
+Version:        0.44.0
 Release:        1%{?dist}
 Summary:        Native scientific notebook studio for Quarto, R, Python, and Jupyter
 

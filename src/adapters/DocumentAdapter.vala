@@ -103,7 +103,7 @@ namespace Imladris.Adapters {
                     return Core.NotebookSerializer.ipynb_to_markdown (raw_content);
                 } catch (GLib.Error e) {
                     GLib.warning ("Failed to deserialize .ipynb JSON: %s", e.message);
-                    return raw_content;
+                    return @"<!-- IMLADRIS_IPYNB_PARSE_ERROR -->\n> **Error parsing Jupyter Notebook (.ipynb):** $(e.message)\n> Editing/saving raw JSON is disabled to prevent data corruption.\n\n```json\n$(raw_content)\n```\n";
                 }
             }
             return raw_content;
@@ -113,11 +113,14 @@ namespace Imladris.Adapters {
             // Strip any Gtk.TextChildAnchor Unicode Object Replacement Characters (\uFFFC)
             string clean_text = editor_text.replace ("\uFFFC", "");
             if (format == Imladris.DocumentFormat.IPYNB) {
+                if (clean_text.has_prefix ("<!-- IMLADRIS_IPYNB_PARSE_ERROR -->")) {
+                    return existing_raw_file ?? clean_text;
+                }
                 try {
                     return Core.NotebookSerializer.markdown_to_ipynb (clean_text, "", existing_raw_file ?? "");
                 } catch (GLib.Error e) {
                     GLib.warning ("Failed to serialize editor buffer to .ipynb JSON: %s", e.message);
-                    return clean_text;
+                    return existing_raw_file ?? clean_text;
                 }
             }
             return clean_text;

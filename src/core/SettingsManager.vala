@@ -389,11 +389,15 @@ namespace Imladris.Core {
         private bool _hw_fallback = true;
         private AppTheme _theme_fallback = AppTheme.SYSTEM;
         private GnomeAccent _accent_fallback = GnomeAccent.BLUE;
+        private string _color_palette = "adwaita";
+        private bool _review_sidebar_on_left = false;
         private Gtk.CssProvider? accent_css_provider = null;
+        private Gtk.CssProvider? palette_css_provider = null;
 
         public signal void hardware_acceleration_changed (bool enabled);
         public signal void theme_changed (AppTheme theme);
         public signal void accent_color_changed (GnomeAccent accent);
+        public signal void color_palette_changed (string palette_id);
         public signal void ai_settings_changed ();
         public signal void physics_changed ();
         public signal void ui_settings_changed ();
@@ -828,6 +832,24 @@ namespace Imladris.Core {
             }
         }
 
+        public string color_palette {
+            get { return _color_palette; }
+            set {
+                string normalized = (value != null && value.length > 0) ? value : "adwaita";
+                if (_color_palette != normalized) {
+                    _color_palette = normalized;
+                    apply_palette (normalized);
+                    color_palette_changed (normalized);
+                    save_ini ();
+                }
+            }
+        }
+
+        public bool review_sidebar_on_left {
+            get { return _review_sidebar_on_left; }
+            set { _review_sidebar_on_left = value; }
+        }
+
         private SettingsManager () {
             var source = GLib.SettingsSchemaSource.get_default ();
             if (source != null) {
@@ -1046,6 +1068,9 @@ namespace Imladris.Core {
                     if (config_keyfile.has_key ("Security", "phi_data_lock")) {
                         _phi_data_lock = config_keyfile.get_boolean ("Security", "phi_data_lock");
                     }
+                    if (config_keyfile.has_key ("Appearance", "color_palette")) {
+                        _color_palette = config_keyfile.get_string ("Appearance", "color_palette").strip ().down ();
+                    }
                     if (config_keyfile.has_key ("Environment", "preferred_kernel")) {
                         _preferred_kernel = KernelOption.from_string_id (
                             config_keyfile.get_string ("Environment", "preferred_kernel")
@@ -1096,6 +1121,7 @@ namespace Imladris.Core {
                 config_keyfile.set_integer ("Workspace", "preview_backend", (int) _preview_backend);
                 config_keyfile.set_boolean ("Security", "airgapped_mode", _airgapped_mode);
                 config_keyfile.set_boolean ("Security", "phi_data_lock", _phi_data_lock);
+                config_keyfile.set_string ("Appearance", "color_palette", _color_palette);
                 config_keyfile.set_string ("Environment", "preferred_kernel", _preferred_kernel.to_string_id ());
                 config_keyfile.set_string ("Environment", "preferred_env_path", _preferred_env_path);
                 config_keyfile.set_string ("Environment", "runtime_scope", _runtime_scope.to_string_id ());
@@ -1159,6 +1185,13 @@ namespace Imladris.Core {
 
         public void apply_theme (AppTheme theme) {
             if (Gtk.is_initialized ()) {
+                if (palette_css_provider != null) {
+                    palette_css_provider.load_from_string ("");
+                }
+                if (_color_palette != "adwaita") {
+                    _color_palette = "adwaita";
+                    color_palette_changed ("adwaita");
+                }
                 var style_mgr = Adw.StyleManager.get_default ();
                 switch (theme) {
                     case AppTheme.SYSTEM:
@@ -1192,11 +1225,12 @@ namespace Imladris.Core {
         public void apply_accent_color (GnomeAccent accent) {
             if (Gtk.is_initialized ()) {
                 string hex = accent.get_hex_color ();
+                string fg = (accent == GnomeAccent.YELLOW) ? "#1e1e1e" : "#ffffff";
                 string css = """
                     @define-color accent_color %s;
                     @define-color accent_bg_color %s;
-                    @define-color accent_fg_color #ffffff;
-                """.printf (hex, hex);
+                    @define-color accent_fg_color %s;
+                """.printf (hex, hex, fg);
 
                 if (accent_css_provider == null) {
                     accent_css_provider = new Gtk.CssProvider ();
@@ -1213,6 +1247,78 @@ namespace Imladris.Core {
                 accent_css_provider.load_from_string (css);
             }
             accent_color_changed (accent);
+        }
+
+        public void apply_palette (string palette_id) {
+            var pal = ThemePalettes.find_by_id (palette_id);
+            if (Gtk.is_initialized ()) {
+                if (palette_css_provider == null) {
+                    palette_css_provider = new Gtk.CssProvider ();
+                    var display = Gdk.Display.get_default ();
+                    if (display != null) {
+                        add_css_provider_for_display (
+                            display,
+                            palette_css_provider,
+                            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 5
+                        );
+                    }
+                }
+
+                if (pal == null || pal.is_default) {
+                    palette_css_provider.load_from_string ("");
+                    apply_theme (app_theme);
+                } else {
+                    var app = GLib.Application.get_default () as Gtk.Application;
+                    if (app != null) {
+                        foreach (var win in app.get_windows ()) {
+                            win.remove_css_class ("eye-friendly");
+                        }
+                    }
+                    Adw.StyleManager.get_default ().color_scheme = pal.is_dark
+                        ? Adw.ColorScheme.FORCE_DARK
+                        : Adw.ColorScheme.FORCE_LIGHT;
+                    string css = """
+                        :root, window {
+                            --window-bg-color: %s;
+                            --window-fg-color: %s;
+                            --view-bg-color: %s;
+                            --view-fg-color: %s;
+                            --headerbar-bg-color: %s;
+                            --headerbar-fg-color: %s;
+                            --card-bg-color: %s;
+                            --card-fg-color: %s;
+                            --popover-bg-color: %s;
+                            --popover-fg-color: %s;
+                            --dialog-bg-color: %s;
+                            --dialog-fg-color: %s;
+                            --sidebar-bg-color: %s;
+                            --sidebar-fg-color: %s;
+                        }
+                        @define-color window_bg_color %s;
+                        @define-color window_fg_color %s;
+                        @define-color view_bg_color %s;
+                        @define-color view_fg_color %s;
+                        @define-color headerbar_bg_color %s;
+                        @define-color headerbar_fg_color %s;
+                        @define-color card_bg_color %s;
+                        @define-color popover_bg_color %s;
+                    """.printf (
+                        pal.window_bg, pal.window_fg,
+                        pal.view_bg, pal.window_fg,
+                        pal.header_bg, pal.window_fg,
+                        pal.card_bg, pal.window_fg,
+                        pal.card_bg, pal.window_fg,
+                        pal.window_bg, pal.window_fg,
+                        pal.header_bg, pal.window_fg,
+                        pal.window_bg, pal.window_fg,
+                        pal.view_bg, pal.window_fg,
+                        pal.header_bg, pal.window_fg,
+                        pal.card_bg, pal.card_bg
+                    );
+                    palette_css_provider.load_from_string (css);
+                }
+            }
+            color_palette_changed (palette_id);
         }
 
         [CCode (cname = "gtk_style_context_add_provider_for_display", cheader_filename = "gtk/gtk.h")]

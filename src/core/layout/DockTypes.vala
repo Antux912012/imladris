@@ -801,34 +801,37 @@ namespace Imladris.Core.Layout {
                 if (root == null || root.get_node_type () != Json.NodeType.OBJECT) return;
                 var obj = root.get_object ();
 
-                if (obj.has_member ("userLockedMode")) {
+                if (obj.has_member ("userLockedMode") && obj.get_member ("userLockedMode").get_node_type () == Json.NodeType.VALUE) {
                     user_locked_mode = obj.get_boolean_member ("userLockedMode");
                 }
-                if (obj.has_member ("topology")) {
-                    topology = LayoutTopology.from_id_string (obj.get_string_member ("topology"));
+                if (obj.has_member ("topology") && obj.get_member ("topology").get_node_type () == Json.NodeType.VALUE) {
+                    topology = LayoutTopology.from_id_string (obj.get_string_member ("topology") ?? "rstudio-default");
                 }
 
-                if (obj.has_member ("ratios")) {
+                if (obj.has_member ("ratios") && obj.get_member ("ratios").get_node_type () == Json.NodeType.OBJECT) {
                     var r_obj = obj.get_object_member ("ratios");
-                    double mv = r_obj.has_member ("mainVertical") ? r_obj.get_double_member ("mainVertical") : 0.55;
-                    double lh = r_obj.has_member ("leftHorizontal") ? r_obj.get_double_member ("leftHorizontal") : 0.68;
-                    double rh = r_obj.has_member ("rightHorizontal") ? r_obj.get_double_member ("rightHorizontal") : 0.45;
-                    double cv = r_obj.has_member ("centerVertical") ? r_obj.get_double_member ("centerVertical") : 0.50;
-                    double ch = r_obj.has_member ("centerHorizontal") ? r_obj.get_double_member ("centerHorizontal") : 0.55;
+                    double mv = (r_obj.has_member ("mainVertical") && r_obj.get_member ("mainVertical").get_node_type () == Json.NodeType.VALUE) ? r_obj.get_double_member ("mainVertical") : 0.55;
+                    double lh = (r_obj.has_member ("leftHorizontal") && r_obj.get_member ("leftHorizontal").get_node_type () == Json.NodeType.VALUE) ? r_obj.get_double_member ("leftHorizontal") : 0.68;
+                    double rh = (r_obj.has_member ("rightHorizontal") && r_obj.get_member ("rightHorizontal").get_node_type () == Json.NodeType.VALUE) ? r_obj.get_double_member ("rightHorizontal") : 0.45;
+                    double cv = (r_obj.has_member ("centerVertical") && r_obj.get_member ("centerVertical").get_node_type () == Json.NodeType.VALUE) ? r_obj.get_double_member ("centerVertical") : 0.50;
+                    double ch = (r_obj.has_member ("centerHorizontal") && r_obj.get_member ("centerHorizontal").get_node_type () == Json.NodeType.VALUE) ? r_obj.get_double_member ("centerHorizontal") : 0.55;
                     ratios.set_clamped_all (mv, lh, rh, cv, ch);
                 }
 
-                if (obj.has_member ("maximizedQuadrant") && !obj.get_null_member ("maximizedQuadrant")) {
+                if (obj.has_member ("maximizedQuadrant") && !obj.get_null_member ("maximizedQuadrant") &&
+                    obj.get_member ("maximizedQuadrant").get_node_type () == Json.NodeType.VALUE) {
                     maximized_quadrant = QuadrantId.from_id_string (obj.get_string_member ("maximizedQuadrant"));
                 } else {
                     maximized_quadrant = null;
                 }
 
                 popped_out_panels.clear ();
-                if (obj.has_member ("poppedOutPanels")) {
+                if (obj.has_member ("poppedOutPanels") && obj.get_member ("poppedOutPanels").get_node_type () == Json.NodeType.ARRAY) {
                     var p_arr = obj.get_array_member ("poppedOutPanels");
                     for (uint i = 0; i < p_arr.get_length (); i++) {
-                        PanelId? pid = PanelId.from_id_string (p_arr.get_string_element (i));
+                        var el = p_arr.get_element (i);
+                        if (el == null || el.get_node_type () != Json.NodeType.VALUE) continue;
+                        PanelId? pid = PanelId.from_id_string (el.get_string () ?? "");
                         if (pid != null) {
                             popped_out_panels.add (pid);
                         }
@@ -836,44 +839,48 @@ namespace Imladris.Core.Layout {
                 }
 
                 floating_geometries.clear ();
-                if (obj.has_member ("floatingGeometries")) {
+                if (obj.has_member ("floatingGeometries") && obj.get_member ("floatingGeometries").get_node_type () == Json.NodeType.OBJECT) {
                     var fg_obj = obj.get_object_member ("floatingGeometries");
                     foreach (var key in fg_obj.get_members ()) {
                         PanelId? pid = PanelId.from_id_string (key);
                         if (pid == null) continue;
+                        if (fg_obj.get_member (key).get_node_type () != Json.NodeType.OBJECT) continue;
                         var g_item = fg_obj.get_object_member (key);
-                        int w = g_item.has_member ("width") ? (int) g_item.get_int_member ("width") : 840;
-                        int h = g_item.has_member ("height") ? (int) g_item.get_int_member ("height") : 600;
-                        int m = g_item.has_member ("monitorIndex") ? (int) g_item.get_int_member ("monitorIndex") : -1;
+                        int w = (g_item.has_member ("width") && g_item.get_member ("width").get_node_type () == Json.NodeType.VALUE) ? (int) g_item.get_int_member ("width") : 840;
+                        int h = (g_item.has_member ("height") && g_item.get_member ("height").get_node_type () == Json.NodeType.VALUE) ? (int) g_item.get_int_member ("height") : 600;
+                        int m = (g_item.has_member ("monitorIndex") && g_item.get_member ("monitorIndex").get_node_type () == Json.NodeType.VALUE) ? (int) g_item.get_int_member ("monitorIndex") : -1;
                         floating_geometries.set (pid, new FloatingWindowGeometry (w, h, m));
                     }
                 }
 
-                if (obj.has_member ("quadrants")) {
+                if (obj.has_member ("quadrants") && obj.get_member ("quadrants").get_node_type () == Json.NodeType.OBJECT) {
                     var q_obj = obj.get_object_member ("quadrants");
                     foreach (var qid in QuadrantId.all ()) {
                         string qkey = qid.to_id_string ();
-                        if (!q_obj.has_member (qkey)) continue;
+                        if (!q_obj.has_member (qkey) || q_obj.get_member (qkey).get_node_type () != Json.NodeType.OBJECT) continue;
                         var q_item = q_obj.get_object_member (qkey);
                         var qc = quadrants.get (qid);
                         if (qc == null) continue;
 
-                        if (q_item.has_member ("sizeState")) {
-                            qc.size_state = QuadrantSizeState.from_id_string (q_item.get_string_member ("sizeState"));
+                        if (q_item.has_member ("sizeState") && q_item.get_member ("sizeState").get_node_type () == Json.NodeType.VALUE) {
+                            qc.size_state = QuadrantSizeState.from_id_string (q_item.get_string_member ("sizeState") ?? "normal");
                         }
 
-                        if (q_item.has_member ("tabs")) {
+                        if (q_item.has_member ("tabs") && q_item.get_member ("tabs").get_node_type () == Json.NodeType.ARRAY) {
                             qc.tabs.clear ();
                             var t_arr = q_item.get_array_member ("tabs");
                             for (uint i = 0; i < t_arr.get_length (); i++) {
-                                PanelId? pid = PanelId.from_id_string (t_arr.get_string_element (i));
+                                var el = t_arr.get_element (i);
+                                if (el == null || el.get_node_type () != Json.NodeType.VALUE) continue;
+                                PanelId? pid = PanelId.from_id_string (el.get_string () ?? "");
                                 if (pid != null) {
                                     qc.tabs.add (pid);
                                 }
                             }
                         }
 
-                        if (q_item.has_member ("activeTab") && !q_item.get_null_member ("activeTab")) {
+                        if (q_item.has_member ("activeTab") && !q_item.get_null_member ("activeTab") &&
+                            q_item.get_member ("activeTab").get_node_type () == Json.NodeType.VALUE) {
                             qc.active_tab = PanelId.from_id_string (q_item.get_string_member ("activeTab"));
                         } else if (qc.tabs.size > 0) {
                             qc.active_tab = qc.tabs.get (0);

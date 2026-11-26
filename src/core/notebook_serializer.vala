@@ -99,23 +99,28 @@ namespace Imladris.Core {
             string kernel_name = "python3";
             string display_name = "Python 3";
 
-            if (root.has_member ("metadata")) {
-                var meta = root.get_object_member ("metadata");
-                if (meta.has_member ("kernelspec")) {
-                    var ks = meta.get_object_member ("kernelspec");
-                    if (ks.has_member ("language")) {
-                        default_lang = ks.get_string_member ("language").down ();
-                    }
-                    if (ks.has_member ("name")) {
-                        kernel_name = ks.get_string_member ("name");
-                    }
-                    if (ks.has_member ("display_name")) {
-                        display_name = ks.get_string_member ("display_name");
-                    }
-                } else if (meta.has_member ("language_info")) {
-                    var li = meta.get_object_member ("language_info");
-                    if (li.has_member ("name")) {
-                        default_lang = li.get_string_member ("name").down ();
+            if (root.has_member ("metadata") && !root.get_null_member ("metadata")) {
+                var meta_node = root.get_member ("metadata");
+                if (meta_node.get_node_type () == Json.NodeType.OBJECT) {
+                    var meta = meta_node.get_object ();
+                    if (meta.has_member ("kernelspec") && !meta.get_null_member ("kernelspec") &&
+                        meta.get_member ("kernelspec").get_node_type () == Json.NodeType.OBJECT) {
+                        var ks = meta.get_object_member ("kernelspec");
+                        if (ks.has_member ("language") && !ks.get_null_member ("language")) {
+                            default_lang = (ks.get_string_member ("language") ?? "python").down ();
+                        }
+                        if (ks.has_member ("name") && !ks.get_null_member ("name")) {
+                            kernel_name = ks.get_string_member ("name") ?? "python3";
+                        }
+                        if (ks.has_member ("display_name") && !ks.get_null_member ("display_name")) {
+                            display_name = ks.get_string_member ("display_name") ?? "Python 3";
+                        }
+                    } else if (meta.has_member ("language_info") && !meta.get_null_member ("language_info") &&
+                               meta.get_member ("language_info").get_node_type () == Json.NodeType.OBJECT) {
+                        var li = meta.get_object_member ("language_info");
+                        if (li.has_member ("name") && !li.get_null_member ("name")) {
+                            default_lang = (li.get_string_member ("name") ?? "python").down ();
+                        }
                     }
                 }
             }
@@ -129,33 +134,46 @@ namespace Imladris.Core {
                 default_lang = "python";
             }
 
+            if (!root.has_member ("cells") || root.get_null_member ("cells") ||
+                root.get_member ("cells").get_node_type () != Json.NodeType.ARRAY) {
+                throw new IOError.INVALID_DATA ("Invalid .ipynb file: missing or non-array 'cells' field.");
+            }
             var cells = root.get_array_member ("cells");
             var builder = new StringBuilder ();
+
+            string safe_display = display_name.replace ("\\", "\\\\").replace ("\"", "\\\"");
+            string safe_kernel = kernel_name.replace ("\\", "\\\\").replace ("\"", "\\\"");
 
             // Emit YAML Frontmatter anchor for kernelspec metadata
             builder.append ("---\n");
             builder.append_printf ("jupyter:\n");
             builder.append_printf ("  kernelspec:\n");
-            builder.append_printf ("    display_name: \"%s\"\n", display_name);
+            builder.append_printf ("    display_name: \"%s\"\n", safe_display);
             builder.append_printf ("    language: \"%s\"\n", default_lang);
-            builder.append_printf ("    name: \"%s\"\n", kernel_name);
+            builder.append_printf ("    name: \"%s\"\n", safe_kernel);
             builder.append ("---\n\n");
 
             for (uint i = 0; i < cells.get_length (); i++) {
-                var cell = cells.get_object_element (i);
-                string cell_type = cell.has_member ("cell_type") ? cell.get_string_member ("cell_type") : "markdown";
+                var cell_node = cells.get_element (i);
+                if (cell_node == null || cell_node.get_node_type () != Json.NodeType.OBJECT) continue;
+                var cell = cell_node.get_object ();
+                string cell_type = (cell.has_member ("cell_type") && !cell.get_null_member ("cell_type"))
+                    ? (cell.get_string_member ("cell_type") ?? "markdown") : "markdown";
 
-                // Parse cell source buffer
+                // Parse cell source buffer safely
                 var cell_text = new StringBuilder ();
-                if (cell.has_member ("source")) {
+                if (cell.has_member ("source") && !cell.get_null_member ("source")) {
                     var source_node = cell.get_member ("source");
                     if (source_node.get_node_type () == Json.NodeType.ARRAY) {
                         var source_arr = source_node.get_array ();
                         for (uint j = 0; j < source_arr.get_length (); j++) {
-                            cell_text.append (source_arr.get_string_element (j));
+                            var s_el = source_arr.get_element (j);
+                            if (s_el != null && s_el.get_node_type () == Json.NodeType.VALUE) {
+                                cell_text.append (s_el.get_string () ?? "");
+                            }
                         }
                     } else if (source_node.get_node_type () == Json.NodeType.VALUE) {
-                        cell_text.append (source_node.get_string ());
+                        cell_text.append (source_node.get_string () ?? "");
                     }
                 }
 
@@ -163,8 +181,8 @@ namespace Imladris.Core {
 
                 // Extract cell id if present
                 string cell_id = "";
-                if (cell.has_member ("id")) {
-                    cell_id = cell.get_string_member ("id");
+                if (cell.has_member ("id") && !cell.get_null_member ("id")) {
+                    cell_id = cell.get_string_member ("id") ?? "";
                 }
 
                 // Extract custom cell language or fallback to notebook default
@@ -243,6 +261,14 @@ namespace Imladris.Core {
                                             if (d_obj.has_member ("text/plain") && !d_obj.get_null_member ("text/plain")) {
                                                 string txt = extract_source_node (d_obj.get_member ("text/plain")).strip ();
                                                 if (txt.length > 0) preview_sb.append (txt).append ("\n");
+                                            }
+                                            if (d_obj.has_member ("image/png") && !d_obj.get_null_member ("image/png")) {
+                                                string png_b64 = extract_source_node (d_obj.get_member ("image/png")).replace ("\n", "").strip ();
+                                                if (png_b64.length > 0) preview_sb.append ("[Image PNG output preserved]\n");
+                                            }
+                                            if (d_obj.has_member ("text/html") && !d_obj.get_null_member ("text/html") && !d_obj.has_member ("text/plain")) {
+                                                string html_txt = extract_source_node (d_obj.get_member ("text/html")).strip ();
+                                                if (html_txt.length > 0) preview_sb.append (html_txt).append ("\n");
                                             }
                                         }
                                     } else if (o_obj.has_member ("ename") && !o_obj.get_null_member ("ename")) {
@@ -373,7 +399,7 @@ namespace Imladris.Core {
             bool in_yaml_frontmatter = false;
             bool has_closed_yaml = false;
             if (lines.length > 1 && lines[0].strip () == "---") {
-                int scan_limit = int.min (lines.length, 60);
+                int scan_limit = int.min (lines.length, 250);
                 for (int j = 1; j < scan_limit; j++) {
                     if (lines[j].strip () == "---") {
                         has_closed_yaml = true;

@@ -656,7 +656,7 @@ subtitle: "Reproducible Workflow via Imladris and Arekyer"
 author: "Researcher Name"
 format:
   revealjs:
-    theme: [dark, default]
+    theme: dark
     transition: slide
     slide-number: true
     chalkboard: false

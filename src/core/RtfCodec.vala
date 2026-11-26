@@ -158,12 +158,17 @@ namespace Imladris.Core {
         private static GLib.Regex? cached_green_rx = null;
         private static GLib.Regex? cached_blue_rx = null;
 
+        private static GLib.Mutex rx_mutex = GLib.Mutex ();
+
         private static void parse_fonttbl (string group_raw, Gee.HashMap<int, string> fonttbl) {
             // Matches {\f0\fswiss... Font Name;} or \f0... Font Name;
             try {
+                rx_mutex.lock ();
                 if (cached_fonttbl_rx == null) cached_fonttbl_rx = new GLib.Regex ("\\\\f(\\d+)[^;{}]*?\\s+([^;{}]+);");
+                var rx = cached_fonttbl_rx;
+                rx_mutex.unlock ();
                 GLib.MatchInfo mi;
-                if (cached_fonttbl_rx.match (group_raw, 0, out mi)) {
+                if (rx.match (group_raw, 0, out mi)) {
                     do {
                         int idx = int.parse (mi.fetch (1));
                         string fname = mi.fetch (2).strip ();
@@ -194,14 +199,21 @@ namespace Imladris.Core {
                 int r = 0, g = 0, b = 0;
                 bool has_rgb = false;
                 try {
+                    rx_mutex.lock ();
                     if (cached_red_rx == null) cached_red_rx = new GLib.Regex ("\\\\red(\\d+)");
                     if (cached_green_rx == null) cached_green_rx = new GLib.Regex ("\\\\green(\\d+)");
                     if (cached_blue_rx == null) cached_blue_rx = new GLib.Regex ("\\\\blue(\\d+)");
+                    var r_rx = cached_red_rx;
+                    var g_rx = cached_green_rx;
+                    var b_rx = cached_blue_rx;
+                    rx_mutex.unlock ();
                     GLib.MatchInfo mi;
-                    if (cached_red_rx.match (entry, 0, out mi)) { r = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
-                    if (cached_green_rx.match (entry, 0, out mi)) { g = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
-                    if (cached_blue_rx.match (entry, 0, out mi)) { b = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
-                } catch (GLib.RegexError e) {}
+                    if (r_rx.match (entry, 0, out mi)) { r = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
+                    if (g_rx.match (entry, 0, out mi)) { g = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
+                    if (b_rx.match (entry, 0, out mi)) { b = int.parse (mi.fetch (1)).clamp (0, 255); has_rgb = true; }
+                } catch (GLib.RegexError e) {
+                    rx_mutex.unlock ();
+                }
                 colortbl.add (has_rgb ? "#%02x%02x%02x".printf (r, g, b) : null);
             }
         }
@@ -257,7 +269,7 @@ namespace Imladris.Core {
                     if (i + 1 < len && rtf_text[i + 1] == '\\') {
                         if (i + 2 < len && rtf_text[i + 2] == '*') {
                             state.skip_group = true;
-                        } else if (rtf_text.substring (i + 1).has_prefix ("\\fonttbl")) {
+                        } else if (i + 9 <= len && rtf_text.substring (i + 1, 8) == "\\fonttbl") {
                             int end_b = find_matching_brace (rtf_text, i);
                             parse_fonttbl (rtf_text.substring (i, end_b - i + 1), fonttbl);
                             if (stack.size > 0) {
@@ -265,7 +277,7 @@ namespace Imladris.Core {
                             }
                             i = end_b + 1;
                             continue;
-                        } else if (rtf_text.substring (i + 1).has_prefix ("\\colortbl")) {
+                        } else if (i + 10 <= len && rtf_text.substring (i + 1, 9) == "\\colortbl") {
                             int end_b = find_matching_brace (rtf_text, i);
                             parse_colortbl (rtf_text.substring (i, end_b - i + 1), colortbl);
                             if (stack.size > 0) {

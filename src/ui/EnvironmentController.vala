@@ -283,10 +283,16 @@ for _k in list(globals().keys()):
                 title = "Import Dataset (CSV, TSV, Text)"
             };
             var filter = new Gtk.FileFilter ();
-            filter.set_filter_name ("Delimited Data (*.csv, *.tsv, *.txt)");
+            filter.set_filter_name ("Data Files (*.csv, *.tsv, *.txt, *.parquet, *.rds, *.dta, *.xlsx)");
             filter.add_pattern ("*.csv");
+            filter.add_pattern ("*.CSV");
             filter.add_pattern ("*.tsv");
+            filter.add_pattern ("*.TSV");
             filter.add_pattern ("*.txt");
+            filter.add_pattern ("*.parquet");
+            filter.add_pattern ("*.rds");
+            filter.add_pattern ("*.dta");
+            filter.add_pattern ("*.xlsx");
             var filters = new GLib.ListStore (typeof (Gtk.FileFilter));
             filters.append (filter);
             file_dialog.filters = filters;
@@ -302,7 +308,8 @@ for _k in list(globals().keys()):
                         }
                         string base_name = file.get_basename () ?? "dataset";
                         string lower_base = base_name.down ();
-                        string raw_stem = base_name.replace (".tabular", "").replace (".csv", "").replace (".tsv", "").replace (".txt", "");
+                        int dot_idx = base_name.last_index_of (".");
+                        string raw_stem = (dot_idx > 0) ? base_name.substring (0, dot_idx) : base_name;
                         var sb_var = new StringBuilder ();
                         for (int ci = 0; ci < raw_stem.length; ci++) {
                             char ch = raw_stem[ci];
@@ -322,29 +329,58 @@ for _k in list(globals().keys()):
 
                         string norm_engine = active_engine.down ().strip ();
                         if (norm_engine == "r" || norm_engine == "polyglot") {
-                            string r_cmd = is_tab
-                                ? @"read.delim(\"$safe_path\", stringsAsFactors = FALSE)"
-                                : @"read.csv(\"$safe_path\")";
+                            string r_cmd;
+                            if (lower_base.has_suffix (".rds")) {
+                                r_cmd = @"readRDS(\"$safe_path\")";
+                            } else if (lower_base.has_suffix (".parquet")) {
+                                r_cmd = @"arrow::read_parquet(\"$safe_path\")";
+                            } else if (lower_base.has_suffix (".dta")) {
+                                r_cmd = @"haven::read_dta(\"$safe_path\")";
+                            } else if (lower_base.has_suffix (".xlsx")) {
+                                r_cmd = @"readxl::read_excel(\"$safe_path\")";
+                            } else {
+                                r_cmd = is_tab
+                                    ? @"read.delim(\"$safe_path\", stringsAsFactors = FALSE)"
+                                    : @"read.csv(\"$safe_path\")";
+                            }
                             string r_code = @"$var_name <- $r_cmd\n";
                             get_session_manager ().execute_r.begin (r_code, (o, r) => {
                                 string? unused_plot = null;
-                                get_session_manager ().execute_r.end (r, out unused_plot);
+                                string out_res = get_session_manager ().execute_r.end (r, out unused_plot);
+                                if (out_res.contains ("Error") || out_res.contains ("✖")) {
+                                    toast_requested (@"Failed to import '$base_name': $(out_res.strip ())");
+                                } else {
+                                    toast_requested (@"Imported dataset as '$var_name'");
+                                }
                                 refresh_environment.begin ();
                                 view_dataframe_requested (var_name, "r");
                             });
                         } else {
-                            string py_cmd = is_tab
-                                ? @"pd.read_csv(\"$safe_path\", sep=\"\\t\")"
-                                : @"pd.read_csv(\"$safe_path\")";
+                            string py_cmd;
+                            if (lower_base.has_suffix (".parquet")) {
+                                py_cmd = @"pd.read_parquet(\"$safe_path\")";
+                            } else if (lower_base.has_suffix (".dta")) {
+                                py_cmd = @"pd.read_stata(\"$safe_path\")";
+                            } else if (lower_base.has_suffix (".xlsx")) {
+                                py_cmd = @"pd.read_excel(\"$safe_path\")";
+                            } else {
+                                py_cmd = is_tab
+                                    ? @"pd.read_csv(\"$safe_path\", sep=\"\\t\")"
+                                    : @"pd.read_csv(\"$safe_path\")";
+                            }
                             string py_code = @"import pandas as pd\n$var_name = $py_cmd\n";
                             get_session_manager ().execute_python.begin (py_code, (o, r) => {
                                 string? unused_plot = null;
-                                get_session_manager ().execute_python.end (r, out unused_plot);
+                                string out_res = get_session_manager ().execute_python.end (r, out unused_plot);
+                                if (out_res.contains ("Traceback") || out_res.contains ("Error") || out_res.contains ("✖")) {
+                                    toast_requested (@"Failed to import '$base_name': $(out_res.strip ())");
+                                } else {
+                                    toast_requested (@"Imported dataset as '$var_name'");
+                                }
                                 refresh_environment.begin ();
                                 view_dataframe_requested (var_name, "python");
                             });
                         }
-                        toast_requested (@"Imported dataset as '$var_name'");
                     }
                 } catch (GLib.Error e) {
                     // Canceled or failed
@@ -360,10 +396,10 @@ local({
     tryCatch({
       val <- get(x, envir = .GlobalEnv)
       cls <- paste(class(val), collapse=", ")
-      dim_str <- if(!is.null(dim(val))) paste0(nrow(val), " × ", ncol(val)) else if(length(val) > 0) as.character(length(val)) else ""
+      dim_str <- if(!is.null(dim(val))) paste(dim(val), collapse = " × ") else if(length(val) > 0) as.character(length(val)) else ""
       sz <- format(object.size(val), units = "auto")
-      is_df <- is.data.frame(val) || is.matrix(val)
-      cols <- if(is.data.frame(val) || is.matrix(val)) paste(utils::head(colnames(val), 80), collapse=",") else if(is.list(val) && !is.null(names(val))) paste(utils::head(names(val), 80), collapse=",") else ""
+      is_df <- is.data.frame(val) || is.matrix(val) || inherits(val, "dgCMatrix") || inherits(val, "Seurat") || inherits(val, "DESeqDataSet") || inherits(val, "SummarizedExperiment")
+      cols <- if(is.data.frame(val) || is.matrix(val) || inherits(val, "dgCMatrix")) paste(utils::head(colnames(val), 80), collapse=",") else if(isS4(val)) paste(utils::head(methods::slotNames(val), 40), collapse=",") else if(is.list(val) && !is.null(names(val))) paste(utils::head(names(val), 80), collapse=",") else ""
       paste(x, cls, dim_str, sz, if(is_df) "1" else "0", cols, sep="\t")
     }, error = function(e) "")
   })
@@ -379,23 +415,43 @@ local({
 
         private async void fetch_python_environment (Gee.ArrayList<EnvVariableItem> items) {
             string py_probe = """
-import sys
-res = []
-for k in list(globals().keys()):
-    if not k.startswith('_') and k not in ('In', 'Out', 'get_ipython', 'exit', 'quit', 'sys', 'os'):
-        try:
-            v = globals()[k]
-            cls = type(v).__name__
-            dim_str = str(getattr(v, 'shape', len(v) if hasattr(v, '__len__') else ''))
-            sz = str(sys.getsizeof(v)) + " bytes"
-            is_df = "1" if hasattr(v, 'columns') or (hasattr(v, 'shape') and hasattr(v.shape, '__len__') and len(v.shape) == 2) else "0"
-            cols = ",".join([str(c) for c in list(v.columns)[:80]]) if hasattr(v, 'columns') else ""
-            res.append(f"{k}\t{cls}\t{dim_str}\t{sz}\t{is_df}\t{cols}")
-        except Exception:
-            pass
-print("___IMLADRIS_ENV_START___")
-print("\n".join(res))
-print("___IMLADRIS_ENV_END___")
+def _imladris_env_probe():
+    import sys
+    def _fmt_sz(n):
+        if n >= 1073741824: return f"{n/1073741824:.1f} GB"
+        if n >= 1048576: return f"{n/1048576:.1f} MB"
+        if n >= 1024: return f"{n/1024:.1f} KB"
+        return f"{n} bytes"
+    res = []
+    _ns = globals()
+    for k in list(_ns.keys()):
+        if not k.startswith('_') and k not in ('In', 'Out', 'get_ipython', 'exit', 'quit', 'sys', 'os'):
+            try:
+                v = _ns[k]
+                cls = type(v).__name__
+                dim_str = str(getattr(v, 'shape', len(v) if hasattr(v, '__len__') else ''))
+                if hasattr(v, 'estimated_size'):
+                    nbytes = int(v.estimated_size())
+                elif hasattr(v, 'memory_usage'):
+                    _deep = (len(v) <= 50000) if hasattr(v, '__len__') else False
+                    nbytes = int(v.memory_usage(deep=_deep).sum())
+                elif hasattr(v, 'nbytes'):
+                    nbytes = int(v.nbytes)
+                elif hasattr(v, 'X') and hasattr(v.X, 'data') and hasattr(v.X.data, 'nbytes'):
+                    nbytes = int(v.X.data.nbytes)
+                else:
+                    nbytes = sys.getsizeof(v)
+                sz = _fmt_sz(nbytes)
+                is_df = "1" if hasattr(v, 'columns') or hasattr(v, 'obs') or (hasattr(v, 'shape') and hasattr(v.shape, '__len__') and len(v.shape) == 2) else "0"
+                cols = ",".join([str(c) for c in list(v.columns)[:80]]) if hasattr(v, 'columns') else (",".join([str(c) for c in list(v.obs.columns)[:40]]) if hasattr(v, 'obs') and hasattr(v.obs, 'columns') else "")
+                res.append(f"{k}\t{cls}\t{dim_str}\t{sz}\t{is_df}\t{cols}")
+            except Exception:
+                pass
+    print("___IMLADRIS_ENV_START___")
+    print("\n".join(res))
+    print("___IMLADRIS_ENV_END___")
+_imladris_env_probe()
+del _imladris_env_probe
 """;
             string? plot_out = null;
             string out_str = yield get_session_manager ().execute_python_with_options (py_probe, null, null, 15000, false, out plot_out);
@@ -597,9 +653,10 @@ try:
         v.info(buf=buf)
         print(buf.getvalue())
     if hasattr(v, 'describe'):
-        print(v.describe().to_string())
+        print(v.describe().to_string()[:4000])
     elif hasattr(v, '__repr__'):
-        print(repr(v))
+        r = repr(v)
+        print(r[:4000] + ('\n... [truncated]' if len(r) > 4000 else ''))
 except Exception as e:
     print(str(e))
 """.printf (b64_name);

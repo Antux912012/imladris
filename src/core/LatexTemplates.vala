@@ -313,7 +313,7 @@ namespace Imladris.Core {
                 "AAAS Science journal numeric reference style with compressed ranges.",
                 "\\usepackage[super,sort&compress]{natbib}",
                 "\\cite{example2026}",
-                "\\bibliographystyle{Science}\n\\bibliography{%BIB%}"
+                "\\bibliographystyle{unsrtnat}\n\\bibliography{%BIB%}"
             ));
 
             // 5. ACM Reference Format

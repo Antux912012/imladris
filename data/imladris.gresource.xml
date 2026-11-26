@@ -12,10 +12,12 @@
     <file alias="index.theme">icons/papirus/index.theme</file>
     <file alias="scalable/actions/book-open-symbolic.svg">icons/papirus/scalable/actions/book-open-symbolic.svg</file>
     <file alias="scalable/actions/character-map-symbolic.svg">icons/papirus/scalable/actions/character-map-symbolic.svg</file>
+    <file alias="scalable/actions/color-select-symbolic.svg">icons/papirus/scalable/actions/color-select-symbolic.svg</file>
     <file alias="scalable/actions/document-edit-symbolic.svg">icons/papirus/scalable/actions/document-edit-symbolic.svg</file>
     <file alias="scalable/actions/document-new-symbolic.svg">icons/papirus/scalable/actions/document-new-symbolic.svg</file>
     <file alias="scalable/actions/document-open-recent-symbolic.svg">icons/papirus/scalable/actions/document-open-recent-symbolic.svg</file>
     <file alias="scalable/actions/document-open-symbolic.svg">icons/papirus/scalable/actions/document-open-symbolic.svg</file>
+    <file alias="scalable/actions/document-properties-symbolic.svg">icons/papirus/scalable/actions/document-properties-symbolic.svg</file>
     <file alias="scalable/actions/document-save-as-symbolic.svg">icons/papirus/scalable/actions/document-save-as-symbolic.svg</file>
     <file alias="scalable/actions/document-save-symbolic.svg">icons/papirus/scalable/actions/document-save-symbolic.svg</file>
     <file alias="scalable/actions/document-send-symbolic.svg">icons/papirus/scalable/actions/document-send-symbolic.svg</file>
@@ -23,6 +25,8 @@
     <file alias="scalable/actions/edit-clear-symbolic.svg">icons/papirus/scalable/actions/edit-clear-symbolic.svg</file>
     <file alias="scalable/actions/edit-copy-symbolic.svg">icons/papirus/scalable/actions/edit-copy-symbolic.svg</file>
     <file alias="scalable/actions/edit-cut-symbolic.svg">icons/papirus/scalable/actions/edit-cut-symbolic.svg</file>
+    <file alias="scalable/actions/edit-delete-symbolic.svg">icons/papirus/scalable/actions/edit-delete-symbolic.svg</file>
+    <file alias="scalable/actions/edit-find-replace-symbolic.svg">icons/papirus/scalable/actions/edit-find-replace-symbolic.svg</file>
     <file alias="scalable/actions/edit-find-symbolic.svg">icons/papirus/scalable/actions/edit-find-symbolic.svg</file>
     <file alias="scalable/actions/edit-paste-symbolic.svg">icons/papirus/scalable/actions/edit-paste-symbolic.svg</file>
     <file alias="scalable/actions/edit-redo-symbolic.svg">icons/papirus/scalable/actions/edit-redo-symbolic.svg</file>
@@ -30,22 +34,30 @@
     <file alias="scalable/actions/emblem-ok-symbolic.svg">icons/papirus/scalable/actions/emblem-ok-symbolic.svg</file>
     <file alias="scalable/actions/folder-download-symbolic.svg">icons/papirus/scalable/actions/folder-download-symbolic.svg</file>
     <file alias="scalable/actions/folder-new-symbolic.svg">icons/papirus/scalable/actions/folder-new-symbolic.svg</file>
+    <file alias="scalable/actions/format-justify-center-symbolic.svg">icons/papirus/scalable/actions/format-justify-center-symbolic.svg</file>
+    <file alias="scalable/actions/format-justify-fill-symbolic.svg">icons/papirus/scalable/actions/format-justify-fill-symbolic.svg</file>
+    <file alias="scalable/actions/format-justify-left-symbolic.svg">icons/papirus/scalable/actions/format-justify-left-symbolic.svg</file>
+    <file alias="scalable/actions/format-justify-right-symbolic.svg">icons/papirus/scalable/actions/format-justify-right-symbolic.svg</file>
     <file alias="scalable/actions/format-text-bold-symbolic.svg">icons/papirus/scalable/actions/format-text-bold-symbolic.svg</file>
     <file alias="scalable/actions/format-text-direction-ltr-symbolic.svg">icons/papirus/scalable/actions/format-text-direction-ltr-symbolic.svg</file>
     <file alias="scalable/actions/format-text-italic-symbolic.svg">icons/papirus/scalable/actions/format-text-italic-symbolic.svg</file>
+    <file alias="scalable/actions/format-text-rich-symbolic.svg">icons/papirus/scalable/actions/format-text-rich-symbolic.svg</file>
     <file alias="scalable/actions/format-text-strikethrough-symbolic.svg">icons/papirus/scalable/actions/format-text-strikethrough-symbolic.svg</file>
     <file alias="scalable/actions/format-text-superscript-symbolic.svg">icons/papirus/scalable/actions/format-text-superscript-symbolic.svg</file>
     <file alias="scalable/actions/format-text-underline-symbolic.svg">icons/papirus/scalable/actions/format-text-underline-symbolic.svg</file>
+    <file alias="scalable/actions/go-down-symbolic.svg">icons/papirus/scalable/actions/go-down-symbolic.svg</file>
     <file alias="scalable/actions/go-home-symbolic.svg">icons/papirus/scalable/actions/go-home-symbolic.svg</file>
     <file alias="scalable/actions/go-next-symbolic.svg">icons/papirus/scalable/actions/go-next-symbolic.svg</file>
     <file alias="scalable/actions/go-previous-symbolic.svg">icons/papirus/scalable/actions/go-previous-symbolic.svg</file>
     <file alias="scalable/actions/go-up-symbolic.svg">icons/papirus/scalable/actions/go-up-symbolic.svg</file>
+    <file alias="scalable/actions/help-about-symbolic.svg">icons/papirus/scalable/actions/help-about-symbolic.svg</file>
     <file alias="scalable/actions/insert-image-symbolic.svg">icons/papirus/scalable/actions/insert-image-symbolic.svg</file>
     <file alias="scalable/actions/insert-link-symbolic.svg">icons/papirus/scalable/actions/insert-link-symbolic.svg</file>
     <file alias="scalable/actions/insert-text-symbolic.svg">icons/papirus/scalable/actions/insert-text-symbolic.svg</file>
     <file alias="scalable/actions/list-add-symbolic.svg">icons/papirus/scalable/actions/list-add-symbolic.svg</file>
     <file alias="scalable/actions/mail-send-symbolic.svg">icons/papirus/scalable/actions/mail-send-symbolic.svg</file>
     <file alias="scalable/actions/media-playback-start-symbolic.svg">icons/papirus/scalable/actions/media-playback-start-symbolic.svg</file>
+    <file alias="scalable/actions/media-playback-stop-symbolic.svg">icons/papirus/scalable/actions/media-playback-stop-symbolic.svg</file>
     <file alias="scalable/actions/media-seek-forward-symbolic.svg">icons/papirus/scalable/actions/media-seek-forward-symbolic.svg</file>
     <file alias="scalable/actions/media-skip-backward-symbolic.svg">icons/papirus/scalable/actions/media-skip-backward-symbolic.svg</file>
     <file alias="scalable/actions/media-skip-forward-symbolic.svg">icons/papirus/scalable/actions/media-skip-forward-symbolic.svg</file>
@@ -55,6 +67,7 @@
     <file alias="scalable/actions/ribbon-toggle-symbolic.svg">icons/papirus/scalable/actions/ribbon-toggle-symbolic.svg</file>
     <file alias="scalable/actions/send-symbolic.svg">icons/papirus/scalable/actions/send-symbolic.svg</file>
     <file alias="scalable/actions/software-properties-symbolic.svg">icons/papirus/scalable/actions/software-properties-symbolic.svg</file>
+    <file alias="scalable/actions/system-log-out-symbolic.svg">icons/papirus/scalable/actions/system-log-out-symbolic.svg</file>
     <file alias="scalable/actions/system-run-symbolic.svg">icons/papirus/scalable/actions/system-run-symbolic.svg</file>
     <file alias="scalable/actions/system-search-symbolic.svg">icons/papirus/scalable/actions/system-search-symbolic.svg</file>
     <file alias="scalable/actions/text-html-symbolic.svg">icons/papirus/scalable/actions/text-html-symbolic.svg</file>
@@ -74,6 +87,7 @@
     <file alias="scalable/actions/window-close-symbolic.svg">icons/papirus/scalable/actions/window-close-symbolic.svg</file>
     <file alias="scalable/actions/window-maximize-symbolic.svg">icons/papirus/scalable/actions/window-maximize-symbolic.svg</file>
     <file alias="scalable/actions/window-minimize-symbolic.svg">icons/papirus/scalable/actions/window-minimize-symbolic.svg</file>
+    <file alias="scalable/actions/window-new-symbolic.svg">icons/papirus/scalable/actions/window-new-symbolic.svg</file>
     <file alias="scalable/actions/zoom-in-symbolic.svg">icons/papirus/scalable/actions/zoom-in-symbolic.svg</file>
     <file alias="scalable/actions/zoom-original-symbolic.svg">icons/papirus/scalable/actions/zoom-original-symbolic.svg</file>
     <file alias="scalable/actions/zoom-out-symbolic.svg">icons/papirus/scalable/actions/zoom-out-symbolic.svg</file>
@@ -93,7 +107,11 @@
     <file alias="scalable/apps/ai-openai.svg">icons/papirus/scalable/apps/ai-openai.svg</file>
     <file alias="scalable/apps/ai-qwen.svg">icons/papirus/scalable/apps/ai-qwen.svg</file>
     <file alias="scalable/apps/help-browser-symbolic.svg">icons/papirus/scalable/apps/help-browser-symbolic.svg</file>
+    <file alias="scalable/apps/preferences-desktop-keyboard-shortcuts-symbolic.svg">icons/papirus/scalable/apps/preferences-desktop-keyboard-shortcuts-symbolic.svg</file>
+    <file alias="scalable/apps/preferences-desktop-theme-symbolic.svg">icons/papirus/scalable/apps/preferences-desktop-theme-symbolic.svg</file>
     <file alias="scalable/apps/utilities-terminal-symbolic.svg">icons/papirus/scalable/apps/utilities-terminal-symbolic.svg</file>
+    <file alias="scalable/apps/web-browser-symbolic.svg">icons/papirus/scalable/apps/web-browser-symbolic.svg</file>
+    <file alias="scalable/categories/applications-engineering-symbolic.svg">icons/papirus/scalable/categories/applications-engineering-symbolic.svg</file>
     <file alias="scalable/categories/applications-graphics-symbolic.svg">icons/papirus/scalable/categories/applications-graphics-symbolic.svg</file>
     <file alias="scalable/categories/applications-internet-symbolic.svg">icons/papirus/scalable/categories/applications-internet-symbolic.svg</file>
     <file alias="scalable/categories/applications-science-symbolic.svg">icons/papirus/scalable/categories/applications-science-symbolic.svg</file>
@@ -124,10 +142,10 @@
     <file alias="scalable/status/dialog-information-symbolic.svg">icons/papirus/scalable/status/dialog-information-symbolic.svg</file>
     <file alias="scalable/status/folder-open-symbolic.svg">icons/papirus/scalable/status/folder-open-symbolic.svg</file>
     <file alias="scalable/status/network-offline-symbolic.svg">icons/papirus/scalable/status/network-offline-symbolic.svg</file>
+    <file alias="scalable/status/network-transmit-receive-symbolic.svg">icons/papirus/scalable/status/network-transmit-receive-symbolic.svg</file>
     <file alias="scalable/status/network-wireless-signal-excellent-symbolic.svg">icons/papirus/scalable/status/network-wireless-signal-excellent-symbolic.svg</file>
     <file alias="scalable/status/process-working-symbolic.svg">icons/papirus/scalable/status/process-working-symbolic.svg</file>
     <file alias="scalable/status/security-high-symbolic.svg">icons/papirus/scalable/status/security-high-symbolic.svg</file>
-    <file alias="scalable/ui/window-new-symbolic.svg">icons/papirus/scalable/ui/window-new-symbolic.svg</file>
     <file alias="scalable/apps/io.github.Antux912012.Imladris.svg">icons/hicolor/scalable/apps/io.github.Antux912012.Imladris.svg</file>
   </gresource>
 </gresources>

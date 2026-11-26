@@ -351,7 +351,7 @@ namespace Imladris.UI {
                     ?? GLib.Path.build_filename (GLib.Environment.get_home_dir (), "Documents"));
 
             DocumentFormat fmt = get_selected_project_format ();
-            if (fmt != DocumentFormat.RMD && fmt != DocumentFormat.QMD) {
+            if (fmt != DocumentFormat.RMD && fmt != DocumentFormat.QMD && fmt != DocumentFormat.IPYNB) {
                 fmt = DocumentFormat.RSCRIPT;
             }
 
@@ -363,9 +363,14 @@ namespace Imladris.UI {
                     selected_project_type == ProjectType.SANDBOXED
                 );
                 string project_dir = rproj_file.get_parent ().get_path ();
-                string starter_filename = (fmt == DocumentFormat.RMD)
-                    ? "analysis.Rmd"
-                    : ((fmt == DocumentFormat.QMD) ? "analysis.qmd" : "main.R");
+                string starter_filename = "main.R";
+                if (fmt == DocumentFormat.RMD) {
+                    starter_filename = "analysis.Rmd";
+                } else if (fmt == DocumentFormat.QMD) {
+                    starter_filename = "analysis.qmd";
+                } else if (fmt == DocumentFormat.IPYNB) {
+                    starter_filename = "notebook.ipynb";
+                }
                 File primary_file = File.new_for_path (GLib.Path.build_filename (project_dir, starter_filename));
 
                 var cfg = new ProjectConfig () {

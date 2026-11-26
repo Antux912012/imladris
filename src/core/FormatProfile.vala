@@ -151,7 +151,7 @@ namespace Imladris.Core {
                         "Render Quarto Document to Target Format",
                         "system-run-symbolic",
                         "QMD",
-                        new string[] { "HTML", "PDF", "RevealJS", "Beamer PDF", "Typst/PDF" }
+                        new string[] { "HTML", "PDF", "DOCX", "RevealJS", "Beamer PDF", "Typst/PDF" }
                     );
                 case DocumentFormat.RMD:
                     return new FormatProfile (
@@ -196,7 +196,7 @@ namespace Imladris.Core {
                         "Preview or Export Markdown Document",
                         "document-send-symbolic",
                         "MD",
-                        new string[] { "HTML", "PDF", "ODT", "RTF" }
+                        new string[] { "HTML", "PDF", "DOCX", "ODT", "RTF" }
                     );
                 case DocumentFormat.TEX:
                     return new FormatProfile (

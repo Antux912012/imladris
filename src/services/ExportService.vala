@@ -104,15 +104,24 @@ namespace Imladris.Services {
             string base_name = GLib.Path.get_basename (input_path);
             int dot_idx = base_name.last_index_of_char ('.');
             string ext = (dot_idx >= 0) ? base_name.substring (dot_idx) : ".md";
+            string parent_dir = GLib.Path.get_dirname (input_path);
+            string staging_dir;
+            if (parent_dir != "" && parent_dir != "." && GLib.FileUtils.test (parent_dir, GLib.FileTest.IS_DIR)) {
+                staging_dir = parent_dir;
+            } else {
+                staging_dir = GLib.Path.build_filename (GLib.Environment.get_user_runtime_dir (), "imladris", "export");
+                GLib.DirUtils.create_with_parents (staging_dir, 0700);
+            }
             temp_file = GLib.Path.build_filename (
-                Core.PlatformUtils.get_shared_cache_dir ("tmp"),
-                @"imladris_export_$(GLib.Random.next_int ())$(ext)"
+                staging_dir,
+                @".imladris_export_$(GLib.Random.next_int ())$(ext)"
             );
             string payload = raw_buffer_fallback;
             if (ext.down () == ".ipynb") {
                 payload = Adapters.DocumentAdapter.save_from_editor_buffer (raw_buffer_fallback, DocumentFormat.IPYNB);
             }
             GLib.FileUtils.set_contents (temp_file, payload);
+            GLib.FileUtils.chmod (temp_file, 0600);
             return temp_file;
         }
 
@@ -152,13 +161,16 @@ namespace Imladris.Services {
             string src_dir = GLib.Path.get_dirname (actual_input);
             string pandoc_from = resolve_pandoc_from (fmt);
 
+            bool cli_attempted = false;
             try {
                 if ((fmt == DocumentFormat.QMD || fmt == DocumentFormat.IPYNB) &&
                     Core.PlatformUtils.is_program_available ("quarto", src_dir)) {
+                    cli_attempted = true;
                     cli_succeeded = run_tool_process ("quarto", { "render", actual_input, "--to", "odt", "--output", out_file }, src_dir)
                                     && move_quarto_output_if_needed (src_dir, out_file, output_path);
                 } else if (fmt == DocumentFormat.RMD &&
                            Core.PlatformUtils.is_program_available ("Rscript", src_dir)) {
+                    cli_attempted = true;
                     string r_expr = "if (requireNamespace('rmarkdown', quietly=TRUE)) rmarkdown::render('%s', output_format = 'odt_document', output_file = '%s', quiet = TRUE) else stop('no rmarkdown')".printf (
                         escape_r_single_quoted (actual_input),
                         escape_r_single_quoted (output_path)
@@ -167,7 +179,82 @@ namespace Imladris.Services {
                 }
 
                 if (!cli_succeeded && Core.PlatformUtils.is_program_available ("pandoc", src_dir)) {
+                    cli_attempted = true;
                     cli_succeeded = run_tool_process ("pandoc", { actual_input, "-f", pandoc_from, "-t", "odt", "-o", output_path, "--standalone" }, src_dir);
+                }
+            } finally {
+                if (temp_src != null) {
+                    if (GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
+                        GLib.FileUtils.remove (temp_src);
+                    }
+                    if (temp_src.has_suffix (".tex")) {
+                        string t_dir = GLib.Path.get_dirname (temp_src);
+                        string t_base = GLib.Path.get_basename (temp_src);
+                        string t_stem = t_base.substring (0, t_base.length - 4);
+                        foreach (string aux_ext in new string[] { ".pdf", ".aux", ".log", ".bbl", ".blg", ".out", ".toc", ".bcf", ".run.xml" }) {
+                            string aux_p = GLib.Path.build_filename (t_dir, t_stem + aux_ext);
+                            if (aux_p != output_path && GLib.FileUtils.test (aux_p, GLib.FileTest.EXISTS)) {
+                                GLib.FileUtils.remove (aux_p);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!cli_succeeded || !GLib.FileUtils.test (output_path, GLib.FileTest.EXISTS)) {
+                string source_text = read_source_or_fallback (input_path, raw_buffer_fallback);
+                build_oasis_odt_container (source_text, output_path, fmt);
+            }
+        }
+
+        /**
+         * Exports a source document (.md, .Rmd, .qmd, .ipynb) to Word (.docx).
+         * Primary bridge: Quarto -> RMarkdown -> Pandoc -> LibreOffice headless fallback.
+         */
+        public static void export_to_docx (string input_path, string output_path, string? raw_buffer_fallback = null) throws GLib.Error {
+            var fmt = DocumentFormat.from_filename (input_path);
+            bool cli_succeeded = false;
+            string out_file = GLib.Path.get_basename (output_path);
+            ensure_parent_dir (output_path);
+
+            string? temp_src = null;
+            string actual_input = materialize_input (input_path, raw_buffer_fallback, out temp_src);
+            string src_dir = GLib.Path.get_dirname (actual_input);
+            string pandoc_from = resolve_pandoc_from (fmt);
+
+            try {
+                if ((fmt == DocumentFormat.QMD || fmt == DocumentFormat.IPYNB) &&
+                    Core.PlatformUtils.is_program_available ("quarto", src_dir)) {
+                    cli_succeeded = run_tool_process ("quarto", { "render", actual_input, "--to", "docx", "--output", out_file }, src_dir)
+                                    && move_quarto_output_if_needed (src_dir, out_file, output_path);
+                } else if (fmt == DocumentFormat.RMD &&
+                           Core.PlatformUtils.is_program_available ("Rscript", src_dir)) {
+                    string r_expr = "if (requireNamespace('rmarkdown', quietly=TRUE)) rmarkdown::render('%s', output_format = 'word_document', output_file = '%s', quiet = TRUE) else stop('no rmarkdown')".printf (
+                        escape_r_single_quoted (actual_input),
+                        escape_r_single_quoted (output_path)
+                    );
+                    cli_succeeded = run_tool_process ("Rscript", { "-e", r_expr }, src_dir);
+                }
+
+                if (!cli_succeeded && fmt != DocumentFormat.RTF && Core.PlatformUtils.is_program_available ("pandoc", src_dir)) {
+                    cli_succeeded = run_tool_process ("pandoc", { actual_input, "-f", pandoc_from, "-t", "docx", "-o", output_path, "--standalone" }, src_dir);
+                }
+
+                if (!cli_succeeded) {
+                    string? soffice_bin = Core.PlatformUtils.is_program_available ("soffice", src_dir)
+                        ? "soffice"
+                        : (Core.PlatformUtils.is_program_available ("libreoffice", src_dir) ? "libreoffice" : null);
+                    if (soffice_bin != null) {
+                        string out_dir = GLib.Path.get_dirname (output_path);
+                        string tmp_odt = GLib.Path.build_filename (out_dir, @".imladris_tmp_docx_$(GLib.Random.next_int ()).odt");
+                        try {
+                            string source_text = read_source_or_fallback (input_path, raw_buffer_fallback);
+                            build_oasis_odt_container (source_text, tmp_odt, fmt);
+                            cli_succeeded = convert_with_libreoffice (soffice_bin, tmp_odt, "docx", out_dir, output_path);
+                        } finally {
+                            if (GLib.FileUtils.test (tmp_odt, GLib.FileTest.EXISTS)) GLib.FileUtils.remove (tmp_odt);
+                        }
+                    }
                 }
             } finally {
                 if (temp_src != null && GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
@@ -176,8 +263,7 @@ namespace Imladris.Services {
             }
 
             if (!cli_succeeded || !GLib.FileUtils.test (output_path, GLib.FileTest.EXISTS)) {
-                string source_text = read_source_or_fallback (input_path, raw_buffer_fallback);
-                build_oasis_odt_container (source_text, output_path, fmt);
+                throw new GLib.IOError.FAILED ("DOCX export requires Quarto, RMarkdown, Pandoc, or LibreOffice.");
             }
         }
 
@@ -230,8 +316,21 @@ namespace Imladris.Services {
                     }
                 }
             } finally {
-                if (temp_src != null && GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
-                    GLib.FileUtils.remove (temp_src);
+                if (temp_src != null) {
+                    if (GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
+                        GLib.FileUtils.remove (temp_src);
+                    }
+                    if (temp_src.has_suffix (".tex")) {
+                        string t_dir = GLib.Path.get_dirname (temp_src);
+                        string t_base = GLib.Path.get_basename (temp_src);
+                        string t_stem = t_base.substring (0, t_base.length - 4);
+                        foreach (string aux_ext in new string[] { ".pdf", ".aux", ".log", ".bbl", ".blg", ".out", ".toc", ".bcf", ".run.xml" }) {
+                            string aux_p = GLib.Path.build_filename (t_dir, t_stem + aux_ext);
+                            if (aux_p != output_path && GLib.FileUtils.test (aux_p, GLib.FileTest.EXISTS)) {
+                                GLib.FileUtils.remove (aux_p);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -296,17 +395,49 @@ namespace Imladris.Services {
                     }
                 }
             } finally {
-                if (temp_src != null && GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
-                    GLib.FileUtils.remove (temp_src);
+                if (temp_src != null) {
+                    if (GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
+                        GLib.FileUtils.remove (temp_src);
+                    }
+                    if (temp_src.has_suffix (".tex")) {
+                        string t_dir = GLib.Path.get_dirname (temp_src);
+                        string t_base = GLib.Path.get_basename (temp_src);
+                        string t_stem = t_base.substring (0, t_base.length - 4);
+                        foreach (string aux_ext in new string[] { ".pdf", ".aux", ".log", ".bbl", ".blg", ".out", ".toc", ".bcf", ".run.xml" }) {
+                            string aux_p = GLib.Path.build_filename (t_dir, t_stem + aux_ext);
+                            if (aux_p != output_path && GLib.FileUtils.test (aux_p, GLib.FileTest.EXISTS)) {
+                                GLib.FileUtils.remove (aux_p);
+                            }
+                        }
+                    }
                 }
             }
 
             if (!cli_succeeded || !GLib.FileUtils.test (output_path, GLib.FileTest.EXISTS)) {
                 string source_text = read_source_or_fallback (input_path, raw_buffer_fallback);
                 string body_html;
-                if (fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.PYSCRIPT || fmt == DocumentFormat.CSS ||
-                    fmt == DocumentFormat.BIB || fmt == DocumentFormat.BIBLIOGRAPHY || fmt == DocumentFormat.CSV ||
-                    fmt == DocumentFormat.TSV || fmt == DocumentFormat.TXT || fmt == DocumentFormat.RPROJ) {
+                if (fmt == DocumentFormat.CSV || fmt == DocumentFormat.TSV) {
+                    char delim = (fmt == DocumentFormat.TSV) ? '\t' : ',';
+                    var tbl_sb = new GLib.StringBuilder ("<table>\n");
+                    string[] csv_lines = source_text.split ("\n");
+                    bool in_head = true;
+                    foreach (string rl in csv_lines) {
+                        string clean_l = rl.replace ("\r", "");
+                        if (clean_l.strip () == "") continue;
+                        string[] cells = parse_csv_row (clean_l, delim);
+                        tbl_sb.append (in_head ? "<thead><tr>" : "<tr>");
+                        string tag = in_head ? "th" : "td";
+                        foreach (string c in cells) {
+                            tbl_sb.append (@"<$tag>").append (GLib.Markup.escape_text (c.strip ())).append (@"</$tag>");
+                        }
+                        tbl_sb.append (in_head ? "</tr></thead><tbody>\n" : "</tr>\n");
+                        in_head = false;
+                    }
+                    tbl_sb.append ("</tbody></table>\n");
+                    body_html = tbl_sb.str;
+                } else if (fmt == DocumentFormat.RSCRIPT || fmt == DocumentFormat.PYSCRIPT || fmt == DocumentFormat.CSS ||
+                    fmt == DocumentFormat.BIB || fmt == DocumentFormat.BIBLIOGRAPHY ||
+                    fmt == DocumentFormat.TXT || fmt == DocumentFormat.RPROJ) {
                     body_html = "<pre><code>" + GLib.Markup.escape_text (source_text) + "</code></pre>";
                 } else {
                     body_html = Adapters.DocumentAdapter.render_html (source_text, fmt);
@@ -350,6 +481,15 @@ namespace Imladris.Services {
     table { border-collapse: collapse; width: 100%%; margin: 20px 0; }
     th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
     th { background: #f1f5f9; font-weight: 600; }
+    @media (prefers-color-scheme: dark) {
+      body { color: #e2e8f0; background: #0f172a; }
+      h1, h2, h3, h4 { color: #f8fafc; border-bottom-color: #334155; }
+      pre, .code-chunk-card { background: #1e293b; border-color: #334155; }
+      .code-chunk-header { background: #334155; color: #cbd5e1; }
+      code { background: #1e293b; }
+      th, td { border-color: #334155; }
+      th { background: #1e293b; }
+    }
     %s
   </style>
 </head>
@@ -409,20 +549,27 @@ namespace Imladris.Services {
                             }
                         }
 
+                        string tex_src = "";
+                        try { GLib.FileUtils.get_contents (actual_input, out tex_src); } catch (GLib.Error e) {}
                         if (engine == "latexmk") {
-                            tex_ok = run_tool_process_with_output ("latexmk", { "-pdf", "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
+                            string latexmk_mode = "-pdf";
+                            if (tex_src.contains ("luacode") || tex_src.contains ("\\directlua") || tex_src.contains ("luatexbase")) {
+                                latexmk_mode = "-lualatex";
+                            } else if (tex_src.contains ("fontspec") || tex_src.contains ("unicode-math") || tex_src.contains ("\\setmainfont")) {
+                                latexmk_mode = "-xelatex";
+                            }
+                            tex_ok = run_tool_process_with_output ("latexmk", { latexmk_mode, "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
                         } else if (engine == "tectonic") {
                             tex_ok = run_tool_process_with_output ("tectonic", { "--keep-logs", base_name }, src_dir, out tex_log, tex_env);
                         } else {
                             tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
-                            string tex_src = "";
-                            try { GLib.FileUtils.get_contents (actual_input, out tex_src); } catch (GLib.Error e) {}
-                            if (tex_ok && (tex_src.contains ("\\bibliography{") || tex_src.contains ("\\addbibresource"))) {
-                                string bib_tool = tex_src.contains ("\\addbibresource") ? "biber" : "bibtex";
+                            bool has_bib = has_uncommented_tex_cmd (tex_src, "\\bibliography{") || has_uncommented_tex_cmd (tex_src, "\\addbibresource");
+                            if (tex_ok && has_bib) {
+                                string bib_tool = (has_uncommented_tex_cmd (tex_src, "\\addbibresource") && !tex_src.contains ("backend=bibtex")) ? "biber" : "bibtex";
                                 string bib_log = "";
                                 bool bib_ok = run_tool_process_with_output (bib_tool, { stem }, src_dir, out bib_log, tex_env);
                                 if (!bib_ok) {
-                                    GLib.warning ("%s failed for '%s': %s", bib_tool, stem, bib_log.strip ());
+                                    throw new GLib.IOError.FAILED (@"$(bib_tool) failed for '$(stem)': $(bib_log.strip ())");
                                 }
                                 tex_ok = run_tool_process_with_output (engine, { "-interaction=nonstopmode", "-file-line-error", base_name }, src_dir, out tex_log, tex_env);
                                 if (tex_ok) {
@@ -523,8 +670,21 @@ namespace Imladris.Services {
                     }
                 }
             } finally {
-                if (temp_src != null && GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
-                    GLib.FileUtils.remove (temp_src);
+                if (temp_src != null) {
+                    if (GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
+                        GLib.FileUtils.remove (temp_src);
+                    }
+                    if (temp_src.has_suffix (".tex")) {
+                        string t_dir = GLib.Path.get_dirname (temp_src);
+                        string t_base = GLib.Path.get_basename (temp_src);
+                        string t_stem = t_base.substring (0, t_base.length - 4);
+                        foreach (string aux_ext in new string[] { ".pdf", ".aux", ".log", ".bbl", ".blg", ".out", ".toc", ".bcf", ".run.xml" }) {
+                            string aux_p = GLib.Path.build_filename (t_dir, t_stem + aux_ext);
+                            if (aux_p != output_path && GLib.FileUtils.test (aux_p, GLib.FileTest.EXISTS)) {
+                                GLib.FileUtils.remove (aux_p);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -581,8 +741,21 @@ namespace Imladris.Services {
                     }
                 }
             } finally {
-                if (temp_src != null && GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
-                    GLib.FileUtils.remove (temp_src);
+                if (temp_src != null) {
+                    if (GLib.FileUtils.test (temp_src, GLib.FileTest.EXISTS)) {
+                        GLib.FileUtils.remove (temp_src);
+                    }
+                    if (temp_src.has_suffix (".tex")) {
+                        string t_dir = GLib.Path.get_dirname (temp_src);
+                        string t_base = GLib.Path.get_basename (temp_src);
+                        string t_stem = t_base.substring (0, t_base.length - 4);
+                        foreach (string aux_ext in new string[] { ".pdf", ".aux", ".log", ".bbl", ".blg", ".out", ".toc", ".bcf", ".run.xml" }) {
+                            string aux_p = GLib.Path.build_filename (t_dir, t_stem + aux_ext);
+                            if (aux_p != output_path && GLib.FileUtils.test (aux_p, GLib.FileTest.EXISTS)) {
+                                GLib.FileUtils.remove (aux_p);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -626,6 +799,8 @@ namespace Imladris.Services {
                         export_to_pdf (src_path, output_path, raw_text);
                     } else if (target == "rtf") {
                         export_to_rtf (src_path, output_path, raw_text);
+                    } else if (target == "docx") {
+                        export_to_docx (src_path, output_path, raw_text);
                     } else {
                         export_to_odt (src_path, output_path, raw_text);
                     }
@@ -868,10 +1043,15 @@ namespace Imladris.Services {
                 ? meta.title.strip ()
                 : "Slide 1";
             var current_bullets = new GLib.StringBuilder ();
+            bool in_code = false;
 
             foreach (string raw_line in lines) {
                 string trimmed = raw_line.strip ();
-                if (trimmed == "---" || trimmed.has_prefix ("# ") || trimmed.has_prefix ("## ")) {
+                if (trimmed.has_prefix ("```")) {
+                    in_code = !in_code;
+                    continue;
+                }
+                if (!in_code && (trimmed == "---" || trimmed.has_prefix ("# ") || trimmed.has_prefix ("## "))) {
                     if (slide_num > 0 || current_bullets.len > 0) {
                         slide_num++;
                         append_odp_slide (pages_xml, slide_num, current_title, current_bullets.str);
@@ -1073,6 +1253,41 @@ namespace Imladris.Services {
 
             rtf.append ("}\n");
             GLib.FileUtils.set_contents (output_path, rtf.str);
+        }
+
+        private static string[] parse_csv_row (string line, char delim) {
+            var fields = new Gee.ArrayList<string> ();
+            var cur = new GLib.StringBuilder ();
+            bool in_quotes = false;
+            for (int i = 0; i < line.length; i++) {
+                char c = line[i];
+                if (c == '"') {
+                    if (in_quotes && i + 1 < line.length && line[i + 1] == '"') {
+                        cur.append_c ('"');
+                        i++;
+                    } else {
+                        in_quotes = !in_quotes;
+                    }
+                } else if (c == delim && !in_quotes) {
+                    fields.add (cur.str);
+                    cur.truncate (0);
+                } else {
+                    cur.append_c (c);
+                }
+            }
+            fields.add (cur.str);
+            return fields.to_array ();
+        }
+
+        private static bool has_uncommented_tex_cmd (string tex_src, string cmd) {
+            foreach (string raw_line in tex_src.split ("\n")) {
+                string trimmed = raw_line.strip ();
+                if (trimmed.has_prefix ("%")) continue;
+                int pct = trimmed.index_of ("%");
+                string active = (pct >= 0) ? trimmed.substring (0, pct) : trimmed;
+                if (active.contains (cmd)) return true;
+            }
+            return false;
         }
 
         private static string escape_rtf_text (string text) {

@@ -185,7 +185,7 @@ namespace Imladris.Services {
             // Route working directory updates through locked 4-field protocol calls
             if (r_initialized && r_process != null) {
                 string hex_dir = Core.PlatformUtils.encode_hex (dir_path.data);
-                string r_chdir = "local({ .h <- '%s'; .idx <- seq.int(1L, nchar(.h), by = 2L); .d <- rawToChar(as.raw(strtoi(substring(.h, .idx, .idx + 1L), 16L))); Encoding(.d) <- 'UTF-8'; setwd(.d) })".printf (hex_dir);
+                string r_chdir = "local({ .h <- '%s'; .idx <- seq.int(1L, nchar(.h), by = 2L); .d <- rawToChar(as.raw(strtoi(substring(.h, .idx, .idx + 1L), 16L))); Encoding(.d) <- 'UTF-8'; setwd(.d); if (file.exists('renv/activate.R')) tryCatch(source('renv/activate.R'), error = function(e) NULL) })".printf (hex_dir);
                 execute_r_with_options.begin (r_chdir, null, null, 10000, false, (obj, res) => {
                     string? p;
                     execute_r_with_options.end (res, out p);
@@ -210,7 +210,7 @@ namespace Imladris.Services {
          * remain alive across calls.
          */
         public async string execute_r (string code, out string? generated_plot) {
-            return yield execute_r_with_options (code, null, null, 60000, true, out generated_plot);
+            return yield execute_r_with_options (code, null, null, 300000, true, out generated_plot);
         }
 
         public async string execute_r_with_options (
@@ -254,10 +254,17 @@ namespace Imladris.Services {
 
             var exec_cancel = new GLib.Cancellable ();
             ulong fwd_hid = 0;
+            uint interrupt_grace_id = 0;
             if (cancellable != null) {
                 fwd_hid = cancellable.connect (() => {
-                    exec_cancel.cancel ();
                     if (r_process != null) r_process.send_signal (2);
+                    if (interrupt_grace_id == 0) {
+                        interrupt_grace_id = GLib.Timeout.add (2500, () => {
+                            interrupt_grace_id = 0;
+                            exec_cancel.cancel ();
+                            return GLib.Source.REMOVE;
+                        });
+                    }
                 });
             }
             bool timed_out = false;
@@ -279,6 +286,10 @@ namespace Imladris.Services {
 
                 var output_sb = new GLib.StringBuilder ();
                 string? line = null;
+                const int MAX_OUTPUT_BYTES = 512 * 1024;
+                const int MAX_UI_LINES = 2000;
+                int line_count = 0;
+                bool truncated = false;
                 while (true) {
                     line = yield r_stdout.read_line_async (GLib.Priority.DEFAULT, exec_cancel);
                     if (line == null) {
@@ -286,9 +297,23 @@ namespace Imladris.Services {
                         break;
                     }
                     if (line.contains (sentinel)) break;
-                    output_sb.append (line + "\n");
-                    if (on_output != null) on_output ("r", line, false);
-                    if (emit_global_signals) session_output_received ("r", line, false);
+                    line_count++;
+                    if (emit_global_signals && output_sb.len >= MAX_OUTPUT_BYTES) {
+                        if (!truncated) {
+                            truncated = true;
+                            output_sb.append ("\n[Output truncated at 512 KB to protect UI responsiveness]\n");
+                        }
+                    } else {
+                        output_sb.append (line + "\n");
+                    }
+                    if (line_count <= MAX_UI_LINES) {
+                        if (on_output != null) on_output ("r", line, false);
+                        if (emit_global_signals) session_output_received ("r", line, false);
+                    } else if (line_count == MAX_UI_LINES + 1) {
+                        string msg = "[Live console streaming paused after 2000 lines; full summary will appear on completion]";
+                        if (on_output != null) on_output ("r", msg, false);
+                        if (emit_global_signals) session_output_received ("r", msg, false);
+                    }
                 }
 
                 if (GLib.FileUtils.test (plot_file, GLib.FileTest.EXISTS)) {
@@ -305,15 +330,18 @@ namespace Imladris.Services {
                 return output_sb.str.strip ();
             } catch (GLib.Error e) {
                 if (timed_out) {
-                    return @"✖ R execution timed out after $(timeout_ms / 1000)s (sent SIGINT).";
+                    terminate_r ();
+                    return @"✖ R execution timed out after $(timeout_ms / 1000)s (session reset to prevent desync).";
                 }
                 if (e is GLib.IOError.CANCELLED) {
-                    return "✖ R execution interrupted.";
+                    terminate_r ();
+                    return "✖ R execution interrupted (session reset).";
                 }
                 r_initialized = false;
                 return @"✖ R evaluation error: $(e.message)";
             } finally {
                 if (timeout_id != 0) GLib.Source.remove (timeout_id);
+                if (interrupt_grace_id != 0) GLib.Source.remove (interrupt_grace_id);
                 if (cancellable != null && fwd_hid != 0) cancellable.disconnect (fwd_hid);
             }
         }
@@ -324,7 +352,7 @@ namespace Imladris.Services {
          * remain alive in the workspace.
          */
         public async string execute_python (string code, out string? generated_plot) {
-            return yield execute_python_with_options (code, null, null, 60000, true, out generated_plot);
+            return yield execute_python_with_options (code, null, null, 300000, true, out generated_plot);
         }
 
         public async string execute_python_with_options (
@@ -368,10 +396,17 @@ namespace Imladris.Services {
 
             var exec_cancel = new GLib.Cancellable ();
             ulong fwd_hid = 0;
+            uint interrupt_grace_id = 0;
             if (cancellable != null) {
                 fwd_hid = cancellable.connect (() => {
-                    exec_cancel.cancel ();
                     if (py_process != null) py_process.send_signal (2);
+                    if (interrupt_grace_id == 0) {
+                        interrupt_grace_id = GLib.Timeout.add (2500, () => {
+                            interrupt_grace_id = 0;
+                            exec_cancel.cancel ();
+                            return GLib.Source.REMOVE;
+                        });
+                    }
                 });
             }
             bool timed_out = false;
@@ -393,6 +428,10 @@ namespace Imladris.Services {
 
                 var output_sb = new GLib.StringBuilder ();
                 string? line = null;
+                const int MAX_OUTPUT_BYTES = 512 * 1024;
+                const int MAX_UI_LINES = 2000;
+                int line_count = 0;
+                bool truncated = false;
                 while (true) {
                     line = yield py_stdout.read_line_async (GLib.Priority.DEFAULT, exec_cancel);
                     if (line == null) {
@@ -400,9 +439,23 @@ namespace Imladris.Services {
                         break;
                     }
                     if (line.contains (sentinel)) break;
-                    output_sb.append (line + "\n");
-                    if (on_output != null) on_output ("python", line, false);
-                    if (emit_global_signals) session_output_received ("python", line, false);
+                    line_count++;
+                    if (emit_global_signals && output_sb.len >= MAX_OUTPUT_BYTES) {
+                        if (!truncated) {
+                            truncated = true;
+                            output_sb.append ("\n[Output truncated at 512 KB to protect UI responsiveness]\n");
+                        }
+                    } else {
+                        output_sb.append (line + "\n");
+                    }
+                    if (line_count <= MAX_UI_LINES) {
+                        if (on_output != null) on_output ("python", line, false);
+                        if (emit_global_signals) session_output_received ("python", line, false);
+                    } else if (line_count == MAX_UI_LINES + 1) {
+                        string msg = "[Live console streaming paused after 2000 lines; full summary will appear on completion]";
+                        if (on_output != null) on_output ("python", msg, false);
+                        if (emit_global_signals) session_output_received ("python", msg, false);
+                    }
                 }
 
                 if (GLib.FileUtils.test (plot_file, GLib.FileTest.EXISTS)) {
@@ -419,15 +472,18 @@ namespace Imladris.Services {
                 return output_sb.str.strip ();
             } catch (GLib.Error e) {
                 if (timed_out) {
-                    return @"✖ Python execution timed out after $(timeout_ms / 1000)s (sent SIGINT).";
+                    terminate_python ();
+                    return @"✖ Python execution timed out after $(timeout_ms / 1000)s (session reset to prevent desync).";
                 }
                 if (e is GLib.IOError.CANCELLED) {
-                    return "✖ Python execution interrupted.";
+                    terminate_python ();
+                    return "✖ Python execution interrupted (session reset).";
                 }
                 py_initialized = false;
                 return @"✖ Python evaluation error: $(e.message)";
             } finally {
                 if (timeout_id != 0) GLib.Source.remove (timeout_id);
+                if (interrupt_grace_id != 0) GLib.Source.remove (interrupt_grace_id);
                 if (cancellable != null && fwd_hid != 0) cancellable.disconnect (fwd_hid);
             }
         }
@@ -497,6 +553,16 @@ namespace Imladris.Services {
                         probe, { "--slave", "--no-restore", "--no-save", "-e", r_driver }, cwd, null, true, out env_vars
                     );
                     argv = Core.HostBridge.wrap_command (routed_r, cwd, env_vars);
+                } else if (source == Core.RuntimeSource.HOST_NATIVE) {
+                    var probe = Core.EnvDiscovery.get_default ().get_cached (cwd);
+                    string[] env_vars;
+                    argv = Core.ExecutionRouter.build_r_command (
+                        probe, { "--slave", "--no-restore", "--no-save", "-e", r_driver }, cwd, null, true, out env_vars
+                    );
+                    foreach (string kv in env_vars) {
+                        string[] parts = kv.split ("=", 2);
+                        if (parts.length == 2) launcher.setenv (parts[0], parts[1], true);
+                    }
                 } else {
                     Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                     argv = raw_argv;
@@ -548,13 +614,16 @@ namespace Imladris.Services {
                 }
 
                 string py_driver = """
-import os, sys, base64, traceback
+import os, sys, ast, base64, traceback, builtins
 os.environ.setdefault('MPLBACKEND', 'Agg')
 try:
     import matplotlib
     matplotlib.use('Agg')
 except Exception:
     pass
+def _imladris_no_input(*args, **kwargs):
+    raise RuntimeError('Interactive input() is not supported in notebook chunks.')
+builtins.input = _imladris_no_input
 _imladris_ns = {'__name__': '__main__'}
 for _raw in sys.stdin:
     _raw = _raw.strip()
@@ -568,8 +637,16 @@ for _raw in sys.stdin:
         if 'matplotlib.pyplot' in sys.modules:
             sys.modules['matplotlib.pyplot'].close('all')
         _src = base64.b64decode(_b64).decode('utf-8')
-        _code = compile(_src, '<imladris-cell>', 'exec')
-        exec(_code, _imladris_ns)
+        _tree = ast.parse(_src, '<imladris-cell>', 'exec')
+        if _tree.body and isinstance(_tree.body[-1], ast.Expr):
+            _last_expr = ast.Expression(_tree.body.pop().value)
+            if _tree.body:
+                exec(compile(_tree, '<imladris-cell>', 'exec'), _imladris_ns)
+            _val = eval(compile(_last_expr, '<imladris-cell>', 'eval'), _imladris_ns)
+            if _val is not None:
+                print(repr(_val))
+        else:
+            exec(compile(_tree, '<imladris-cell>', 'exec'), _imladris_ns)
         if _has_plot == '1' and 'matplotlib.pyplot' in sys.modules:
             _plt = sys.modules['matplotlib.pyplot']
             if _plt.get_fignums():
@@ -604,6 +681,16 @@ for _raw in sys.stdin:
                         probe, { "-u", "-c", py_driver }, cwd, null, out env_vars
                     );
                     argv = Core.HostBridge.wrap_command (routed_py, cwd, env_vars);
+                } else if (source == Core.RuntimeSource.HOST_NATIVE) {
+                    var probe = Core.EnvDiscovery.get_default ().get_cached (cwd);
+                    string[] env_vars;
+                    argv = Core.ExecutionRouter.build_python_command (
+                        probe, { "-u", "-c", py_driver }, cwd, null, out env_vars
+                    );
+                    foreach (string kv in env_vars) {
+                        string[] parts = kv.split ("=", 2);
+                        if (parts.length == 2) launcher.setenv (parts[0], parts[1], true);
+                    }
                 } else {
                     Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                     argv = raw_argv;

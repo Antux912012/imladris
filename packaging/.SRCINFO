@@ -1,6 +1,6 @@
 pkgbase = imladris
 	pkgdesc = Native scientific notebook IDE for Quarto, R, Python & Jupyter with GTK4 and AI
-	pkgver = 0.43.2
+	pkgver = 0.44.0
 	pkgrel = 1
 	url = https://antux912012.github.io/imladris/
 	arch = x86_64
@@ -37,7 +37,7 @@ pkgbase = imladris
 	optdepends = quarto-cli-bin: Quarto document, slide deck, and poster rendering
 	optdepends = texlive-basic: LaTeX PDF compilation for Quarto and R Markdown
 	optdepends = libreoffice: Presentation and spreadsheet export
-	source = imladris-0.43.2.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v0.43.2.tar.gz
+	source = imladris-0.44.0.tar.gz::https://github.com/Antux912012/imladris/archive/refs/tags/v0.44.0.tar.gz
 	sha256sums = 670ff69b37a6348e64d5087902b0ebe7c4f3bc01774714e62e8988a783c513e8
 
 pkgname = imladris

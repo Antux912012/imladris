@@ -452,6 +452,27 @@ def summarize(n):
         string read_resp = McpServer.handle_json_rpc (read_req, null);
         assert (read_resp.contains ("Hello MCP"));
 
+        // 4b. JSON-RPC 2.0 notifications (no "id") return "" and explicit "id": null is preserved
+        string notif_req = "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}";
+        assert (McpServer.handle_json_rpc (notif_req, null) == "");
+        string null_id_req = "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"initialize\"}";
+        string null_id_resp = McpServer.handle_json_rpc (null_id_req, null);
+        assert (null_id_resp.contains ("\"id\":null"));
+
+        // 4c. NativeCore outline (#| label:, LaTeX \section), TS kind:name dedup, and LaTeX log consecutive '!' errors
+        string qmd_lbl = "```{r}\n#| label: fig-qc\nplot(1:10)\n```\n";
+        assert (NativeCore.extract_outline_json (qmd_lbl, "qmd").contains ("fig-qc (r)"));
+        string tex_doc = "\\section{Methods}\n\\subsection{Cohort}\n";
+        string tex_outline = NativeCore.extract_outline_json (tex_doc, "tex");
+        assert (tex_outline.contains ("Methods") && tex_outline.contains ("Cohort"));
+        string ts_doc = "// const ignored = () => 1;\ninterface Sample { id: number; }\nconst Sample = 42;\n";
+        string ts_syms = NativeCore.analyze_typescript_symbols_json (ts_doc);
+        assert (!ts_syms.contains ("ignored"));
+        assert (ts_syms.contains ("interface") && ts_syms.contains ("const"));
+        string log_multi = "! First fatal error.\n! Second fatal error.\nl.12 \\bad\n";
+        string log_json = NativeCore.parse_latex_log_json (log_multi);
+        assert (log_json.contains ("First fatal error.") && log_json.contains ("Second fatal error."));
+
         // 5. IMLADRIS_MCP_READONLY=1 blocks mutating tools (including render_document & compile_latex) and writes audit log
         GLib.Environment.set_variable ("IMLADRIS_MCP_READONLY", "1", true);
         string ro_resp = McpServer.handle_json_rpc (ins_req, null);

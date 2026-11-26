@@ -38,7 +38,19 @@ namespace Imladris.Core {
 
             builder.begin_array ();
             string[] lines = source.split ("\n");
+            bool in_block_comment = false;
             for (int i = 0; i < lines.length; i++) {
+                string trimmed_l = lines[i].strip ();
+                if (in_block_comment) {
+                    if (trimmed_l.contains ("*/")) in_block_comment = false;
+                    continue;
+                }
+                if (trimmed_l.has_prefix ("/*")) {
+                    if (!trimmed_l.contains ("*/")) in_block_comment = true;
+                    continue;
+                }
+                if (trimmed_l.has_prefix ("//")) continue;
+
                 GLib.MatchInfo match_info;
                 if (!declaration.match (lines[i], 0, out match_info)) {
                     continue;
@@ -46,14 +58,17 @@ namespace Imladris.Core {
 
                 string kind = match_info.fetch (1);
                 string name = match_info.fetch (2);
-                if (seen.contains (name)) {
-                    continue;
-                }
-                seen.add (name);
-
-                if ((kind == "const" || kind == "let" || kind == "var") && lines[i].contains ("=>")) {
+                string code_part = lines[i];
+                int c_idx = code_part.index_of ("//");
+                if (c_idx >= 0) code_part = code_part.substring (0, c_idx);
+                if ((kind == "const" || kind == "let" || kind == "var") && code_part.contains ("=>")) {
                     kind = "function";
                 }
+                string key = @"$kind:$name";
+                if (seen.contains (key)) {
+                    continue;
+                }
+                seen.add (key);
 
                 builder.begin_object ();
                 builder.set_member_name ("name");
@@ -78,7 +93,11 @@ namespace Imladris.Core {
             }
             var heading_regex = outline_heading_regex;
             var chunk_regex = outline_chunk_regex;
+            string fmt = format_code.down ().strip ();
             bool in_fence = false;
+            string pending_chunk_lang = "";
+            int pending_chunk_line = 0;
+            bool pending_chunk_emitted = false;
 
             builder.begin_array ();
             string[] lines = source.split ("\n");
@@ -88,6 +107,15 @@ namespace Imladris.Core {
                 if (in_fence) {
                     if (trimmed.has_prefix ("```") || trimmed.has_prefix ("~~~")) {
                         in_fence = false;
+                        pending_chunk_lang = "";
+                        pending_chunk_emitted = false;
+                    } else if (!pending_chunk_emitted && trimmed.has_prefix ("#|") && trimmed.contains ("label:")) {
+                        int lbl_idx = trimmed.index_of ("label:") + 6;
+                        string lbl = trimmed.substring (lbl_idx).strip ();
+                        if (lbl.length > 0) {
+                            append_outline_item (builder, 2, @"$lbl ($pending_chunk_lang)", pending_chunk_line, "chunk");
+                            pending_chunk_emitted = true;
+                        }
                     }
                     continue;
                 }
@@ -97,8 +125,12 @@ namespace Imladris.Core {
                     string language = chunk_match.fetch (1).down ();
                     string? raw_label = chunk_match.fetch (2);
                     string label = raw_label != null ? raw_label.strip () : "";
+                    pending_chunk_lang = language;
+                    pending_chunk_line = i + 1;
+                    pending_chunk_emitted = false;
                     if (label != "" && !label.contains ("=")) {
                         append_outline_item (builder, 2, @"$label ($language)", i + 1, "chunk");
+                        pending_chunk_emitted = true;
                     }
                     in_fence = true;
                     continue;
@@ -106,6 +138,18 @@ namespace Imladris.Core {
 
                 if (trimmed.has_prefix ("```") || trimmed.has_prefix ("~~~")) {
                     in_fence = true;
+                    continue;
+                }
+
+                if (fmt == "tex" || fmt == "latex") {
+                    if (trimmed.has_prefix ("\\section{") || trimmed.has_prefix ("\\subsection{") || trimmed.has_prefix ("\\subsubsection{")) {
+                        int lvl = trimmed.has_prefix ("\\subsubsection") ? 3 : (trimmed.has_prefix ("\\subsection") ? 2 : 1);
+                        int ob = trimmed.index_of_char ('{');
+                        int cb = trimmed.last_index_of_char ('}');
+                        if (ob >= 0 && cb > ob) {
+                            append_outline_item (builder, lvl, trimmed.substring (ob + 1, cb - ob - 1).strip (), i + 1, "heading");
+                        }
+                    }
                     continue;
                 }
 
@@ -156,6 +200,9 @@ namespace Imladris.Core {
             foreach (string line in log_text.split ("\n")) {
                 string trimmed = line.strip ();
                 if (trimmed.has_prefix ("!")) {
+                    if (pending_error != null) {
+                        append_latex_diagnostic (builder, pending_error, pending_line, "error");
+                    }
                     pending_error = trimmed.substring (1).strip ();
                     pending_line = 1;
                     continue;

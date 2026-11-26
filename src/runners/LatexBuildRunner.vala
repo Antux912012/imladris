@@ -117,10 +117,14 @@ namespace Imladris.Runners {
             string out_log = "";
             int exit_code = 1;
 
+            string tex_src = "";
+            try { GLib.FileUtils.get_contents (tex_path, out tex_src); } catch (GLib.Error e) {}
+
             if (engine == "latexmk") {
+                string latexmk_mode = (tex_src.contains ("fontspec") || tex_src.contains ("unicode-math") || tex_src.contains ("\\setmainfont")) ? "-xelatex" : "-pdf";
                 exit_code = yield run_tex_cmd (
                     "latexmk",
-                    { "-pdf", "-interaction=nonstopmode", "-file-line-error", "-synctex=1", base_name },
+                    { latexmk_mode, "-interaction=nonstopmode", "-file-line-error", "-synctex=1", base_name },
                     work_dir,
                     cancellable,
                     out out_log
@@ -142,32 +146,34 @@ namespace Imladris.Runners {
                     out out_log
                 );
                 // Multi-pass bibliography support if requested in source
-                string tex_src = "";
-                try { GLib.FileUtils.get_contents (tex_path, out tex_src); } catch (GLib.Error e) {}
                 if (exit_code == 0 && (tex_src.contains ("\\bibliography{") || tex_src.contains ("\\addbibresource{"))) {
                     string bib_tool = tex_src.contains ("\\addbibresource{") ? "biber" : "bibtex";
                     string bib_out;
-                    yield run_tex_cmd (bib_tool, { stem }, work_dir, cancellable, out bib_out);
+                    int bib_rc = yield run_tex_cmd (bib_tool, { stem }, work_dir, cancellable, out bib_out);
                     out_log += "\n" + bib_out;
-                    string pass2;
-                    exit_code = yield run_tex_cmd (
-                        engine,
-                        { "-interaction=nonstopmode", "-file-line-error", "-synctex=1", base_name },
-                        work_dir,
-                        cancellable,
-                        out pass2
-                    );
-                    out_log += "\n" + pass2;
-                    if (exit_code == 0) {
-                        string pass3;
+                    if (bib_rc != 0) {
+                        exit_code = bib_rc;
+                    } else {
+                        string pass2;
                         exit_code = yield run_tex_cmd (
                             engine,
                             { "-interaction=nonstopmode", "-file-line-error", "-synctex=1", base_name },
                             work_dir,
                             cancellable,
-                            out pass3
+                            out pass2
                         );
-                        out_log += "\n" + pass3;
+                        out_log += "\n" + pass2;
+                        if (exit_code == 0) {
+                            string pass3;
+                            exit_code = yield run_tex_cmd (
+                                engine,
+                                { "-interaction=nonstopmode", "-file-line-error", "-synctex=1", base_name },
+                                work_dir,
+                                cancellable,
+                                out pass3
+                            );
+                            out_log += "\n" + pass3;
+                        }
                     }
                 }
 

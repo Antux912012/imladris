@@ -60,7 +60,7 @@ namespace Imladris.UI {
                 tooltip_text = "Pop Out Active Panel to Independent Window (Multi-Screen)"
             };
             popout_quick_btn.add_css_class ("flat");
-            popout_quick_btn.add_css_class ("DockControlBtn");
+            popout_quick_btn.add_css_class ("dock-control-btn");
             popout_quick_btn.clicked.connect (() => {
                 var qc = dock_state.quadrants.get (quad_id);
                 if (qc != null && qc.active_tab != null) {
@@ -73,7 +73,7 @@ namespace Imladris.UI {
                 tooltip_text = "Maximize / Restore Pane"
             };
             max_btn.add_css_class ("flat");
-            max_btn.add_css_class ("DockControlBtn");
+            max_btn.add_css_class ("dock-control-btn");
             max_btn.clicked.connect (() => {
                 dock_state.toggle_maximize (quad_id);
             });
@@ -84,7 +84,7 @@ namespace Imladris.UI {
                 tooltip_text = "Pane Options (Move, Swap Quadrant, Minimize, Pop Out)"
             };
             move_btn.add_css_class ("flat");
-            move_btn.add_css_class ("DockControlBtn");
+            move_btn.add_css_class ("dock-control-btn");
 
             options_popover = new Gtk.Popover ();
             options_pop_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 4) {
@@ -382,8 +382,10 @@ namespace Imladris.UI {
                     drag_source.set_icon (paintable, 12, 12);
                 });
                 drag_source.drag_cancel.connect ((drag, reason) => {
-                    // Dragged outside all dock drop zones -> pop out to independent window
-                    if (reason == Gdk.DragCancelReason.NO_TARGET && !dock_state.popped_out_panels.contains (pid)) {
+                    // Dragged outside all dock drop zones -> pop out to independent window unless layout is locked
+                    if (reason == Gdk.DragCancelReason.NO_TARGET &&
+                        !dock_state.user_locked_mode &&
+                        !dock_state.popped_out_panels.contains (pid)) {
                         popout_tab_requested (pid);
                         return true;
                     }
@@ -521,8 +523,8 @@ namespace Imladris.UI {
                 end_child = quadrant_widgets.get (QuadrantId.Q2_BOTTOM_LEFT),
                 resize_start_child = true,
                 resize_end_child = true,
-                shrink_start_child = false,
-                shrink_end_child = false,
+                shrink_start_child = true,
+                shrink_end_child = true,
                 wide_handle = true,
                 hexpand = true,
                 vexpand = true
@@ -533,8 +535,8 @@ namespace Imladris.UI {
                 end_child = quadrant_widgets.get (QuadrantId.Q6_BOTTOM_CENTER),
                 resize_start_child = true,
                 resize_end_child = true,
-                shrink_start_child = false,
-                shrink_end_child = false,
+                shrink_start_child = true,
+                shrink_end_child = true,
                 wide_handle = true,
                 hexpand = true,
                 vexpand = true,
@@ -546,8 +548,8 @@ namespace Imladris.UI {
                 end_child = quadrant_widgets.get (QuadrantId.Q4_BOTTOM_RIGHT),
                 resize_start_child = true,
                 resize_end_child = true,
-                shrink_start_child = false,
-                shrink_end_child = false,
+                shrink_start_child = true,
+                shrink_end_child = true,
                 wide_handle = true,
                 hexpand = true,
                 vexpand = true
@@ -559,7 +561,7 @@ namespace Imladris.UI {
                 resize_start_child = true,
                 resize_end_child = true,
                 shrink_start_child = true,
-                shrink_end_child = false,
+                shrink_end_child = true,
                 wide_handle = true,
                 hexpand = true,
                 vexpand = true
@@ -570,8 +572,8 @@ namespace Imladris.UI {
                 end_child = right_hpaned,
                 resize_start_child = true,
                 resize_end_child = true,
-                shrink_start_child = false,
-                shrink_end_child = false,
+                shrink_start_child = true,
+                shrink_end_child = true,
                 wide_handle = true,
                 hexpand = true,
                 vexpand = true

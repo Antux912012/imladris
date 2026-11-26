@@ -162,20 +162,21 @@ namespace Imladris {
             sb.append_printf ("# Dataset ID: %s (HID: %d | Format: %s)\n\n", safe_id, ds.hid, ds.extension);
 
             sb.append_printf ("galaxy_url <- \"%s/api/histories/%s/contents/%s/display\"\n", safe_url, safe_hist, safe_id);
+            sb.append ("if (!nzchar(Sys.getenv(\"GALAXY_API_KEY\"))) stop(\"Set GALAXY_API_KEY in your environment or Imladris workbench.\")\n");
             sb.append ("req <- httr2::request(galaxy_url) |>\n");
-            sb.append ("  httr2::req_headers(\"x-api-key\" = Sys.getenv(\"GALAXY_API_KEY\"))\n");
-            sb.append ("resp <- httr2::req_perform(req)\n");
+            sb.append ("  httr2::req_headers(\"x-api-key\" = Sys.getenv(\"GALAXY_API_KEY\")) |>\n");
+            sb.append ("  httr2::req_timeout(300)\n");
+            sb.append ("dir.create(\"./data/galaxy\", recursive = TRUE, showWarnings = FALSE)\n");
+            sb.append_printf ("dest_path <- file.path(\"./data/galaxy\", \"%s_%s\")\n", safe_id, safe_name);
+            sb.append ("if (!file.exists(dest_path)) {\n");
+            sb.append ("  httr2::req_perform(req, path = dest_path)\n");
+            sb.append ("}\n");
 
             if (is_tsv || is_csv) {
                 string reader = is_tsv ? "readr::read_tsv" : "readr::read_csv";
-                sb.append_printf ("galaxy_df_%d <- %s(httr2::resp_body_raw(resp), show_col_types = FALSE)\n", ds.hid, reader);
+                sb.append_printf ("galaxy_df_%d <- %s(dest_path, show_col_types = FALSE)\n", ds.hid, reader);
             } else {
                 // Large bioinformatics binary or non-tabular format (bam, vcf, fasta, h5ad)
-                sb.append ("dir.create(\"./data/galaxy\", recursive = TRUE, showWarnings = FALSE)\n");
-                sb.append_printf ("dest_path <- file.path(\"./data/galaxy\", \"%s_%s\")\n", safe_id, safe_name);
-                sb.append ("if (!file.exists(dest_path)) {\n");
-                sb.append ("  httr2::req_perform(req, path = dest_path)\n");
-                sb.append ("}\n");
                 sb.append_printf ("galaxy_file_%d <- dest_path\n", ds.hid);
                 sb.append_printf ("message(paste(\"Cached dataset file at:\", galaxy_file_%d))\n", ds.hid);
             }
@@ -222,25 +223,25 @@ namespace Imladris {
             sb.append ("if not galaxy_key:\n");
             sb.append ("    raise RuntimeError(\"Set GALAXY_API_KEY in your environment or Imladris workbench.\")\n\n");
 
+            sb.append ("cache_dir = os.path.join(\".\", \"data\", \"galaxy\")\n");
+            sb.append ("os.makedirs(cache_dir, exist_ok=True)\n");
+            sb.append_printf ("dest_path = os.path.join(cache_dir, \"%s_%s\")\n\n", safe_id, safe_name);
+            sb.append ("if not os.path.exists(dest_path):\n");
+            sb.append ("    with requests.get(galaxy_url, headers={\"x-api-key\": galaxy_key}, stream=True, timeout=300) as resp:\n");
+            sb.append ("        resp.raise_for_status()\n");
+            sb.append ("        with open(dest_path, \"wb\") as f:\n");
+            sb.append ("            for chunk in resp.iter_content(chunk_size=1048576):\n");
+            sb.append ("                if chunk:\n");
+            sb.append ("                    f.write(chunk)\n\n");
+
             if (is_tsv || is_csv) {
-                sb.append ("resp = requests.get(galaxy_url, headers={\"x-api-key\": galaxy_key}, timeout=60)\n");
-                sb.append ("resp.raise_for_status()\n");
                 if (is_tsv) {
-                    sb.append_printf ("galaxy_df_%d = pd.read_csv(io.StringIO(resp.text), sep=\"\\t\")\n", ds.hid);
+                    sb.append_printf ("galaxy_df_%d = pd.read_csv(dest_path, sep=\"\\t\")\n", ds.hid);
                 } else {
-                    sb.append_printf ("galaxy_df_%d = pd.read_csv(io.StringIO(resp.text))\n", ds.hid);
+                    sb.append_printf ("galaxy_df_%d = pd.read_csv(dest_path)\n", ds.hid);
                 }
                 sb.append_printf ("galaxy_df_%d.head()\n", ds.hid);
             } else {
-                // Non-tabular file cache download
-                sb.append ("cache_dir = os.path.join(\".\", \"data\", \"galaxy\")\n");
-                sb.append ("os.makedirs(cache_dir, exist_ok=True)\n");
-                sb.append_printf ("dest_path = os.path.join(cache_dir, \"%s_%s\")\n\n", safe_id, safe_name);
-                sb.append ("if not os.path.exists(dest_path):\n");
-                sb.append ("    resp = requests.get(galaxy_url, headers={\"x-api-key\": galaxy_key}, timeout=60)\n");
-                sb.append ("    resp.raise_for_status()\n");
-                sb.append ("    with open(dest_path, \"wb\") as f:\n");
-                sb.append ("        f.write(resp.content)\n\n");
                 sb.append_printf ("galaxy_file_%d = dest_path\n", ds.hid);
                 sb.append_printf ("print(f\"Cached dataset file at: {dest_path}\")\n");
             }

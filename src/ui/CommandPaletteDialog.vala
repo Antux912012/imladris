@@ -74,7 +74,7 @@ namespace Imladris.UI {
             // Scientific Studios & Bridges
             all_items.add (new CommandPaletteItem ("Elbereth Clinical Biostatistics", "ICH E9 sample size, power curves, ADSL Table 1, and survival analysis", "view-statistics-symbolic", "bridge.elbereth", "Scientific"));
             all_items.add (new CommandPaletteItem ("Taniquetil AlphaFold Structural Bridge", "Macromolecular structures, pLDDT metrics, and Bio3D coordinates", "network-cellular-symbolic", "bridge.taniquetil", "Scientific"));
-            all_items.add (new CommandPaletteItem ("Yavanna Bio-Entity Inspector", "NCBI Taxonomy, Ensembl genes, and RT-qPCR oligo melting curves", "applications-science-symbolic", "bridge.yavanna", "Scientific"));
+            all_items.add (new CommandPaletteItem ("Yavanna Bio-Entity Inspector", "UniProtKB, Ensembl genes, and RT-qPCR oligo melting curves", "applications-science-symbolic", "bridge.yavanna", "Scientific"));
             all_items.add (new CommandPaletteItem ("Elrond AI Assistant", "Open AI editing and research assistant (Ctrl+Shift+E)", "system-run-symbolic", "app.elrond_assist", "Scientific"));
             all_items.add (new CommandPaletteItem ("Insert Code Chunk", "Insert executable R or Python code chunk at cursor (Ctrl+Alt+I)", "list-add-symbolic", "win.insert_chunk", "Editing"));
             all_items.add (new CommandPaletteItem ("Toggle Line Comment", "Comment or uncomment active line or selection (Ctrl+Shift+C)", "edit-copy-symbolic", "win.toggle_comment", "Editing"));

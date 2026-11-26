@@ -25,17 +25,53 @@ namespace Imladris.Services {
             }
 
             if (needs_r) {
-                init_r_sandbox (project_root);
+                yield init_r_sandbox_async (project_root);
             }
 
             if (needs_py) {
-                init_py_sandbox (project_root);
+                yield init_py_sandbox_async (project_root);
 
                 string req_path = Path.build_filename (project_root, "requirements.txt");
                 if (!FileUtils.test (req_path, FileTest.EXISTS)) {
                     FileUtils.set_contents (req_path, "# Imladris Sandboxed Python Dependencies\n");
                 }
             }
+        }
+
+        public static async void init_r_sandbox_async (string project_path, GLib.Cancellable? cancellable = null) throws GLib.Error {
+            SourceFunc cb = init_r_sandbox_async.callback;
+            GLib.Error? worker_err = null;
+            new GLib.Thread<void*> ("imladris-init-r-sandbox", () => {
+                try {
+                    if (cancellable == null || !cancellable.is_cancelled ()) {
+                        init_r_sandbox (project_path);
+                    }
+                } catch (GLib.Error e) {
+                    worker_err = e;
+                }
+                GLib.Idle.add ((owned) cb);
+                return null;
+            });
+            yield;
+            if (worker_err != null) throw worker_err;
+        }
+
+        public static async void init_py_sandbox_async (string project_path, GLib.Cancellable? cancellable = null) throws GLib.Error {
+            SourceFunc cb = init_py_sandbox_async.callback;
+            GLib.Error? worker_err = null;
+            new GLib.Thread<void*> ("imladris-init-py-sandbox", () => {
+                try {
+                    if (cancellable == null || !cancellable.is_cancelled ()) {
+                        init_py_sandbox (project_path);
+                    }
+                } catch (GLib.Error e) {
+                    worker_err = e;
+                }
+                GLib.Idle.add ((owned) cb);
+                return null;
+            });
+            yield;
+            if (worker_err != null) throw worker_err;
         }
 
 
@@ -100,7 +136,7 @@ local({
             if (!lock_file.query_exists ()) {
                 string lock_stub = """{
   "R": {
-    "Version": "4.3.0",
+    "Version": "4.4.0",
     "Repositories": [
       {
         "Name": "CRAN",
@@ -128,16 +164,23 @@ local({
             string venv_dir = Path.build_filename (project_path, ".venv");
             File vdir = File.new_for_path (venv_dir);
 
-            // 1. Create .venv if not present
-            if (!vdir.query_exists () && Environment.find_program_in_path ("python3") != null) {
-                try {
-                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
-                    launcher.set_cwd (project_path);
-                    string[] argv = { "python3", "-m", "venv", ".venv" };
-                    var proc = launcher.spawnv (argv);
-                    proc.wait_check ();
-                } catch (GLib.Error e) {
-                    // venv creation failed
+            // 1. Create .venv if not present using resolved python3 / HostBridge
+            string? resolved_py = null;
+            string? py_env = null;
+            var py_src = Core.PlatformUtils.resolve_runtime ("python3", project_path, out resolved_py, out py_env);
+            if (!vdir.query_exists () && py_src != Core.RuntimeSource.MISSING) {
+                var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_PIPE);
+                launcher.set_cwd (project_path);
+                Core.PlatformUtils.configure_managed_env (launcher, py_env);
+                string[] raw_argv = { (resolved_py != null) ? resolved_py : "python3", "-m", "venv", ".venv" };
+                string[] argv = (py_src == Core.RuntimeSource.HOST_FLATPAK_SPAWN)
+                    ? Core.PlatformUtils.build_host_command ({ "python3", "-m", "venv", ".venv" }, project_path)
+                    : raw_argv;
+                var proc = launcher.spawnv (argv);
+                string? err_buf = null;
+                proc.communicate_utf8 (null, null, null, out err_buf);
+                if (!proc.get_successful ()) {
+                    GLib.warning ("Python .venv creation failed in %s: %s", project_path, (err_buf ?? "").strip ());
                 }
             }
 
@@ -155,7 +198,7 @@ numpy>=1.24.0
                 FileUtils.set_contents (req_path, req_content);
             }
 
-            // 3. Register a local Jupyter kernelspec pointing directly to .venv/bin/python
+            // 3. Register a local Jupyter kernelspec pointing to .venv/bin/python
             string kernel_spec_dir = Path.build_filename (project_path, ".venv", "share", "jupyter", "kernels", "imladris-sandbox");
             File ks_dir = File.new_for_path (kernel_spec_dir);
             if (!ks_dir.query_exists ()) {
@@ -225,18 +268,24 @@ numpy>=1.24.0
          * pip install -r requirements.txt for Python).
          */
         public static void restore_environment (string project_path) throws GLib.Error {
+            var errs = new GLib.StringBuilder ();
+
             // Restore R renv environment
             string renv_dir = Path.build_filename (project_path, "renv");
-            if (FileUtils.test (renv_dir, FileTest.IS_DIR) && Core.PlatformUtils.is_program_available ("Rscript")) {
+            if (FileUtils.test (renv_dir, FileTest.IS_DIR) && Core.PlatformUtils.is_program_available ("Rscript", project_path)) {
                 try {
-                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
+                    var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_MERGE);
                     if (project_path != "") launcher.set_cwd (project_path);
                     string[] raw_argv = { "Rscript", "-e", "if (requireNamespace('renv', quietly=TRUE)) renv::restore(prompt = FALSE)" };
                     string[] argv = Core.PlatformUtils.build_host_command (raw_argv, project_path);
                     var proc = launcher.spawnv (argv);
-                    proc.wait_check ();
+                    string? out_buf = null;
+                    proc.communicate_utf8 (null, null, out out_buf, null);
+                    if (!proc.get_successful ()) {
+                        errs.append (@"renv::restore failed: $((out_buf ?? "").strip ())\n");
+                    }
                 } catch (GLib.Error e) {
-                    // Restore failed
+                    errs.append (@"R restore error: $(e.message)\n");
                 }
             }
 
@@ -256,13 +305,22 @@ numpy>=1.24.0
                         }
                     }
                     if (has_packages) {
-                        string[] argv = { venv_python, "-m", "pip", "install", "-r", req_path };
-                        var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_SILENCE | SubprocessFlags.STDERR_SILENCE);
-                        proc.wait_check ();
+                        string[] raw_argv = { venv_python, "-m", "pip", "install", "-r", req_path };
+                        string[] argv = Core.PlatformUtils.build_host_command (raw_argv, project_path);
+                        var proc = new Subprocess.newv (argv, SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_MERGE);
+                        string? out_buf = null;
+                        proc.communicate_utf8 (null, null, out out_buf, null);
+                        if (!proc.get_successful ()) {
+                            errs.append (@"pip install failed: $((out_buf ?? "").strip ())\n");
+                        }
                     }
                 } catch (GLib.Error e) {
-                    // Restore failed
+                    errs.append (@"Python restore error: $(e.message)\n");
                 }
+            }
+
+            if (errs.len > 0) {
+                GLib.warning ("Environment restore issues in %s: %s", project_path, errs.str.strip ());
             }
         }
 

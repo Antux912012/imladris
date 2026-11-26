@@ -101,7 +101,7 @@ namespace Imladris.Execution {
 
         private async void read_stdout_loop () {
             try {
-                while (is_running && stdout_stream != null) {
+                while (stdout_stream != null) {
                     size_t length;
                     string? line = yield stdout_stream.read_line_async (Priority.DEFAULT, null, out length);
                     if (line != null) {
@@ -117,7 +117,7 @@ namespace Imladris.Execution {
 
         private async void read_stderr_loop () {
             try {
-                while (is_running && stderr_stream != null) {
+                while (stderr_stream != null) {
                     size_t length;
                     string? line = yield stderr_stream.read_line_async (Priority.DEFAULT, null, out length);
                     if (line != null) {

@@ -100,12 +100,14 @@ namespace Imladris {
         private static Regex? zotero_cite_regex = null;
         private static Regex? pandoc_part_regex = null;
 
+        private bool force_window_close = false;
+
         public Window (Adw.Application app) {
             Object (
                 application: app,
                 title: "Imladris — Polyglot Scientific & Web Studio",
-                default_width: 1380,
-                default_height: 860
+                default_width: 1200,
+                default_height: 760
             );
         }
 
@@ -125,6 +127,34 @@ namespace Imladris {
             });
 
             this.close_request.connect (() => {
+                if (!force_window_close && tab_view != null) {
+                    int unsaved_count = 0;
+                    for (int i = 0; i < tab_view.n_pages; i++) {
+                        var page = tab_view.get_nth_page (i);
+                        var doc = page.child as DocumentPage;
+                        if (doc != null && doc.source_buffer != null && doc.source_buffer.get_modified ()) {
+                            unsaved_count++;
+                        }
+                    }
+                    if (unsaved_count > 0) {
+                        var dlg = new Adw.AlertDialog (
+                            "Unsaved Changes",
+                            @"$(unsaved_count) open document(s) have unsaved changes. Discard unsaved changes and close?"
+                        );
+                        dlg.add_response ("cancel", "Cancel");
+                        dlg.add_response ("discard", "Discard & Close");
+                        dlg.set_default_response ("cancel");
+                        dlg.set_response_appearance ("discard", Adw.ResponseAppearance.DESTRUCTIVE);
+                        dlg.response.connect ((resp) => {
+                            if (resp == "discard") {
+                                force_window_close = true;
+                                this.close ();
+                            }
+                        });
+                        dlg.present (this);
+                        return true;
+                    }
+                }
                 if (theme_changed_hid != 0) {
                     Core.SettingsManager.get_default ().disconnect (theme_changed_hid);
                     theme_changed_hid = 0;
@@ -290,11 +320,9 @@ namespace Imladris {
                 tab_btn.add_css_class ("ribbon-tab-btn");
                 if (cat == "Home") tab_btn_home = tab_btn;
                 if (cat == "Run") {
-                    tab_btn.add_css_class ("ribbon-tab-scientific");
                     tab_btn_run = tab_btn;
                 }
                 if (cat == "Publish") {
-                    tab_btn.add_css_class ("ribbon-tab-web");
                     tab_btn_publish = tab_btn;
                 }
                 if (cat == "Packages") {
@@ -550,6 +578,9 @@ namespace Imladris {
                 string py_bin = argv.length > 0 ? argv[0] : "python3";
                 run_python_pip_and_snapshot.begin (py_bin, argv, working_dir, sandboxed, label);
             });
+            packages_ribbon_bar.status_changed.connect ((msg) => {
+                show_toast (msg);
+            });
 
             // =================================================================
             // TIER 3: STREAMLINED TAB BAR WITH AI & LAYOUT TOGGLES
@@ -579,6 +610,39 @@ namespace Imladris {
             tab_view = new Adw.TabView ();
             tab_view.close_page.connect ((page) => {
                 var doc = page.child as DocumentPage;
+                if (doc != null && doc.source_buffer != null && doc.source_buffer.get_modified ()) {
+                    var dlg = new Adw.AlertDialog (
+                        "Save Changes Before Closing?",
+                        @"\"$(page.title)\" has unsaved changes."
+                    );
+                    dlg.add_response ("cancel", "Cancel");
+                    dlg.add_response ("discard", "Discard");
+                    dlg.add_response ("save", "Save");
+                    dlg.set_default_response ("save");
+                    dlg.set_response_appearance ("discard", Adw.ResponseAppearance.DESTRUCTIVE);
+                    dlg.set_response_appearance ("save", Adw.ResponseAppearance.SUGGESTED);
+                    dlg.response.connect ((resp) => {
+                        if (resp == "discard") {
+                            doc.cleanup ();
+                            tab_view.close_page_finish (page, true);
+                        } else if (resp == "save") {
+                            tab_view.set_selected_page (page);
+                            save_document_async.begin ((obj, res) => {
+                                save_document_async.end (res);
+                                if (!doc.source_buffer.get_modified ()) {
+                                    doc.cleanup ();
+                                    tab_view.close_page_finish (page, true);
+                                } else {
+                                    tab_view.close_page_finish (page, false);
+                                }
+                            });
+                        } else {
+                            tab_view.close_page_finish (page, false);
+                        }
+                    });
+                    dlg.present (this);
+                    return true;
+                }
                 if (doc != null) {
                     doc.cleanup ();
                 }
@@ -628,7 +692,6 @@ namespace Imladris {
 
             status_env_badge_lbl = new Gtk.Label ("Sandboxed • Reproducible");
             status_env_badge_lbl.add_css_class ("status-badge");
-            status_env_badge_lbl.add_css_class ("env-badge");
             status_env_badge_lbl.add_css_class ("env-sandboxed");
             status_bar.append (status_env_badge_lbl);
 
@@ -786,8 +849,12 @@ namespace Imladris {
                     update_ribbon_state_machine (fmt, current_project_type);
                     sync_document_ui_toggles (d);
                     if (d.file_location != null && d.file_location.get_parent () != null) {
+                        string doc_dir = d.file_location.get_parent ().get_path ();
+                        d.panel_registry.get_session_manager ().set_working_directory (
+                            doc_dir, current_project_type
+                        );
                         Services.PersistentSessionManager.get_default ().set_working_directory (
-                            d.file_location.get_parent ().get_path (), current_project_type
+                            doc_dir, current_project_type
                         );
                     }
                     if (btn_shiny_app != null) {
@@ -850,7 +917,20 @@ namespace Imladris {
                 toast.button_clicked.connect (() => {
                     restored = true;
                     foreach (var rec in recs) {
-                        string title = rec.file_path != null ? GLib.Path.get_basename (rec.file_path) : "Recovered-Document.md";
+                        string fallback_ext = ".md";
+                        switch (rec.doc_type.down ()) {
+                            case "r": fallback_ext = ".R"; break;
+                            case "python": fallback_ext = ".py"; break;
+                            case "quarto":
+                            case "qmd": fallback_ext = ".qmd"; break;
+                            case "rmarkdown":
+                            case "rmd": fallback_ext = ".Rmd"; break;
+                            case "ipynb": fallback_ext = ".ipynb"; break;
+                            case "latex":
+                            case "tex": fallback_ext = ".tex"; break;
+                            default: fallback_ext = ".md"; break;
+                        }
+                        string title = rec.file_path != null ? GLib.Path.get_basename (rec.file_path) : @"Recovered-Document$(fallback_ext)";
                         GLib.File? f = rec.file_path != null ? GLib.File.new_for_path (rec.file_path) : null;
                         add_document_tab (title, rec.doc_type, rec.content, f);
                         var restored_doc = get_active_document ();
@@ -869,7 +949,7 @@ namespace Imladris {
                     }
                 });
                 toast.dismissed.connect (() => {
-                    if (!restored) {
+                    if (restored) {
                         foreach (var rec in recs) {
                             Services.RecoveryService.get_default ().purge_document_cache (rec.doc_id);
                         }
@@ -939,16 +1019,9 @@ namespace Imladris {
         public void ask_elrond (string prompt) {
             var doc = get_active_document ();
             if (doc != null) {
-                if (Services.WorkspaceStateManager.get_default ().active_layout == Services.LayoutMode.RSTUDIO &&
-                    doc.panel_registry != null &&
-                    doc.panel_registry.elrond_chat_panel != null) {
-                    doc.dock_layout_state.activate_panel (Imladris.Core.Layout.PanelId.ELROND_AI);
+                doc.show_ai_assistant ();
+                if (doc.panel_registry != null && doc.panel_registry.elrond_chat_panel != null) {
                     doc.panel_registry.elrond_chat_panel.submit_external_prompt (prompt);
-                } else {
-                    doc.show_ai_assistant ();
-                    if (doc.assistant_panel != null) {
-                        doc.assistant_panel.send_prompt (prompt);
-                    }
                 }
             } else {
                 trigger_elrond_assistance ();
@@ -1402,7 +1475,7 @@ namespace Imladris {
         public void show_onboarding_tour_dialog (bool check_toolchain_after = false) {
             var dlg = new UI.OnboardingTourDialog ();
             dlg.tour_finished.connect ((open_toolchain_setup, skipped) => {
-                if (open_toolchain_setup || (!skipped && check_toolchain_after && !Core.ToolchainManager.get_default ().is_base_environment_installed ())) {
+                if (open_toolchain_setup || (check_toolchain_after && !Core.ToolchainManager.get_default ().is_base_environment_installed ())) {
                     show_toolchain_setup_dialog (false, true);
                 }
             });
@@ -1508,6 +1581,9 @@ namespace Imladris {
                 this.current_project_type = config.project_type;
                 if (file.get_parent () != null) {
                     this.current_project_dir = file.get_parent ().get_path ();
+                    Services.PersistentSessionManager.peek_for_key (this.current_project_dir).set_working_directory (
+                        this.current_project_dir, config.project_type
+                    );
                     Services.PersistentSessionManager.get_default ().set_working_directory (
                         this.current_project_dir, config.project_type
                     );
@@ -1523,6 +1599,9 @@ namespace Imladris {
             dlg.rproj_created.connect ((rproj_file, primary_file, config) => {
                 this.current_project_type = config.project_type;
                 this.current_project_dir = rproj_file.get_parent ().get_path ();
+                Services.PersistentSessionManager.peek_for_key (this.current_project_dir).set_working_directory (
+                    this.current_project_dir, config.project_type
+                );
                 Services.PersistentSessionManager.get_default ().set_working_directory (
                     this.current_project_dir, config.project_type
                 );
@@ -1610,6 +1689,14 @@ namespace Imladris {
                     var ptype = Services.SandboxController.detect_project_type (parent_dir.get_path ());
                     this.current_project_type = ptype;
                     this.current_project_dir = parent_dir.get_path ();
+                    var active_doc = get_active_document ();
+                    if (active_doc != null) {
+                        active_doc.panel_registry.get_session_manager ().set_working_directory (this.current_project_dir, ptype);
+                        active_doc.review_service.load_for_document (file.get_path (), this.current_project_dir, text);
+                        if (active_doc.review_service.store.threads.size > 0) {
+                            active_doc.set_review_sidebar_visible (true);
+                        }
+                    }
                     Services.PersistentSessionManager.get_default ().set_working_directory (this.current_project_dir, ptype);
                     update_environment_badge (ptype);
                     update_ribbon_state_machine (fmt, ptype);
@@ -1660,6 +1747,7 @@ namespace Imladris {
                         out etag
                     );
                     doc.source_buffer.set_modified (false);
+                    doc.review_service.save_to_disk ();
                     if (doc.rtf_editor != null) {
                         doc.rtf_editor.buffer.set_modified (false);
                     }
@@ -1696,6 +1784,7 @@ namespace Imladris {
                             out etag
                         );
                         doc.source_buffer.set_modified (false);
+                    doc.review_service.save_to_disk ();
                     if (doc.rtf_editor != null) {
                         doc.rtf_editor.buffer.set_modified (false);
                     }
@@ -2027,9 +2116,10 @@ namespace Imladris {
             if (doc_fmt == DocumentFormat.QMD) {
                 var sc_fmt = Core.ScientificOutputFormat.HTML_MANUSCRIPT;
                 if (sel == 1) sc_fmt = Core.ScientificOutputFormat.PDF_MANUSCRIPT;
-                else if (sel == 2) sc_fmt = Core.ScientificOutputFormat.REVEALJS_SLIDES;
-                else if (sel == 3) sc_fmt = Core.ScientificOutputFormat.BEAMER_PDF_SLIDES;
-                else if (sel == 4) sc_fmt = Core.ScientificOutputFormat.TYPST_POSTER_PDF;
+                else if (sel == 2) sc_fmt = Core.ScientificOutputFormat.DOCX_DOCUMENT;
+                else if (sel == 3) sc_fmt = Core.ScientificOutputFormat.REVEALJS_SLIDES;
+                else if (sel == 4) sc_fmt = Core.ScientificOutputFormat.BEAMER_PDF_SLIDES;
+                else if (sel == 5) sc_fmt = Core.ScientificOutputFormat.TYPST_POSTER_PDF;
                 compile_scientific_document_async.begin (sc_fmt);
                 return;
             }
@@ -2141,9 +2231,11 @@ namespace Imladris {
             string target_ext = "html";
             if (low.contains ("pdf")) {
                 target_ext = "pdf";
+            } else if (low.contains ("docx") || low.contains ("word")) {
+                target_ext = "docx";
             } else if (low.contains ("odt")) {
                 target_ext = "odt";
-            } else if (low.contains ("rtf") || low.contains ("word")) {
+            } else if (low.contains ("rtf")) {
                 target_ext = "rtf";
             }
 
@@ -2406,6 +2498,27 @@ namespace Imladris {
             });
             this.add_action (action_ultrawide_6);
 
+            var action_quad_4 = new GLib.SimpleAction ("layout_quad_4", null);
+            action_quad_4.activate.connect (() => {
+                var d = get_active_document ();
+                if (d == null) {
+                    show_toast ("Open or create a document first to switch to 4-Quadrant layout");
+                    return;
+                }
+                Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+                UI.LayoutSerializer.apply_topology_preset (Imladris.Core.Layout.LayoutTopology.QUAD_4, d.dock_layout_state);
+                sync_document_ui_toggles (d);
+                show_toast ("Switched to 4-Quadrant Standard layout");
+            });
+            this.add_action (action_quad_4);
+
+            var action_focus_mode = new GLib.SimpleAction ("toggle_focus_mode", null);
+            action_focus_mode.activate.connect (() => {
+                var act = this.lookup_action ("collapse_ribbon");
+                if (act != null) act.activate (null);
+            });
+            this.add_action (action_focus_mode);
+
             var action_redock_all = new GLib.SimpleAction ("redock_all_panels", null);
             action_redock_all.activate.connect (() => {
                 var d = get_active_document ();
@@ -2427,6 +2540,20 @@ namespace Imladris {
                 trigger_web_sync_quick_commit ();
             });
             this.add_action (action_web_sync_commit);
+
+            var action_add_review = new GLib.SimpleAction ("add_review_comment", null);
+            action_add_review.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null) d.prompt_add_review_comment ();
+            });
+            this.add_action (action_add_review);
+
+            var action_toggle_review = new GLib.SimpleAction ("toggle_review_comments", null);
+            action_toggle_review.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null) d.toggle_review_comments_sidebar ();
+            });
+            this.add_action (action_toggle_review);
         }
 
         private void notify_web_sync_on_save (DocumentPage doc, string editor_content) {
@@ -3230,6 +3357,7 @@ namespace Imladris {
 
         public async void run_r_install_and_snapshot (string r_cmd, string display_label) {
             var doc = get_active_document ();
+            var sess = (doc != null) ? doc.panel_registry.get_session_manager () : Services.PersistentSessionManager.get_default ();
             if (doc != null) {
                 doc.append_console_log (@"▶ [R] Executing: $r_cmd");
             }
@@ -3239,23 +3367,33 @@ namespace Imladris {
 
             string? plot_file = null;
             ulong sig_id = 0;
-            sig_id = Services.PersistentSessionManager.get_default ().session_output_received.connect ((eng, line, is_err) => {
+            sig_id = sess.session_output_received.connect ((eng, line, is_err) => {
                 if (eng == "r" && doc != null) {
                     doc.append_console_log (line);
                 }
             });
 
             try {
-                string output = yield Services.PersistentSessionManager.get_default ().execute_r (r_cmd, out plot_file);
-                if (doc != null && output.strip ().length > 0) {
-                    doc.append_console_log (output.strip ());
+                string output = yield sess.execute_r (r_cmd, out plot_file);
+                string trimmed_out = output.strip ();
+                if (doc != null && trimmed_out.length > 0) {
+                    doc.append_console_log (trimmed_out);
                 }
-                if (doc != null) {
-                    doc.append_console_log (@"✔ R package installation finished for $display_label.");
+                bool has_err = trimmed_out.contains ("✖") || trimmed_out.contains ("Error:") ||
+                    trimmed_out.contains ("ERROR:") || trimmed_out.contains ("non-zero exit status");
+                if (has_err) {
+                    if (doc != null) {
+                        doc.append_console_log (@"✖ R package installation failed for $display_label.");
+                    }
+                    show_toast (@"R package installation failed for $display_label (see console)");
+                } else {
+                    if (doc != null) {
+                        doc.append_console_log (@"✔ R package installation finished for $display_label.");
+                    }
+                    show_toast (@"Successfully installed $display_label");
                 }
-                show_toast (@"Successfully installed $display_label");
             } finally {
-                Services.PersistentSessionManager.get_default ().disconnect (sig_id);
+                sess.disconnect (sig_id);
                 if (packages_ribbon_bar != null) {
                     packages_ribbon_bar.set_r_busy (false, display_label);
                 }
@@ -3553,18 +3691,22 @@ namespace Imladris {
         }
 
         public void restart_active_kernel () {
-            Services.PersistentSessionManager.get_default ().restart_all_sessions ();
             var doc = get_active_document ();
             if (doc != null) {
+                doc.panel_registry.get_session_manager ().restart_all_sessions ();
                 doc.append_console_log ("✔ Active persistent R and Python sessions restarted.");
+            } else {
+                Services.PersistentSessionManager.get_default ().restart_all_sessions ();
             }
         }
 
         public void interrupt_active_execution () {
-            Services.PersistentSessionManager.get_default ().interrupt_active_execution ();
             var doc = get_active_document ();
             if (doc != null) {
+                doc.panel_registry.get_session_manager ().interrupt_active_execution ();
                 doc.append_console_log ("⏹ Execution interrupted (SIGINT sent).");
+            } else {
+                Services.PersistentSessionManager.get_default ().interrupt_active_execution ();
             }
         }
 

@@ -67,6 +67,8 @@ namespace Imladris.UI {
         private Gtk.Button btn_copy;
         private Gtk.Button btn_prev_page;
         private Gtk.Button btn_next_page;
+        private Gtk.Button btn_prev_cols;
+        private Gtk.Button btn_next_cols;
         private Gtk.Label page_label;
         private Gtk.Spinner loading_spinner;
 
@@ -77,6 +79,9 @@ namespace Imladris.UI {
         private int current_offset = 0;
         private int page_size = 1000;
         private int total_df_rows = 0;
+        private int current_col_offset = 0;
+        private int col_page_size = 50;
+        private int total_df_cols = 0;
 
         public signal void close_requested ();
 
@@ -111,10 +116,15 @@ namespace Imladris.UI {
         private static GLib.Regex? safe_id_regex = null;
         private uint64 request_gen = 0;
 
+        private static bool try_parse_numeric (string raw, out double val) {
+            string s = raw.strip ().replace (",", "").replace ("$", "").replace ("€", "").replace ("£", "").replace ("%", "");
+            return double.try_parse (s, out val);
+        }
+
         private static bool is_safe_identifier (string name) {
             try {
                 if (safe_id_regex == null) {
-                    safe_id_regex = new GLib.Regex ("^[A-Za-z_][A-Za-z0-9_.$\\[\\]]*$");
+                    safe_id_regex = new GLib.Regex ("^[A-Za-z_][A-Za-z0-9_.$@\\[\\]]*$");
                 }
                 return safe_id_regex.match (name.strip ());
             } catch (GLib.RegexError e) {
@@ -188,6 +198,30 @@ namespace Imladris.UI {
                 }
             });
             toolbar.append (btn_next_page);
+
+            btn_prev_cols = new Gtk.Button.from_icon_name ("go-first-symbolic") {
+                tooltip_text = "Previous 50 Columns"
+            };
+            btn_prev_cols.add_css_class ("flat");
+            btn_prev_cols.clicked.connect (() => {
+                if (current_col_offset >= col_page_size) {
+                    current_col_offset -= col_page_size;
+                    fetch_page_slice.begin ();
+                }
+            });
+            toolbar.append (btn_prev_cols);
+
+            btn_next_cols = new Gtk.Button.from_icon_name ("go-last-symbolic") {
+                tooltip_text = "Next 50 Columns"
+            };
+            btn_next_cols.add_css_class ("flat");
+            btn_next_cols.clicked.connect (() => {
+                if (current_col_offset + col_page_size < total_df_cols) {
+                    current_col_offset += col_page_size;
+                    fetch_page_slice.begin ();
+                }
+            });
+            toolbar.append (btn_next_cols);
 
             search_entry = new Gtk.SearchEntry () {
                 placeholder_text = "Filter current page...",
@@ -368,7 +402,7 @@ namespace Imladris.UI {
                     if (a_na) return 1;
                     if (b_na) return -1;
                     double da = 0.0, db = 0.0;
-                    if (double.try_parse (sa.strip (), out da) && double.try_parse (sb.strip (), out db) && !da.is_nan () && !db.is_nan ()) {
+                    if (try_parse_numeric (sa, out da) && try_parse_numeric (sb, out db) && !da.is_nan () && !db.is_nan ()) {
                         if (da < db) return -1;
                         if (da > db) return 1;
                         return 0;
@@ -398,24 +432,29 @@ namespace Imladris.UI {
 
         private void update_status_dimensions () {
             uint visible_count = filter_model.get_n_items ();
-            int total_cols = current_col_names.length;
+            int total_cols = (total_df_cols > 0) ? total_df_cols : current_col_names.length;
+            string col_range = (total_cols > col_page_size)
+                ? @"cols $(current_col_offset + 1)–$(int.min (current_col_offset + col_page_size, total_cols)) of $total_cols"
+                : @"$total_cols cols";
 
             if (total_df_rows > 0) {
                 int start_row = current_offset + 1;
                 int end_row = int.min (current_offset + page_size, total_df_rows);
                 if (search_entry.text.strip ().length > 0) {
-                    dim_badge.label = @"Rows $start_row–$end_row of $total_df_rows ($visible_count shown) • $total_cols cols";
+                    dim_badge.label = @"Rows $start_row–$end_row of $total_df_rows ($visible_count shown) • $col_range";
                 } else {
-                    dim_badge.label = @"Rows $start_row–$end_row of $total_df_rows • $total_cols cols";
+                    dim_badge.label = @"Rows $start_row–$end_row of $total_df_rows • $col_range";
                 }
             } else {
-                dim_badge.label = @"$(visible_count) rows • $total_cols cols";
+                dim_badge.label = @"$(visible_count) rows • $col_range";
             }
         }
 
         private void update_pagination_ui () {
             btn_prev_page.sensitive = (current_offset > 0);
             btn_next_page.sensitive = (current_offset + page_size < total_df_rows);
+            btn_prev_cols.sensitive = (current_col_offset > 0);
+            btn_next_cols.sensitive = (current_col_offset + col_page_size < total_df_cols);
 
             int page_idx = (current_offset / page_size) + 1;
             int total_pages = (total_df_rows > 0) ? (int) GLib.Math.ceil ((double) total_df_rows / page_size) : 1;
@@ -474,6 +513,8 @@ namespace Imladris.UI {
             this.active_object_name = object_name;
             this.active_engine = engine;
             this.current_offset = 0;
+            this.current_col_offset = 0;
+            this.total_df_cols = 0;
             yield fetch_page_slice ();
         }
 
@@ -481,52 +522,122 @@ namespace Imladris.UI {
             this.active_file_path = file_path;
             this.active_engine = "file";
             this.current_offset = 0;
-            load_delimited_file_slice (file_path);
+            this.current_col_offset = 0;
+            this.total_df_cols = 0;
+            load_delimited_file_slice_async.begin (file_path);
         }
 
-        private void load_delimited_file_slice (string file_path) {
-            try {
-                string raw;
-                GLib.FileUtils.get_contents (file_path, out raw);
-                string[] lines = raw.split ("\n");
-                char sep = file_path.down ().has_suffix (".tsv") ? '\t' : ',';
-                var sb = new GLib.StringBuilder ();
-                int row_num = 0;
-                int col_count = 0;
-                int start_row = current_offset + 1;
-                int end_row = current_offset + page_size;
-                foreach (string raw_line in lines) {
-                    string line = raw_line.replace ("\r", "");
-                    if (line.strip () == "") continue;
-                    string[] fields = parse_delimited_line (line, sep);
-                    if (row_num == 0) {
-                        col_count = fields.length;
-                        sb.append ("__COLS__\t").append (string.joinv ("\t", fields)).append ("\n");
-                    } else if (row_num >= start_row && row_num <= end_row) {
-                        sb.append_printf ("__ROW__\t%d\t%s\n", row_num, string.joinv ("\t", fields));
+        private async void load_delimited_file_slice_async (string file_path) {
+            uint64 gen = ++request_gen;
+            string bname = GLib.Path.get_basename (file_path);
+            this.active_object_name = bname;
+            title_label.label = @"Loading $bname...";
+            loading_spinner.visible = true;
+            loading_spinner.spinning = true;
+
+            int start_row = current_offset + 1;
+            int end_row = current_offset + page_size;
+            string low_path = file_path.down ();
+            bool is_gz = low_path.has_suffix (".gz");
+            string base_low = is_gz ? low_path.substring (0, low_path.length - 3) : low_path;
+            char sep = (base_low.has_suffix (".tsv") || base_low.has_suffix (".tabular") ||
+                        base_low.has_suffix (".txt") || base_low.has_suffix (".vcf") ||
+                        base_low.has_suffix (".bed") || base_low.has_suffix (".gtf")) ? '\t' : ',';
+
+            string[] cols = new string[0];
+            var rows = new Gee.ArrayList<DataRow> ();
+            int total_rows = 0;
+            string? err_msg = null;
+
+            SourceFunc cb = load_delimited_file_slice_async.callback;
+            new GLib.Thread<void*> ("imladris-csv-slice", () => {
+                try {
+                    var file = GLib.File.new_for_path (file_path);
+                    GLib.InputStream base_stream = file.read (null);
+                    if (is_gz) {
+                        var decomp = new GLib.ZlibDecompressor (GLib.ZlibCompressorFormat.GZIP);
+                        base_stream = new GLib.ConverterInputStream (base_stream, decomp);
                     }
-                    row_num++;
+                    var dis = new GLib.DataInputStream (base_stream);
+                    string? raw_line = null;
+                    int row_num = 0;
+                    int all_col_count = 0;
+                    bool is_vcf_or_gtf = (base_low.has_suffix (".vcf") || base_low.has_suffix (".gtf"));
+                    bool is_bed = base_low.has_suffix (".bed");
+                    while ((raw_line = dis.read_line (null, null)) != null) {
+                        string line = raw_line.replace ("\r", "");
+                        if (line.strip () == "") continue;
+                        if (is_vcf_or_gtf && line.has_prefix ("##")) continue;
+                        if (is_vcf_or_gtf && line.has_prefix ("#!")) continue;
+                        if (row_num == 0 && sep == ',' && !line.contains (",") && line.contains (";")) {
+                            sep = ';';
+                        }
+                        if (row_num == 0) {
+                            string[] all_cols = parse_delimited_line (line, sep);
+                            all_col_count = all_cols.length;
+                            if (is_bed && !line.has_prefix ("#") && !line.has_prefix ("chrom")) {
+                                var synth = new Gee.ArrayList<string> ();
+                                for (int ci = 0; ci < all_col_count; ci++) {
+                                    if (ci == 0) synth.add ("chrom");
+                                    else if (ci == 1) synth.add ("start");
+                                    else if (ci == 2) synth.add ("end");
+                                    else synth.add (@"col_$(ci + 1)");
+                                }
+                                int c_hi = int.min (all_col_count, current_col_offset + col_page_size);
+                                cols = (current_col_offset < c_hi) ? synth.to_array ()[current_col_offset:c_hi] : new string[0];
+                                row_num++;
+                                if (row_num >= start_row && row_num <= end_row) {
+                                    string[] sliced = (current_col_offset < c_hi) ? all_cols[current_col_offset:c_hi] : new string[0];
+                                    rows.add (new DataRow (row_num, sliced));
+                                }
+                                row_num++;
+                                continue;
+                            }
+                            if (is_vcf_or_gtf && all_cols.length > 0 && all_cols[0].has_prefix ("#")) {
+                                all_cols[0] = all_cols[0].substring (1);
+                            }
+                            int c_hi = int.min (all_col_count, current_col_offset + col_page_size);
+                            cols = (current_col_offset < c_hi) ? all_cols[current_col_offset:c_hi] : new string[0];
+                        } else if (row_num >= start_row && row_num <= end_row) {
+                            string[] all_cells = parse_delimited_line (line, sep);
+                            int c_hi = int.min (all_cells.length, current_col_offset + col_page_size);
+                            string[] sliced = (current_col_offset < c_hi) ? all_cells[current_col_offset:c_hi] : new string[0];
+                            rows.add (new DataRow (row_num, sliced));
+                        }
+                        row_num++;
+                    }
+                    dis.close (null);
+                    total_rows = int.max (0, row_num - 1);
+                    this.total_df_cols = all_col_count;
+                } catch (GLib.Error e) {
+                    err_msg = e.message;
                 }
-                int total_rows = int.max (0, row_num - 1);
-                sb.append_printf ("__DONE__\t%d\t%d\n", total_rows, col_count);
-                string bname = GLib.Path.get_basename (file_path);
-                this.active_object_name = bname;
-                parse_tsv_stream (bname, sb.str);
-            } catch (GLib.Error e) {
+                GLib.Idle.add ((owned) cb);
+                return null;
+            });
+            yield;
+
+            if (gen != request_gen) return;
+            loading_spinner.spinning = false;
+            loading_spinner.visible = false;
+
+            if (err_msg != null) {
                 title_label.label = "Failed to load file";
-                dim_badge.label = e.message;
+                dim_badge.label = err_msg;
+                return;
             }
+            this.total_df_rows = total_rows;
+            if (cols.length == 0 && rows.size == 0) {
+                cols = { "Status", "Details" };
+                rows.add (new DataRow (1, new string[] { "No Data", @"File '$bname' is empty." }));
+                this.total_df_rows = 0;
+            }
+            populate_grid_data (bname, cols, rows);
         }
 
         private async void fetch_page_slice () {
             if (active_engine == "file" && active_file_path != null) {
-                uint64 gen = ++request_gen;
-                loading_spinner.visible = true;
-                loading_spinner.spinning = true;
-                load_delimited_file_slice (active_file_path);
-                if (gen != request_gen) return;
-                loading_spinner.spinning = false;
-                loading_spinner.visible = false;
+                yield load_delimited_file_slice_async (active_file_path);
                 return;
             }
 
@@ -557,64 +668,57 @@ namespace Imladris.UI {
         private async void fetch_r_dataframe (string obj_name) {
             int start_row = current_offset + 1;
             int end_row = current_offset + page_size;
-            string b64_name = GLib.Base64.encode (obj_name.data);
+            string b64_name = Core.PlatformUtils.encode_hex (obj_name.data);
 
             string r_code = """
 local({
-  .raw_hex <- '%s'
-  .obj_name <- rawToChar(jsonlite::base64_dec(.raw_hex))
-  if (FALSE) {}
-})
-""";
-            // Decode Base64 safely in base R without requiring jsonlite
-            r_code = """
-local({
-  .b64 <- '%s'
-  .b64_alpha <- 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  .b64_dec_str <- function(s) {
-    s <- gsub('=+$', '', s)
-    chars <- strsplit(s, '')[[1L]]
-    if (length(chars) == 0L) return('')
-    vals <- match(chars, strsplit(.b64_alpha, '')[[1L]]) - 1L
-    bits <- integer(0)
-    for (v in vals) {
-      for (b in 5:0) bits <- c(bits, bitwAnd(bitwShiftR(v, b), 1L))
-    }
-    nbytes <- length(bits) %/% 8L
-    if (nbytes == 0L) return('')
-    bytes <- vapply(seq_len(nbytes), function(i) {
-      sl <- bits[((i - 1L) * 8L + 1L):(i * 8L)]
-      sum(sl * c(128L, 64L, 32L, 16L, 8L, 4L, 2L, 1L))
-    }, integer(1))
-    out <- rawToChar(as.raw(bytes))
-    Encoding(out) <- 'UTF-8'
-    out
-  }
-  .obj_name <- .b64_dec_str(.b64)
+  .hex <- '%s'
+  .n_hex <- nchar(.hex) %%/%% 2L
+  .obj_name <- if (.n_hex > 0L) {
+    .out <- rawToChar(as.raw(strtoi(substring(.hex, seq(1L, by = 2L, length.out = .n_hex), seq(2L, by = 2L, length.out = .n_hex)), 16L)))
+    Encoding(.out) <- 'UTF-8'
+    .out
+  } else ''
   if (!exists(.obj_name, envir = .GlobalEnv)) {
     cat('__ERROR__\tObject not found in R GlobalEnv\n')
   } else {
     d <- get(.obj_name, envir = .GlobalEnv)
+    if (inherits(d, 'data.table')) d <- as.data.frame(d)
+    if (inherits(d, 'Seurat')) d <- d@meta.data
+    if (inherits(d, 'SummarizedExperiment') || inherits(d, 'DESeqDataSet')) {
+      d <- as.data.frame(SummarizedExperiment::colData(d))
+    }
     if (is.matrix(d)) d <- as.data.frame(d)
     nr <- nrow(d); nc <- ncol(d)
     if (is.null(nr)) nr <- 0L
     if (is.null(nc)) nc <- 0L
-    if (nc == 0L) {
+    col_start <- %dL
+    col_limit <- %dL
+    if (nc == 0L || col_start > nc) {
       cat('__COLS__\t(no columns)\n')
-      cat('__DONE__\t', nr, '\t', 0L, '\n', sep='')
+      cat('__DONE__\t', nr, '\t', nc, '\n', sep='')
     } else {
-      cols <- colnames(d)
-      if (is.null(cols)) cols <- paste0('V', seq_len(nc))
-      types <- vapply(d, function(x) class(x)[1], character(1))
+      col_end <- min(nc, col_start + col_limit - 1L)
+      col_idx <- seq.int(col_start, col_end)
+      show_nc <- length(col_idx)
+      cols <- colnames(d)[col_idx]
+      if (is.null(cols)) cols <- paste0('V', col_idx)
+      is_sparse_s4 <- isS4(d)
+      types <- if (is_sparse_s4) rep(class(d)[1], show_nc) else vapply(d[, col_idx, drop = FALSE], function(x) class(x)[1], character(1))
       headers <- paste0(cols, ' [', types, ']')
-      .has_rn <- if (exists('has_rownames', mode = 'function')) has_rownames(d) else (!is.null(rownames(d)) && .row_names_info(d, 1L) > 0L && !identical(rownames(d), as.character(seq_len(nr))))
+      .has_rn <- if (exists('has_rownames', mode = 'function')) {
+        tryCatch(has_rownames(d), error = function(e) FALSE)
+      } else {
+        .rni <- tryCatch(.row_names_info(d, 1L), error = function(e) 0L)
+        !is.null(rownames(d)) && length(.rni) == 1L && !is.na(.rni) && .rni > 0L && !identical(rownames(d), as.character(seq_len(nr)))
+      }
       if (.has_rn) {
         headers <- c('rowname [character]', headers)
       }
       cat('__COLS__\t', paste(headers, collapse = '\t'), '\n', sep='')
       if (nr > 0L) {
         idx <- seq.int(min(%dL, nr), min(%dL, nr))
-        sub_d <- d[idx, , drop = FALSE]
+        sub_d <- if (is_sparse_s4) as.data.frame(as.matrix(d[idx, col_idx, drop = FALSE])) else d[idx, col_idx, drop = FALSE]
         sub_chr <- lapply(sub_d, function(col) {
           v <- as.character(col)
           v[is.na(v)] <- 'NA'
@@ -627,11 +731,11 @@ local({
         lines <- do.call(paste, c(sub_chr, sep = '\t'))
         cat(paste0('__ROW__\t', idx, '\t', lines, collapse = '\n'), '\n', sep='')
       }
-      cat('__DONE__\t', nr, '\t', if (.has_rn) nc + 1L else nc, '\n', sep='')
+      cat('__DONE__\t', nr, '\t', nc, '\n', sep='')
     }
   }
 })
-""".printf (b64_name, start_row, end_row);
+""".printf (b64_name, current_col_offset + 1, col_page_size, start_row, end_row);
 
             string? plot_out = null;
             string out_str = yield Services.PersistentSessionManager.peek_for_key (session_key).execute_r_with_options (r_code, null, null, 15000, false, out plot_out);
@@ -644,36 +748,69 @@ local({
             string b64_name = GLib.Base64.encode (obj_name.data);
 
             string py_code = """
-import base64 as _b64
-try:
-    _obj_name = _b64.b64decode('%s').decode('utf-8')
-    _d = globals()[_obj_name] if _obj_name in globals() else eval(_obj_name, globals())
-    if hasattr(_d, 'to_dict') and hasattr(_d, 'columns'):
-        cols = [f"{c} [{_d[c].dtype}]" for c in _d.columns]
-        print('__COLS__\t' + '\t'.join(cols))
-        nr = len(_d)
-        nc = len(_d.columns)
-        sub = _d.iloc[%d:%d]
-        if nc > 0 and len(sub) > 0:
-            _rows = sub.astype(str).apply(lambda col: col.str.replace('\t', ' ', regex=False).str.replace('\r', ' ', regex=False).str.replace('\n', ' ', regex=False))
-            for idx, row in enumerate(_rows.itertuples(index=False, name=None), start=%d):
-                print(f'__ROW__\t{idx}\t' + '\t'.join(row))
-        print(f'__DONE__\t{nr}\t{nc}')
-    elif hasattr(_d, 'shape') and len(_d.shape) == 2:
-        cols = [f'col_{i}' for i in range(_d.shape[1])]
-        print('__COLS__\t' + '\t'.join(cols))
-        nr = _d.shape[0]
-        nc = _d.shape[1]
-        sub = _d[%d:%d]
-        for idx, r in enumerate(sub, start=%d):
-            row_vals = [str(v).replace('\t', ' ').replace('\r', ' ').replace('\n', ' ') for v in r]
-            print(f'__ROW__\t{idx}\t' + '\t'.join(row_vals))
-        print(f'__DONE__\t{nr}\t{nc}')
-    else:
-        print('__ERROR__\tTarget is not a 2D dataframe or matrix')
-except Exception as e:
-    print('__ERROR__\t' + str(e))
-""".printf (b64_name, start_idx, end_idx, start_idx + 1, start_idx, end_idx, start_idx + 1);
+def _imladris_fetch_df():
+    import base64 as _b64
+    try:
+        _obj_name = _b64.b64decode('%s').decode('utf-8')
+        _ns = globals()
+        _d = _ns[_obj_name] if _obj_name in _ns else eval(_obj_name, _ns)
+        _col_start = %d
+        _col_end = _col_start + %d
+        if hasattr(_d, 'obs') and hasattr(_d.obs, 'columns'):
+            _d = _d.obs
+        if hasattr(_d, 'collect') and hasattr(_d, 'columns'):
+            _d = _d.head(%d + %d).collect()
+        if hasattr(_d, 'to_pandas') and hasattr(_d, 'schema'):
+            _nr = len(_d) if hasattr(_d, '__len__') else 0
+            _d = _d.slice(%d, %d).to_pandas()
+            _r_start, _r_end = 0, len(_d)
+        elif type(_d).__name__ == 'Series' and hasattr(_d, 'to_frame'):
+            _d = _d.to_frame(name=str(_d.name or 'value'))
+            _nr = len(_d)
+            _r_start, _r_end = %d, %d
+        else:
+            _nr = len(_d) if hasattr(_d, '__len__') else _d.shape[0]
+            _r_start, _r_end = %d, %d
+        if hasattr(_d, 'iloc') and hasattr(_d, 'columns'):
+            nc_total = len(_d.columns)
+            show_cols = list(_d.columns[_col_start:_col_end])
+            _dtypes = _d.dtypes
+            cols = [f"{c} [{_dtypes[i + _col_start]}]" for i, c in enumerate(show_cols)]
+            has_idx = hasattr(_d, 'index') and (getattr(_d.index, 'name', None) is not None or type(_d.index).__name__ in ('DatetimeIndex', 'Index', 'MultiIndex'))
+            if has_idx:
+                cols = [f"{_d.index.name or 'index'} [{type(_d.index).__name__}]"] + cols
+            print('__COLS__\t' + '\t'.join(cols))
+            nc = len(show_cols)
+            sub = _d.iloc[_r_start:_r_end, _col_start:_col_start + nc]
+            if nc > 0 and len(sub) > 0:
+                _rows = sub.astype(str).apply(lambda col: col.str.replace('\t', ' ', regex=False).str.replace('\r', ' ', regex=False).str.replace('\n', ' ', regex=False))
+                _idx_vals = [str(ix).replace('\t', ' ').replace('\r', ' ').replace('\n', ' ') for ix in sub.index] if has_idx else None
+                for idx, row in enumerate(_rows.itertuples(index=False, name=None), start=%d):
+                    if _idx_vals is not None:
+                        print(f'__ROW__\t{idx}\t{_idx_vals[idx - %d]}\t' + '\t'.join(row))
+                    else:
+                        print(f'__ROW__\t{idx}\t' + '\t'.join(row))
+            print(f'__DONE__\t{_nr}\t{nc_total}')
+        elif hasattr(_d, 'shape') and len(_d.shape) == 2:
+            nr = _d.shape[0]
+            nc_total = _d.shape[1]
+            c_hi = min(nc_total, _col_end)
+            cols = [f'col_{i}' for i in range(_col_start, c_hi)]
+            print('__COLS__\t' + '\t'.join(cols))
+            sub = _d[%d:%d, _col_start:c_hi]
+            if hasattr(sub, 'toarray'):
+                sub = sub.toarray()
+            for idx, r in enumerate(sub, start=%d):
+                row_vals = [str(v).replace('\t', ' ').replace('\r', ' ').replace('\n', ' ') for v in r]
+                print(f'__ROW__\t{idx}\t' + '\t'.join(row_vals))
+            print(f'__DONE__\t{nr}\t{nc_total}')
+        else:
+            print('__ERROR__\tTarget is not a 2D dataframe or matrix')
+    except Exception as e:
+        print('__ERROR__\t' + str(e))
+_imladris_fetch_df()
+del _imladris_fetch_df
+""".printf (b64_name, current_col_offset, col_page_size, start_idx, page_size, start_idx, page_size, start_idx, end_idx, start_idx, end_idx, start_idx + 1, start_idx + 1, start_idx, end_idx, start_idx + 1);
 
             string? plot_out = null;
             string out_str = yield Services.PersistentSessionManager.peek_for_key (session_key).execute_python_with_options (py_code, null, null, 15000, false, out plot_out);
@@ -708,6 +845,7 @@ except Exception as e:
                     string[] dim_parts = trimmed.substring ("__DONE__\t".length).split ("\t");
                     if (dim_parts.length >= 2) {
                         this.total_df_rows = int.parse (dim_parts[0]);
+                        this.total_df_cols = int.parse (dim_parts[1]);
                     }
                 }
             }

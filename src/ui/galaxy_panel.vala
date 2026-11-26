@@ -78,13 +78,20 @@ namespace Imladris.UI {
             setup_ui ();
             connect_signals ();
 
-            // Probe connection on launch if credentials exist
+            // Probe connection on launch if credentials exist, or when async keyring completes
+            client.credentials_loaded.connect ((has_key) => {
+                if (has_key) {
+                    probe_connection_and_refresh ();
+                }
+            });
             if (client.api_key.length > 0) {
                 probe_connection_and_refresh ();
             } else {
                 update_status_display (false, "Disconnected");
             }
         }
+
+        private GLib.Cancellable? datasets_cancellable = null;
 
         /**
          * Initializes and arranges all sub-widgets inside the vertical panel.
@@ -544,9 +551,18 @@ namespace Imladris.UI {
             this.active_history_id = history_id;
             this.active_history_name = history_name;
 
+            if (datasets_cancellable != null) {
+                datasets_cancellable.cancel ();
+            }
+            var req_cancel = new GLib.Cancellable ();
+            datasets_cancellable = req_cancel;
+
             show_loading (true);
 
-            client.fetch_history_datasets_async.begin (history_id, null, (obj, res) => {
+            client.fetch_history_datasets_async.begin (history_id, req_cancel, (obj, res) => {
+                if (datasets_cancellable != req_cancel) {
+                    return;
+                }
                 show_loading (false);
 
                 try {
@@ -565,6 +581,7 @@ namespace Imladris.UI {
                         content_stack.set_visible_child_name ("empty");
                     }
                 } catch (GLib.Error e) {
+                    if (e is GLib.IOError.CANCELLED) return;
                     empty_status_page.title = "Fetch Failed";
                     empty_status_page.description = e.message;
                     content_stack.set_visible_child_name ("empty");

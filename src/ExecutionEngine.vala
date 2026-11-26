@@ -17,7 +17,7 @@ namespace Imladris {
             var source = Core.PlatformUtils.resolve_runtime (prog, working_dir, out resolved_path, out env_prefix);
 
             string[] final_argv;
-            if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
+            if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN || source == Core.RuntimeSource.HOST_NATIVE) {
                 var probe = Core.EnvDiscovery.get_default ().get_cached (working_dir);
                 string[] sub_args = new string[argv.length - 1];
                 for (int i = 1; i < argv.length; i++) sub_args[i - 1] = argv[i];
@@ -31,7 +31,15 @@ namespace Imladris {
                 } else if (prog == "python" || prog == "python3") {
                     routed = Core.ExecutionRouter.build_python_command (probe, sub_args, working_dir, null, out env_vars);
                 }
-                final_argv = Core.HostBridge.wrap_command (routed, working_dir, env_vars);
+                if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
+                    final_argv = Core.HostBridge.wrap_command (routed, working_dir, env_vars);
+                } else {
+                    foreach (string kv in env_vars) {
+                        string[] parts = kv.split ("=", 2);
+                        if (parts.length == 2) launcher.setenv (parts[0], parts[1], true);
+                    }
+                    final_argv = routed;
+                }
             } else if (source == Core.RuntimeSource.MANAGED_GLOBAL || source == Core.RuntimeSource.PROJECT_SANDBOX) {
                 Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                 final_argv = new string[argv.length];
@@ -95,6 +103,9 @@ namespace Imladris {
                     argv, working_dir, GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE
                 );
                 yield proc.communicate_utf8_async (null, linked_cancellable, out output, null);
+                if (output != null && output.length > 2 * 1024 * 1024) {
+                    output = output.substring (0, 2 * 1024 * 1024) + "\n[Output truncated at 2 MB to prevent OOM]";
+                }
                 timed_out = did_timeout;
                 if (!did_timeout) {
                     exit_status = proc.get_exit_status ();

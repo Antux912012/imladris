@@ -144,7 +144,7 @@ namespace Imladris.Bridges.Yavanna {
             var db_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
             var db_model = new Gtk.StringList ({
                 "UniProtKB (Protein)",
-                "Ensembl (Human GRCh38 Gene)"
+                "Ensembl (Multi-Species Gene)"
             });
             db_selector = new Gtk.DropDown (db_model, null) {
                 selected = 0
@@ -153,7 +153,7 @@ namespace Imladris.Bridges.Yavanna {
                 if (db_selector.selected == 0) {
                     accession_entry.placeholder_text = "e.g., P04637 or TP53_HUMAN";
                 } else {
-                    accession_entry.placeholder_text = "e.g., BRCA1 or ENSG00000012048";
+                    accession_entry.placeholder_text = "e.g., BRCA1, mus_musculus:Tp53, or ENSG00000012048";
                 }
             });
             db_box.append (db_selector);
@@ -248,6 +248,8 @@ namespace Imladris.Bridges.Yavanna {
             return box;
         }
 
+        private uint64 request_gen = 0;
+
         private void on_resolve_triggered () {
             string query = accession_entry.text.strip ();
             if (query.length == 0) return;
@@ -256,6 +258,7 @@ namespace Imladris.Bridges.Yavanna {
                 active_cancellable.cancel ();
             }
             active_cancellable = new GLib.Cancellable ();
+            uint64 my_gen = ++request_gen;
 
             resolve_spinner.visible = true;
             resolve_spinner.spinning = true;
@@ -263,13 +266,13 @@ namespace Imladris.Bridges.Yavanna {
             resolve_status_label.label = @"Querying $(db_selector.selected == 0 ? "UniProtKB" : "Ensembl")...";
 
             if (db_selector.selected == 0) {
-                resolve_uniprot_async.begin (query, active_cancellable);
+                resolve_uniprot_async.begin (query, active_cancellable, my_gen);
             } else {
-                resolve_ensembl_async.begin (query, active_cancellable);
+                resolve_ensembl_async.begin (query, active_cancellable, my_gen);
             }
         }
 
-        private async void resolve_uniprot_async (string accession, GLib.Cancellable cancellable) {
+        private async void resolve_uniprot_async (string accession, GLib.Cancellable cancellable, uint64 my_gen) {
             string clean_acc = accession.strip ().up ();
             string url = @"https://rest.uniprot.org/uniprotkb/$(GLib.Uri.escape_string (clean_acc, null, false)).json";
             var msg = new Soup.Message ("GET", url);
@@ -327,11 +330,19 @@ namespace Imladris.Bridges.Yavanna {
                                 full_name = fn.get_string_member ("value");
                             }
                         }
+                    } else if (pd.has_member ("submissionNames") && pd.get_member ("submissionNames").get_node_type () == Json.NodeType.ARRAY) {
+                        var sn_arr = pd.get_array_member ("submissionNames");
+                        if (sn_arr.get_length () > 0 && sn_arr.get_object_element (0).has_member ("fullName")) {
+                            var fn = sn_arr.get_object_element (0).get_object_member ("fullName");
+                            if (fn.has_member ("value")) {
+                                full_name = fn.get_string_member ("value");
+                            }
+                        }
                     }
                 }
 
-                string org_name = "Homo sapiens";
-                int64 taxon_id = 9606;
+                string org_name = "Unknown organism";
+                int64 taxon_id = 0;
                 if (obj.has_member ("organism")) {
                     var org = obj.get_object_member ("organism");
                     if (org.has_member ("scientificName")) {
@@ -368,23 +379,32 @@ namespace Imladris.Bridges.Yavanna {
                 btn_inject_r.sensitive = true;
                 btn_inject_py.sensitive = true;
             } catch (GLib.Error e) {
-                if (!(e is GLib.IOError.CANCELLED)) {
+                if (my_gen == request_gen && !(e is GLib.IOError.CANCELLED)) {
                     resolve_status_label.label = @"✖ Error: $(e.message)";
                     clear_resolved_cache ();
                 }
             } finally {
-                resolve_spinner.spinning = false;
-                resolve_spinner.visible = false;
-                btn_resolve.sensitive = true;
+                if (my_gen == request_gen) {
+                    resolve_spinner.spinning = false;
+                    resolve_spinner.visible = false;
+                    btn_resolve.sensitive = true;
+                }
             }
         }
 
-        private async void resolve_ensembl_async (string query, GLib.Cancellable cancellable) {
+        private async void resolve_ensembl_async (string query, GLib.Cancellable cancellable, uint64 my_gen) {
             string clean_q = query.strip ();
-            string escaped_q = GLib.Uri.escape_string (clean_q, null, false);
-            string url = @"https://rest.ensembl.org/lookup/symbol/homo_sapiens/$escaped_q?content-type=application/json";
-            if (clean_q.up ().has_prefix ("ENS")) {
-                url = @"https://rest.ensembl.org/lookup/id/$(GLib.Uri.escape_string (clean_q.up (), null, false))?content-type=application/json";
+            string species = "homo_sapiens";
+            string symbol = clean_q;
+            int colon = clean_q.index_of (":");
+            if (colon > 0 && colon + 1 < clean_q.length) {
+                species = clean_q.substring (0, colon).strip ().down ().replace (" ", "_");
+                symbol = clean_q.substring (colon + 1).strip ();
+            }
+            string escaped_q = GLib.Uri.escape_string (symbol, null, false);
+            string url = @"https://rest.ensembl.org/lookup/symbol/$(GLib.Uri.escape_string (species, null, false))/$escaped_q?content-type=application/json";
+            if (symbol.up ().has_prefix ("ENS")) {
+                url = @"https://rest.ensembl.org/lookup/id/$(GLib.Uri.escape_string (symbol.up (), null, false))?content-type=application/json";
             }
 
             var msg = new Soup.Message ("GET", url);
@@ -435,14 +455,16 @@ namespace Imladris.Bridges.Yavanna {
                 btn_inject_r.sensitive = true;
                 btn_inject_py.sensitive = true;
             } catch (GLib.Error e) {
-                if (!(e is GLib.IOError.CANCELLED)) {
+                if (my_gen == request_gen && !(e is GLib.IOError.CANCELLED)) {
                     resolve_status_label.label = @"✖ Error: $(e.message)";
                     clear_resolved_cache ();
                 }
             } finally {
-                resolve_spinner.spinning = false;
-                resolve_spinner.visible = false;
-                btn_resolve.sensitive = true;
+                if (my_gen == request_gen) {
+                    resolve_spinner.spinning = false;
+                    resolve_spinner.visible = false;
+                    btn_resolve.sensitive = true;
+                }
             }
         }
 
@@ -682,7 +704,9 @@ entity_data = resp.json()
 
             btn_inject_oligo.sensitive = (n >= 4);
 
-            if (had_invalid) {
+            if (n < 4) {
+                oligo_validation_label.label = "Enter at least 4 bases (A/T/U/G/C) to insert";
+            } else if (had_invalid) {
                 oligo_validation_label.label = "⚠ Stripped invalid characters. Cleaned sequence active.";
             } else if (oligo_gc_percent >= 40.0 && oligo_gc_percent <= 60.0 && oligo_tm >= 55.0 && oligo_tm <= 65.0) {
                 oligo_validation_label.label = "✔ Optimal RT-qPCR parameters (40-60% GC, 55-65 °C Tm)";

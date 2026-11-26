@@ -197,17 +197,22 @@ namespace Imladris {
             } else if (GLib.Environment.get_variable ("DBUS_SESSION_BUS_ADDRESS") != null) {
                 // Asynchronously attempt to load from Secret Service when session bus exists
                 load_api_key_async.begin (this.server_url, (obj, res) => {
+                    bool loaded = false;
                     try {
                         string? retrieved_key = load_api_key_async.end (res);
                         if (retrieved_key != null && retrieved_key.length > 0) {
                             this.api_key = retrieved_key;
+                            loaded = true;
                         }
                     } catch (GLib.Error e) {
                         GLib.debug ("Secret service unavailable when loading Galaxy API key: %s", e.message);
                     }
+                    credentials_loaded (loaded);
                 });
             }
         }
+
+        public signal void credentials_loaded (bool has_key);
 
         /**
          * Persists credentials to OS Keyring and local settings.

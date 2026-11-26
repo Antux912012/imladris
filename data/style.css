@@ -12,37 +12,6 @@
     padding: 2px 8px;
 }
 
-menubutton.imladris-brand-btn {
-    border-radius: 9999px;
-    padding: 0;
-    margin-right: 8px;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-}
-
-menubutton.imladris-brand-btn > button {
-    border-radius: 9999px;
-    background-color: alpha(@accent_color, 0.15);
-    color: @accent_color;
-    border: 1px solid alpha(@accent_color, 0.35);
-    padding: 4px 14px;
-    font-weight: 700;
-    box-shadow: none;
-    transition: all 150ms ease;
-}
-
-menubutton.imladris-brand-btn > button:hover {
-    background-color: @accent_bg_color;
-    color: @accent_fg_color;
-}
-
-menubutton.imladris-brand-btn > button:checked,
-menubutton.imladris-brand-btn > button:active {
-    background-color: alpha(@accent_color, 0.25);
-    color: @accent_color;
-}
-
 /* Category Switcher Tabs - Modern Libadwaita Segmented Style */
 .ribbon-tab-btn {
     background: transparent;
@@ -110,25 +79,6 @@ menubutton.imladris-brand-btn > button:active {
     background-color: alpha(@window_fg_color, 0.08);
 }
 .ribbon-tool-btn:checked {
-    background-color: alpha(@accent_bg_color, 0.20);
-    color: @accent_color;
-}
-
-/* Tall Ribbon Button (Compact Libadwaita Style) */
-.ribbon-tall-btn,
-.ribbon-tall-btn > button {
-    padding: 3px 6px;
-    border-radius: 6px;
-    min-width: 48px;
-    min-height: 44px;
-    transition: background 120ms ease;
-}
-.ribbon-tall-btn label {
-    font-size: 0.72rem;
-    line-height: 1.1;
-    margin-top: 1px;
-}
-.ribbon-tall-btn:checked {
     background-color: alpha(@accent_bg_color, 0.20);
     color: @accent_color;
 }
@@ -319,12 +269,12 @@ menubutton.imladris-brand-btn > button:active {
     opacity: 0.85;
 }
 
-.dock-drag-pill {
-    background-color: @accent_bg_color;
-    color: @accent_fg_color;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 6px;
+.dock-control-btn,
+.dock-control-btn > button {
+    min-width: 26px;
+    min-height: 26px;
+    padding: 2px 4px;
+    border-radius: 5px;
 }
 
 .dock-subtoolbar {
@@ -436,9 +386,37 @@ menubutton.imladris-brand-btn > button:active {
 .accent-circle-purple { background-color: #9141ac; }
 .accent-circle-slate  { background-color: #6f8396; }
 
+/* Ptyxis / Rewaita Palette Selector Cards */
+button.palette-card {
+    transition: border-color 120ms ease, outline 120ms ease;
+}
+
+button.palette-card.is-selected {
+    outline: 2.5px solid @accent_color;
+    outline-offset: 1px;
+}
+
+.palette-check-badge {
+    min-width: 18px;
+    min-height: 18px;
+    border-radius: 9999px;
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+    padding: 2px;
+}
+
 /* Eye Friendly (Sepia) Theme Overrides */
 window.eye-friendly,
 .eye-friendly {
+    @define-color window_bg_color #f5eee6;
+    @define-color window_fg_color #383431;
+    @define-color view_bg_color #faf5ee;
+    @define-color view_fg_color #2b2826;
+    @define-color headerbar_bg_color #ebe2d8;
+    @define-color headerbar_fg_color #383431;
+    @define-color card_bg_color #ede5da;
+    @define-color popover_bg_color #faf5ee;
+    @define-color borders #dcd0c2;
     --window-bg-color: #f5eee6;
     --window-fg-color: #383431;
     --view-bg-color: #faf5ee;
@@ -465,25 +443,6 @@ window.eye-friendly,
 
 .eye-friendly .ribbon-deck {
     background-color: #ebe2d8;
-}
-
-/* Package installer quick-add chip buttons */
-.chip-button {
-    border-radius: 9999px;
-    padding: 3px 10px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    margin: 2px;
-    background-color: alpha(@window_fg_color, 0.08);
-    color: @window_fg_color;
-    border: 1px solid alpha(@window_fg_color, 0.16);
-    transition: all 120ms ease;
-}
-
-.chip-button:hover {
-    background-color: alpha(@accent_color, 0.2);
-    color: @accent_color;
-    border-color: alpha(@accent_color, 0.45);
 }
 
 .eye-friendly .imladris-statusbar {
@@ -519,35 +478,10 @@ window.eye-friendly,
     font-weight: 600;
 }
 
-/* Zotero interactive citation pill */
-.citation-pill {
-    border-radius: 6px;
-    font-family: monospace;
-    background-color: alpha(@accent_bg_color, 0.15);
-    color: @accent_color;
-    border: 1px solid alpha(@accent_bg_color, 0.3);
-    padding: 2px 6px;
-    font-weight: 600;
-    transition: all 120ms ease;
-}
-
-.citation-pill:hover {
-    background-color: alpha(@accent_bg_color, 0.28);
-}
-
 /* Semantic colors */
 .success {
     color: @success_color;
     font-weight: bold;
-}
-
-.accent-btn {
-    color: @accent_color;
-    font-weight: 600;
-}
-
-.accent-btn:hover {
-    background-color: alpha(@accent_bg_color, 0.18);
 }
 
 /* Code cell card styling */
@@ -582,21 +516,11 @@ window.eye-friendly,
     font-weight: 700;
 }
 
-/* GPU Hardware Acceleration Status Badge */
-.gpu-status-badge {
-    background-color: alpha(@accent_bg_color, 0.14);
-    color: @accent_color;
-    border: 1px solid alpha(@accent_bg_color, 0.30);
-    font-variant-numeric: tabular-nums;
-}
-
 /* Alacritty Crisp Physics Mode (65ms Zero-Lag Micro-Transitions & Crisp Glyph Hinting) */
 window.physics-alacritty .ribbon-tab-btn,
 window.physics-alacritty .ribbon-tool-btn,
-window.physics-alacritty .ribbon-tall-btn,
 window.physics-alacritty .ribbon-compact-btn,
 window.physics-alacritty .target-env-pill,
-window.physics-alacritty .citation-pill,
 window.physics-alacritty .mermaid-palette-btn,
 window.physics-alacritty button {
     transition-duration: 65ms;
@@ -609,12 +533,23 @@ window.physics-alacritty textview {
 }
 
 /* PuTTY Instant Terminal Physics Mode (0ms Zero-Latency State Snap) */
-window.physics-putty *,
 window.physics-putty .ribbon-tab-btn,
 window.physics-putty .ribbon-tool-btn,
-window.physics-putty .ribbon-tall-btn,
 window.physics-putty .ribbon-compact-btn,
-window.physics-putty button {
+window.physics-putty .target-env-pill,
+window.physics-putty .mermaid-palette-btn,
+window.physics-putty .dock-center-crosshair,
+window.physics-putty .table-cell-btn,
+window.physics-putty .accent-swatch-button,
+window.physics-putty .accent-circle,
+window.physics-putty button,
+window.physics-putty togglebutton,
+window.physics-putty menubutton,
+window.physics-putty tab,
+window.physics-putty row,
+window.physics-putty popover,
+window.physics-putty revealer,
+window.physics-putty stack {
     transition-duration: 0ms;
     animation-duration: 0ms;
 }

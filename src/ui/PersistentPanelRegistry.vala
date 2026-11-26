@@ -28,7 +28,6 @@ namespace Imladris.UI {
         public Gtk.Box live_preview_panel { get; private set; }
         public Gtk.Box console_panel { get; private set; }
         public Gtk.TextView terminal_view { get; private set; }
-        public Gtk.ListBox environment_list { get; private set; }
         public EnvironmentController environment_controller { get; private set; }
         public DataGridViewer data_grid_viewer { get; private set; }
         public ElrondChatPanel elrond_chat_panel { get; private set; }
@@ -329,18 +328,13 @@ namespace Imladris.UI {
                 vexpand = true
             };
 
-            notebook_cell_toolbar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
-                margin_top = 4,
-                margin_bottom = 4,
-                margin_start = 8,
-                margin_end = 8
+            notebook_cell_toolbar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+                margin_top = 3,
+                margin_bottom = 3,
+                margin_start = 6,
+                margin_end = 6
             };
             notebook_cell_toolbar.add_css_class ("dock-subtoolbar");
-
-            var cell_badge = new Gtk.Label ("Notebook / Chunk Actions:") {
-                css_classes = { "dim-label", "caption" }
-            };
-            notebook_cell_toolbar.append (cell_badge);
 
             var run_cell_btn = new Gtk.Button () {
                 tooltip_text = "Execute active code cell or chunk (Ctrl+Shift+Enter)"
@@ -349,7 +343,7 @@ namespace Imladris.UI {
             run_cell_btn.add_css_class ("ribbon-compact-btn");
             var rc_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
             rc_box.append (new Gtk.Image.from_icon_name ("media-playback-start-symbolic"));
-            rc_box.append (new Gtk.Label ("Run Cell (Ctrl+Shift+Enter)"));
+            rc_box.append (new Gtk.Label ("Run Cell"));
             run_cell_btn.set_child (rc_box);
             run_cell_btn.clicked.connect (() => {
                 execute_active_cell ();
@@ -371,7 +365,7 @@ namespace Imladris.UI {
             notebook_cell_toolbar.append (run_advance_btn);
 
             var run_all_btn = new Gtk.Button () {
-                tooltip_text = "Execute all code cells sequentially"
+                tooltip_text = "Execute all code cells sequentially (Ctrl+Alt+R)"
             };
             run_all_btn.add_css_class ("flat");
             run_all_btn.add_css_class ("ribbon-compact-btn");
@@ -385,13 +379,13 @@ namespace Imladris.UI {
             notebook_cell_toolbar.append (run_all_btn);
 
             var clear_out_btn = new Gtk.Button () {
-                tooltip_text = "Clear all console and cell outputs"
+                tooltip_text = "Clear all console and cell outputs (Ctrl+L)"
             };
             clear_out_btn.add_css_class ("flat");
             clear_out_btn.add_css_class ("ribbon-compact-btn");
             var clr_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
             clr_box.append (new Gtk.Image.from_icon_name ("edit-clear-symbolic"));
-            clr_box.append (new Gtk.Label ("Clear Outputs"));
+            clr_box.append (new Gtk.Label ("Clear"));
             clear_out_btn.set_child (clr_box);
             clear_out_btn.clicked.connect (() => {
                 clear_all_outputs ();
@@ -399,20 +393,24 @@ namespace Imladris.UI {
             notebook_cell_toolbar.append (clear_out_btn);
 
             var restart_k_btn = new Gtk.Button () {
-                tooltip_text = "Restart execution kernel and reset state"
+                tooltip_text = "Restart execution kernel and reset state (Ctrl+Shift+F10)"
             };
             restart_k_btn.add_css_class ("flat");
             restart_k_btn.add_css_class ("ribbon-compact-btn");
             var rst_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4);
             rst_box.append (new Gtk.Image.from_icon_name ("view-refresh-symbolic"));
-            rst_box.append (new Gtk.Label ("Restart Kernel"));
+            rst_box.append (new Gtk.Label ("Restart"));
             restart_k_btn.set_child (rst_box);
             restart_k_btn.clicked.connect (() => {
                 restart_kernel ();
             });
             notebook_cell_toolbar.append (restart_k_btn);
 
-            var add_py_btn = new Gtk.Button.with_label ("+ Python Cell");
+            notebook_cell_toolbar.append (new Gtk.Separator (Gtk.Orientation.VERTICAL));
+
+            var add_py_btn = new Gtk.Button.with_label ("+ Python") {
+                tooltip_text = "Insert executable Python code chunk"
+            };
             add_py_btn.add_css_class ("flat");
             add_py_btn.add_css_class ("ribbon-compact-btn");
             add_py_btn.clicked.connect (() => {
@@ -420,7 +418,9 @@ namespace Imladris.UI {
             });
             notebook_cell_toolbar.append (add_py_btn);
 
-            var add_r_btn = new Gtk.Button.with_label ("+ R Cell");
+            var add_r_btn = new Gtk.Button.with_label ("+ R") {
+                tooltip_text = "Insert executable R code chunk"
+            };
             add_r_btn.add_css_class ("flat");
             add_r_btn.add_css_class ("ribbon-compact-btn");
             add_r_btn.clicked.connect (() => {
@@ -428,7 +428,9 @@ namespace Imladris.UI {
             });
             notebook_cell_toolbar.append (add_r_btn);
 
-            var add_md_btn = new Gtk.Button.with_label ("+ Markdown Cell");
+            var add_md_btn = new Gtk.Button.with_label ("+ Markdown") {
+                tooltip_text = "Insert Markdown narrative section"
+            };
             add_md_btn.add_css_class ("flat");
             add_md_btn.add_css_class ("ribbon-compact-btn");
             add_md_btn.clicked.connect (() => {
@@ -436,7 +438,7 @@ namespace Imladris.UI {
             });
             notebook_cell_toolbar.append (add_md_btn);
 
-            var add_math_chem_btn = new Gtk.Button.with_label ("+ Math / Chem") {
+            var add_math_chem_btn = new Gtk.Button.with_label ("+ Math/Chem") {
                 tooltip_text = "Open Math & Chemical Reaction Studio (Ctrl+M)"
             };
             add_math_chem_btn.add_css_class ("flat");
@@ -665,7 +667,6 @@ namespace Imladris.UI {
             environment_controller.toast_requested.connect ((msg) => {
                 if (main_window != null) main_window.show_toast (msg);
             });
-            environment_list = new Gtk.ListBox (); // dummy placeholder for AST variables
             panels.set (PanelId.ENVIRONMENT, environment_controller);
 
             // DATA VIEWER PANEL (Virtualized Matrix & Dataframe Inspector)
@@ -1128,13 +1129,17 @@ namespace Imladris.UI {
                     populate_files_browser ();
                 } else {
                     string lower_f = fpath.down ();
-                    if (lower_f.has_suffix (".csv") || lower_f.has_suffix (".tsv")) {
+                    if (lower_f.has_suffix (".csv") || lower_f.has_suffix (".tsv") ||
+                        lower_f.has_suffix (".csv.gz") || lower_f.has_suffix (".tsv.gz") ||
+                        lower_f.has_suffix (".vcf") || lower_f.has_suffix (".vcf.gz") ||
+                        lower_f.has_suffix (".bed") || lower_f.has_suffix (".gtf")) {
                         data_grid_viewer.load_delimited_file (fpath);
                         doc_page.dock_layout_state.activate_tab (QuadrantId.Q1_TOP_LEFT, PanelId.DATA_VIEWER);
                         string bname = GLib.Path.get_basename (fpath);
                         string safe_p = fpath.replace ("\\", "/").replace ("'", "\\'");
-                        string r_fn = lower_f.has_suffix (".tsv") ? "read.delim" : "read.csv";
-                        string py_sep = lower_f.has_suffix (".tsv") ? ", sep='\\t'" : "";
+                        bool is_tab = !lower_f.has_suffix (".csv") && !lower_f.has_suffix (".csv.gz");
+                        string r_fn = is_tab ? "read.delim" : "read.csv";
+                        string py_sep = is_tab ? ", sep='\\t'" : "";
                         doc_page.append_console_log (@"📊 Previewing '$bname' in Data Viewer.\n  • R:      df <- $r_fn('$safe_p')\n  • Python: df = pd.read_csv('$safe_p'$py_sep)");
                     } else if (main_window != null) {
                         main_window.open_file_from_path.begin (fpath);
@@ -1158,7 +1163,7 @@ namespace Imladris.UI {
                 populate_files_browser ();
                 Gtk.TextIter end;
                 terminal_view.buffer.get_end_iter (out end);
-                terminal_view.buffer.insert (ref end, @"\n[Working Directory changed to: $new_dir]\n$$ ", -1);
+                terminal_view.buffer.insert (ref end, "\n[Working Directory changed to: " + new_dir + "]\n$ ", -1);
             });
             sess_plot_hid = sess_mgr.plot_generated.connect ((plot_path) => {
                 register_generated_plot (plot_path);
@@ -1217,8 +1222,14 @@ namespace Imladris.UI {
                 vexpand = true
             };
             pkg_box.append (pkg_scroll);
+            bool packages_initialized = false;
+            pkg_box.map.connect (() => {
+                if (!packages_initialized) {
+                    packages_initialized = true;
+                    scan_installed_packages.begin ();
+                }
+            });
             panels.set (PanelId.PACKAGES, pkg_box);
-            scan_installed_packages.begin ();
 
             // 12. HELP PANEL (Documentation & RStudio Help Reference Browser)
             var help_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
@@ -1702,7 +1713,7 @@ namespace Imladris.UI {
 
             try {
                 if (view_call_regex == null) {
-                    view_call_regex = new GLib.Regex ("\\bView\\s*\\(\\s*([A-Za-z_\\.][A-Za-z0-9_\\.]*)\\s*\\)");
+                    view_call_regex = new GLib.Regex ("\\bView\\s*\\(\\s*([A-Za-z_\\.][A-Za-z0-9_\\.@$]*)\\s*\\)");
                 }
                 GLib.MatchInfo mi;
                 if (view_call_regex.match (sanitized.str, 0, out mi)) {
@@ -1774,22 +1785,23 @@ namespace Imladris.UI {
                 bool any_line_streamed = false;
                 string output = yield sess_mgr.execute_r_with_options (
                     code,
-                    (line, is_err) => {
+                    (eng, line, is_err) => {
                         any_line_streamed = true;
-                        doc_page.append_console_log (line);
+                        if (doc_page != null) doc_page.append_console_log (line);
                     },
                     cancellable,
                     60000,
                     true,
                     out plot_file
                 );
+                if (doc_page == null || (cancellable != null && cancellable.is_cancelled ())) return;
                 output = output.strip ();
                 double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
                 if (!any_line_streamed && output.length > 0) {
                     doc_page.append_console_log (@"Out [$count]:\n$output");
-                    if (output.contains ("Install Toolchain") && main_window != null) {
-                        main_window.show_toolchain_setup_dialog ();
-                    }
+                }
+                if (output.contains ("Install Toolchain") && main_window != null) {
+                    main_window.show_toolchain_setup_dialog ();
                 }
                 if (plot_file != null && plot_file.length > 0) {
                     register_generated_plot (plot_file);
@@ -1813,22 +1825,23 @@ namespace Imladris.UI {
                 bool any_line_streamed = false;
                 string output = yield sess_mgr.execute_python_with_options (
                     code,
-                    (line, is_err) => {
+                    (eng, line, is_err) => {
                         any_line_streamed = true;
-                        doc_page.append_console_log (line);
+                        if (doc_page != null) doc_page.append_console_log (line);
                     },
                     cancellable,
                     60000,
                     true,
                     out plot_file
                 );
+                if (doc_page == null || (cancellable != null && cancellable.is_cancelled ())) return;
                 output = output.strip ();
                 double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
                 if (!any_line_streamed && output.length > 0) {
                     doc_page.append_console_log (@"Out [$count]:\n$output");
-                    if (output.contains ("Install Toolchain") && main_window != null) {
-                        main_window.show_toolchain_setup_dialog ();
-                    }
+                }
+                if (output.contains ("Install Toolchain") && main_window != null) {
+                    main_window.show_toolchain_setup_dialog ();
                 }
                 if (plot_file != null && plot_file.length > 0) {
                     register_generated_plot (plot_file);
@@ -1869,7 +1882,26 @@ namespace Imladris.UI {
                 }
                 refresh_environment_and_outline ();
             } else if (norm_engine == "bash" || norm_engine == "sh" || norm_engine == "zsh") {
-                string output = (yield ExecutionEngine.capture_command_async ({ "bash", "-c", code })).strip ();
+                string? bash_cwd = current_browser_dir != "" ? current_browser_dir : (doc_page.current_project_dir != "" ? doc_page.current_project_dir : null);
+                string skey = GLib.Checksum.compute_for_string (GLib.ChecksumType.MD5, get_session_key ());
+                string env_cache = GLib.Path.build_filename (Core.PlatformUtils.get_shared_cache_dir ("tmp"), @"imladris_bash_env_$(skey).sh");
+                string cwd_cache = GLib.Path.build_filename (Core.PlatformUtils.get_shared_cache_dir ("tmp"), @"imladris_bash_cwd_$(skey).txt");
+                string persistent_cmd = "if [ -f " + GLib.Shell.quote (env_cache) + " ]; then source " + GLib.Shell.quote (env_cache) + " 2>/dev/null || true; fi\n" +
+                    "_imladris_save_bash() {\n  pwd > " + GLib.Shell.quote (cwd_cache) + "\n  export -p > " + GLib.Shell.quote (env_cache) + "\n}\n" +
+                    "trap _imladris_save_bash EXIT\n" +
+                    code;
+                string output = (yield ExecutionEngine.capture_command_in_dir_async ({ "bash", "-c", persistent_cmd }, bash_cwd, cancellable)).strip ();
+                if (GLib.FileUtils.test (cwd_cache, GLib.FileTest.EXISTS)) {
+                    try {
+                        string new_cwd;
+                        GLib.FileUtils.get_contents (cwd_cache, out new_cwd);
+                        new_cwd = new_cwd.strip ();
+                        if (new_cwd.length > 0 && GLib.FileUtils.test (new_cwd, GLib.FileTest.IS_DIR)) {
+                            current_browser_dir = new_cwd;
+                        }
+                    } catch (GLib.Error e) {}
+                }
+                if (doc_page == null || (cancellable != null && cancellable.is_cancelled ())) return;
                 double elapsed_ms = (GLib.get_monotonic_time () - start_us) / 1000.0;
                 if (output.length > 0) {
                     doc_page.append_console_log (@"Out [$count]:\n$output");
@@ -1894,8 +1926,46 @@ namespace Imladris.UI {
             terminal_view.buffer.get_end_iter (out end);
             terminal_view.buffer.insert (ref end, cmd + "\n", -1);
 
-            ExecutionEngine.capture_command_async.begin ({ "bash", "-c", cmd }, null, 60000, (obj, res) => {
-                string output = ExecutionEngine.capture_command_async.end (res);
+            string trimmed = cmd.strip ();
+            string cwd = current_browser_dir != "" ? current_browser_dir : get_session_manager ().current_working_dir;
+            if (cwd == "") cwd = GLib.Environment.get_current_dir ();
+
+            if (trimmed == "cd" || trimmed.has_prefix ("cd ")) {
+                string raw_target = trimmed == "cd" ? "~" : trimmed.substring (3).strip ();
+                if ((raw_target.has_prefix ("\"") && raw_target.has_suffix ("\"")) ||
+                    (raw_target.has_prefix ("'") && raw_target.has_suffix ("'"))) {
+                    if (raw_target.length >= 2) {
+                        raw_target = raw_target.substring (1, raw_target.length - 2);
+                    }
+                }
+                string resolved;
+                if (raw_target == "" || raw_target == "~") {
+                    resolved = GLib.Environment.get_home_dir ();
+                } else if (raw_target.has_prefix ("~/")) {
+                    resolved = GLib.Path.build_filename (GLib.Environment.get_home_dir (), raw_target.substring (2));
+                } else if (GLib.Path.is_absolute (raw_target)) {
+                    resolved = raw_target;
+                } else {
+                    resolved = GLib.Path.build_filename (cwd, raw_target);
+                }
+                var target_file = GLib.File.new_for_path (resolved);
+                string? norm_path = target_file.get_path ();
+                if (norm_path != null && GLib.FileUtils.test (norm_path, GLib.FileTest.IS_DIR)) {
+                    current_browser_dir = norm_path;
+                    populate_files_browser ();
+                    Gtk.TextIter e_cd;
+                    terminal_view.buffer.get_end_iter (out e_cd);
+                    terminal_view.buffer.insert (ref e_cd, "[cwd: " + norm_path + "]\n$ ", -1);
+                } else {
+                    Gtk.TextIter e_err;
+                    terminal_view.buffer.get_end_iter (out e_err);
+                    terminal_view.buffer.insert (ref e_err, "✖ cd: no such directory: " + raw_target + "\n$ ", -1);
+                }
+                return;
+            }
+
+            ExecutionEngine.capture_command_in_dir_async.begin ({ "bash", "-c", cmd }, cwd, null, 60000, (obj, res) => {
+                string output = ExecutionEngine.capture_command_in_dir_async.end (res);
                 Gtk.TextIter e2;
                 terminal_view.buffer.get_end_iter (out e2);
                 terminal_view.buffer.insert (ref e2, output + "\n$ ", -1);
@@ -1992,7 +2062,9 @@ namespace Imladris.UI {
                             ins_btn.add_css_class ("flat");
                             string cite_key = w;
                             ins_btn.clicked.connect (() => {
+                                doc_page.source_buffer.begin_user_action ();
                                 doc_page.source_buffer.insert_at_cursor (@"[$cite_key]", -1);
+                                doc_page.source_buffer.end_user_action ();
                             });
                             crow.add_suffix (ins_btn);
                             citations_list.append (crow);
@@ -2038,77 +2110,52 @@ namespace Imladris.UI {
         public void render_default_scientific_plot () {
             string bg, text, card_bg, card_border, title_col, sub_col;
             get_plot_theme_colors (out bg, out text, out card_bg, out card_border, out title_col, out sub_col);
-            string svg_html = """<!DOCTYPE html>
+            string empty_html = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
   body {
     margin: 0;
-    padding: 16px;
+    padding: 24px;
     background: %s;
-    font-family: system-ui, sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     color: %s;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    min-height: 75vh;
+    text-align: center;
   }
-  .plot-card {
-    border: 1px solid %s;
-    border-radius: 8px;
-    padding: 16px;
+  .empty-card {
+    border: 1px dashed %s;
+    border-radius: 10px;
+    padding: 28px 24px;
     background: %s;
-    width: 92%%;
-    max-width: 560px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    max-width: 380px;
   }
-  .plot-title {
+  .empty-title {
     font-size: 14px;
     font-weight: 700;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     color: %s;
   }
-  .plot-sub {
-    font-size: 11px;
+  .empty-sub {
+    font-size: 12px;
+    line-height: 1.5;
     color: %s;
-    margin-bottom: 12px;
   }
 </style>
 </head>
 <body>
-  <div class="plot-card">
-    <div class="plot-title">mtcars: Miles Per Gallon (mpg) vs Horsepower (hp)</div>
-    <div class="plot-sub">Rendered SVG Figure • RStudio Quadrant 4 Output</div>
-    <svg viewBox="0 0 460 240" width="100%%" height="auto" xmlns="http://www.w3.org/2000/svg">
-      <rect x="40" y="10" width="400" height="195" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
-      <!-- Grid lines -->
-      <line x1="40" y1="50" x2="440" y2="50" stroke="#f1f5f9" stroke-width="1"/>
-      <line x1="40" y1="100" x2="440" y2="100" stroke="#f1f5f9" stroke-width="1"/>
-      <line x1="40" y1="150" x2="440" y2="150" stroke="#f1f5f9" stroke-width="1"/>
-      <line x1="140" y1="10" x2="140" y2="205" stroke="#f1f5f9" stroke-width="1"/>
-      <line x1="240" y1="10" x2="240" y2="205" stroke="#f1f5f9" stroke-width="1"/>
-      <line x1="340" y1="10" x2="340" y2="205" stroke="#f1f5f9" stroke-width="1"/>
-      <!-- Regression trend line -->
-      <line x1="60" y1="35" x2="410" y2="185" stroke="#3b82f6" stroke-width="2" stroke-dasharray="5,4"/>
-      <!-- Data scatter points -->
-      <circle cx="85" cy="42" r="5" fill="#2563eb" opacity="0.85"/>
-      <circle cx="110" cy="58" r="5" fill="#2563eb" opacity="0.85"/>
-      <circle cx="135" cy="74" r="5" fill="#2563eb" opacity="0.85"/>
-      <circle cx="160" cy="88" r="5" fill="#10b981" opacity="0.85"/>
-      <circle cx="190" cy="95" r="5" fill="#10b981" opacity="0.85"/>
-      <circle cx="220" cy="112" r="5" fill="#10b981" opacity="0.85"/>
-      <circle cx="260" cy="128" r="5" fill="#f59e0b" opacity="0.85"/>
-      <circle cx="305" cy="145" r="5" fill="#f59e0b" opacity="0.85"/>
-      <circle cx="355" cy="168" r="5" fill="#ef4444" opacity="0.85"/>
-      <circle cx="395" cy="180" r="5" fill="#ef4444" opacity="0.85"/>
-      <!-- Axis labels -->
-      <text x="240" y="230" font-size="11" text-anchor="middle" fill="%s">Gross Horsepower (hp)</text>
-      <text x="15" y="110" font-size="11" text-anchor="middle" fill="%s" transform="rotate(-90 15,110)">MPG</text>
-    </svg>
+  <div class="empty-card">
+    <div class="empty-title">No Plots Generated Yet</div>
+    <div class="empty-sub">Execute an R or Python plotting cell (e.g. <code>ggplot2</code>, <code>plot()</code>, or <code>matplotlib</code>) to inspect figures here.</div>
   </div>
 </body>
-</html>""".printf (bg, text, card_border, card_bg, title_col, sub_col, sub_col, sub_col);
-            plots_webview.load_html (svg_html, "file:///");
+</html>""".printf (bg, text, card_border, card_bg, title_col, sub_col);
+            plots_webview.load_html (empty_html, "file:///");
         }
 
         public void load_plot_image (string plot_file_path) {
@@ -2356,17 +2403,17 @@ namespace Imladris.UI {
             var toolbar_view = new Adw.ToolbarView ();
             toolbar_view.add_top_bar (new Adw.HeaderBar ());
 
-            var web = WebViewFactory.create ();
-            string uri;
-            try {
-                uri = GLib.Filename.to_uri (plot_file);
-            } catch (GLib.Error e) {
-                uri = "file://" + plot_file;
-            }
-            string html = """<!DOCTYPE html><html><body style="margin:0;padding:16px;background:#1e1e2e;display:flex;justify-content:center;align-items:center;min-height:90vh;"><img src="%s" style="max-width:100%%;max-height:90vh;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);" /></body></html>""".printf (uri);
-            web.load_html (html, "file:///");
+            var picture = new Gtk.Picture.for_filename (plot_file);
+            picture.content_fit = Gtk.ContentFit.CONTAIN;
+            picture.can_shrink = true;
+            picture.hexpand = true;
+            picture.vexpand = true;
+            picture.margin_top = 12;
+            picture.margin_bottom = 12;
+            picture.margin_start = 12;
+            picture.margin_end = 12;
 
-            toolbar_view.set_content (web);
+            toolbar_view.set_content (picture);
             zoom_win.set_content (toolbar_view);
             zoom_win.present ();
         }
@@ -2443,9 +2490,20 @@ namespace Imladris.UI {
                 if (resp == "create") {
                     string folder_name = entry.text.strip ();
                     if (folder_name.length > 0) {
+                        if (folder_name.contains ("..") || folder_name.contains ("/") || folder_name.contains ("\\")) {
+                            if (main_window != null) {
+                                main_window.show_toast ("Invalid folder name: path separators and '..' are not allowed.");
+                            }
+                            return;
+                        }
                         string target = GLib.Path.build_filename (current_browser_dir, folder_name);
-                        GLib.DirUtils.create_with_parents (target, 0755);
-                        populate_files_browser ();
+                        if (GLib.DirUtils.create_with_parents (target, 0755) != 0) {
+                            if (main_window != null) {
+                                main_window.show_toast (@"Failed to create folder '$folder_name'.");
+                            }
+                        } else {
+                            populate_files_browser ();
+                        }
                     }
                 }
             });
@@ -2465,6 +2523,12 @@ namespace Imladris.UI {
                 if (resp == "create") {
                     string fname = entry.text.strip ();
                     if (fname.length > 0) {
+                        if (fname.contains ("..") || fname.contains ("/") || fname.contains ("\\")) {
+                            if (main_window != null) {
+                                main_window.show_toast ("Invalid file name: path separators and '..' are not allowed.");
+                            }
+                            return;
+                        }
                         string target = GLib.Path.build_filename (current_browser_dir, fname);
                         try {
                             if (fname.has_suffix (".Rproj")) {
@@ -2479,7 +2543,11 @@ namespace Imladris.UI {
                             }
                             populate_files_browser ();
                             if (main_window != null) main_window.open_file_from_path.begin (target);
-                        } catch (GLib.Error e) {}
+                        } catch (GLib.Error e) {
+                            if (main_window != null) {
+                                main_window.show_toast (@"Failed to create file '$fname': $(e.message)");
+                            }
+                        }
                     }
                 }
             });
@@ -2593,7 +2661,11 @@ namespace Imladris.UI {
             btn_ot.add_css_class ("flat");
             btn_ot.clicked.connect (() => {
                 pop.popdown ();
-                run_shell_command (@"cd \"$current_browser_dir\"");
+                string target_dir = current_browser_dir != "" ? current_browser_dir : get_session_manager ().current_working_dir;
+                activate_panel_in_dock (PanelId.TERMINAL);
+                Gtk.TextIter end;
+                terminal_view.buffer.get_end_iter (out end);
+                terminal_view.buffer.insert (ref end, "\n[cwd: " + target_dir + "]\n$ ", -1);
             });
             vbox.append (btn_ot);
 
@@ -2621,7 +2693,9 @@ namespace Imladris.UI {
             if (selected_row != null) {
                 string? cmd = selected_row.get_data<string> ("cmd-text");
                 if (cmd != null) {
+                    doc_page.source_buffer.begin_user_action ();
                     doc_page.source_buffer.insert_at_cursor (cmd + "\n", -1);
+                    doc_page.source_buffer.end_user_action ();
                     doc_page.source_view.grab_focus ();
                 }
             }
@@ -2693,11 +2767,13 @@ namespace Imladris.UI {
             string r_probe = """
 local({
   pkgs <- installed.packages()
-  res <- apply(pkgs, 1, function(p) {
-    paste(p["Package"], p["Version"], gsub("[\r\n\t]+", " ", p["Title"]), sep="\t")
-  })
   cat("___IMLADRIS_PKGS_START___\n")
-  cat(res, sep="\n")
+  if (nrow(pkgs) > 0L) {
+    titles <- gsub("[\r\n\t]+", " ", pkgs[, "Title"])
+    titles[is.na(titles)] <- ""
+    res <- paste(pkgs[, "Package"], pkgs[, "Version"], titles, sep = "\t")
+    cat(res, sep = "\n")
+  }
   cat("___IMLADRIS_PKGS_END___\n")
 })
 """;
@@ -2722,17 +2798,6 @@ local({
                 }
             }
 
-            // Fallback to essential tidyverse & scientific packages
-            if (installed_packages.size == 0) {
-                installed_packages.add (new PackageItem ("base", "4.4.1", "The R Base Package", true));
-                installed_packages.add (new PackageItem ("datasets", "4.4.1", "The R Datasets Package", true));
-                installed_packages.add (new PackageItem ("graphics", "4.4.1", "The R Graphics Package", true));
-                installed_packages.add (new PackageItem ("ggplot2", "3.5.1", "Create Elegant Data Visualisations", false));
-                installed_packages.add (new PackageItem ("dplyr", "1.1.4", "A Grammar of Data Manipulation", false));
-                installed_packages.add (new PackageItem ("tidyr", "1.3.1", "Tidy Messy Data", false));
-                installed_packages.add (new PackageItem ("readr", "2.1.5", "Read Rectangular Text Data", false));
-            }
-
             filter_packages_ui ();
         }
 
@@ -2742,6 +2807,17 @@ local({
                 var next = child.get_next_sibling ();
                 packages_list.remove (child);
                 child = next;
+            }
+
+            if (installed_packages.size == 0) {
+                var empty_row = new Adw.ActionRow () {
+                    title = "No R packages detected",
+                    subtitle = "Configure an R runtime in Data Science Toolchains, then click Refresh",
+                    use_markup = false
+                };
+                empty_row.add_prefix (new Gtk.Image.from_icon_name ("application-x-addon-symbolic"));
+                packages_list.append (empty_row);
+                return;
             }
 
             string query = packages_search_entry != null ? packages_search_entry.text.strip ().down () : "";
@@ -2785,22 +2861,24 @@ local({
         // HELP PANEL & R DOCUMENTATION HELPERS
         // =================================================================
         private void load_default_help_home () {
+            string bg, text, card_bg, card_border, title_col, sub_col;
+            get_plot_theme_colors (out bg, out text, out card_bg, out card_border, out title_col, out sub_col);
             string home_html = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-  body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #1e293b; line-height: 1.5; font-size: 13px; background: #ffffff; }
-  h2 { color: #1d4ed8; margin-top: 0; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
-  h3 { color: #334155; margin-bottom: 6px; margin-top: 18px; font-size: 14px; }
-  code { background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+  body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: %s; line-height: 1.5; font-size: 13px; background: %s; }
+  h2 { color: %s; margin-top: 0; font-size: 18px; border-bottom: 1px solid %s; padding-bottom: 8px; }
+  h3 { color: %s; margin-bottom: 6px; margin-top: 18px; font-size: 14px; }
+  code { background: %s; border: 1px solid %s; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 12px; }
   ul { padding-left: 20px; }
   li { margin-bottom: 4px; }
-  .tip-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 4px; margin: 12px 0; }
+  .tip-box { background: %s; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 4px; margin: 12px 0; color: %s; }
 </style>
 </head>
 <body>
-  <h2>Imladris & RStudio Workbench Documentation</h2>
+  <h2>Imladris &amp; RStudio Workbench Documentation</h2>
   <div class="tip-box">
     <strong>Instant Help Query:</strong> Type <code>?topic</code> or <code>help(name)</code> in the Console or search entry above to render full R man pages.
   </div>
@@ -2815,13 +2893,13 @@ local({
   </ul>
   <h3>Quadrant Layout System</h3>
   <ul>
-    <li><strong>Quadrant 1 (Top-Left):</strong> Source Editor & Data Viewer (<code>View(df)</code>).</li>
+    <li><strong>Quadrant 1 (Top-Left):</strong> Source Editor &amp; Data Viewer (<code>View(df)</code>).</li>
     <li><strong>Quadrant 2 (Bottom-Left):</strong> Interactive Console, Shell Terminal, Elrond AI.</li>
     <li><strong>Quadrant 3 (Top-Right):</strong> Environment Inspector, History, Document Outline, Citations.</li>
-    <li><strong>Quadrant 4 (Bottom-Right):</strong> Files Browser, Plots Gallery, Packages Manager, Help & Reference, Web Preview.</li>
+    <li><strong>Quadrant 4 (Bottom-Right):</strong> Files Browser, Plots Gallery, Packages Manager, Help &amp; Reference, Web Preview.</li>
   </ul>
 </body>
-</html>""";
+</html>""".printf (text, bg, title_col, card_border, title_col, card_bg, card_border, card_bg, sub_col);
             help_view.load_html (home_html, "file:///");
         }
 
@@ -2866,16 +2944,19 @@ local({
         }
 
         private string inject_help_styling (string raw_html) {
+            string bg, text, card_bg, card_border, title_col, sub_col;
+            get_plot_theme_colors (out bg, out text, out card_bg, out card_border, out title_col, out sub_col);
             string style = """<style>
-body { font-family: system-ui, sans-serif; padding: 16px 20px; line-height: 1.5; font-size: 13px; color: #1e293b; background: #ffffff; }
-h2 { color: #1d4ed8; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
-h3 { color: #334155; margin-top: 14px; }
-pre, code { font-family: monospace; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 4px; font-size: 12px; }
+body { font-family: system-ui, sans-serif; padding: 16px 20px; line-height: 1.5; font-size: 13px; color: %s; background: %s; }
+h2 { color: %s; border-bottom: 1px solid %s; padding-bottom: 6px; }
+h3 { color: %s; margin-top: 14px; }
+a { color: #3b82f6; }
+pre, code { font-family: monospace; background: %s; border: 1px solid %s; border-radius: 4px; padding: 2px 4px; font-size: 12px; color: %s; }
 pre { padding: 10px; overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
-th { background: #f1f5f9; }
-</style>""";
+table { border-collapse: collapse; width: 100%%; margin: 12px 0; }
+th, td { border: 1px solid %s; padding: 6px 10px; text-align: left; }
+th { background: %s; }
+</style>""".printf (text, bg, title_col, card_border, title_col, card_bg, card_border, text, card_border, card_bg);
             if (raw_html.contains ("<head>")) {
                 return raw_html.replace ("<head>", "<head>" + style);
             }
@@ -2883,11 +2964,13 @@ th { background: #f1f5f9; }
         }
 
         private void render_help_fallback (string topic) {
+            string bg, text, card_bg, card_border, title_col, sub_col;
+            get_plot_theme_colors (out bg, out text, out card_bg, out card_border, out title_col, out sub_col);
             string safe_topic = GLib.Markup.escape_text (topic);
-            string html = """<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px;color:#334155;text-align:center;">
-<h3 style="color:#64748b;">No documentation found for <code>%s</code></h3>
-<p style="font-size:12px;color:#94a3b8;">Ensure R is running and package is loaded via <code>library(...)</code>.</p>
-</body></html>""".printf (safe_topic);
+            string html = """<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px;background:%s;color:%s;text-align:center;">
+<h3 style="color:%s;">No documentation found for <code>%s</code></h3>
+<p style="font-size:12px;color:%s;">Ensure R is running and package is loaded via <code>library(...)</code>.</p>
+</body></html>""".printf (bg, text, title_col, safe_topic, sub_col);
             help_view.load_html (html, "file:///");
         }
 
@@ -2903,14 +2986,16 @@ th { background: #f1f5f9; }
 
         private void load_empty_shiny_placeholder () {
             if (shiny_webview == null) return;
+            string bg, text, card_bg, card_border, title_col, sub_col;
+            get_plot_theme_colors (out bg, out text, out card_bg, out card_border, out title_col, out sub_col);
             string html = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
   body {
-    background: #1e1e1e;
-    color: #94a3b8;
+    background: %s;
+    color: %s;
     font-family: system-ui, -apple-system, sans-serif;
     display: flex;
     flex-direction: column;
@@ -2920,10 +3005,10 @@ th { background: #f1f5f9; }
     margin: 0;
     text-align: center;
   }
-  .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
-  h2 { color: #f1f5f9; margin: 0 0 8px 0; font-size: 18px; }
+  .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.7; }
+  h2 { color: %s; margin: 0 0 8px 0; font-size: 16px; }
   p { font-size: 13px; max-width: 320px; line-height: 1.5; margin: 0; }
-  code { background: #334155; padding: 2px 6px; border-radius: 4px; color: #38bdf8; }
+  code { background: %s; border: 1px solid %s; padding: 2px 6px; border-radius: 4px; color: %s; }
 </style>
 </head>
 <body>
@@ -2931,7 +3016,7 @@ th { background: #f1f5f9; }
   <h2>Shiny Web App Viewer</h2>
   <p>Run a Shiny application (<code>app.R</code> or <code>shinyApp()</code>) to preview interactive reactive dashboards directly in this pane.</p>
 </body>
-</html>""";
+</html>""".printf (bg, sub_col, title_col, card_bg, card_border, text);
             shiny_webview.load_html (html, "file:///");
         }
 

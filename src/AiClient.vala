@@ -8,6 +8,12 @@ using Imladris.Core;
 
 namespace Imladris {
 
+    public enum ProviderLocality {
+        LOCAL_LOOPBACK,
+        LAN_SELF_HOSTED,
+        CLOUD_EXTERNAL
+    }
+
     public class AiClient : GLib.Object {
 
         private Soup.Session session;
@@ -16,12 +22,23 @@ namespace Imladris {
 
         public signal void provider_failover_triggered (AiProvider from_provider, AiProvider to_provider);
 
+        public static ProviderLocality get_provider_locality (AiProvider provider, string endpoint) {
+            if (provider == AiProvider.GITHUB_COPILOT || provider == AiProvider.ANTIGRAVITY) {
+                return ProviderLocality.CLOUD_EXTERNAL;
+            }
+            if (SettingsManager.is_local_url (endpoint)) {
+                return ProviderLocality.LOCAL_LOOPBACK;
+            }
+            if (provider == AiProvider.OLLAMA || provider == AiProvider.LM_STUDIO ||
+                provider == AiProvider.CHERRY_STUDIO || provider == AiProvider.FREELMAPI_LOCAL) {
+                return ProviderLocality.LAN_SELF_HOSTED;
+            }
+            return ProviderLocality.CLOUD_EXTERNAL;
+        }
+
         public bool is_online {
             get {
-                return config_mgr.active_provider != AiProvider.LM_STUDIO &&
-                       config_mgr.active_provider != AiProvider.OLLAMA &&
-                       config_mgr.active_provider != AiProvider.CHERRY_STUDIO &&
-                       config_mgr.active_provider != AiProvider.ANTIGRAVITY;
+                return get_provider_locality (config_mgr.active_provider, endpoint_url) != ProviderLocality.LOCAL_LOOPBACK;
             }
             set {
                 if (!value) {
@@ -65,7 +82,7 @@ namespace Imladris {
         public AiClient () {
             config_mgr = AiConfigManager.get_default ();
             session = new Soup.Session () {
-                timeout = 90
+                timeout = 180
             };
         }
 
@@ -103,17 +120,23 @@ namespace Imladris {
         private static GLib.Regex? cached_ssn_rx = null;
         private static GLib.Regex? cached_email_rx = null;
         private static GLib.Regex? cached_mrn_rx = null;
+        private static GLib.Regex? cached_iban_rx = null;
+        private static GLib.Regex? cached_eu_id_rx = null;
 
         public static string redact_phi_pii (string text) {
             if (text.length == 0) return text;
             try {
                 if (cached_ssn_rx == null) cached_ssn_rx = new GLib.Regex ("\\b\\d{3}-\\d{2}-\\d{4}\\b");
                 if (cached_email_rx == null) cached_email_rx = new GLib.Regex ("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
-                if (cached_mrn_rx == null) cached_mrn_rx = new GLib.Regex ("(?i)\\b(MRN|PATIENT[_ ]?ID|SUBJID)\\s*[:=]\\s*[A-Za-z0-9_-]{3,}");
+                if (cached_mrn_rx == null) cached_mrn_rx = new GLib.Regex ("(?i)\\b(MRN|PATIENT[_ ]?ID|SUBJID|HH[_ ]?ID|PERS[_ ]?ID|ENT[_ ]?ID|VAT|TIN)\\s*[:=]\\s*[A-Za-z0-9_-]{3,}");
+                if (cached_iban_rx == null) cached_iban_rx = new GLib.Regex ("\\b[A-Z]{2}\\d{2}[A-Z0-9]{11,30}\\b");
+                if (cached_eu_id_rx == null) cached_eu_id_rx = new GLib.Regex ("(?i)\\b(NUTS|LAU)[ _:-]?[A-Z]{2}[A-Z0-9]{2,6}\\b");
                 string out_text = text;
                 out_text = cached_ssn_rx.replace (out_text, -1, 0, "[REDACTED-SSN]");
                 out_text = cached_email_rx.replace (out_text, -1, 0, "[REDACTED-EMAIL]");
                 out_text = cached_mrn_rx.replace (out_text, -1, 0, "\\1: [REDACTED-ID]");
+                out_text = cached_iban_rx.replace (out_text, -1, 0, "[REDACTED-IBAN]");
+                out_text = cached_eu_id_rx.replace (out_text, -1, 0, "[REDACTED-REGION]");
                 return out_text;
             } catch (GLib.RegexError e) {
                 return text;
@@ -467,7 +490,7 @@ namespace Imladris {
             builder.add_string_value (model);
 
             builder.set_member_name ("max_tokens");
-            builder.add_int_value (4096);
+            builder.add_int_value (8192);
 
             builder.set_member_name ("temperature");
             builder.add_double_value (config_mgr.temperature);

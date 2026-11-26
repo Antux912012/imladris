@@ -13,6 +13,7 @@ namespace Imladris.UI {
     public class InlineChunkOutputWidget : Gtk.Box {
         public int chunk_end_line { get; set; default = -1; }
         private Gtk.TextView log_view;
+        private Gtk.ScrolledWindow log_scroller;
         private Gtk.Picture plot_picture;
         private Gtk.Expander expander;
         private Gtk.Label timing_label;
@@ -53,12 +54,12 @@ namespace Imladris.UI {
             };
             log_view.add_css_class ("dim-label");
 
-            var scroller = new Gtk.ScrolledWindow () {
+            log_scroller = new Gtk.ScrolledWindow () {
                 min_content_height = 60,
                 max_content_height = 180,
                 child = log_view
             };
-            content_box.append (scroller);
+            content_box.append (log_scroller);
 
             plot_picture = new Gtk.Picture () {
                 halign = Gtk.Align.CENTER,
@@ -86,6 +87,7 @@ namespace Imladris.UI {
             }
 
             log_view.get_buffer ().set_text (text_output);
+            log_scroller.set_visible (text_output.strip ().length > 0);
 
             if (plot_path != null && GLib.FileUtils.test (plot_path, GLib.FileTest.EXISTS)) {
                 plot_picture.set_filename (plot_path);

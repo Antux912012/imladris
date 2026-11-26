@@ -506,13 +506,13 @@ To achieve **%.0f%% statistical power** ($1 - \beta = %.2f$) at a two-sided Type
             double alpha = get_selected_alpha ();
             double power = power_spin.value;
             if (endpoint_selector.selected == 0) {
-                double k = param2_spin.value;
+                double k = double.max (0.10, param2_spin.value);
                 if ((k - 1.0).abs () > 1e-6) {
                     return """```{r elbereth-power-ttest-unequal}
 # ELBERETH ICH E9 POWER VERIFICATION: Two-Sample Unequal Allocation (k = n2/n1 = %.2f)
 alpha <- %.3f; power <- %.2f; d <- %.2f; k <- %.2f
 z_alpha <- qnorm(1 - alpha / 2); z_beta <- qnorm(power)
-n1 <- ceiling(((1 + 1 / k) * (z_alpha + z_beta)^2) / (d^2))
+n1 <- ceiling(((1 + 1 / k) * (z_alpha + z_beta)^2) / (d^2) + (z_alpha^2) / (2 * (1 + k)))
 n2 <- ceiling(n1 * k)
 cat(sprintf("Arm 1: %%d | Arm 2: %%d | Total Evaluable N: %%d\n", n1, n2, n1 + n2))
 ```
@@ -547,17 +547,54 @@ cat(sprintf("Required Events: %%d | Evaluable Sample Size: %%d\n", req_events, n
         private string build_py_power_chunk () {
             double alpha = get_selected_alpha ();
             double power = power_spin.value;
-            return """```{python elbereth-power-verify}
-# ELBERETH ICH E9 POWER & SAMPLE SIZE VERIFICATION
+            double attrition = dropout_spin.value / 100.0;
+            int mode = (int) endpoint_selector.selected;
+            if (mode == 0) {
+                double d = double.max (0.05, param1_spin.value);
+                double k = double.max (0.10, param2_spin.value);
+                return """```{python elbereth-power-verify}
+# ELBERETH ICH E9 TWO-SAMPLE CONTINUOUS POWER & SAMPLE SIZE
 import math
 from scipy.stats import norm
 
-alpha, power = %.3f, %.2f
+alpha, power, d, k, attrition = %.3f, %.2f, %.3f, %.3f, %.2f
 z_alpha, z_beta = norm.ppf(1 - alpha / 2), norm.ppf(power)
-print(f"Z_(1-alpha/2) = {z_alpha:.4f}, Z_(1-beta) = {z_beta:.4f}")
-print(f"Evaluable N = %d | Attrition-Adjusted Enrolled N = %d")
+n1 = math.ceil(((1.0 + 1.0 / k) * ((z_alpha + z_beta) ** 2)) / (d ** 2) + (z_alpha ** 2) / (2.0 * (1.0 + k)))
+n2 = math.ceil(k * n1)
+n_eval = n1 + n2
+n_enr = math.ceil(n_eval / max(1.0 - attrition, 0.01))
+print(f"Arm 1: {n1} | Arm 2: {n2} | Evaluable N = {n_eval} | Enrolled N = {n_enr}")
 ```
-""".printf (alpha, power, calc_evaluable_n, calc_enrolled_n);
+""".printf (alpha, power, d, k, attrition);
+            } else if (mode == 1) {
+                return """```{python elbereth-power-verify}
+# ELBERETH ICH E9 TWO-PROPORTION POWER & SAMPLE SIZE
+import math
+from scipy.stats import norm
+
+alpha, power, p1, p2, attrition = %.3f, %.2f, %.3f, %.3f, %.2f
+z_alpha, z_beta = norm.ppf(1 - alpha / 2), norm.ppf(power)
+p_bar = (p1 + p2) / 2.0
+n_per_arm = math.ceil(((z_alpha * math.sqrt(2 * p_bar * (1 - p_bar)) + z_beta * math.sqrt(p1 * (1 - p1) + p2 * (1 - p2))) ** 2) / max((p1 - p2) ** 2, 1e-12))
+n_eval = 2 * n_per_arm
+n_enr = math.ceil(n_eval / max(1.0 - attrition, 0.01))
+print(f"n/arm = {n_per_arm} | Evaluable N = {n_eval} | Enrolled N = {n_enr}")
+```
+""".printf (alpha, power, param1_spin.value, param2_spin.value, attrition);
+            }
+            return """```{python elbereth-power-verify}
+# ELBERETH ICH E9 SCHOENFELD SURVIVAL POWER & SAMPLE SIZE
+import math
+from scipy.stats import norm
+
+alpha, power, hr, p_event, attrition = %.3f, %.2f, %.3f, %.3f, %.2f
+z_alpha, z_beta = norm.ppf(1 - alpha / 2), norm.ppf(power)
+req_events = math.ceil(4.0 * ((z_alpha + z_beta) ** 2) / max(math.log(hr) ** 2, 1e-12))
+n_eval = math.ceil(req_events / max(p_event, 0.01))
+n_enr = math.ceil(n_eval / max(1.0 - attrition, 0.01))
+print(f"Required Events = {req_events} | Evaluable N = {n_eval} | Enrolled N = {n_enr}")
+```
+""".printf (alpha, power, get_effective_hr (), param2_spin.value, attrition);
         }
 
         private string build_clinical_r_template () {
@@ -631,8 +668,59 @@ ggplot(%s, aes(x = .data[["%s"]], y = neg_log10_padj, color = sig_status)) +
             string aval = sanitize_identifier (outcome_col_entry.text, "AVAL");
             string ev = sanitize_identifier (status_col_entry.text, "EVENT");
 
-            if (template_selector.selected == 3) {
-                return """```{python omics-volcano-py}
+            switch (template_selector.selected) {
+                case 0:
+                    return """```{python cdisc-table1-py}
+# CDISC ADSL TABLE 1: Baseline Summary Stratified by %s
+import pandas as pd
+from scipy import stats
+
+summary_tbl = %s.groupby("%s")[["%s"]].agg(["count", "mean", "std", "median"])
+print(summary_tbl)
+groups = [g["%s"].dropna().to_numpy() for _, g in %s.groupby("%s")]
+if len(groups) == 2:
+    t_stat, p_val = stats.ttest_ind(groups[0], groups[1], equal_var=False)
+    print(f"Welch t = {t_stat:.3f}, p = {p_val:.4g}")
+```
+""".printf (arm, df, arm, aval, aval, df, arm);
+                case 1:
+                    return """```{python cdisc-adtte-survival-py}
+# CDISC ADTTE SURVIVAL ANALYSIS (lifelines Kaplan-Meier & Cox PH)
+from lifelines import KaplanMeierFitter, CoxPHFitter
+import matplotlib.pyplot as plt
+
+kmf = KaplanMeierFitter()
+fig, ax = plt.subplots(figsize=(7, 5))
+for grp_name, grp_df in %s.groupby("%s"):
+    kmf.fit(grp_df["%s"], event_observed=grp_df["%s"], label=str(grp_name))
+    kmf.plot_survival_function(ax=ax)
+ax.set_xlabel("Time"); ax.set_ylabel("Survival Probability")
+ax.set_title("Kaplan-Meier Survival Curve by %s")
+plt.tight_layout(); plt.show()
+
+cph = CoxPHFitter()
+cph.fit(%s[["%s", "%s", "%s"]], duration_col="%s", event_col="%s")
+cph.print_summary()
+```
+""".printf (df, arm, aval, ev, arm, df, aval, ev, arm, aval, ev);
+                case 2:
+                    return """```{python clinical-forest-py}
+# SUBGROUP HAZARD RATIO / ODDS RATIO FOREST PLOT (95%% CI)
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 5))
+y_pos = range(len(%s))
+xerr_low = %s["%s"] - %s["ci_lower"]
+xerr_high = %s["ci_upper"] - %s["%s"]
+ax.errorbar(%s["%s"], y_pos, xerr=[xerr_low, xerr_high], fmt="o", color="#2563eb", ecolor="#475569", capsize=4)
+ax.axvline(1.0, ls="--", color="#64748b")
+ax.set_yticks(list(y_pos)); ax.set_yticklabels(%s["%s"].astype(str))
+ax.set_xlabel("Hazard Ratio (95%% CI)"); ax.set_title("Subgroup Forest Plot")
+plt.tight_layout(); plt.show()
+```
+""".printf (df, df, aval, df, df, df, aval, df, aval, df, arm);
+                default:
+                    return """```{python omics-volcano-py}
 # MULTI-OMICS VOLCANO PLOT (Python / Matplotlib)
 import numpy as np
 import matplotlib.pyplot as plt
@@ -645,22 +733,18 @@ sig = (padj < 0.05) & (np.abs(fc) >= 1.0)
 plt.figure(figsize=(7, 5))
 plt.scatter(fc[~sig], neg_log_p[~sig], c="#94a3b8", alpha=0.6, s=16, label="NS")
 plt.scatter(fc[sig], neg_log_p[sig], c="#dc2626", alpha=0.85, s=22, label="FDR < 0.05 & |log2FC| >= 1")
+if "%s" in %s.columns and np.any(sig):
+    top_idx = np.argsort(padj[sig])[:10]
+    for idx in np.flatnonzero(sig)[top_idx]:
+        plt.annotate(str(%s["%s"].iloc[idx]), (fc[idx], neg_log_p[idx]), fontsize=8)
 plt.axvline(-1.0, ls="--", c="#475569"); plt.axvline(1.0, ls="--", c="#475569")
 plt.axhline(-np.log10(0.05), ls="--", c="#475569")
 plt.xlabel("log2 Fold Change"); plt.ylabel("-log10(Adjusted P-Value)")
 plt.title("Differential Expression Volcano Plot"); plt.legend()
 plt.tight_layout(); plt.show()
 ```
-""".printf (df, arm, df, aval);
+""".printf (df, arm, df, aval, ev, df, df, ev);
             }
-
-            return """```{python clinical-analysis-py}
-# CLINICAL BIOSTATISTICS SUMMARY & SURVIVAL STRATIFICATION
-import pandas as pd
-summary_tbl = %s.groupby("%s")[["%s", "%s"]].describe()
-print(summary_tbl)
-```
-""".printf (df, arm, aval, ev);
         }
     }
 }

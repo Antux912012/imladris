@@ -24,17 +24,46 @@ namespace Imladris.Services {
             return instance;
         }
 
+        private class SnapshotTask {
+            public string doc_id;
+            public string? file_path;
+            public string doc_type;
+            public string content;
+            public int line;
+            public int offset;
+            public bool is_dirty;
+            public uint64 gen;
+            public SourceFunc? callback;
+        }
+
         private string cache_dir;
         private GLib.Mutex snapshot_mutex = GLib.Mutex ();
         private Gee.HashMap<string, uint64?> doc_generations = new Gee.HashMap<string, uint64?> ();
+        private GLib.ThreadPool<SnapshotTask> worker_pool;
 
         public RecoveryService () {
             Object ();
-            cache_dir = GLib.Path.build_filename (GLib.Environment.get_user_cache_dir (), "imladris", "recovery");
+            cache_dir = resolve_recovery_dir ();
             ensure_directory ();
+            try {
+                worker_pool = new GLib.ThreadPool<SnapshotTask>.with_owned_data ((task) => {
+                    process_snapshot_task (task);
+                }, 1, false);
+            } catch (GLib.ThreadError e) {
+                GLib.warning ("Failed to create recovery ThreadPool: %s", e.message);
+            }
+        }
+
+        private static string resolve_recovery_dir () {
+            var sm = Core.SettingsManager.get_default ();
+            if (sm.is_airgapped () || sm.phi_data_lock) {
+                return GLib.Path.build_filename (GLib.Environment.get_user_runtime_dir (), "imladris", "recovery");
+            }
+            return GLib.Path.build_filename (GLib.Environment.get_user_cache_dir (), "imladris", "recovery");
         }
 
         private void ensure_directory () {
+            cache_dir = resolve_recovery_dir ();
             GLib.DirUtils.create_with_parents (cache_dir, 0700);
         }
 
@@ -60,66 +89,87 @@ namespace Imladris.Services {
             } catch (GLib.Error e) {}
         }
 
-        public async void snapshot_async (string doc_id, string? file_path, string doc_type, string content, int line, int offset, bool is_dirty) {
-            SourceFunc callback = snapshot_async.callback;
+        private void process_snapshot_task (SnapshotTask task) {
+            snapshot_mutex.lock ();
+            try {
+                uint64 latest = doc_generations.has_key (task.doc_id) ? doc_generations.get (task.doc_id) : 0;
+                if (latest != task.gen) {
+                    // Stale snapshot superseded by newer snapshot or purge
+                } else if (!task.is_dirty) {
+                    purge_document_cache_locked (task.doc_id);
+                } else {
+                    ensure_directory ();
+                    string doc_cache_file = shadow_path_for_id (task.doc_id);
+                    string doc_temp_file = @"$(doc_cache_file).$(GLib.get_monotonic_time ()).tmp";
 
+                    var builder = new Json.Builder ();
+                    builder.begin_object ();
+                    builder.set_member_name ("doc_id");
+                    builder.add_string_value (task.doc_id);
+                    builder.set_member_name ("file_path");
+                    builder.add_string_value (task.file_path ?? "");
+                    builder.set_member_name ("doc_type");
+                    builder.add_string_value (task.doc_type);
+                    builder.set_member_name ("cursor_line");
+                    builder.add_int_value (task.line);
+                    builder.set_member_name ("cursor_offset");
+                    builder.add_int_value (task.offset);
+                    builder.set_member_name ("timestamp");
+                    builder.add_int_value (GLib.get_real_time () / 1000);
+                    builder.set_member_name ("content");
+                    builder.add_string_value (task.content);
+                    builder.end_object ();
+
+                    var json_gen = new Json.Generator ();
+                    json_gen.set_root (builder.get_root ());
+                    json_gen.to_file (doc_temp_file);
+
+                    GLib.FileUtils.chmod (doc_temp_file, 0600);
+                    var tmp = GLib.File.new_for_path (doc_temp_file);
+                    var dest = GLib.File.new_for_path (doc_cache_file);
+                    tmp.move (dest, GLib.FileCopyFlags.OVERWRITE, null, null);
+                    GLib.FileUtils.chmod (doc_cache_file, 0600);
+                }
+            } catch (GLib.Error e) {
+                GLib.warning ("Recovery snapshot error: %s", e.message);
+            } finally {
+                snapshot_mutex.unlock ();
+            }
+
+            if (task.callback != null) {
+                SourceFunc cb = (owned) task.callback;
+                Idle.add ((owned) cb);
+            }
+        }
+
+        public async void snapshot_async (string doc_id, string? file_path, string doc_type, string content, int line, int offset, bool is_dirty) {
             snapshot_mutex.lock ();
             uint64 gen = (doc_generations.has_key (doc_id) ? doc_generations.get (doc_id) : 0) + 1;
             doc_generations.set (doc_id, gen);
             snapshot_mutex.unlock ();
 
-            new Thread<void*> ("imladris-recovery-worker", () => {
-                snapshot_mutex.lock ();
+            var task = new SnapshotTask () {
+                doc_id = doc_id,
+                file_path = file_path,
+                doc_type = doc_type,
+                content = content,
+                line = line,
+                offset = offset,
+                is_dirty = is_dirty,
+                gen = gen,
+                callback = snapshot_async.callback
+            };
+
+            if (worker_pool != null) {
                 try {
-                    uint64 latest = doc_generations.has_key (doc_id) ? doc_generations.get (doc_id) : 0;
-                    if (latest != gen) {
-                        // Stale snapshot superseded by newer snapshot or purge
-                    } else if (!is_dirty) {
-                        purge_document_cache_locked (doc_id);
-                    } else {
-                        ensure_directory ();
-                        string doc_cache_file = shadow_path_for_id (doc_id);
-                        string doc_temp_file = @"$(doc_cache_file).$(GLib.get_monotonic_time ()).tmp";
-
-                        var builder = new Json.Builder ();
-                        builder.begin_object ();
-                        builder.set_member_name ("doc_id");
-                        builder.add_string_value (doc_id);
-                        builder.set_member_name ("file_path");
-                        builder.add_string_value (file_path ?? "");
-                        builder.set_member_name ("doc_type");
-                        builder.add_string_value (doc_type);
-                        builder.set_member_name ("cursor_line");
-                        builder.add_int_value (line);
-                        builder.set_member_name ("cursor_offset");
-                        builder.add_int_value (offset);
-                        builder.set_member_name ("timestamp");
-                        builder.add_int_value (GLib.get_real_time () / 1000);
-                        builder.set_member_name ("content");
-                        builder.add_string_value (content);
-                        builder.end_object ();
-
-                        var json_gen = new Json.Generator ();
-                        json_gen.set_root (builder.get_root ());
-                        json_gen.to_file (doc_temp_file);
-
-                        // Restrict permissions before and after atomic rename
-                        GLib.FileUtils.chmod (doc_temp_file, 0600);
-                        var tmp = GLib.File.new_for_path (doc_temp_file);
-                        var dest = GLib.File.new_for_path (doc_cache_file);
-                        tmp.move (dest, GLib.FileCopyFlags.OVERWRITE, null, null);
-                        GLib.FileUtils.chmod (doc_cache_file, 0600);
-                    }
-                } catch (GLib.Error e) {
-                    GLib.warning ("Recovery snapshot error: %s", e.message);
-                } finally {
-                    snapshot_mutex.unlock ();
+                    worker_pool.add ((owned) task);
+                    yield;
+                    return;
+                } catch (GLib.ThreadError e) {
+                    GLib.warning ("Recovery ThreadPool enqueue failed: %s", e.message);
                 }
-
-                Idle.add ((owned) callback);
-                return null;
-            });
-
+            }
+            process_snapshot_task (task);
             yield;
         }
 
@@ -145,7 +195,9 @@ namespace Imladris.Services {
                     GLib.FileInfo info;
                     while ((info = enumerator.next_file ()) != null) {
                         string name = info.get_name ();
-                        if (name.has_suffix (".shadow")) {
+                        if (name.has_suffix (".tmp")) {
+                            GLib.FileUtils.remove (GLib.Path.build_filename (cache_dir, name));
+                        } else if (name.has_suffix (".shadow")) {
                             string path = GLib.Path.build_filename (cache_dir, name);
                             var rec = parse_shadow_file (path);
                             if (rec != null) {

@@ -267,7 +267,8 @@ namespace Imladris.Editor {
                 cursor_line,
                 line_prefix,
                 doc_type,
-                manual_trigger
+                manual_trigger,
+                ctx
             );
 
             // Merge live REPL session variables and DataFrame columns from EnvironmentController

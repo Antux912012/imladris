@@ -485,8 +485,13 @@ namespace Imladris {
             chat_view.buffer.get_end_iter (out end);
             chat_view.buffer.insert (ref end, text + "\n", -1);
 
-            // Auto-scroll to bottom
-            var mark = chat_view.buffer.create_mark (null, end, false);
+            // Auto-scroll to bottom using a single reusable named mark
+            var mark = chat_view.buffer.get_mark ("chat-end");
+            if (mark == null) {
+                mark = chat_view.buffer.create_mark ("chat-end", end, false);
+            } else {
+                chat_view.buffer.move_mark (mark, end);
+            }
             chat_view.scroll_to_mark (mark, 0.05f, false, 0.0f, 1.0f);
         }
 

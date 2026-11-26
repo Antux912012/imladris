@@ -171,8 +171,9 @@ namespace Imladris.Core {
 
         private static string clean_val (string val) {
             string cleaned = val;
-            if ((cleaned.has_prefix ("\"") && cleaned.has_suffix ("\"")) ||
-                (cleaned.has_prefix ("'") && cleaned.has_suffix ("'"))) {
+            if (cleaned.length >= 2 &&
+                ((cleaned.has_prefix ("\"") && cleaned.has_suffix ("\"")) ||
+                 (cleaned.has_prefix ("'") && cleaned.has_suffix ("'")))) {
                 cleaned = cleaned.substring (1, cleaned.length - 2);
             }
             return cleaned.strip ();

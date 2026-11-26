@@ -139,12 +139,26 @@ namespace Imladris.Services {
                 target_file_or_dir = file_or_dir_path;
             }
 
-            // Assign ephemeral port
-            int port = 3838 + (int) (GLib.Random.next_int () % 5000);
+            // Assign ephemeral port (checked for availability)
+            int port = find_available_port (3838 + (int) (GLib.Random.next_int () % 5000));
             string sanitized_target = target_file_or_dir.replace ("\\", "/").replace ("'", "\\'");
+            string lower_target = target_file_or_dir.down ();
+            bool is_rmd = lower_target.has_suffix (".rmd") || lower_target.has_suffix (".qmd");
 
-            // Standard R Shiny execution command
-            string r_cmd = """
+            // Standard R Shiny execution command (supports .R and .Rmd/.qmd runtime: shiny)
+            string r_cmd;
+            if (is_rmd) {
+                r_cmd = """
+if (!requireNamespace('rmarkdown', quietly = TRUE)) {
+    cat('ERROR: package "rmarkdown" is not installed.\n', file = stderr())
+    quit(status = 1)
+}
+options(shiny.launch.browser = FALSE)
+cat('Starting Interactive RMarkdown/Quarto Shiny App on port %d...\n')
+rmarkdown::run('%s', shiny_args = list(port = %dL, host = '127.0.0.1', launch.browser = FALSE))
+""".printf (port, sanitized_target, port);
+            } else {
+                r_cmd = """
 if (!requireNamespace('shiny', quietly = TRUE)) {
     cat('ERROR: package "shiny" is not installed. Please install shiny using install.packages("shiny").\n', file = stderr())
     quit(status = 1)
@@ -153,6 +167,7 @@ options(shiny.autoreload = TRUE, shiny.launch.browser = FALSE)
 cat('Starting Shiny App on port %d...\n')
 shiny::runApp('%s', port = %d, host = '127.0.0.1', launch.browser = FALSE)
 """.printf (port, sanitized_target, port);
+            }
 
             try {
                 string? resolved_r = null;
@@ -168,13 +183,18 @@ shiny::runApp('%s', port = %d, host = '127.0.0.1', launch.browser = FALSE)
                 var launcher = new SubprocessLauncher (SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE);
                 launcher.set_cwd (target_dir);
 
-                string[] raw_argv = {
-                    (resolved_r != null) ? resolved_r : "R",
-                    "--vanilla", "--quiet", "-e", r_cmd
-                };
+                bool has_project_rprof = GLib.FileUtils.test (GLib.Path.build_filename (target_dir, ".Rprofile"), GLib.FileTest.EXISTS)
+                    || GLib.FileUtils.test (GLib.Path.build_filename (target_dir, "renv.lock"), GLib.FileTest.EXISTS);
+
+                string[] raw_argv = has_project_rprof
+                    ? new string[] { (resolved_r != null) ? resolved_r : "R", "--no-save", "--no-restore", "--quiet", "-e", r_cmd }
+                    : new string[] { (resolved_r != null) ? resolved_r : "R", "--vanilla", "--quiet", "-e", r_cmd };
                 string[] argv;
                 if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
-                    argv = Core.PlatformUtils.build_host_command ({ "R", "--vanilla", "--quiet", "-e", r_cmd }, target_dir);
+                    string[] host_args = has_project_rprof
+                        ? new string[] { "R", "--no-save", "--no-restore", "--quiet", "-e", r_cmd }
+                        : new string[] { "R", "--vanilla", "--quiet", "-e", r_cmd };
+                    argv = Core.PlatformUtils.build_host_command (host_args, target_dir);
                 } else {
                     Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
                     argv = raw_argv;
@@ -263,6 +283,21 @@ shiny::runApp('%s', port = %d, host = '127.0.0.1', launch.browser = FALSE)
             this.status = ShinyAppStatus.STOPPED;
             this.active_url = null;
             status_changed (this.status);
+        }
+
+        private static int find_available_port (int start_port) {
+            for (int p = start_port; p < start_port + 50; p++) {
+                try {
+                    var sock = new GLib.Socket (GLib.SocketFamily.IPV4, GLib.SocketType.STREAM, GLib.SocketProtocol.TCP);
+                    var addr = new GLib.InetSocketAddress (new GLib.InetAddress.loopback (GLib.SocketFamily.IPV4), (uint16) p);
+                    if (sock.bind (addr, false)) {
+                        sock.close ();
+                        return p;
+                    }
+                    sock.close ();
+                } catch (GLib.Error e) {}
+            }
+            return start_port;
         }
     }
 }

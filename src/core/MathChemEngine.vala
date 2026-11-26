@@ -276,10 +276,11 @@ namespace Imladris.Core {
                 }
             }
 
-            // Check for chemical formula patterns like H2O, CO2, CH3, SO4^2-, NaOH, Fe2O3
+            // Check for multi-element chemical formulas (H2O, CO2, NaOH, Fe2O3) or ions (SO4^2-)
+            // Avoid matching single-letter econ/finance variables like M1, M2, P0, F1
             try {
                 if (detect_chem_rx == null) {
-                    detect_chem_rx = new GLib.Regex ("\\b[0-9]*[A-Z][a-z]?[0-9]+([A-Z][a-z]?[0-9]*)*(\\^[0-9]*[+-])?\\b");
+                    detect_chem_rx = new GLib.Regex ("\\b[0-9]*([A-Z][a-z]?[0-9]+)([A-Z][a-z]?[0-9]*)+(\\^[0-9]*[+-])?\\b|\\b[0-9]*[A-Z][a-z]?([A-Z][a-z]?[0-9]+)+(\\^[0-9]*[+-])?\\b");
                 }
                 if (detect_chem_rx.match (s)) {
                     return FormulaMode.CHEMISTRY;
@@ -687,7 +688,7 @@ namespace Imladris.Core {
                     }
                     den_str = s.substring (right_start + 1, right_end - right_start - 1);
                 } else {
-                    while (right_end < s.length && (s[right_end].isalnum () || s[right_end] == '_' || s[right_end] == '^' || s[right_end] == '\\' || s[right_end] == '.' || s[right_end] == '{' || s[right_end] == '}')) {
+                    while (right_end < s.length && (s[right_end].isalnum () || s[right_end] == '_' || s[right_end] == '^' || s[right_end] == '\\' || s[right_end] == '.' || s[right_end] == '{' || s[right_end] == '}' || s[right_end] == '(')) {
                         if (s[right_end] == '(') {
                             int sub_close = find_matching_delimiter (s, right_end, '(', ')');
                             if (sub_close > right_end) {
@@ -1194,18 +1195,17 @@ namespace Imladris.Core {
             s = s.replace ("sqrt(", "√(");
             s = s.replace ("cbrt(", "∛(");
 
-            string[,] greek_unicode = {
-                { "infinity", "∞" }, { "inf", "∞" },
-                { "alpha", "α" }, { "beta", "β" }, { "gamma", "γ" }, { "delta", "δ" },
-                { "epsilon", "ε" }, { "theta", "θ" }, { "lambda", "λ" }, { "mu", "μ" },
-                { "pi", "π" }, { "sigma", "σ" }, { "tau", "τ" }, { "phi", "φ" },
-                { "omega", "ω" }, { "Gamma", "Γ" }, { "Delta", "Δ" }, { "Theta", "Θ" },
-                { "Lambda", "Λ" }, { "Pi", "Π" }, { "Sigma", "Σ" }, { "Omega", "Ω" },
-                { "nabla", "∇" }, { "partial", "∂" }, { "int", "∫" }, { "sum", "∑" }, { "prod", "∏" }
-            };
-
             try {
                 if (rx_greek_unicode == null || map_greek_unicode == null) {
+                    string[,] greek_unicode = {
+                        { "infinity", "∞" }, { "inf", "∞" },
+                        { "alpha", "α" }, { "beta", "β" }, { "gamma", "γ" }, { "delta", "δ" },
+                        { "epsilon", "ε" }, { "theta", "θ" }, { "lambda", "λ" }, { "mu", "μ" },
+                        { "pi", "π" }, { "sigma", "σ" }, { "tau", "τ" }, { "phi", "φ" },
+                        { "omega", "ω" }, { "Gamma", "Γ" }, { "Delta", "Δ" }, { "Theta", "Θ" },
+                        { "Lambda", "Λ" }, { "Pi", "Π" }, { "Sigma", "Σ" }, { "Omega", "Ω" },
+                        { "nabla", "∇" }, { "partial", "∂" }, { "int", "∫" }, { "sum", "∑" }, { "prod", "∏" }
+                    };
                     map_greek_unicode = new GLib.HashTable<string, string> (str_hash, str_equal);
                     var pat = new GLib.StringBuilder ("\\b(");
                     for (int i = 0; i < greek_unicode.length[0]; i++) {
@@ -1469,7 +1469,10 @@ namespace Imladris.Core {
                 { "\\ll", "≪" }, { "\\gg", "≫" },
                 { "\\langle", "⟨" }, { "\\rangle", "⟩" },
                 { "\\dots", "…" }, { "\\cdots", "⋯" }, { "\\vdots", "⋮" },
-                { "\\Re", "ℜ" }, { "\\Im", "ℑ" }
+                { "\\Re", "ℜ" }, { "\\Im", "ℑ" },
+                { "\\mathbb{E}", "𝔼" }, { "\\mathbb{R}", "ℝ" }, { "\\mathbb{N}", "ℕ" }, { "\\mathbb{Z}", "ℤ" },
+                { "\\mid", "|" }, { "\\Pr", "<span class=\"math-func\">Pr</span>" },
+                { "\\operatorname", "" }
             };
             var tbl = new Gee.HashMap<string, string> ();
             for (int i = 0; i < sym_map.length[0]; i++) {

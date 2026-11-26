@@ -264,7 +264,7 @@ namespace Imladris.UI {
             r_expander.add_row (tidy_switch);
             comp_group.add (r_expander);
 
-            // 3. LaTeX
+            // 3. LaTeX (opt-in on first run)
             latex_switch = new Adw.SwitchRow () {
                 title = "LaTeX (Tectonic Engine)",
                 subtitle = "Self-updating TeX engine for compiling .tex documents and PDF output.",
@@ -273,20 +273,20 @@ namespace Imladris.UI {
             latex_switch.add_prefix (new Gtk.Image.from_icon_name ("x-office-document-symbolic"));
             comp_group.add (latex_switch);
 
-            // 4. HTML / CSS
+            // 4. HTML / CSS (opt-in on first run)
             html_css_switch = new Adw.SwitchRow () {
                 title = "HTML / CSS Web Tooling",
                 subtitle = "HTML5 validator/formatter (tidy-html5), Node.js, and WeasyPrint CSS-to-PDF engine.",
-                active = true
+                active = false
             };
             html_css_switch.add_prefix (new Gtk.Image.from_icon_name ("text-html-symbolic"));
             comp_group.add (html_css_switch);
 
-            // 5. TypeScript (TS)
+            // 5. TypeScript (TS) (opt-in on first run)
             ts_switch = new Adw.SwitchRow () {
                 title = "TypeScript (TS) + Node.js",
                 subtitle = "Node.js runtime and TypeScript compiler (tsc) for .ts execution and diagnostics.",
-                active = true
+                active = false
             };
             ts_switch.add_prefix (new Gtk.Image.from_icon_name ("application-x-addon-symbolic"));
             comp_group.add (ts_switch);

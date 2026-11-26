@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 project('imladris', 'vala', 'c',
-  version: '0.43.2',
+  version: '0.44.0',
   default_options: ['warning_level=1']
 )
 
@@ -128,10 +128,15 @@ sources = files(
   'src/ui/PreferencesDialog.vala',
   'src/ui/ThemeSelectorWidget.vala',
   'src/ui/AccentColorSelectorWidget.vala',
+  'src/ui/PaletteSelectorWidget.vala',
   'src/ui/AiSettingsDialog.vala',
   'src/ui/ToolchainSetupDialog.vala',
   'src/ui/DoiBibDialog.vala',
   'src/core/SettingsManager.vala',
+  'src/core/ThemePalettes.vala',
+  'src/core/ReviewCommentModels.vala',
+  'src/services/ReviewCommentService.vala',
+  'src/ui/ReviewCommentsPanel.vala',
   'src/core/AiConfigManager.vala',
   'src/core/PlatformUtils.vala',
   'src/core/HostBridge.vala',
@@ -210,6 +215,8 @@ test_sources = files(
   'src/core/EnvDiscovery.vala',
   'src/core/ExecutionRouter.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/SettingsManager.vala',
+  'src/core/ThemePalettes.vala',
   'src/core/toolchain_native.c',
   'src/bridges/elbereth/ClinicalBiostatsPopover.vala',
 )
@@ -226,6 +233,7 @@ ai_test_sources = files(
   'tests/test_ai_integration.vala',
   'src/core/AiConfigManager.vala',
   'src/core/SettingsManager.vala',
+  'src/core/ThemePalettes.vala',
   'src/core/PlatformUtils.vala',
   'src/core/HostBridge.vala',
   'src/core/EnvDiscovery.vala',
@@ -272,8 +280,6 @@ plugin_test_sources = files(
   'src/core/export_native.c',
   'src/services/MediaHelper.vala',
   'src/core/ChunkParser.vala',
-  'src/console/ReplBridge.vala',
-  'src/editor/ChunkExecutionEngine.vala',
   'src/editor/CodeIntelliSenseEngine.vala',
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
@@ -281,6 +287,8 @@ plugin_test_sources = files(
   'src/core/EnvDiscovery.vala',
   'src/core/ExecutionRouter.vala',
   'src/core/ToolchainManager.vala',
+  'src/core/SettingsManager.vala',
+  'src/core/ThemePalettes.vala',
   'src/core/toolchain_native.c',
 )
 
@@ -312,8 +320,6 @@ dock_test_sources = files(
   'src/core/export_native.c',
   'src/services/MediaHelper.vala',
   'src/core/ChunkParser.vala',
-  'src/console/ReplBridge.vala',
-  'src/editor/ChunkExecutionEngine.vala',
   'src/editor/CodeIntelliSenseEngine.vala',
   'src/ui/InlineChunkOutputWidget.vala',
   'src/core/PlatformUtils.vala',
@@ -324,6 +330,7 @@ dock_test_sources = files(
   'src/core/toolchain_native.c',
   'src/core/layout/DockTypes.vala',
   'src/core/SettingsManager.vala',
+  'src/core/ThemePalettes.vala',
   'src/ui/LayoutSerializer.vala',
   'src/ui/DataGridViewer.vala',
   'src/ui/EnvironmentController.vala',
@@ -384,8 +391,6 @@ shiny_test_sources = files(
   'src/core/RtfCodec.vala',
   'src/adapters/DocumentAdapter.vala',
   'src/core/ChunkParser.vala',
-  'src/console/ReplBridge.vala',
-  'src/editor/ChunkExecutionEngine.vala',
 )
 
 shiny_test_exe = executable('test_shiny_service',
@@ -487,6 +492,8 @@ exec_sec_test_exe = executable('test_execution_and_security',
   'src/core/EnvDiscovery.vala',
   'src/core/ExecutionRouter.vala',
     'src/core/ToolchainManager.vala',
+    'src/core/SettingsManager.vala',
+    'src/core/ThemePalettes.vala',
   'src/core/toolchain_native.c',
     'src/core/NativeCore.vala',
     'src/core/FormatProfile.vala',
@@ -523,6 +530,7 @@ web_sync_test_exe = executable('test_web_sync',
     'src/bridges/WebSyncClient.vala',
     'src/services/WebSyncService.vala',
     'src/core/SettingsManager.vala',
+    'src/core/ThemePalettes.vala',
     'src/core/PlatformUtils.vala',
     'src/core/HostBridge.vala',
     'src/core/EnvDiscovery.vala',
@@ -536,6 +544,17 @@ web_sync_test_exe = executable('test_web_sync',
 )
 
 test('web_sync_tests', web_sync_test_exe, timeout: 30)
+
+review_comments_test_exe = executable('test_review_comments',
+  files(
+    'tests/test_review_comments.vala',
+    'src/core/ReviewCommentModels.vala',
+  ),
+  dependencies: deps,
+  include_directories: core_inc,
+)
+
+test('review_comments_tests', review_comments_test_exe, timeout: 30)
 
 
 

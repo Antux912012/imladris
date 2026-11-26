@@ -538,8 +538,23 @@ namespace Imladris.UI {
 
             if (composer.has_context_kind (ElrondContextKind.ACTIVE_FILE)) {
                 string doc_text = doc_page.get_clean_source_text ();
-                if (doc_text.length > 4000) {
-                    doc_text = doc_text.substring (0, 4000) + "\n... [truncated]";
+                if (doc_text.length > 6000) {
+                    Gtk.TextIter cursor_iter;
+                    doc_page.source_buffer.get_iter_at_mark (out cursor_iter, doc_page.source_buffer.get_insert ());
+                    int cursor_line = cursor_iter.get_line ();
+                    string[] all_lines = doc_text.split ("\n");
+                    int start_l = int.max (0, cursor_line - 120);
+                    int end_l = int.min (all_lines.length, cursor_line + 120);
+                    var win_sb = new GLib.StringBuilder ();
+                    if (start_l > 0) win_sb.append_printf ("... [lines 1-%d omitted] ...\n", start_l);
+                    for (int li = start_l; li < end_l; li++) {
+                        win_sb.append (all_lines[li]).append_c ('\n');
+                    }
+                    if (end_l < all_lines.length) win_sb.append_printf ("... [lines %d-%d omitted] ...", end_l + 1, all_lines.length);
+                    doc_text = win_sb.str;
+                    if (doc_text.length > 6000) {
+                        doc_text = doc_text.substring (0, 6000) + "\n... [truncated]";
+                    }
                 }
                 context_sb.append_printf ("[Active File Content (%s)]:\n%s\n\n", doc_page.doc_type, doc_text);
                 summary_parts.add (@"Active $(doc_page.doc_type) document");
@@ -553,7 +568,8 @@ namespace Imladris.UI {
                     int count = 0;
                     foreach (var v in vars) {
                         if (count > 0) sb_env.append (", ");
-                        sb_env.append (@"$(v.name) ($(v.var_type): $(v.dimensions))");
+                        string col_hint = (v.columns_csv != null && v.columns_csv.length > 0) ? @" cols=[$(v.columns_csv)]" : "";
+                        sb_env.append (@"$(v.name) ($(v.var_type): $(v.dimensions)$col_hint)");
                         count++;
                         if (count >= 12) break;
                     }
@@ -565,8 +581,8 @@ namespace Imladris.UI {
 
             if (composer.has_context_kind (ElrondContextKind.LAST_ERROR)) {
                 string console_text = doc_page.console_view.buffer.text;
-                if (console_text.contains ("Error") || console_text.contains ("✖")) {
-                    int start_idx = int.max (0, console_text.length - 500);
+                if (console_text.contains ("Error") || console_text.contains ("Traceback") || console_text.contains ("✖")) {
+                    int start_idx = int.max (0, console_text.length - 1500);
                     while (start_idx > 0 && start_idx < console_text.length && (console_text[start_idx] & 0xC0) == 0x80) {
                         start_idx++;
                     }
@@ -659,15 +675,63 @@ namespace Imladris.UI {
             }
             Gtk.TextIter sel_start, sel_end;
             doc_page.source_buffer.get_selection_bounds (out sel_start, out sel_end);
+            string before_text = doc_page.source_buffer.get_text (sel_start, sel_end, false);
+            string after_text = code.strip ();
+
+            if (parent_window != null) {
+                var mark_start = doc_page.source_buffer.create_mark (null, sel_start, true);
+                var mark_end = doc_page.source_buffer.create_mark (null, sel_end, false);
+                var dlg = new Adw.AlertDialog (
+                    "Preview AI Edit",
+                    "Review the proposed replacement before modifying your document:"
+                );
+                var preview_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
+                    width_request = 460
+                };
+                var diff_tv = new Gtk.TextView () {
+                    editable = false,
+                    monospace = true,
+                    wrap_mode = Gtk.WrapMode.WORD_CHAR
+                };
+                diff_tv.buffer.set_text (@"--- Current Selection ---\n$(before_text)\n\n+++ Proposed Replacement +++\n$(after_text)", -1);
+                var sc = new Gtk.ScrolledWindow () {
+                    min_content_height = 220,
+                    max_content_height = 360,
+                    child = diff_tv
+                };
+                preview_box.append (sc);
+                dlg.set_extra_child (preview_box);
+                dlg.add_response ("cancel", "Cancel");
+                dlg.add_response ("apply", "Apply Edit");
+                dlg.set_default_response ("apply");
+                dlg.set_response_appearance ("apply", Adw.ResponseAppearance.SUGGESTED);
+                dlg.response.connect ((resp) => {
+                    if (resp == "apply" && !mark_start.get_deleted () && !mark_end.get_deleted ()) {
+                        Gtk.TextIter s2, e2;
+                        doc_page.source_buffer.get_iter_at_mark (out s2, mark_start);
+                        doc_page.source_buffer.get_iter_at_mark (out e2, mark_end);
+                        doc_page.source_buffer.begin_user_action ();
+                        try {
+                            doc_page.source_buffer.delete (ref s2, ref e2);
+                            doc_page.source_buffer.insert (ref s2, after_text, -1);
+                        } finally {
+                            doc_page.source_buffer.end_user_action ();
+                        }
+                        parent_window.show_toast_with_action ("Applied AI edit to selection", "Undo", "win.undo");
+                    }
+                    if (!mark_start.get_deleted ()) doc_page.source_buffer.delete_mark (mark_start);
+                    if (!mark_end.get_deleted ()) doc_page.source_buffer.delete_mark (mark_end);
+                });
+                dlg.present (parent_window);
+                return;
+            }
+
             doc_page.source_buffer.begin_user_action ();
             try {
                 doc_page.source_buffer.delete (ref sel_start, ref sel_end);
-                doc_page.source_buffer.insert (ref sel_start, code.strip (), -1);
+                doc_page.source_buffer.insert (ref sel_start, after_text, -1);
             } finally {
                 doc_page.source_buffer.end_user_action ();
-            }
-            if (parent_window != null) {
-                parent_window.show_toast_with_action ("Applied AI edit to selection", "Undo", "win.undo");
             }
         }
 

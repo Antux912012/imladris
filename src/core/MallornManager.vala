@@ -123,7 +123,8 @@ namespace Imladris {
                 project_name = clean_name,
                 custom_project_dir = project_dir,
                 format = primary_format,
-                project_type = sandboxed ? ProjectType.SANDBOXED : ProjectType.STANDARD
+                project_type = sandboxed ? ProjectType.SANDBOXED : ProjectType.STANDARD,
+                sandboxed = sandboxed
             };
 
             // Write 1:1 .Rproj manifest
@@ -142,9 +143,14 @@ message("✔ RStudio project environment initialized for: %s")
             FileUtils.set_contents (rprofile_path, rprofile_content);
 
             // Write starter primary file
-            string starter_filename = (primary_format == DocumentFormat.RMD)
-                ? "analysis.Rmd"
-                : ((primary_format == DocumentFormat.QMD) ? "analysis.qmd" : "main.R");
+            string starter_filename = "main.R";
+            if (primary_format == DocumentFormat.RMD) {
+                starter_filename = "analysis.Rmd";
+            } else if (primary_format == DocumentFormat.QMD) {
+                starter_filename = "analysis.qmd";
+            } else if (primary_format == DocumentFormat.IPYNB) {
+                starter_filename = "notebook.ipynb";
+            }
 
             string starter_path = Path.build_filename (project_dir, starter_filename);
             File starter_file = File.new_for_path (starter_path);
@@ -156,10 +162,13 @@ message("✔ RStudio project environment initialized for: %s")
             // Sync with .mallorn manifests
             write_project_manifests (project_dir, cfg);
 
-            // If sandboxed, initialize renv and ensure .Rprofile activates it
+            // If sandboxed, initialize renv and Python .venv (for polyglot QMD/IPYNB)
             if (sandboxed) {
                 try {
                     Services.SandboxController.init_r_sandbox (project_dir);
+                    if (primary_format == DocumentFormat.QMD || primary_format == DocumentFormat.IPYNB || primary_format == DocumentFormat.PYSCRIPT) {
+                        Services.SandboxController.init_py_sandbox (project_dir);
+                    }
                     string rprof_curr = "";
                     if (FileUtils.test (rprofile_path, FileTest.EXISTS)) {
                         FileUtils.get_contents (rprofile_path, out rprof_curr);
@@ -169,7 +178,7 @@ message("✔ RStudio project environment initialized for: %s")
                         FileUtils.set_contents (rprofile_path, rprof_curr);
                     }
                 } catch (GLib.Error e) {
-                    // Non-fatal if host Rscript unavailable
+                    // Non-fatal if host Rscript/python3 unavailable
                 }
             }
 

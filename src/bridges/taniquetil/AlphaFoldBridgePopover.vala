@@ -261,6 +261,8 @@ namespace Imladris.Bridges.Taniquetil {
             cr.restore ();
         }
 
+        private uint64 request_gen = 0;
+
         private void on_resolve_clicked () {
             string raw_query = accession_entry.text.strip ();
             if (raw_query.length == 0) return;
@@ -269,6 +271,7 @@ namespace Imladris.Bridges.Taniquetil {
                 active_cancellable.cancel ();
             }
             active_cancellable = new GLib.Cancellable ();
+            uint64 my_gen = ++request_gen;
 
             resolve_spinner.visible = true;
             resolve_spinner.spinning = true;
@@ -276,7 +279,7 @@ namespace Imladris.Bridges.Taniquetil {
             status_label.visible = false;
             action_box.sensitive = false;
 
-            resolve_alphafold_model.begin (raw_query, active_cancellable);
+            resolve_alphafold_model.begin (raw_query, active_cancellable, my_gen);
         }
 
         private async string resolve_uniprot_primary_accession (string raw_query, GLib.Cancellable cancellable) {
@@ -308,7 +311,7 @@ namespace Imladris.Bridges.Taniquetil {
             return q;
         }
 
-        private async void resolve_alphafold_model (string query, GLib.Cancellable cancellable) {
+        private async void resolve_alphafold_model (string query, GLib.Cancellable cancellable, uint64 my_gen) {
             try {
                 string clean_q = query.strip ().up ();
                 string url = @"https://alphafold.ebi.ac.uk/api/prediction/$(GLib.Uri.escape_string (clean_q, null, false))";
@@ -358,7 +361,9 @@ namespace Imladris.Bridges.Taniquetil {
                 this.uniprot_id = pred.has_member ("uniprotId") ? pred.get_string_member ("uniprotId") : "";
                 this.gene_symbol = pred.has_member ("gene") ? pred.get_string_member ("gene") : "";
                 this.organism_name = pred.has_member ("organismScientificName") ? pred.get_string_member ("organismScientificName") : "Unknown";
-                this.seq_length = pred.has_member ("uniprotEnd") ? pred.get_int_member ("uniprotEnd") : 0;
+                int64 start_res = pred.has_member ("uniprotStart") ? pred.get_int_member ("uniprotStart") : 1;
+                int64 end_res = pred.has_member ("uniprotEnd") ? pred.get_int_member ("uniprotEnd") : 0;
+                this.seq_length = (end_res >= start_res && end_res > 0) ? (end_res - start_res + 1) : end_res;
                 this.global_plddt = pred.has_member ("globalMetricValue") ? pred.get_double_member ("globalMetricValue") : 0.0;
                 this.fraction_very_high = pred.has_member ("fractionPlddtVeryHigh") ? pred.get_double_member ("fractionPlddtVeryHigh") : 0.0;
                 this.fraction_confident = pred.has_member ("fractionPlddtConfident") ? pred.get_double_member ("fractionPlddtConfident") : 0.0;
@@ -388,14 +393,29 @@ namespace Imladris.Bridges.Taniquetil {
                 status_label.visible = true;
 
             } catch (GLib.Error e) {
-                status_label.label = @"✖ Error: $(e.message)";
-                status_label.add_css_class ("error");
-                status_label.visible = true;
+                if (my_gen == request_gen && !(e is GLib.IOError.CANCELLED)) {
+                    status_label.label = @"✖ Error: $(e.message)";
+                    status_label.add_css_class ("error");
+                    status_label.visible = true;
+                    entry_id = "";
+                    row_entry_id.subtitle = "—";
+                    row_protein.subtitle = "—";
+                    row_organism.subtitle = "—";
+                    row_length.subtitle = "—";
+                    row_mean_plddt.subtitle = "—";
+                    fraction_very_high = 0.0;
+                    fraction_confident = 0.0;
+                    fraction_low = 0.0;
+                    fraction_very_low = 0.0;
+                    plddt_bar.queue_draw ();
+                }
             } finally {
-                resolve_spinner.spinning = false;
-                resolve_spinner.visible = false;
-                btn_resolve.sensitive = true;
-                active_cancellable = null;
+                if (my_gen == request_gen) {
+                    resolve_spinner.spinning = false;
+                    resolve_spinner.visible = false;
+                    btn_resolve.sensitive = true;
+                    active_cancellable = null;
+                }
             }
         }
 
@@ -455,12 +475,17 @@ import requests
 af_version = %lld
 af_cif_url = "%s"
 af_pae_url = "%s"
+cif_resp = requests.get(af_cif_url, timeout=15)
+cif_resp.raise_for_status()
+cif_path = "%s.cif"
+with open(cif_path, "w", encoding="utf-8") as _f:
+    _f.write(cif_resp.text)
 pae_resp = requests.get(af_pae_url, timeout=15)
 pae_resp.raise_for_status()
 pae_data = pae_resp.json()
-print(f"Loaded %s (v{af_version}): mean pLDDT = %.1f (%lld residues)")
+print(f"Loaded %s (v{af_version}): mean pLDDT = %.1f (%lld residues) -> {cif_path}")
 ```
-""".printf (label, safe_entry, latest_version, safe_gene, global_plddt, latest_version, Core.PlatformUtils.escape_string_literal (cif_url), Core.PlatformUtils.escape_string_literal (pae_doc_url), safe_entry_lit, global_plddt, seq_length);
+""".printf (label, safe_entry, latest_version, safe_gene, global_plddt, latest_version, Core.PlatformUtils.escape_string_literal (cif_url), Core.PlatformUtils.escape_string_literal (pae_doc_url), safe_entry_lit, safe_entry_lit, global_plddt, seq_length);
 
             insert_snippet_requested (chunk);
             this.popdown ();

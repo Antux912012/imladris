@@ -130,17 +130,26 @@ namespace Imladris {
                 }
                 var req = root.get_object ();
 
-                int64 id = 1;
+                bool has_id = req.has_member ("id");
+                if (!has_id) {
+                    // JSON-RPC 2.0 notifications must not receive a response object
+                    return "";
+                }
+
+                bool id_is_null = false;
+                int64 id = 0;
                 string? id_str = null;
-                if (req.has_member ("id")) {
-                    var id_node = req.get_member ("id");
-                    if (id_node.get_node_type () == Json.NodeType.VALUE) {
-                        if (id_node.get_value_type () == typeof (string)) {
-                            id_str = id_node.get_string ();
-                        } else {
-                            id = id_node.get_int ();
-                        }
+                var id_node = req.get_member ("id");
+                if (id_node.get_node_type () == Json.NodeType.NULL) {
+                    id_is_null = true;
+                } else if (id_node.get_node_type () == Json.NodeType.VALUE) {
+                    if (id_node.get_value_type () == typeof (string)) {
+                        id_str = id_node.get_string ();
+                    } else {
+                        id = id_node.get_int ();
                     }
+                } else {
+                    id_is_null = true;
                 }
                 string method = (req.has_member ("method") && req.get_member ("method").get_node_type () == Json.NodeType.VALUE)
                     ? req.get_string_member ("method") : "";
@@ -150,7 +159,9 @@ namespace Imladris {
                 builder.set_member_name ("jsonrpc");
                 builder.add_string_value ("2.0");
                 builder.set_member_name ("id");
-                if (id_str != null) {
+                if (id_is_null) {
+                    builder.add_null_value ();
+                } else if (id_str != null) {
                     builder.add_string_value (id_str);
                 } else {
                     builder.add_int_value (id);

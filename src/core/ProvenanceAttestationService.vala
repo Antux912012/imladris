@@ -32,12 +32,36 @@ namespace Imladris.Core {
                 return null;
             }
             try {
-                uint8[] data;
-                GLib.FileUtils.get_data (file_path, out data);
-                return GLib.Checksum.compute_for_data (GLib.ChecksumType.SHA256, data);
+                var file = GLib.File.new_for_path (file_path);
+                var stream = file.read (null);
+                var checksum = new GLib.Checksum (GLib.ChecksumType.SHA256);
+                uint8[] buf = new uint8[65536];
+                ssize_t n;
+                while ((n = stream.read (buf, null)) > 0) {
+                    checksum.update (buf, (size_t) n);
+                }
+                stream.close (null);
+                return checksum.get_string ();
             } catch (GLib.Error e) {
                 return null;
             }
+        }
+
+        public static async string? compute_sha256_file_async (string file_path, GLib.Cancellable? cancellable = null) {
+            if (!GLib.FileUtils.test (file_path, GLib.FileTest.IS_REGULAR)) {
+                return null;
+            }
+            string? result = null;
+            SourceFunc cb = compute_sha256_file_async.callback;
+            new GLib.Thread<void*> ("imladris-sha256", () => {
+                if (cancellable == null || !cancellable.is_cancelled ()) {
+                    result = compute_sha256_file (file_path);
+                }
+                GLib.Idle.add ((owned) cb);
+                return null;
+            });
+            yield;
+            return result;
         }
 
         /**
@@ -76,13 +100,16 @@ namespace Imladris.Core {
             builder.set_member_name ("environmentLocks");
             builder.begin_array ();
 
-            string[] candidate_locks = { "renv.lock", "uv.lock", "requirements.txt", "environment.yml", "conda-lock.yml", "_quarto.yml" };
+            string[] candidate_locks = {
+                "renv.lock", "uv.lock", "requirements.txt", "environment.yml", "conda-lock.yml",
+                "pixi.lock", "pyproject.toml", "Snakefile", "nextflow.config", "_quarto.yml"
+            };
             var lock_digests = new GLib.StringBuilder ();
             lock_digests.append (doc_hash);
 
             foreach (var lock_name in candidate_locks) {
                 string lock_path = GLib.Path.build_filename (project_dir, lock_name);
-                string? hash = compute_sha256_file (lock_path);
+                string? hash = yield compute_sha256_file_async (lock_path);
                 if (hash != null) {
                     builder.begin_object ();
                     builder.set_member_name ("file");
@@ -100,23 +127,25 @@ namespace Imladris.Core {
                 try {
                     var dir = GLib.File.new_for_path (bdir);
                     if (!dir.query_exists ()) continue;
-                    var enumerator = dir.enumerate_children ("standard::name,standard::type", GLib.FileQueryInfoFlags.NONE, null);
-                    GLib.FileInfo? info;
-                    while ((info = enumerator.next_file (null)) != null) {
-                        if (info.get_file_type () != GLib.FileType.REGULAR) continue;
-                        string fname = info.get_name ();
-                        if (!fname.down ().has_suffix (".bib")) continue;
-                        string fpath = GLib.Path.build_filename (bdir, fname);
-                        string? hash = compute_sha256_file (fpath);
-                        if (hash != null) {
-                            string rel_name = (bdir == project_dir) ? fname : GLib.Path.build_filename ("bibliography", fname);
-                            builder.begin_object ();
-                            builder.set_member_name ("file");
-                            builder.add_string_value (rel_name);
-                            builder.set_member_name ("sha256");
-                            builder.add_string_value (hash);
-                            builder.end_object ();
-                            lock_digests.append (hash);
+                    var enumerator = yield dir.enumerate_children_async ("standard::name,standard::type", GLib.FileQueryInfoFlags.NONE, GLib.Priority.DEFAULT, null);
+                    GLib.List<GLib.FileInfo> files_list;
+                    while ((files_list = yield enumerator.next_files_async (32, GLib.Priority.DEFAULT, null)).length () > 0) {
+                        foreach (var info in files_list) {
+                            if (info.get_file_type () != GLib.FileType.REGULAR) continue;
+                            string fname = info.get_name ();
+                            if (!fname.down ().has_suffix (".bib")) continue;
+                            string fpath = GLib.Path.build_filename (bdir, fname);
+                            string? hash = yield compute_sha256_file_async (fpath);
+                            if (hash != null) {
+                                string rel_name = (bdir == project_dir) ? fname : GLib.Path.build_filename ("bibliography", fname);
+                                builder.begin_object ();
+                                builder.set_member_name ("file");
+                                builder.add_string_value (rel_name);
+                                builder.set_member_name ("sha256");
+                                builder.add_string_value (hash);
+                                builder.end_object ();
+                                lock_digests.append (hash);
+                            }
                         }
                     }
                 } catch (GLib.Error e) {}

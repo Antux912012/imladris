@@ -10,6 +10,7 @@ namespace Imladris.UI {
     public class PackagesRibbonBar : Gtk.Box {
         public signal void dispatch_r_install (string r_command, string display_label);
         public signal void dispatch_python_install (string[] argv, string working_dir, bool is_sandboxed, string display_label);
+        public signal void status_changed (string message);
 
         public string project_root { get; set; default = ""; }
         public bool is_sandboxed { get; set; default = true; }
@@ -95,9 +96,9 @@ namespace Imladris.UI {
             };
 
             r_search_entry = new Gtk.Entry () {
-                placeholder_text = "Install R package from CRAN (e.g. tidyverse, lme4)...",
+                placeholder_text = "Install CRAN or bioc: pkg (e.g. tidyverse, bioc:DESeq2)...",
                 secondary_icon_name = "folder-download-symbolic",
-                secondary_icon_tooltip_text = "Install from CRAN (Enter)",
+                secondary_icon_tooltip_text = "Install from CRAN or Bioconductor (Enter)",
                 width_chars = 34
             };
 
@@ -541,7 +542,7 @@ namespace Imladris.UI {
             if (s.length == 0 || s.contains ("..")) return false;
             try {
                 if (r_pkg_spec_regex == null) {
-                    r_pkg_spec_regex = new GLib.Regex ("^[A-Za-z0-9._/-]+$");
+                    r_pkg_spec_regex = new GLib.Regex ("^[A-Za-z0-9._:/-]+$");
                 }
                 return r_pkg_spec_regex.match (s);
             } catch (GLib.RegexError e) {
@@ -565,6 +566,7 @@ namespace Imladris.UI {
                 if (clean.length > 0) {
                     if (!is_valid_r_package_spec (clean)) {
                         GLib.warning ("Rejected unsafe R package identifier: %s", clean);
+                        status_changed (@"✖ Invalid R package name: '$clean'");
                         return;
                     }
                     if (count > 0) builder.append (", ");
@@ -573,20 +575,41 @@ namespace Imladris.UI {
                 }
             }
             builder.append (")");
-            if (count == 0) return;
+            if (count == 0) {
+                status_changed ("✖ No valid R package specifications entered.");
+                return;
+            }
 
             string deps = deps_check.active ? "TRUE" : "FALSE";
+            string pak_deps = deps_check.active ? "NA" : "FALSE";
             string pkg_vec = builder.str;
             string r_cmd;
 
-            // Fast-path: check if pak is available for accelerated parallel install, otherwise standard renv/install.packages
-            if (is_sandboxed) {
-                r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(%s); renv::snapshot(prompt = FALSE) } else { renv::install(packages = %s, dependencies = %s); renv::snapshot(prompt = FALSE) }".printf (
-                    pkg_vec, pkg_vec, deps
+            if (raw.has_prefix ("bioc:") || raw.contains ("BiocManager")) {
+                string bioc_raw = raw.replace ("bioc:", "").strip ();
+                var bioc_b = new GLib.StringBuilder ("c(");
+                int bc = 0;
+                foreach (string t in Regex.split_simple ("[\\s,;]+", bioc_raw)) {
+                    string cl = t.strip ();
+                    if (cl.length > 0 && is_valid_r_package_spec (cl)) {
+                        if (bc > 0) bioc_b.append (", ");
+                        bioc_b.append (@"\"$(escape_r_string (cl))\"");
+                        bc++;
+                    }
+                }
+                bioc_b.append (")");
+                if (bc == 0) return;
+                r_cmd = "if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager', repos = 'https://cloud.r-project.org'); BiocManager::install(%s, update = FALSE, ask = FALSE)".printf (bioc_b.str);
+                if (is_sandboxed) {
+                    r_cmd += "; renv::snapshot(prompt = FALSE)";
+                }
+            } else if (is_sandboxed) {
+                r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(%s, dependencies = %s); renv::snapshot(prompt = FALSE) } else { renv::install(packages = %s, dependencies = %s); renv::snapshot(prompt = FALSE) }".printf (
+                    pkg_vec, pak_deps, pkg_vec, deps
                 );
             } else {
-                r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(%s) } else { install.packages(%s, repos = \"https://cloud.r-project.org\", dependencies = %s) }".printf (
-                    pkg_vec, pkg_vec, deps
+                r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(%s, dependencies = %s) } else { install.packages(%s, repos = \"https://cloud.r-project.org\", dependencies = %s) }".printf (
+                    pkg_vec, pak_deps, pkg_vec, deps
                 );
             }
 
@@ -598,17 +621,23 @@ namespace Imladris.UI {
             string raw = py_search_entry.text.strip ();
             if (raw.length == 0) return;
 
-            string[] tokens = Regex.split_simple ("[\\s,]+", raw);
+            // Split on commas (or whitespace only when no version operators like >=, ==, ~= are present)
+            string[] tokens = (raw.contains (",") || raw.contains (">") || raw.contains ("<") || raw.contains ("=") || raw.contains ("~"))
+                ? Regex.split_simple ("\\s*,\\s*", raw)
+                : Regex.split_simple ("[\\s,]+", raw);
             var args = build_base_pip_argv ();
             int count = 0;
             foreach (string t in tokens) {
                 string clean = t.strip ();
-                if (clean.length > 0) {
+                if (clean.length > 0 && !clean.has_prefix ("-")) {
                     args.add (clean);
                     count++;
                 }
             }
-            if (count == 0) return;
+            if (count == 0) {
+                status_changed ("✖ No valid R package specifications entered.");
+                return;
+            }
 
             py_search_entry.text = "";
             dispatch_python_install (to_null_terminated_strv (args), project_root, is_sandboxed, raw);
@@ -622,14 +651,15 @@ namespace Imladris.UI {
                 }
                 string safe_spec = escape_r_string (repo_spec.strip ());
                 string deps = deps_check.active ? "TRUE" : "FALSE";
+                string pak_deps = deps_check.active ? "NA" : "FALSE";
                 string r_cmd;
                 if (is_sandboxed) {
-                    r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(\"%s\"); renv::snapshot(prompt = FALSE) } else { renv::install(\"%s\"); renv::snapshot(prompt = FALSE) }".printf (
-                        safe_spec, safe_spec
+                    r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(\"%s\", dependencies = %s); renv::snapshot(prompt = FALSE) } else { renv::install(\"%s\", dependencies = %s); renv::snapshot(prompt = FALSE) }".printf (
+                        safe_spec, pak_deps, safe_spec, deps
                     );
                 } else {
-                    r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(\"%s\") } else { if (!requireNamespace('remotes', quietly = TRUE)) install.packages('remotes', repos = 'https://cloud.r-project.org'); remotes::install_github(\"%s\", dependencies = %s) }".printf (
-                        safe_spec, safe_spec, deps
+                    r_cmd = "if (requireNamespace('pak', quietly = TRUE)) { pak::pkg_install(\"%s\", dependencies = %s) } else { if (!requireNamespace('remotes', quietly = TRUE)) install.packages('remotes', repos = 'https://cloud.r-project.org'); remotes::install_github(\"%s\", dependencies = %s) }".printf (
+                        safe_spec, pak_deps, safe_spec, deps
                     );
                 }
                 dispatch_r_install (r_cmd, repo_spec);

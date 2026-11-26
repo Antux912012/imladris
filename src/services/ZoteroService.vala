@@ -472,7 +472,7 @@ namespace Imladris.Services {
             var entries = new Gee.ArrayList<CitationItem> ();
             try {
                 if (reg_entry_cache == null) {
-                    reg_entry_cache = new Regex ("@([a-zA-Z]+)\\s*\\{\\s*([^,\\s]+)\\s*,([\\s\\S]*?)(?=\\n@[a-zA-Z]+\\s*\\{|\\s*$)");
+                    reg_entry_cache = new Regex ("@([a-zA-Z]+)\\s*\\{\\s*([^,\\s]+)\\s*,([\\s\\S]*?)(?=\\r?\\n\\s*@[a-zA-Z]+\\s*\\{|\\s*$)");
                 }
                 MatchInfo mi;
                 string lower_q = query.down ();
@@ -540,7 +540,7 @@ namespace Imladris.Services {
                     }
                 }
             } catch (GLib.Error e) {
-                // If offline or export fails, fail gracefully
+                GLib.warning ("Zotero bibliography sync failed for %s: %s", citekey, e.message);
             }
         }
 

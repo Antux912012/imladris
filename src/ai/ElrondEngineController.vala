@@ -347,10 +347,12 @@ namespace Imladris.AI {
         }
 
         private async bool probe_http_status_ok_async (string url) {
+            uint tid = 0;
             try {
                 var msg = new Soup.Message ("GET", url);
                 var cancellable = new Cancellable ();
-                Timeout.add (1000, () => {
+                tid = Timeout.add (1000, () => {
+                    tid = 0;
                     cancellable.cancel ();
                     return Source.REMOVE;
                 });
@@ -358,6 +360,10 @@ namespace Imladris.AI {
                 return msg.status_code == Soup.Status.OK && bytes != null;
             } catch (Error e) {
                 return false;
+            } finally {
+                if (tid != 0) {
+                    Source.remove (tid);
+                }
             }
         }
 
@@ -583,12 +589,14 @@ namespace Imladris.AI {
 
         private async bool probe_http_endpoint_async (string url, out string detected_model) {
             detected_model = "";
+            uint tid = 0;
             try {
                 var msg = new Soup.Message ("GET", url);
                 var cancellable = new Cancellable ();
 
                 // Set a 2-second probe deadline to avoid delaying startup
-                Timeout.add (2000, () => {
+                tid = Timeout.add (2000, () => {
+                    tid = 0;
                     cancellable.cancel ();
                     return Source.REMOVE;
                 });
@@ -598,7 +606,12 @@ namespace Imladris.AI {
                     detected_model = extract_model_from_json (bytes);
                     return true;
                 }
-            } catch (Error e) {}
+            } catch (Error e) {
+            } finally {
+                if (tid != 0) {
+                    Source.remove (tid);
+                }
+            }
             return false;
         }
 

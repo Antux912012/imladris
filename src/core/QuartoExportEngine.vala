@@ -14,6 +14,7 @@ namespace Imladris.Core {
     public enum ScientificOutputFormat {
         HTML_MANUSCRIPT,
         PDF_MANUSCRIPT,
+        DOCX_DOCUMENT,
         REVEALJS_SLIDES,
         BEAMER_PDF_SLIDES,
         TYPST_POSTER_PDF;
@@ -22,6 +23,7 @@ namespace Imladris.Core {
             switch (this) {
                 case HTML_MANUSCRIPT:   return "html";
                 case PDF_MANUSCRIPT:    return "pdf";
+                case DOCX_DOCUMENT:     return "docx";
                 case REVEALJS_SLIDES:   return "revealjs";
                 case BEAMER_PDF_SLIDES: return "beamer";
                 case TYPST_POSTER_PDF:  return "typst";
@@ -33,6 +35,7 @@ namespace Imladris.Core {
             switch (this) {
                 case HTML_MANUSCRIPT:   return "Manuscript (HTML)";
                 case PDF_MANUSCRIPT:    return "Article / Report (PDF)";
+                case DOCX_DOCUMENT:     return "Word Document (DOCX)";
                 case REVEALJS_SLIDES:   return "Interactive Slides (RevealJS)";
                 case BEAMER_PDF_SLIDES: return "Conference Slides (Beamer PDF)";
                 case TYPST_POSTER_PDF:  return "Symposium Poster (Typst/PDF)";
@@ -46,6 +49,8 @@ namespace Imladris.Core {
                 case BEAMER_PDF_SLIDES:
                 case TYPST_POSTER_PDF:
                     return ".pdf";
+                case DOCX_DOCUMENT:
+                    return ".docx";
                 case HTML_MANUSCRIPT:
                 case REVEALJS_SLIDES:
                 default:
@@ -101,12 +106,16 @@ namespace Imladris.Core {
                                  exec_log.contains ("xelatex not found") ||
                                  exec_log.contains ("pdflatex not found") ||
                                  exec_log.contains ("lualatex not found") ||
-                                 exec_log.contains ("LaTeX Error") ||
                                  exec_log.contains ("beamer.cls") ||
                                  exec_log.contains ("tlmgr") ||
                                  exec_log.contains ("tinytex");
 
                 if (needs_tex) {
+                    if (SettingsManager.get_default ().is_airgapped ()) {
+                        throw new ExportError.TINYTEX_INSTALL_FAILED (
+                            "Missing LaTeX/TinyTeX runtime; automatic download is blocked in Air-Gapped Mode."
+                        );
+                    }
                     tex_healing_started ();
                     compilation_progress ("[Imladris TeX Healer] Missing LaTeX packages detected. Provisioning isolated TinyTeX runtime...");
                     yield heal_tinytex_runtime (working_dir);
@@ -137,9 +146,6 @@ namespace Imladris.Core {
 
         private string resolve_expected_output_path (string working_dir, string root_name, string ext) {
             string direct = GLib.Path.build_filename (working_dir, root_name + ext);
-            if (GLib.FileUtils.test (direct, GLib.FileTest.EXISTS)) {
-                return direct;
-            }
             string? dir = working_dir;
             for (int depth = 0; depth < 3 && dir != null && dir != "" && dir != "/"; depth++) {
                 string yml_path = GLib.Path.build_filename (dir, "_quarto.yml");
@@ -151,9 +157,16 @@ namespace Imladris.Core {
                         string yml;
                         GLib.FileUtils.get_contents (yml_path, out yml);
                         foreach (string raw_line in yml.split ("\n")) {
-                            string line = raw_line.strip ();
-                            if (line.has_prefix ("output-dir:")) {
-                                string out_dir = line.substring ("output-dir:".length).strip ().replace ("\"", "").replace ("'", "");
+                            string trimmed = raw_line.strip ();
+                            if (trimmed.has_prefix ("#")) continue;
+                            if (trimmed.has_prefix ("output-file:")) {
+                                string out_file = trimmed.substring ("output-file:".length).strip ().replace ("\"", "").replace ("'", "");
+                                if (out_file.length > 0) {
+                                    root_name = out_file.has_suffix (ext) ? out_file.substring (0, out_file.length - ext.length) : out_file;
+                                }
+                            }
+                            if (trimmed.has_prefix ("output-dir:")) {
+                                string out_dir = trimmed.substring ("output-dir:".length).strip ().replace ("\"", "").replace ("'", "");
                                 if (out_dir.length > 0) {
                                     string candidate = GLib.Path.is_absolute (out_dir)
                                         ? GLib.Path.build_filename (out_dir, root_name + ext)
@@ -183,19 +196,47 @@ namespace Imladris.Core {
             string target_flag = format.to_quarto_flag ();
             string[] raw_args = { (resolved_quarto != null) ? resolved_quarto : "quarto", "render", qmd_path, "--to", target_flag };
 
+            var env_list = new Gee.ArrayList<string> ();
+            string? search_dir = working_dir;
+            bool found_py = false;
+            bool found_renv = false;
+            for (int depth = 0; depth < 3 && search_dir != null && search_dir != "" && search_dir != "/"; depth++) {
+                if (!found_py) {
+                    string venv_py = GLib.Path.build_filename (search_dir, ".venv", "bin", "python3");
+                    string iml_py = GLib.Path.build_filename (search_dir, ".imladris-env", "bin", "python3");
+                    if (GLib.FileUtils.test (venv_py, GLib.FileTest.IS_EXECUTABLE)) {
+                        env_list.add ("QUARTO_PYTHON=" + venv_py);
+                        launcher.setenv ("QUARTO_PYTHON", venv_py, true);
+                        found_py = true;
+                    } else if (GLib.FileUtils.test (iml_py, GLib.FileTest.IS_EXECUTABLE)) {
+                        env_list.add ("QUARTO_PYTHON=" + iml_py);
+                        launcher.setenv ("QUARTO_PYTHON", iml_py, true);
+                        found_py = true;
+                    }
+                }
+                if (!found_renv) {
+                    string renv_act = GLib.Path.build_filename (search_dir, "renv", "activate.R");
+                    if (GLib.FileUtils.test (renv_act, GLib.FileTest.EXISTS)) {
+                        env_list.add ("RENV_PROJECT=" + search_dir);
+                        launcher.setenv ("RENV_PROJECT", search_dir, true);
+                        found_renv = true;
+                    }
+                }
+                search_dir = GLib.Path.get_dirname (search_dir);
+            }
+            var probe = Core.EnvDiscovery.get_default ().get_cached (working_dir);
+            if (probe != null && probe.latest_r_path != null && probe.latest_r_path.length > 0) {
+                string q_r = GLib.Path.build_filename (GLib.Path.get_dirname (probe.latest_r_path), "R");
+                env_list.add ("QUARTO_R=" + q_r);
+                launcher.setenv ("QUARTO_R", q_r, true);
+            }
+
             string[] argv;
             if (source == Core.RuntimeSource.HOST_FLATPAK_SPAWN) {
                 string[] host_cmd = { "quarto", "render", qmd_path, "--to", target_flag };
-                argv = Core.PlatformUtils.build_host_command (host_cmd, working_dir);
+                argv = Core.HostBridge.wrap_command (host_cmd, working_dir, env_list.to_array ());
             } else {
                 Core.PlatformUtils.configure_managed_env (launcher, env_prefix);
-                string venv_py = GLib.Path.build_filename (working_dir, ".venv", "bin", "python3");
-                string iml_py = GLib.Path.build_filename (working_dir, ".imladris-env", "bin", "python3");
-                if (GLib.FileUtils.test (venv_py, GLib.FileTest.IS_EXECUTABLE)) {
-                    launcher.setenv ("QUARTO_PYTHON", venv_py, true);
-                } else if (GLib.FileUtils.test (iml_py, GLib.FileTest.IS_EXECUTABLE)) {
-                    launcher.setenv ("QUARTO_PYTHON", iml_py, true);
-                }
                 argv = raw_args;
             }
 
@@ -224,6 +265,9 @@ namespace Imladris.Core {
         }
 
         private async void heal_tinytex_runtime (string working_dir) throws GLib.Error {
+            if (SettingsManager.get_default ().is_airgapped ()) {
+                throw new ExportError.TINYTEX_INSTALL_FAILED ("TinyTeX download is blocked in Air-Gapped Mode.");
+            }
             string? resolved_quarto = null;
             string? env_prefix = null;
             var source = Core.PlatformUtils.resolve_runtime ("quarto", working_dir, out resolved_quarto, out env_prefix);

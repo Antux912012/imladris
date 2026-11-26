@@ -203,6 +203,12 @@ namespace Imladris.UI {
                     blocks.add (new DocBlock (BlockKind.QUOTE, trimmed.substring (2)));
                 } else if (trimmed.has_prefix ("- ") || trimmed.has_prefix ("* ")) {
                     blocks.add (new DocBlock (BlockKind.BULLET, trimmed.substring (2)));
+                } else if (trimmed.has_prefix ("|") && trimmed.contains ("|")) {
+                    // Skip pure separator rows like |---|---|
+                    string no_sep = trimmed.replace ("|", "").replace ("-", "").replace (":", "").strip ();
+                    if (no_sep.length > 0) {
+                        blocks.add (new DocBlock (BlockKind.CODE, trimmed));
+                    }
                 } else {
                     blocks.add (new DocBlock (BlockKind.PARAGRAPH, trimmed));
                 }
@@ -483,6 +489,29 @@ namespace Imladris.UI {
             double max_y = page_h - margin_bot;
 
             foreach (var blk in blocks) {
+                if (blk.kind == BlockKind.CODE) {
+                    string[] code_lines = blk.text.split ("\n");
+                    if (code_lines.length > 28) {
+                        for (int ci = 0; ci < code_lines.length; ci += 28) {
+                            int end_ci = int.min (ci + 28, code_lines.length);
+                            var sub_sb = new GLib.StringBuilder ();
+                            for (int k = ci; k < end_ci; k++) {
+                                if (k > ci) sub_sb.append_c ('\n');
+                                sub_sb.append (code_lines[k]);
+                            }
+                            var sub_blk = new DocBlock (BlockKind.CODE, sub_sb.str);
+                            double h = measure_cairo_block_height (tmp_cr, sub_blk, content_w);
+                            if (y + h > max_y && current_page.items.size > 0) {
+                                current_page = new PageSlice ();
+                                pages.add (current_page);
+                                y = margin_top;
+                            }
+                            current_page.items.add (new PageDrawItem (sub_blk.kind, sub_blk.text, y, h));
+                            y += h + 6.0;
+                        }
+                        continue;
+                    }
+                }
                 double h = measure_cairo_block_height (tmp_cr, blk, content_w);
                 if (y + h > max_y && current_page.items.size > 0) {
                     current_page = new PageSlice ();
@@ -567,7 +596,11 @@ namespace Imladris.UI {
             layout.set_width ((int) ((content_w - indent - 2.0 * pad_x) * Pango.SCALE));
             layout.set_wrap (Pango.WrapMode.WORD_CHAR);
             string display = (item.kind == BlockKind.BULLET) ? @"•  $(item.text)" : item.text;
-            layout.set_text (display, -1);
+            if (item.kind == BlockKind.CODE) {
+                layout.set_text (display, -1);
+            } else {
+                layout.set_markup (to_pango_inline (display), -1);
+            }
 
             cr.save ();
             if (item.kind == BlockKind.META || item.kind == BlockKind.QUOTE) {

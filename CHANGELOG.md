@@ -2,6 +2,17 @@
 
 All notable changes to **Imladris** are documented in this file.
 
+## [0.44.0] - 2026-11-26
+
+### Added
+- **Left/Right Review Notes Sidebar (`ReviewCommentModels`, `ReviewCommentService`, `ReviewCommentsPanel`):** Threaded chat-style review comments anchored to specific lines or ranges via `Gtk.TextMark` and `GtkSource.Mark` gutter icons, stored cleanly in `.imladris/reviews/*.comments.json` sidecars with fuzzy re-anchoring, multi-reviewer `.comments.json` merge, and Markdown rebuttal export (`Ctrl+Alt+M` / `Ctrl+Shift+R`).
+- **Ptyxis / Rewaita Color Palettes (`ThemePalettes`, `PaletteSelectorWidget`):** 18 curated light/dark palettes with live card previews, expandable "Show All Palettes" grid, and GNOME Accent Color layering.
+- **DOCX Export & Bioinformatics / Quant Upgrades:** Added `DOCX` export target across `FormatProfile`, `QuartoExportEngine`, and `ExportService`; added Polars, `data.table`, `AnnData`, `Seurat`, `DESeqDataSet`, `SummarizedExperiment`, `.csv.gz`/`.tsv.gz`/`.vcf`/`.bed`/`.gtf`, and 50-column pagination in `DataGridViewer`; added `bioc:` Bioconductor support (`-c bioconda`) and multi-species Ensembl resolution (`species:symbol`) in Yavanna.
+
+### Fixed
+- **Kernel & Execution Resilience:** Non-destructive `SIGINT` grace window in `PersistentSessionManager`, hex-encoded R chunk harness, `ExecutionRouter` wiring on native Linux, per-session persistent Bash chunks, and Elrond AI `Gtk.TextMark`-anchored diff preview.
+- **Data-Loss & Crash Guards:** Unsaved document prompts on tab/window close, null-safe `.ipynb` and `dock-layout.json` parsing, `MathChemEngine` Econ/Finance variable detection, and bundled Papirus symbolic icons.
+
 ## [0.43.2] - 2026-11-25
 
 ### Changed & Fixed (Flatpak Isolation)

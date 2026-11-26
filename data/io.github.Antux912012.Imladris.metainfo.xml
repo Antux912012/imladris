@@ -76,6 +76,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.44.0" date="2026-11-26" type="stable">
+      <description>
+        <p>Major release featuring threaded Review Notes Sidebar, Ptyxis/Rewaita Color Palettes, DOCX export, Polars/AnnData/Seurat/DESeq2 DataGrid support, and 12-suite test coverage:</p>
+        <ul>
+          <li>Added Left/Right collapsible Review Notes Sidebar with sidecar JSON persistence, Gtk.TextMark line-range anchoring, fuzzy re-anchoring, multi-reviewer merge, and Markdown rebuttal export.</li>
+          <li>Added Ptyxis-inspired Rewaita Color Palette selector (18 palettes) alongside GNOME Accent Color and Eye-Friendly theming.</li>
+          <li>Added DOCX export support, Polars/AnnData/Seurat/DESeqDataSet DataGrid inspection with column pagination and .gz/.vcf/.bed/.gtf preview, and multi-species Ensembl support in Yavanna.</li>
+          <li>Improved kernel interrupt/timeout stability, unsaved document close guards, malformed .ipynb/layout resilience, and Elrond AI inline diff preview.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.43.2" date="2026-11-25" type="stable">
       <description>
         <p>Release 0.43.2 enforces strict in-sandbox toolchain isolation for Flatpak builds:</p>

@@ -205,6 +205,8 @@ namespace Imladris {
             this.set_accels_for_action ("win.run_chunks_above", { "<Control><Alt>p" });
             this.set_accels_for_action ("win.clear_console", { "<Control>l" });
             this.set_accels_for_action ("app.restart_kernel", { "<Control><Shift>F10" });
+            this.set_accels_for_action ("win.add_review_comment", { "<Control><Alt>m" });
+            this.set_accels_for_action ("win.toggle_review_comments", { "<Control><Shift>r" });
 
             var provider = new Gtk.CssProvider ();
             provider.load_from_resource ("/org/imladris/app/style.css");
@@ -218,6 +220,7 @@ namespace Imladris {
             }
 
             Core.SettingsManager.get_default ().apply_theme (Core.SettingsManager.get_default ().app_theme);
+            Core.SettingsManager.get_default ().apply_palette (Core.SettingsManager.get_default ().color_palette);
             Core.SettingsManager.get_default ().apply_accent_color (Core.SettingsManager.get_default ().accent_color);
 
             // WebKitGTK 6.0 (WebKit 2.52+) must initialize WebKit2 before any standalone

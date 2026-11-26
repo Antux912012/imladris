@@ -779,13 +779,20 @@ namespace Imladris.Tests {
                 assert_not_reached ();
             }
 
-            // PHI/PII redaction preserves DOIs while redacting SSNs/emails/MRNs
-            string raw = "Patient MRN: P99123 SSN 123-45-6789 email alice@hospital.org doi:10.1038/s41586-020-2649-2";
+            // PHI/PII redaction preserves DOIs while redacting SSNs/emails/MRNs/EU IDs
+            string raw = "Patient MRN: P99123 SSN 123-45-6789 email alice@hospital.org IBAN DE89370400440532013000 region NUTS:BE251 doi:10.1038/s41586-020-2649-2";
             string clean = Imladris.AiClient.redact_phi_pii (raw);
             assert (!clean.contains ("123-45-6789"));
             assert (!clean.contains ("alice@hospital.org"));
             assert (!clean.contains ("P99123"));
+            assert (!clean.contains ("DE89370400440532013000"));
+            assert (!clean.contains ("BE251"));
             assert (clean.contains ("10.1038/s41586-020-2649-2"));
+
+            // ProviderLocality classification
+            assert (Imladris.AiClient.get_provider_locality (Imladris.Core.AiProvider.OLLAMA, "http://127.0.0.1:11434/v1") == Imladris.ProviderLocality.LOCAL_LOOPBACK);
+            assert (Imladris.AiClient.get_provider_locality (Imladris.Core.AiProvider.FREELMAPI_LOCAL, "http://127.0.0.1:8000/v1") == Imladris.ProviderLocality.LOCAL_LOOPBACK);
+            assert (Imladris.AiClient.get_provider_locality (Imladris.Core.AiProvider.ANTIGRAVITY, "local://agy") == Imladris.ProviderLocality.CLOUD_EXTERNAL);
         } catch (GLib.Error e) {
             error ("Policy test failed: %s", e.message);
         } finally {

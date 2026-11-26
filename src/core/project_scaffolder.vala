@@ -299,22 +299,27 @@ namespace Imladris {
             // 5. Generate .mallorn & 1:1 .Rproj manifests + metadata
             MallornManager.write_project_manifests (root_path, config);
 
-            // 6. If Sandboxed, initialize dependencies
+            // 6. If Sandboxed, initialize dependencies asynchronously off the GTK main thread
             if (config.project_type == ProjectType.SANDBOXED) {
-                if (config.format == DocumentFormat.RMD || config.format == DocumentFormat.QMD) {
-                    try {
-                        Services.SandboxController.init_r_sandbox (root_path);
-                    } catch (GLib.Error e) {
-                        // Handled via bootstrap stubs
+                string r_root = root_path;
+                var fmt_copy = config.format;
+                new GLib.Thread<void*> ("imladris-sandbox-init", () => {
+                    if (fmt_copy == DocumentFormat.RMD || fmt_copy == DocumentFormat.QMD) {
+                        try {
+                            Services.SandboxController.init_r_sandbox (r_root);
+                        } catch (GLib.Error e) {
+                            GLib.warning ("R sandbox init failed for %s: %s", r_root, e.message);
+                        }
                     }
-                }
-                if (config.format == DocumentFormat.IPYNB || config.format == DocumentFormat.QMD) {
-                    try {
-                        Services.SandboxController.init_py_sandbox (root_path);
-                    } catch (GLib.Error e) {
-                        // Handled via bootstrap stubs
+                    if (fmt_copy == DocumentFormat.IPYNB || fmt_copy == DocumentFormat.QMD) {
+                        try {
+                            Services.SandboxController.init_py_sandbox (r_root);
+                        } catch (GLib.Error e) {
+                            GLib.warning ("Python sandbox init failed for %s: %s", r_root, e.message);
+                        }
                     }
-                }
+                    return null;
+                });
             }
 
             return main_file;

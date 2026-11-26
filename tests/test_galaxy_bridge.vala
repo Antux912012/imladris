@@ -102,8 +102,8 @@ public class TestGalaxyBridge {
         assert ("galaxy_url <- \"https://usegalaxy.eu/api/histories/bbd44e69cb8906b5/contents/f2db41e1fa331b3e/display\"" in chunk);
         assert ("httr2::request(galaxy_url)" in chunk);
         assert ("httr2::req_headers(\"x-api-key\" = Sys.getenv(\"GALAXY_API_KEY\"))" in chunk);
-        assert ("resp <- httr2::req_perform(req)" in chunk);
-        assert ("galaxy_df_43 <- readr::read_tsv(httr2::resp_body_raw(resp), show_col_types = FALSE)" in chunk);
+        assert ("httr2::req_perform(req, path = dest_path)" in chunk);
+        assert ("galaxy_df_43 <- readr::read_tsv(dest_path, show_col_types = FALSE)" in chunk);
         assert ("```" in chunk);
     }
 

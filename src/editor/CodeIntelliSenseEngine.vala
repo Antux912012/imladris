@@ -1436,11 +1436,12 @@ namespace Imladris.Editor {
             int cursor_line,
             string line_prefix,
             string doc_type = "markdown",
-            bool manual_trigger = false
+            bool manual_trigger = false,
+            IntelliSenseContext? precomputed_ctx = null
         ) {
             ensure_catalogs_initialized ();
             var results = new ArrayList<IntelliSenseItem> ();
-            var ctx = detect_context (document_text, cursor_line, line_prefix, doc_type);
+            var ctx = precomputed_ctx ?? detect_context (document_text, cursor_line, line_prefix, doc_type);
             string token = extract_active_token_for_context (line_prefix, ctx);
 
             // 1. Chunk Fence Header Context (```{r}, ```{python}, etc.)

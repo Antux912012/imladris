@@ -66,7 +66,7 @@ namespace Imladris.Core {
                 case CLINICAL_BIOSTATS:
                     return { "r-survival", "r-survminer", "r-gtsummary", "r-gt", "r-flextable", "r-officer", "r-lme4", "r-emmeans" };
                 case BIOINFORMATICS:
-                    return { "numpy", "pandas", "scipy", "matplotlib", "biopython", "anndata", "scanpy", "biotite", "nbformat", "ipywidgets" };
+                    return { "numpy", "pandas", "scipy", "matplotlib", "biopython", "anndata", "scanpy", "biotite", "nbformat", "ipywidgets", "r-biocmanager", "bioconductor-deseq2", "r-seurat", "bioconductor-genomicranges", "bioconductor-biostrings", "samtools", "bcftools", "bedtools", "fastqc", "seqtk" };
                 default:
                     return {};
             }
@@ -829,6 +829,19 @@ namespace Imladris.Core {
             cmd.add (env_target);
             cmd.add ("-c");
             cmd.add ("conda-forge");
+            bool needs_bioconda = false;
+            for (int i = 0; i < pkgs.length; i++) {
+                string p = pkgs[i].down ();
+                if (p.has_prefix ("bioconductor-") || p == "samtools" || p == "bcftools" ||
+                    p == "bedtools" || p == "fastqc" || p == "seqtk") {
+                    needs_bioconda = true;
+                    break;
+                }
+            }
+            if (needs_bioconda) {
+                cmd.add ("-c");
+                cmd.add ("bioconda");
+            }
             cmd.add ("--override-channels");
 
             for (int i = 0; i < pkgs.length; i++) {

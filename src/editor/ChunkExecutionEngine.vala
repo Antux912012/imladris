@@ -63,7 +63,8 @@ namespace Imladris.Execution {
             string wrapped_code;
 
             if (lang == LanguageRuntime.R) {
-                // R Capture Harness: Redirects graphics device to high-DPI PNG and captures output
+                // R Capture Harness: Hex-encode raw_code so '%', quotes, and multiline strings stay safe
+                string hex_code = Core.PlatformUtils.encode_hex (raw_code.data);
                 wrapped_code = """
 {
   .imladris.plot.file <- "%s"
@@ -71,9 +72,16 @@ namespace Imladris.Execution {
   .imladris.has.plot <- FALSE
   .imladris.plot.hook <- function(...) { .imladris.has.plot <<- TRUE }
   .imladris.chunk.ok <- TRUE
+  .imladris.hex <- "%s"
+  .imladris.code <- if (nzchar(.imladris.hex)) {
+    .idx <- seq.int(1L, nchar(.imladris.hex), by = 2L)
+    .s <- rawToChar(as.raw(strtoi(substring(.imladris.hex, .idx, .idx + 1L), 16L)))
+    Encoding(.s) <- "UTF-8"
+    .s
+  } else ""
   # Execute user code safely
   .imladris.res <- tryCatch({
-%s
+    eval(parse(text = .imladris.code), envir = globalenv())
   }, error = function(e) {
     .imladris.chunk.ok <<- FALSE
     message(e)
@@ -88,7 +96,7 @@ namespace Imladris.Execution {
   if (!.imladris.chunk.ok) cat("\n[IMLADRIS_CHUNK_ERR]\n")
   cat(paste0("\n", "%s", "\n"))
 }
-""".printf (plot_filename.replace ("\\", "/"), raw_code, sentinel);
+""".printf (plot_filename.replace ("\\", "/"), hex_code, sentinel);
 
             } else {
                 // Python Capture Harness: Hooks matplotlib and captures stdout
@@ -163,7 +171,7 @@ print(f"\n%s")
                 error_buffer.append (text);
             });
 
-            timeout_id = GLib.Timeout.add (30000, () => {
+            timeout_id = GLib.Timeout.add (120000, () => {
                 timeout_id = 0;
                 if (!done) {
                     timed_out = true;

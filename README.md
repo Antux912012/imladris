@@ -18,7 +18,7 @@ SPDX-License-Identifier: Apache-2.0
   <a href="https://antux912012.github.io/imladris/"><img src="https://img.shields.io/badge/Website-Landing%20Page-88C0D0?style=flat-square&logo=googlechrome&logoColor=white" alt="Landing Page"></a>
   <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/"><img src="https://img.shields.io/badge/Flatpark-io.github.Antux912012.Imladris-4B89AC?style=flat-square&logo=flatpak&logoColor=white" alt="Flatpark"></a>
   <a href="https://github.com/Antux912012/imladris/wiki"><img src="https://img.shields.io/badge/Docs-Technical%20Wiki-5E81AC?style=flat-square&logo=readthedocs&logoColor=white" alt="Technical Wiki"></a>
-  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.42.1"><img src="https://img.shields.io/badge/Release-v0.42.1-blue?style=flat-square" alt="Release v0.42.1"></a>
+  <a href="https://github.com/Antux912012/imladris/releases/tag/v0.44.0"><img src="https://img.shields.io/badge/Release-v0.44.0-blue?style=flat-square" alt="Release v0.44.0"></a>
   <a href="https://github.com/Antux912012/imladris-on-web"><img src="https://img.shields.io/badge/Sister%20Project-Imladris%20on%20Web-2496ED?style=flat-square" alt="Imladris on Web"></a>
   <img src="https://img.shields.io/badge/GTK4%20%2F%20Libadwaita-1.5%2B-blue?style=flat-square" alt="Toolkit">
   <img src="https://img.shields.io/badge/License-Apache--2.0%20(Open--Core)-brightgreen?style=flat-square" alt="License">
@@ -26,7 +26,7 @@ SPDX-License-Identifier: Apache-2.0
 
 <p align="center">
   <strong><a href="https://antux912012.github.io/imladris/">Landing Page</a></strong> ·
-  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.42.1">Download v0.42.1 (.deb / .rpm / Flatpak / AUR)</a></strong> ·
+  <strong><a href="https://github.com/Antux912012/imladris/releases/tag/v0.44.0">Download v0.44.0 (.deb / .rpm / Flatpak / AUR / NixOS)</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris-on-web">Imladris on Web (Self-Hosted)</a></strong> ·
   <strong><a href="https://github.com/Antux912012/imladris/wiki">Technical Wiki</a></strong> ·
   <strong><a href="docs/paper/imladris-scientific-paper.qmd">Scientific Paper</a></strong> ·
@@ -44,7 +44,7 @@ Scientific computing teams in pharma, biotech, academia, and regulated R&amp;D f
 
 **Imladris** is compiled directly to native machine code using **Vala**, **GTK4**, **Libadwaita**, **GtkSourceView 5**, and **WebKitGTK 6.0**, keeping idle memory below 120 MB and cold startup under 0.6 seconds. For teams requiring browser-based multi-user co-authoring, inline peer review, and container orchestration on lab or university servers, see the self-hosted sister project **[Imladris on Web](https://github.com/Antux912012/imladris-on-web)**.
 
-| Operational Dimension | Electron / JVM Desktop IDEs | Imladris (`v0.42.1`) |
+| Operational Dimension | Electron / JVM Desktop IDEs | Imladris (`v0.44.0`) |
 | :--- | :--- | :--- |
 | **Idle Memory Footprint** | 1.2–2.5 GB RAM | **&lt; 120 MB RAM** (native Vala/GTK4 binary) |
 | **Cold Startup Latency** | 4.0–9.0 seconds | **&lt; 0.6 seconds** |
@@ -76,7 +76,9 @@ Scientific computing teams in pharma, biotech, academia, and regulated R&amp;D f
 * **Lossless Jupyter &amp; RStudio Parity**: Round-trip `.ipynb` (`nbformat` 4.5) preserving cell IDs, execution counts, outputs, and metadata; 1:1 `.Rproj` compatibility; `.mallorn` (`tar.zst`/`zip`) project bundles.
 * **Polyglot IntelliSense &amp; Authoring Tools**: Live `refilter()` + fuzzy highlighting, `@fig-*`/`@tbl-*`/`@sec-*`/`@eq-*` cross-references, R `library()` and named argument completion, live REPL DataFrame column discovery (`$` / `.`), Quick Table Picker (`Ctrl+Alt+T`), Natural Math &amp; Chemistry (`Ctrl+M`), and bi-directional Mermaid Flow Studio (`Ctrl+Shift+D`).
 * **Top 10 LaTeX Publisher &amp; Presentation Templates**: Built-in templates for IEEE, ACM (`acmart`), Springer LNCS (`llncs`), Elsevier (`elsarticle`), Nature, PLOS ONE, APS (`revtex4-2`), NeurIPS, ICML, MDPI, and Beamer/Quarto/Marp/Reveal.js/Slidev/Typst decks.
-* **Multi-Format Export (`ExportService` + `export_native.c`)**: Built-in Cairo + Pango A4 vector PDF renderer, zero-dependency zlib PKZIP OASIS ODT packager, RTF serializer, and headless LaTeX/Quarto/Pandoc compilation.
+* **Multi-Format Export (`ExportService` + `export_native.c`)**: Built-in Cairo + Pango A4 vector PDF renderer, zero-dependency zlib PKZIP OASIS ODT/ODP packagers, RTF serializer, and headless Quarto/RMarkdown/Pandoc/LaTeX compilation including **DOCX**, HTML, PDF, RevealJS, Beamer, and Typst.
+* **Threaded Review Notes Sidebar (`Ctrl+Alt+M` / `Ctrl+Shift+R`)**: Left/Right collapsible chat-style peer review sidebar anchored to line ranges via `Gtk.TextMark` and gutter badges, stored in `.imladris/reviews/*.comments.json` sidecars with multi-reviewer merge and Markdown rebuttal export.
+* **Ptyxis / Rewaita Color Palettes**: 18 light/dark workspace palettes paired with GNOME Accent Colors and Eye-Friendly sepia mode.
 
 ### Elrond AI Copilot &amp; Local Hardware Optimization
 * **Hardware Auto-Optimizer (`ElrondHardwareProbe`, `ElrondOptimizer`)**: Probes `llama-server --list-devices`, `/proc/meminfo`, and CPU cores across 5 tiers (NVIDIA, AMD, Intel Arc, iGPU, CPU), with 15-second `/health` crash recovery and automatic CPU fallback.
@@ -233,6 +235,7 @@ imladris document.qmd        # Open document, notebook, .Rproj, or .mallorn arch
 | `Ctrl+Space` | Contextual Polyglot IntelliSense |
 | `Ctrl+Enter` / `Ctrl+Shift+Enter` | Execute Line/Selection or Active Chunk |
 | `Ctrl+Shift+A` | Run / Stop Embedded R Shiny Application |
+| `Ctrl+Alt+M` / `Ctrl+Shift+R` | Add Review Comment on Selection / Toggle Review Notes Sidebar |
 | `Ctrl+F1` / `Ctrl+Comma` | Toggle Ribbon Toolbar / Preferences |
 
 ---

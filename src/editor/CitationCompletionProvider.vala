@@ -55,7 +55,23 @@ namespace Imladris.Editor {
             return 40;
         }
 
+        private static bool is_inside_code_fence (Gtk.TextIter iter) {
+            Gtk.TextIter start;
+            iter.get_buffer ().get_start_iter (out start);
+            string text_before = iter.get_buffer ().get_text (start, iter, false);
+            bool in_fence = false;
+            foreach (string raw_line in text_before.split ("\n")) {
+                if (raw_line.strip ().has_prefix ("```")) {
+                    in_fence = !in_fence;
+                }
+            }
+            return in_fence;
+        }
+
         public bool is_trigger (Gtk.TextIter iter, unichar ch) {
+            if (is_inside_code_fence (iter)) {
+                return false;
+            }
             if (ch == '@') {
                 return true;
             }
@@ -166,10 +182,16 @@ namespace Imladris.Editor {
                 // Auto-sync references.bib in background without resetting cursor/marks
                 if (doc_page != null) {
                     string project_dir = doc_page.current_project_dir;
+                    if (project_dir == "" && doc_page.file_location != null) {
+                        var parent = doc_page.file_location.get_parent ();
+                        if (parent != null) project_dir = parent.get_path () ?? "";
+                    }
                     if (get_citation_style () != Core.CitationStyle.LATEX_CITE) {
                         ensure_buffer_bibliography_line (buffer, "references.bib");
                     }
-                    ZoteroService.get_default ().sync_citation_to_project_async.begin (p.citekey, project_dir);
+                    if (project_dir != "") {
+                        ZoteroService.get_default ().sync_citation_to_project_async.begin (p.citekey, project_dir);
+                    }
                 }
             }
         }
@@ -227,7 +249,10 @@ namespace Imladris.Editor {
 
             string query = after_at.strip ();
             last_query = "@" + query.down ();
-            bool inside_brackets = (at_idx > 0 && line_prefix[at_idx - 1] == '[');
+            string before_at = line_prefix.substring (0, at_idx);
+            int open_br = before_at.last_index_of ("[");
+            int close_br = before_at.last_index_of ("]");
+            bool inside_brackets = (open_br > close_br);
             bool inside_latex_cite = false;
             try {
                 if (cached_cite_ctx_rx == null) cached_cite_ctx_rx = new GLib.Regex ("\\\\cite[a-zA-Z*]*\\s*(?:\\[[^\\]]*\\]\\s*)*\\{[^}]*$");

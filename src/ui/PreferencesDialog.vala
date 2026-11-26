@@ -94,6 +94,32 @@ namespace Imladris.UI {
 
             gen_page.add (appearance_group);
 
+            // Ptyxis / Rewaita Color Palette Grid
+            var palette_group = new Adw.PreferencesGroup () {
+                title = "Palette",
+                description = "Rewaita &amp; Ptyxis-inspired color schemes (keeps your chosen Accent Color)"
+            };
+            var show_all_btn = new Gtk.ToggleButton () {
+                valign = Gtk.Align.CENTER
+            };
+            var show_all_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
+            var show_all_icon = new Gtk.Image.from_icon_name ("pan-down-symbolic");
+            var show_all_lbl = new Gtk.Label ("Show All Palettes");
+            show_all_box.append (show_all_icon);
+            show_all_box.append (show_all_lbl);
+            show_all_btn.set_child (show_all_box);
+            palette_group.set_header_suffix (show_all_btn);
+
+            var palette_selector = new PaletteSelectorWidget ();
+            show_all_btn.toggled.connect (() => {
+                bool expanded = show_all_btn.active;
+                palette_selector.set_show_all (expanded);
+                show_all_icon.icon_name = expanded ? "pan-up-symbolic" : "pan-down-symbolic";
+                show_all_lbl.label = expanded ? "Show Fewer Palettes" : "Show All Palettes";
+            });
+            palette_group.add (palette_selector);
+            gen_page.add (palette_group);
+
             var workspace_group = new Adw.PreferencesGroup () {
                 title = "Workspace &amp; Editor",
                 description = "Customize toolbar visibility, layout defaults, and editor zoom"
