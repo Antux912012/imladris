@@ -664,7 +664,7 @@
       <a class="brand" href="#">
         <img src="assets/logo.svg" alt="Imladris" width="26" height="26" decoding="async">
         <span>Imladris</span>
-        <span class="ver">v0.43.2</span>
+        <span class="ver">v0.44.0</span>
       </a>
 
       <nav class="nav-links" aria-label="Primary">
@@ -686,7 +686,7 @@
             <path d="M7.024 1.503a.75.75 0 0 1 .746.976A5.25 5.25 0 0 0 13.52 9.23a.75.75 0 0 1 .977.746A6.75 6.75 0 1 1 7.024 1.503z"/>
           </svg>
         </button>
-        <a class="btn primary" href="https://github.com/Antux912012/imladris/releases/tag/v0.43.2">Download</a>
+        <a class="btn primary" href="https://github.com/Antux912012/imladris/releases/tag/v0.44.0">Download</a>
       </div>
     </div>
   </header>
@@ -1036,7 +1036,7 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
       <span>Imladris · Apache-2.0 Open-Core · Antonio De Gaetano</span>
       <div class="footer-links">
         <a href="https://github.com/Antux912012/imladris-on-web">Imladris on Web</a>
-        <a href="https://github.com/Antux912012/imladris/releases/tag/v0.43.2">Releases</a>
+        <a href="https://github.com/Antux912012/imladris/releases/tag/v0.44.0">Releases</a>
         <a href="https://github.com/Antux912012/imladris/wiki">Wiki</a>
         <a href="https://github.com/Antux912012/imladris/blob/main/docs/paper/imladris-scientific-paper.qmd">Paper</a>
         <a href="https://flatpark.org/apps/io.github.Antux912012.Imladris/">FlatPark</a>
@@ -1123,19 +1123,19 @@ flatpak install flatpark io.github.Antux912012.Imladris</code><button id="copy-b
           note: "Installs the stable Imladris release from FlatPark."
         },
         debian: {
-          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.43.2/imladris_0.43.2_amd64.deb\nsudo apt install ./imladris_0.43.2_amd64.deb",
+          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.44.0/imladris_0.44.0_amd64.deb\nsudo apt install ./imladris_0.44.0_amd64.deb",
           note: "Unified .deb package with R, Python, pip/venv, and Pandoc runtime dependencies."
         },
         fedora: {
-          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.43.2/imladris-0.43.2-1.fc45.x86_64.rpm\nsudo dnf install ./imladris-0.43.2-1.fc45.x86_64.rpm",
+          cmd: "wget https://github.com/Antux912012/imladris/releases/download/v0.44.0/imladris-0.44.0-1.fc45.x86_64.rpm\nsudo dnf install ./imladris-0.44.0-1.fc45.x86_64.rpm",
           note: "Unified .rpm package with R-core, python3, and pandoc."
         },
         arch: {
-          cmd: "sudo pacman -S --needed gtk4 libadwaita gtksourceview5 webkitgtk-6.0 libsecret libsoup3 json-glib libgee r python python-pip pandoc\ncurl -LO https://github.com/Antux912012/imladris/releases/download/v0.43.2/PKGBUILD && makepkg -si",
+          cmd: "sudo pacman -S --needed gtk4 libadwaita gtksourceview5 webkitgtk-6.0 libsecret libsoup3 json-glib libgee r python python-pip pandoc\ncurl -LO https://github.com/Antux912012/imladris/releases/download/v0.44.0/PKGBUILD && makepkg -si",
           note: "Builds natively from PKGBUILD with R, Python, and Pandoc."
         },
         nix: {
-          cmd: "nix profile install github:Antux912012/imladris/v0.43.2",
+          cmd: "nix profile install github:Antux912012/imladris/v0.44.0",
           note: "Reproducible Nix Flake package with GTK4, Libadwaita, Vala, and wrapped runtimes."
         }
       };
