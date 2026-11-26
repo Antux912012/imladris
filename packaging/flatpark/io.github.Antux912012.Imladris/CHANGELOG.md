@@ -5,6 +5,14 @@ SPDX-License-Identifier: Apache-2.0
 
 # FlatPark Release Changelog (`io.github.Antux912012.Imladris`)
 
+## [0.44.0] - 2026-11-26 — Stable Release (`stable` branch, `Apache-2.0`)
+
+- **Left/Right Review Notes Sidebar (`Ctrl+Alt+M` / `Ctrl+Shift+R`):** Professors, reviewers, and co-authors can now attach threaded chat-style review comments to specific lines or line ranges without modifying source code. Notes are saved cleanly in `.imladris/reviews/*.comments.json` sidecars with gutter badges, fuzzy re-anchoring, multi-reviewer merge, and Markdown rebuttal export.
+- **Ptyxis / Rewaita Color Palettes:** Added 18 curated light and dark workspace palettes in Preferences → Appearance with live preview cards, expandable palette grid, and GNOME Accent Color layering.
+- **DOCX Export & Quantitative/Bioinformatics Data Grid:** Added Word (`.docx`) export support (`FormatProfile`, `QuartoExportEngine`, `ExportService`), plus `Polars`, `data.table`, `AnnData`, `Seurat`, `DESeqDataSet`, `SummarizedExperiment`, `.csv.gz`/`.tsv.gz`/`.vcf`/`.bed`/`.gtf` preview, and 50-column pagination in `DataGridViewer`.
+- **Bioconductor, Ensembl & Kernel Stability:** Added `bioc:` Bioconductor package support (`-c bioconda`), multi-species Ensembl resolution (`species:symbol`) in Yavanna, non-destructive kernel interrupt handling, unsaved document close guards, null-safe `.ipynb`/layout loading, and bundled Papirus symbolic icons.
+- **Verified:** All 12/12 Meson test suites pass.
+
 ## [0.42.1] - 2026-11-23 — Stable Release (`stable` branch, `Apache-2.0`)
 
 - **RTF Creation Crash Fix & Editor Parity:** Fixed deterministic `SIGSEGV` when creating `.rtf` (and `.txt`/`.csv`/`.tsv`) documents due to `null` `GtkSource.Language`, added RTF project scaffolding, UTF-8/non-BMP codec fixes, crash-recovery snapshotting, and PDF/ODT export button parity.

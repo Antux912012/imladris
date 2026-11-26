@@ -21,5 +21,15 @@
       <summary>Galaxy Server URL</summary>
       <description>Default remote Galaxy server endpoint for bioinformatics histories and datasets.</description>
     </key>
+    <key name="elrond-auto-optimize" type="b">
+      <default>true</default>
+      <summary>Elrond AI Hardware Auto-Optimize</summary>
+      <description>Automatically probe GPU/CPU hardware and apply optimal Vulkan/CPU launch flags for Elrond AI.</description>
+    </key>
+    <key name="elrond-compute-mode" type="s">
+      <default>'auto'</default>
+      <summary>Elrond AI Compute Mode</summary>
+      <description>Manual compute backend override ('auto', 'vulkan', or 'cpu') when elrond-auto-optimize is disabled.</description>
+    </key>
   </schema>
 </schemalist>
