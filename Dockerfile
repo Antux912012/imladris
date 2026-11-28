@@ -26,6 +26,7 @@ RUN dnf -y update && \
       libsecret-devel \
       libsoup3-devel \
       json-glib-devel \
+      sqlite-devel \
       libgee-devel \
       glib2-devel \
       git && \

@@ -42,6 +42,7 @@
               webkitgtk_6_0
               libsoup_3
               json-glib
+              sqlite
               libsecret
               libgee
               gsettings-desktop-schemas

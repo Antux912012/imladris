@@ -36,6 +36,7 @@ namespace Imladris.Adapters {
         private static GLib.Regex? inline_sub_regex = null;
         private static GLib.Regex? inline_sup_regex = null;
         private static GLib.Regex? inline_link_regex = null;
+        private static GLib.Regex? inline_qual_span_regex = null;
         private static GLib.Regex? inline_math_regex = null;
         private static GLib.Regex? inline_ce_regex = null;
         private static GLib.Regex? ordered_list_regex = null;
@@ -80,6 +81,7 @@ namespace Imladris.Adapters {
                 if (inline_sub_regex == null) inline_sub_regex = new GLib.Regex ("(?<!~)~([^~\\s]+)~(?!~)");
                 if (inline_sup_regex == null) inline_sup_regex = new GLib.Regex ("\\^([^\\^\\s]+)\\^");
                 if (inline_link_regex == null) inline_link_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
+                if (inline_qual_span_regex == null) inline_qual_span_regex = new GLib.Regex ("\\[([^\\]]+)\\]\\{\\.qual([^\\}]*)\\}");
                 if (inline_ce_regex == null) inline_ce_regex = new GLib.Regex ("\\\\ce\\{([^\\}]+)\\}");
                 if (inline_math_regex == null) inline_math_regex = new GLib.Regex ("(?<!\\$)(?<!\\\\)\\$(?!\\s)([^\\$\\n]+?)(?<!\\s)\\$(?!\\d)(?!\\$)");
                 if (ordered_list_regex == null) ordered_list_regex = new GLib.Regex ("^[0-9]+\\.\\s+(.+)$");
@@ -579,6 +581,23 @@ namespace Imladris.Adapters {
                 escaped = inline_strike_regex.replace (escaped, -1, 0, "<del>\\1</del>");
                 escaped = inline_sub_regex.replace (escaped, -1, 0, "<sub>\\1</sub>");
                 escaped = inline_sup_regex.replace (escaped, -1, 0, "<sup>\\1</sup>");
+                escaped = inline_qual_span_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
+                    string excerpt = match_info.fetch (1);
+                    string attrs = match_info.fetch (2);
+                    string code_badge = "qual";
+                    int cpos = attrs.index_of ("code=&quot;");
+                    if (cpos >= 0) {
+                        int vs = cpos + 11;
+                        int ve = attrs.index_of ("&quot;", vs);
+                        if (ve > vs) code_badge = attrs.substring (vs, ve - vs);
+                    }
+                    res.append_printf (
+                        "<mark class=\"qual-inline-mark\">%s <sup class=\"qual-inline-badge\">%s</sup></mark>",
+                        excerpt,
+                        code_badge
+                    );
+                    return false;
+                });
                 escaped = inline_link_regex.replace_eval (escaped, -1, 0, 0, (match_info, res) => {
                     string href = match_info.fetch (2);
                     if (is_safe_link (href)) {

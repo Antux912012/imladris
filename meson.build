@@ -26,6 +26,7 @@ deps = [
   dependency('cairo'),
   dependency('pangocairo'),
   dependency('zlib'),
+  dependency('sqlite3'),
   m_dep,
 ]
 
@@ -144,6 +145,23 @@ sources = files(
   'src/core/ExecutionRouter.vala',
   'src/core/ToolchainManager.vala',
   'src/core/toolchain_native.c',
+  'src/qual/QualModels.vala',
+  'src/qual/QualSpanParser.vala',
+  'src/qual/QualDatabase.vala',
+  'src/qual/ProfileLoader.vala',
+  'src/qual/QualWorkspaceService.vala',
+  'src/qual/QualStatsEngine.vala',
+  'src/qual/NetworkBuilder.vala',
+  'src/qual/NetworkSerializers.vala',
+  'src/bridges/cytoscape/CyRestClient.vala',
+  'src/bridges/qual/QualSubsystemBridges.vala',
+  'src/services/DocsRepositoryClient.vala',
+  'src/ui/HelpHubPanel.vala',
+  'src/ui/qual/CodebookSidebar.vala',
+  'src/ui/qual/EvidenceMatrixView.vala',
+  'src/ui/qual/BiostatDashboard.vala',
+  'src/ui/qual/QualGraphView.vala',
+  'src/ui/qual/QualWorkbenchPanel.vala',
 )
 
 executable('imladris',
@@ -173,7 +191,18 @@ gnome.post_install(glib_compile_schemas: true)
 
 install_data(
   'scripts/install-llama-server.sh',
+  'scripts/qual_stats.R',
   install_dir: get_option('datadir') / 'imladris' / 'scripts'
+)
+
+install_subdir(
+  'data/profiles',
+  install_dir: get_option('datadir') / 'imladris'
+)
+
+install_subdir(
+  'docs/manuals',
+  install_dir: get_option('datadir') / 'imladris'
 )
 
 install_subdir(
@@ -555,6 +584,86 @@ review_comments_test_exe = executable('test_review_comments',
 )
 
 test('review_comments_tests', review_comments_test_exe, timeout: 30)
+
+qual_p1_test_exe = executable('test_qual_phase1',
+  files(
+    'tests/test_qual_phase1.vala',
+    'src/qual/QualModels.vala',
+    'src/qual/QualSpanParser.vala',
+    'src/qual/QualDatabase.vala',
+    'src/qual/ProfileLoader.vala',
+  ),
+  dependencies: deps,
+)
+test('qual_phase1_tests', qual_p1_test_exe, timeout: 30)
+
+qual_p2_test_exe = executable('test_qual_phase2',
+  files(
+    'tests/test_qual_phase2.vala',
+    'src/qual/QualModels.vala',
+    'src/qual/QualSpanParser.vala',
+    'src/qual/QualDatabase.vala',
+    'src/qual/ProfileLoader.vala',
+    'src/qual/QualWorkspaceService.vala',
+  ),
+  dependencies: deps,
+)
+test('qual_phase2_tests', qual_p2_test_exe, timeout: 60)
+
+qual_p3_test_exe = executable('test_qual_phase3',
+  files(
+    'tests/test_qual_phase3.vala',
+    'src/qual/QualModels.vala',
+    'src/qual/QualStatsEngine.vala',
+  ),
+  dependencies: deps,
+)
+test('qual_phase3_tests', qual_p3_test_exe, timeout: 30)
+
+qual_p4_test_exe = executable('test_qual_phase4',
+  files(
+    'tests/test_qual_phase4.vala',
+    'src/qual/QualModels.vala',
+    'src/qual/QualSpanParser.vala',
+    'src/qual/QualDatabase.vala',
+    'src/qual/ProfileLoader.vala',
+    'src/qual/QualWorkspaceService.vala',
+    'src/qual/NetworkBuilder.vala',
+    'src/qual/NetworkSerializers.vala',
+    'src/bridges/cytoscape/CyRestClient.vala',
+  ),
+  dependencies: deps,
+  vala_args: ['--target-glib=2.76'],
+)
+test('qual_phase4_tests', qual_p4_test_exe, timeout: 30)
+
+qual_p5_test_exe = executable('test_qual_phase5',
+  files(
+    'tests/test_qual_phase5.vala',
+    'src/qual/QualModels.vala',
+    'src/qual/QualSpanParser.vala',
+    'src/qual/QualDatabase.vala',
+    'src/qual/ProfileLoader.vala',
+    'src/qual/QualWorkspaceService.vala',
+    'src/qual/QualStatsEngine.vala',
+    'src/qual/NetworkBuilder.vala',
+    'src/qual/NetworkSerializers.vala',
+    'src/bridges/qual/QualSubsystemBridges.vala',
+  ),
+  dependencies: deps,
+  vala_args: ['--target-glib=2.76'],
+)
+test('qual_phase5_tests', qual_p5_test_exe, timeout: 30)
+
+qual_p6_test_exe = executable('test_qual_phase6',
+  files(
+    'tests/test_qual_phase6.vala',
+    'src/services/DocsRepositoryClient.vala',
+  ),
+  dependencies: deps,
+  vala_args: ['--target-glib=2.76'],
+)
+test('qual_phase6_tests', qual_p6_test_exe, timeout: 30)
 
 
 

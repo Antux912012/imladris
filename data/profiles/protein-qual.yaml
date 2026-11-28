@@ -1,0 +1,35 @@
+profile_id: "protein-qual-v1"
+domain: "protein"
+name: "Protein Qualitative Analysis"
+version: "1.0.0"
+entity_resolver: "yavanna:uniprot"
+scales:
+  confidence: ["low", "moderate", "high"]
+  valence: ["positive", "neutral", "negative", "ambiguous"]
+codes:
+  - id: "localization"
+    label: "Subcellular Localization"
+    color: "#88C0D0"
+    children:
+      - id: "loc-nuclear"
+        label: "Nuclear"
+        color: "#88C0D0"
+      - id: "loc-cytosolic"
+        label: "Cytosolic"
+        color: "#81A1C1"
+      - id: "loc-membrane"
+        label: "Plasma Membrane"
+        color: "#5E81AC"
+  - id: "ptm-dysregulation"
+    label: "PTM Dysregulation"
+    color: "#BF616A"
+    children:
+      - id: "ptm-hyperphos"
+        label: "Hyperphosphorylation"
+        color: "#BF616A"
+      - id: "ptm-ubiquitin"
+        label: "Ubiquitin-Proteasome"
+        color: "#D08770"
+  - id: "ppi-complex"
+    label: "Protein Interaction Complex"
+    color: "#A3BE8C"

@@ -224,6 +224,7 @@ namespace Imladris.UI {
                 }
 
                 state.ensure_panel_present (PanelId.WEB_SYNC, QuadrantId.Q3_TOP_RIGHT);
+                state.ensure_panel_present (PanelId.QUALITATIVE, QuadrantId.Q3_TOP_RIGHT);
                 state.save_to_disk ();
                 state.state_updated ();
                 return true;

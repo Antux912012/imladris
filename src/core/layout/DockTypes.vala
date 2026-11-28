@@ -97,7 +97,8 @@ namespace Imladris.Core.Layout {
         HELP,
         SHINY_VIEWER,
         GALAXY,
-        WEB_SYNC;
+        WEB_SYNC,
+        QUALITATIVE;
 
         public string to_id_string () {
             switch (this) {
@@ -118,6 +119,7 @@ namespace Imladris.Core.Layout {
                 case SHINY_VIEWER: return "shiny-viewer";
                 case GALAXY: return "galaxy";
                 case WEB_SYNC: return "web-sync";
+                case QUALITATIVE: return "qualitative";
                 default: return "source-editor";
             }
         }
@@ -141,6 +143,7 @@ namespace Imladris.Core.Layout {
                 case "shiny-viewer": return SHINY_VIEWER;
                 case "galaxy": return GALAXY;
                 case "web-sync": return WEB_SYNC;
+                case "qualitative": return QUALITATIVE;
                 default: return null;
             }
         }
@@ -164,6 +167,7 @@ namespace Imladris.Core.Layout {
                 case SHINY_VIEWER: return "Viewer";
                 case GALAXY: return "Arekyer Bridge";
                 case WEB_SYNC: return "Imladris Web";
+                case QUALITATIVE: return "Qualitative";
                 default: return "Panel";
             }
         }
@@ -187,6 +191,7 @@ namespace Imladris.Core.Layout {
                 case SHINY_VIEWER: return "applications-internet-symbolic";
                 case GALAXY: return "applications-internet-symbolic";
                 case WEB_SYNC: return "network-server-symbolic";
+                case QUALITATIVE: return "view-list-bullet-symbolic";
                 default: return "application-x-addon-symbolic";
             }
         }
@@ -209,7 +214,8 @@ namespace Imladris.Core.Layout {
                 HELP,
                 SHINY_VIEWER,
                 GALAXY,
-                WEB_SYNC
+                WEB_SYNC,
+                QUALITATIVE
             };
         }
     }
@@ -479,7 +485,7 @@ namespace Imladris.Core.Layout {
             );
             quadrants.set (
                 QuadrantId.Q3_TOP_RIGHT,
-                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS, PanelId.GALAXY, PanelId.WEB_SYNC }, PanelId.ENVIRONMENT)
+                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.QUALITATIVE, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS, PanelId.GALAXY, PanelId.WEB_SYNC }, PanelId.ENVIRONMENT)
             );
             quadrants.set (
                 QuadrantId.Q4_BOTTOM_RIGHT,
@@ -523,7 +529,7 @@ namespace Imladris.Core.Layout {
             );
             quadrants.set (
                 QuadrantId.Q3_TOP_RIGHT,
-                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS, PanelId.GALAXY, PanelId.WEB_SYNC }, PanelId.ENVIRONMENT)
+                new QuadrantConfig (QuadrantId.Q3_TOP_RIGHT, { PanelId.ENVIRONMENT, PanelId.QUALITATIVE, PanelId.HISTORY, PanelId.OUTLINE, PanelId.CITATIONS, PanelId.GALAXY, PanelId.WEB_SYNC }, PanelId.ENVIRONMENT)
             );
             quadrants.set (
                 QuadrantId.Q4_BOTTOM_RIGHT,
@@ -894,6 +900,7 @@ namespace Imladris.Core.Layout {
                 ensure_panel_present (PanelId.LIVE_PREVIEW, QuadrantId.Q4_BOTTOM_RIGHT);
                 ensure_panel_present (PanelId.SHINY_VIEWER, QuadrantId.Q4_BOTTOM_RIGHT);
                 ensure_panel_present (PanelId.WEB_SYNC, QuadrantId.Q3_TOP_RIGHT);
+                ensure_panel_present (PanelId.QUALITATIVE, QuadrantId.Q3_TOP_RIGHT);
             } catch (GLib.Error e) {
                 warning ("Failed to load RStudio dock layout state: %s", e.message);
             }

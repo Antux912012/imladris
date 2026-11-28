@@ -75,6 +75,8 @@ namespace Imladris {
         private Gtk.Widget? view_focus_split_group = null;
         private Gtk.Widget? view_focus_split_sep = null;
         private Gtk.Button? web_sync_status_btn = null;
+        private Gtk.Button? cytoscape_status_btn = null;
+        private ulong cyrest_conn_hid = 0;
         private bool syncing_ui_toggles = false;
 
         // Plugin Extension Ribbon Tracking
@@ -212,6 +214,12 @@ namespace Imladris {
                 if (web_sync_conn_hid != 0) {
                     ws_svc_cleanup.disconnect (web_sync_conn_hid);
                     web_sync_conn_hid = 0;
+                }
+                var cy_cleanup = Bridges.Cytoscape.CyRestClient.get_default ();
+                cy_cleanup.stop_background_discovery ();
+                if (cyrest_conn_hid != 0) {
+                    cy_cleanup.disconnect (cyrest_conn_hid);
+                    cyrest_conn_hid = 0;
                 }
                 for (int i = 0; i < tab_view.n_pages; i++) {
                     var page = tab_view.get_nth_page (i);
@@ -518,6 +526,34 @@ namespace Imladris {
             sci_box.append (btn_yavanna_inline);
             sci_box.append (btn_taniquetil_inline);
             sci_box.append (btn_elbereth_inline);
+
+            var btn_qual_inline = new Gtk.Button () {
+                child = new Adw.ButtonContent () {
+                    icon_name = "view-list-bullet-symbolic",
+                    label = "Qualitative & Cytoscape Studio"
+                },
+                hexpand = true
+            };
+            btn_qual_inline.add_css_class ("flat");
+            btn_qual_inline.clicked.connect (() => {
+                sci_popover.popdown ();
+                open_qualitative_studio ();
+            });
+            sci_box.append (btn_qual_inline);
+
+            var btn_help_hub_inline = new Gtk.Button () {
+                child = new Adw.ButtonContent () {
+                    icon_name = "help-browser-symbolic",
+                    label = "Help & Manuals Hub (F1)"
+                },
+                hexpand = true
+            };
+            btn_help_hub_inline.add_css_class ("flat");
+            btn_help_hub_inline.clicked.connect (() => {
+                sci_popover.popdown ();
+                open_help_hub ();
+            });
+            sci_box.append (btn_help_hub_inline);
             sci_popover.set_child (sci_box);
 
             sci_tools_btn = new Gtk.MenuButton () {
@@ -740,6 +776,30 @@ namespace Imladris {
             });
 
             status_bar.append (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true });
+
+            cytoscape_status_btn = new Gtk.Button.with_label ("Cytoscape: Offline") {
+                tooltip_text = "Bidirectional Cytoscape Desktop Bridge (CyREST localhost:1234) — Click to open Qualitative & Graph Studio",
+                valign = Gtk.Align.CENTER
+            };
+            cytoscape_status_btn.add_css_class ("flat");
+            cytoscape_status_btn.add_css_class ("web-sync-pill");
+            cytoscape_status_btn.add_css_class ("offline");
+            cytoscape_status_btn.clicked.connect (() => {
+                Bridges.Cytoscape.CyRestClient.get_default ().probe_health_async.begin ();
+                open_qualitative_studio ();
+            });
+            status_bar.append (cytoscape_status_btn);
+
+            var cy_client = Bridges.Cytoscape.CyRestClient.get_default ();
+            cyrest_conn_hid = cy_client.connection_status_changed.connect ((connected, label_txt) => {
+                if (cytoscape_status_btn != null) {
+                    cytoscape_status_btn.label = label_txt;
+                    cytoscape_status_btn.remove_css_class ("synced");
+                    cytoscape_status_btn.remove_css_class ("offline");
+                    cytoscape_status_btn.add_css_class (connected ? "synced" : "offline");
+                }
+            });
+            cy_client.start_background_discovery (20);
 
             web_sync_status_btn = new Gtk.Button.with_label ("Imladris Web") {
                 tooltip_text = "Imladris on Web Sync & Offline Git-Style Commits (Ctrl+Shift+W)",
@@ -2554,6 +2614,82 @@ namespace Imladris {
                 if (d != null) d.toggle_review_comments_sidebar ();
             });
             this.add_action (action_toggle_review);
+
+            var action_qual_apply = new GLib.SimpleAction ("qual_apply_code", null);
+            action_qual_apply.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null) d.apply_qual_code_to_selection (null);
+            });
+            this.add_action (action_qual_apply);
+
+            var action_qual_memo = new GLib.SimpleAction ("qual_add_memo", null);
+            action_qual_memo.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null) d.prompt_add_qual_memo ();
+            });
+            this.add_action (action_qual_memo);
+
+            var action_qual_query = new GLib.SimpleAction ("qual_raise_query", null);
+            action_qual_query.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null) d.prompt_raise_cra_query ();
+            });
+            this.add_action (action_qual_query);
+
+            var action_open_qual = new GLib.SimpleAction ("open_qual_studio", null);
+            action_open_qual.activate.connect (() => {
+                open_qualitative_studio ();
+            });
+            this.add_action (action_open_qual);
+
+            var action_open_qual_bio = new GLib.SimpleAction ("open_qual_biostats", null);
+            action_open_qual_bio.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null && d.panel_registry != null && d.panel_registry.qual_panel != null) {
+                    d.panel_registry.qual_panel.open_biostats_dashboard ();
+                }
+            });
+            this.add_action (action_open_qual_bio);
+
+            var action_open_help_hub = new GLib.SimpleAction ("open_help_hub", null);
+            action_open_help_hub.activate.connect (() => {
+                open_help_hub ();
+            });
+            this.add_action (action_open_help_hub);
+
+            var action_lookup_sym = new GLib.SimpleAction ("lookup_symbol_help", null);
+            action_lookup_sym.activate.connect (() => {
+                var d = get_active_document ();
+                if (d != null) d.lookup_symbol_at_cursor_in_help ();
+            });
+            this.add_action (action_lookup_sym);
+        }
+
+        public void open_qualitative_studio () {
+            var d = get_active_document ();
+            if (d == null) {
+                add_document_tab ("analysis.qmd", "quarto");
+                d = get_active_document ();
+            }
+            if (d == null) return;
+            if (d.get_workbench_mode () != Services.LayoutMode.RSTUDIO) {
+                Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+            }
+            d.dock_layout_state.activate_panel (Core.Layout.PanelId.QUALITATIVE);
+            d.sync_qual_spans_if_present ();
+        }
+
+        public void open_help_hub () {
+            var d = get_active_document ();
+            if (d == null) {
+                add_document_tab ("analysis.qmd", "quarto");
+                d = get_active_document ();
+            }
+            if (d == null) return;
+            if (d.get_workbench_mode () != Services.LayoutMode.RSTUDIO) {
+                Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+            }
+            d.dock_layout_state.activate_panel (Core.Layout.PanelId.HELP);
         }
 
         private void notify_web_sync_on_save (DocumentPage doc, string editor_content) {

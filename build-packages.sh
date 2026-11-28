@@ -47,6 +47,7 @@ has_native_build_deps() {
         "cairo"
         "pangocairo"
         "zlib"
+        "sqlite3"
     )
     local missing=()
     local spec
@@ -225,7 +226,7 @@ Priority: optional
 Architecture: ${ARCH}
 Installed-Size: ${INSTALLED_SIZE}
 Maintainer: Antonio De Gaetano <antux912012@users.noreply.github.com>
-Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.14), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3, python3-pip, python3-venv, r-base, pandoc, curl, bzip2, tar, git
+Depends: libc6 (>= 2.34), libglib2.0-0t64 | libglib2.0-0 (>= 2.76), libgtk-4-1 (>= 4.14), libadwaita-1-0 (>= 1.5), libgtksourceview-5-0 (>= 5.10), libwebkitgtk-6.0-4 (>= 2.40), libsoup-3.0-0, libjson-glib-1.0-0, libsqlite3-0, libgee-0.8-2, libsecret-1-0 (>= 0.20), python3, python3-pip, python3-venv, r-base, pandoc, curl, bzip2, tar, git
 Recommends: texlive-latex-base | typst, libreoffice-writer | libreoffice, llama.cpp | llama-cpp
 Provides: imladris-toolchain
 Conflicts: imladris-toolchain

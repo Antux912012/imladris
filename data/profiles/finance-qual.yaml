@@ -1,0 +1,32 @@
+profile_id: "finance-qual-v1"
+domain: "finance"
+name: "Financial Filings & Risk Analysis"
+version: "1.0.0"
+entity_resolver: "yavanna:sec-ticker"
+scales:
+  confidence: ["low", "moderate", "high"]
+  valence: ["positive", "neutral", "negative", "hedged"]
+codes:
+  - id: "risk-factors"
+    label: "Material Risk Factors"
+    color: "#BF616A"
+    children:
+      - id: "risk-liquidity"
+        label: "Liquidity & Covenant Exposure"
+        color: "#BF616A"
+      - id: "risk-supply-chain"
+        label: "Supply Chain Concentration"
+        color: "#D08770"
+  - id: "guidance-outlook"
+    label: "Forward Guidance & Margin"
+    color: "#A3BE8C"
+    children:
+      - id: "guide-expansion"
+        label: "Margin Expansion"
+        color: "#A3BE8C"
+      - id: "guide-headwind"
+        label: "Macroeconomic Headwind"
+        color: "#EBCB8B"
+  - id: "regulatory-disclosure"
+    label: "SEC / Regulatory Disclosure"
+    color: "#88C0D0"

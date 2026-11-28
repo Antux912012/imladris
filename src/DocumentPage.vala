@@ -331,11 +331,20 @@ namespace Imladris {
             setup_cell_execution_shortcut ();
 
             var editor_context_menu = new GLib.Menu ();
-            editor_context_menu.append ("Add Review Comment…", "win.add_review_comment");
-            editor_context_menu.append ("Toggle Review Notes Sidebar", "win.toggle_review_comments");
-            editor_context_menu.append ("Insert Table...", "win.insert_table");
-            editor_context_menu.append ("Write with Elrond Assistance (AI)", "app.elrond_assist");
-            editor_context_menu.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
+            var qual_menu_sec = new GLib.Menu ();
+            qual_menu_sec.append ("Apply Code…", "win.qual_apply_code");
+            qual_menu_sec.append ("Add Analytical Memo…", "win.qual_add_memo");
+            qual_menu_sec.append ("Raise CRA Query…", "win.qual_raise_query");
+            qual_menu_sec.append ("Lookup Symbol in Help Hub (F1)", "win.lookup_symbol_help");
+            editor_context_menu.append_section (null, qual_menu_sec);
+
+            var std_menu_sec = new GLib.Menu ();
+            std_menu_sec.append ("Add Review Comment…", "win.add_review_comment");
+            std_menu_sec.append ("Toggle Review Notes Sidebar", "win.toggle_review_comments");
+            std_menu_sec.append ("Insert Table...", "win.insert_table");
+            std_menu_sec.append ("Write with Elrond Assistance (AI)", "app.elrond_assist");
+            std_menu_sec.append ("Math & Chemical Reaction Studio...", "app.math_chem_editor");
+            editor_context_menu.append_section (null, std_menu_sec);
             source_view.extra_menu = editor_context_menu;
 
             review_service = new Services.ReviewCommentService (source_view, source_buffer);
@@ -738,6 +747,7 @@ namespace Imladris {
                     emit_buffer_stats (doc_text);
                     refresh_live_preview (doc_text);
                     panel_registry.refresh_environment_and_outline (doc_text);
+                    sync_qual_spans_if_present (doc_text);
 
                     if (!source_buffer.get_modified ()) {
                         return GLib.Source.REMOVE;
@@ -844,6 +854,9 @@ namespace Imladris {
                             return true;
                         }
                     }
+                } else if (keyval == Gdk.Key.F1 && (state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK)) == 0) {
+                    lookup_symbol_at_cursor_in_help ();
+                    return true;
                 } else if ((state & Gdk.ModifierType.ALT_MASK) != 0 &&
                            (state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK)) == 0 &&
                            (keyval == Gdk.Key.minus || keyval == Gdk.Key.KP_Subtract)) {
@@ -919,6 +932,7 @@ namespace Imladris {
             source_buffer.create_tag ("h1", "scale", 1.7, "weight", Pango.Weight.BOLD);
             source_buffer.create_tag ("h2", "scale", 1.4, "weight", Pango.Weight.BOLD);
             source_buffer.create_tag ("h3", "scale", 1.2, "weight", Pango.Weight.BOLD);
+            source_buffer.create_tag ("qual-blinded-hidden", "invisible", true);
         }
 
         private void populate_starter_template (string title, string lang_id) {
@@ -1151,7 +1165,15 @@ Start writing formatted text here.\par
                 return;
             }
 
-            string body_html = Adapters.DocumentAdapter.render_html (raw, fmt);
+            string preview_source = raw;
+            if (panel_registry != null && panel_registry.qual_panel != null &&
+                panel_registry.qual_panel.service.blinded_mode && preview_source.contains (".qual")) {
+                preview_source = Qual.QualSpanParser.strip_qual_spans (
+                    preview_source,
+                    panel_registry.qual_panel.service.current_coder
+                );
+            }
+            string body_html = Adapters.DocumentAdapter.render_html (preview_source, fmt);
 
             var app_theme = Core.SettingsManager.get_default ().app_theme;
             bool is_dark = Adw.StyleManager.get_default ().dark;
@@ -1230,6 +1252,20 @@ Start writing formatted text here.\par
     font-weight: 600;
     padding: 2px 6px;
     border-radius: 4px;
+  }
+  .qual-inline-mark {
+    background: rgba(136, 192, 208, 0.20);
+    color: inherit;
+    border-bottom: 2px solid #88C0D0;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  .qual-inline-badge {
+    font-family: monospace;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #88C0D0;
+    margin-left: 2px;
   }
   pre {
     background: %s;
@@ -1984,6 +2020,317 @@ Start writing formatted text here.\par
             source_buffer.begin_user_action ();
             source_buffer.insert (ref insert_iter, prefix, -1);
             source_buffer.end_user_action ();
+        }
+
+        // =====================================================================
+        // QUALITATIVE ANALYSIS, CRA CONTROLS & CONTEXTUAL F1 HELP LOOKUP
+        // =====================================================================
+        public void replace_buffer_preserving_undo (string new_text) {
+            source_buffer.begin_user_action ();
+            Gtk.TextIter s, e;
+            source_buffer.get_bounds (out s, out e);
+            source_buffer.delete (ref s, ref e);
+            source_buffer.insert (ref s, new_text, -1);
+            source_buffer.end_user_action ();
+        }
+
+        public void jump_to_line_1based (int line_1based) {
+            int max_line = int.max (0, source_buffer.get_line_count () - 1);
+            int target_line = (line_1based - 1).clamp (0, max_line);
+            Gtk.TextIter iter;
+            source_buffer.get_iter_at_line (out iter, target_line);
+            source_buffer.place_cursor (iter);
+            source_view.scroll_to_iter (iter, 0.18, true, 0.0, 0.35);
+            source_view.grab_focus ();
+        }
+
+        public void sync_qual_spans_if_present (string? preloaded_text = null) {
+            if (panel_registry == null || panel_registry.qual_panel == null) return;
+            var svc = panel_registry.qual_panel.service;
+            if (svc == null || svc.db == null) return;
+
+            string doc_text = preloaded_text ?? get_clean_source_text ();
+            string fp = (file_location != null && file_location.get_path () != null)
+                ? file_location.get_path ()
+                : initial_title;
+            if (doc_text.contains (".qual") || svc.db.list_spans (fp).size > 0) {
+                try {
+                    svc.db.sync_document_spans (fp, doc_text, svc.current_coder);
+                } catch (GLib.Error e) {}
+            }
+            if (svc.blinded_mode) {
+                apply_blinded_qual_mask (true, svc.current_coder);
+            }
+        }
+
+        public void apply_blinded_qual_mask (bool blinded, string current_coder) {
+            Gtk.TextIter start, end;
+            source_buffer.get_bounds (out start, out end);
+            source_buffer.remove_tag_by_name ("qual-blinded-hidden", start, end);
+            if (!blinded) return;
+
+            string text = source_buffer.text;
+            if (!text.contains (".qual")) return;
+
+            var spans = Qual.QualSpanParser.parse_document (text);
+            foreach (var sp in spans) {
+                if (sp.coder_id != "" && sp.coder_id != current_coder) {
+                    // Hide '[' before excerpt and ']{.qual ...}' after excerpt
+                    int open_char = text.substring (0, sp.byte_start).char_count ();
+                    int exc_chars = sp.excerpt.char_count ();
+                    int close_end_char = text.substring (0, sp.byte_end).char_count ();
+
+                    Gtk.TextIter b1, b2, e1, e2;
+                    source_buffer.get_iter_at_offset (out b1, open_char);
+                    source_buffer.get_iter_at_offset (out b2, open_char + 1);
+                    source_buffer.apply_tag_by_name ("qual-blinded-hidden", b1, b2);
+
+                    source_buffer.get_iter_at_offset (out e1, open_char + 1 + exc_chars);
+                    source_buffer.get_iter_at_offset (out e2, close_end_char);
+                    source_buffer.apply_tag_by_name ("qual-blinded-hidden", e1, e2);
+                }
+            }
+        }
+
+        public void apply_qual_code_to_selection (string? preselected_code_id = null) {
+            if (panel_registry == null || panel_registry.qual_panel == null) return;
+            var svc = panel_registry.qual_panel.service;
+
+            Gtk.TextIter sel_s, sel_e;
+            if (!source_buffer.get_selection_bounds (out sel_s, out sel_e)) {
+                if (parent_window != null) {
+                    parent_window.show_toast ("Select text in the editor first to apply a qualitative code");
+                }
+                return;
+            }
+            string excerpt = source_buffer.get_text (sel_s, sel_e, false);
+            if (excerpt.strip () == "") return;
+
+            if (preselected_code_id != null && preselected_code_id != "") {
+                commit_qual_span_on_selection (sel_s, sel_e, excerpt, preselected_code_id, "", "high", "neutral", "", "Direct codebook tag");
+                return;
+            }
+
+            var dlg = new Adw.AlertDialog (
+                "Apply Qualitative Code",
+                "Annotate selected excerpt with a Pandoc {.qual} span and ALCOA+ audit record:"
+            );
+            var form = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) { width_request = 400 };
+
+            var flat_codes = svc.active_profile.flatten_codes ();
+            string[] code_labels = new string[flat_codes.size];
+            for (int i = 0; i < flat_codes.size; i++) {
+                code_labels[i] = @"$(flat_codes[i].label) ($(flat_codes[i].id))";
+            }
+            var code_dd = new Gtk.DropDown (new Gtk.StringList (code_labels), null) { selected = 0 };
+            var entity_entry = new Gtk.Entry () { placeholder_text = "Entity ID (e.g. P04637, ENSG00000141510, $AAPL)..." };
+            var conf_dd = new Gtk.DropDown (new Gtk.StringList ({ "high", "moderate", "low" }), null) { selected = 0 };
+            var val_dd = new Gtk.DropDown (new Gtk.StringList ({ "neutral", "positive", "negative", "ambiguous" }), null) { selected = 0 };
+            var ref_entry = new Gtk.Entry () { placeholder_text = "Citation or URI (e.g. @doe2025)..." };
+            var rat_entry = new Gtk.Entry () { placeholder_text = "Audit rationale (ALCOA+)..." };
+
+            form.append (code_dd);
+            form.append (entity_entry);
+            form.append (conf_dd);
+            form.append (val_dd);
+            form.append (ref_entry);
+            form.append (rat_entry);
+            dlg.set_extra_child (form);
+
+            dlg.add_response ("cancel", "Cancel");
+            dlg.add_response ("apply", "Apply Code");
+            dlg.set_default_response ("apply");
+            dlg.set_response_appearance ("apply", Adw.ResponseAppearance.SUGGESTED);
+            dlg.response.connect ((resp) => {
+                if (resp == "apply" && flat_codes.size > 0) {
+                    uint idx = code_dd.selected;
+                    string cid = flat_codes[(int) idx.clamp (0, flat_codes.size - 1)].id;
+                    string conf = ((Gtk.StringObject) conf_dd.selected_item).string;
+                    string val = ((Gtk.StringObject) val_dd.selected_item).string;
+                    Gtk.TextIter cur_s, cur_e;
+                    if (source_buffer.get_selection_bounds (out cur_s, out cur_e)) {
+                        string cur_exc = source_buffer.get_text (cur_s, cur_e, false);
+                        commit_qual_span_on_selection (
+                            cur_s, cur_e, cur_exc, cid,
+                            entity_entry.text.strip (),
+                            conf, val,
+                            ref_entry.text.strip (),
+                            rat_entry.text.strip () != "" ? rat_entry.text.strip () : "Manual qualitative coding"
+                        );
+                    }
+                }
+            });
+            dlg.present ((Gtk.Widget?) parent_window ?? this);
+        }
+
+        private void commit_qual_span_on_selection (
+            Gtk.TextIter sel_s,
+            Gtk.TextIter sel_e,
+            string excerpt,
+            string code_id,
+            string raw_entity,
+            string confidence,
+            string valence,
+            string citation_ref,
+            string rationale
+        ) {
+            var svc = panel_registry.qual_panel.service;
+            var sp = new Qual.QualSpan ();
+            sp.span_id = Qual.QualSpan.generate_short_id ();
+            sp.file_path = (file_location != null && file_location.get_path () != null) ? file_location.get_path () : initial_title;
+            sp.line_start = sel_s.get_line () + 1;
+            sp.line_end = sel_e.get_line () + 1;
+            sp.excerpt = excerpt;
+            sp.domain = svc.active_profile != null ? svc.active_profile.domain_slug : "general";
+            sp.code_id = code_id;
+            sp.coder_id = svc.current_coder;
+            sp.confidence = confidence;
+            sp.valence = valence;
+            if (raw_entity != "") {
+                string resolver = svc.active_profile != null ? svc.active_profile.entity_resolver : "";
+                sp.entity_id = Bridges.Qual.YavannaQualResolver.normalize_entity_id (raw_entity, resolver);
+            }
+            if (citation_ref != "") {
+                if (citation_ref.has_prefix ("http://") || citation_ref.has_prefix ("https://") || citation_ref.has_prefix ("file://")) {
+                    sp.source_uri = citation_ref;
+                } else {
+                    sp.citation_key = citation_ref;
+                }
+            }
+
+            string serialized = Qual.QualSpanParser.serialize_span (sp);
+            source_buffer.begin_user_action ();
+            source_buffer.delete (ref sel_s, ref sel_e);
+            source_buffer.insert (ref sel_s, serialized, -1);
+            source_buffer.end_user_action ();
+
+            string doc_after = get_clean_source_text ();
+            string slice = Qual.QualSpanParser.extract_lines_slice (doc_after, sp.line_start, sp.line_end);
+            sp.source_sha256 = Qual.QualSpanParser.compute_sha256 (slice);
+            try {
+                svc.db.upsert_span (sp, svc.current_coder, rationale);
+                if (parent_window != null) {
+                    parent_window.show_toast (@"Applied code '$code_id' ($(sp.span_id))");
+                }
+            } catch (GLib.Error e) {
+                if (parent_window != null) parent_window.show_toast (@"Qual DB error: $(e.message)");
+            }
+        }
+
+        private string detect_span_id_near_cursor () {
+            Gtk.TextIter cursor;
+            source_buffer.get_iter_at_mark (out cursor, source_buffer.get_insert ());
+            int line_1b = cursor.get_line () + 1;
+            var spans = Qual.QualSpanParser.parse_document (get_clean_source_text ());
+            foreach (var sp in spans) {
+                if (line_1b >= sp.line_start && line_1b <= sp.line_end) {
+                    return sp.span_id;
+                }
+            }
+            return spans.size > 0 ? spans[0].span_id : "document";
+        }
+
+        public void prompt_add_qual_memo () {
+            if (panel_registry == null || panel_registry.qual_panel == null) return;
+            var svc = panel_registry.qual_panel.service;
+            string default_target = detect_span_id_near_cursor ();
+
+            var dlg = new Adw.AlertDialog ("Add Analytical Memo", "Attach an audited analytical memo to a span, code, or entity:");
+            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) { width_request = 380 };
+            var target_entry = new Gtk.Entry () { text = default_target, placeholder_text = "Target span_id, code_id, or entity_id..." };
+            var tv = new Gtk.TextView () { wrap_mode = Gtk.WrapMode.WORD_CHAR };
+            var sc = new Gtk.ScrolledWindow () { min_content_height = 100, child = tv };
+            box.append (target_entry);
+            box.append (sc);
+            dlg.set_extra_child (box);
+            dlg.add_response ("cancel", "Cancel");
+            dlg.add_response ("save", "Save Memo");
+            dlg.set_default_response ("save");
+            dlg.set_response_appearance ("save", Adw.ResponseAppearance.SUGGESTED);
+            dlg.response.connect ((resp) => {
+                if (resp == "save") {
+                    Gtk.TextIter s, e;
+                    tv.buffer.get_bounds (out s, out e);
+                    string body = tv.buffer.get_text (s, e, false).strip ();
+                    if (body != "") {
+                        var memo = new Qual.QualMemo () {
+                            target_id = target_entry.text.strip () != "" ? target_entry.text.strip () : "document",
+                            author_id = svc.current_coder,
+                            body = body
+                        };
+                        try {
+                            svc.db.upsert_memo (memo, svc.current_coder, "Analytical memo added");
+                            if (parent_window != null) parent_window.show_toast ("Saved analytical memo to ALCOA+ store");
+                        } catch (GLib.Error err) {}
+                    }
+                }
+            });
+            dlg.present ((Gtk.Widget?) parent_window ?? this);
+        }
+
+        public void prompt_raise_cra_query () {
+            if (panel_registry == null || panel_registry.qual_panel == null) return;
+            var svc = panel_registry.qual_panel.service;
+            string default_span = detect_span_id_near_cursor ();
+
+            var dlg = new Adw.AlertDialog ("Raise CRA Query (EDC)", "Open a structured Source Data Verification or protocol query:");
+            var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) { width_request = 380 };
+            var span_entry = new Gtk.Entry () { text = default_span == "document" ? "" : default_span, placeholder_text = "Target span_id (optional)..." };
+            var msg_entry = new Gtk.Entry () { placeholder_text = "Query description or discrepancy..." };
+            box.append (span_entry);
+            box.append (msg_entry);
+            dlg.set_extra_child (box);
+            dlg.add_response ("cancel", "Cancel");
+            dlg.add_response ("raise", "Raise Query");
+            dlg.set_default_response ("raise");
+            dlg.set_response_appearance ("raise", Adw.ResponseAppearance.SUGGESTED);
+            dlg.response.connect ((resp) => {
+                if (resp == "raise" && msg_entry.text.strip () != "") {
+                    var q = new Qual.QualReviewQuery () {
+                        span_id = span_entry.text.strip (),
+                        raised_by = svc.current_coder,
+                        status = "Open",
+                        message = msg_entry.text.strip ()
+                    };
+                    try {
+                        svc.db.upsert_review_query (q, svc.current_coder, "CRA query raised");
+                        if (parent_window != null) parent_window.show_toast ("Raised CRA review query");
+                    } catch (GLib.Error err) {}
+                }
+            });
+            dlg.present ((Gtk.Widget?) parent_window ?? this);
+        }
+
+        public void lookup_symbol_at_cursor_in_help () {
+            if (panel_registry == null || panel_registry.help_hub_panel == null) return;
+            string sym = get_selected_text ().strip ();
+            if (sym == "") {
+                Gtk.TextIter cursor;
+                source_buffer.get_iter_at_mark (out cursor, source_buffer.get_insert ());
+                Gtk.TextIter ws = cursor;
+                Gtk.TextIter we = cursor;
+                while (ws.backward_char ()) {
+                    unichar ch = ws.get_char ();
+                    if (!ch.isalnum () && ch != '_' && ch != '.' && ch != '-') {
+                        ws.forward_char ();
+                        break;
+                    }
+                }
+                while (!we.is_end ()) {
+                    unichar ch = we.get_char ();
+                    if (!ch.isalnum () && ch != '_' && ch != '.' && ch != '-') break;
+                    we.forward_char ();
+                }
+                sym = source_buffer.get_text (ws, we, false).strip ();
+            }
+
+            if (current_layout_mode != Services.LayoutMode.RSTUDIO) {
+                Services.WorkspaceStateManager.get_default ().set_layout_mode (Services.LayoutMode.RSTUDIO, true);
+            }
+            dock_layout_state.activate_panel (PanelId.HELP);
+            if (sym != "") {
+                panel_registry.help_hub_panel.lookup_and_jump (sym, doc_type);
+            }
         }
     }
 }

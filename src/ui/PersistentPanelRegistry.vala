@@ -39,6 +39,8 @@ namespace Imladris.UI {
         public Gtk.ListBox packages_list { get; private set; }
         public Gtk.Entry repl_entry { get; private set; }
         public WebKit.WebView help_view { get; private set; }
+        public HelpHubPanel help_hub_panel { get; private set; }
+        public UI.Qual.QualWorkbenchPanel qual_panel { get; private set; }
         public WebKit.WebView shiny_webview { get; private set; }
         public GalaxyPanel galaxy_panel { get; private set; }
         public WebSyncPanel web_sync_panel { get; private set; }
@@ -172,6 +174,12 @@ namespace Imladris.UI {
             }
             if (web_sync_panel != null) {
                 web_sync_panel.cleanup ();
+            }
+            if (help_hub_panel != null) {
+                help_hub_panel.cleanup ();
+            }
+            if (qual_panel != null) {
+                qual_panel.cleanup ();
             }
             detach_all ();
             panels.clear ();
@@ -1160,6 +1168,9 @@ namespace Imladris.UI {
             sess_cwd_hid = sess_mgr.working_directory_changed.connect ((new_dir) => {
                 this.current_browser_dir = new_dir;
                 this.root_project_dir = new_dir;
+                if (qual_panel != null) {
+                    qual_panel.sync_workspace_dir (new_dir);
+                }
                 populate_files_browser ();
                 Gtk.TextIter end;
                 terminal_view.buffer.get_end_iter (out end);
@@ -1231,67 +1242,25 @@ namespace Imladris.UI {
             });
             panels.set (PanelId.PACKAGES, pkg_box);
 
-            // 12. HELP PANEL (Documentation & RStudio Help Reference Browser)
-            var help_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
-                hexpand = true,
-                vexpand = true
-            };
-            var help_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
-                margin_top = 4,
-                margin_bottom = 4,
-                margin_start = 8,
-                margin_end = 8
-            };
-            help_bar.add_css_class ("dock-subtoolbar");
-
-            var btn_help_back = new Gtk.Button.from_icon_name ("go-previous-symbolic") {
-                tooltip_text = "Back in Help History"
-            };
-            btn_help_back.add_css_class ("flat");
-            btn_help_back.clicked.connect (() => {
-                if (help_view.can_go_back ()) help_view.go_back ();
-            });
-            help_bar.append (btn_help_back);
-
-            var btn_help_fwd = new Gtk.Button.from_icon_name ("go-next-symbolic") {
-                tooltip_text = "Forward in Help History"
-            };
-            btn_help_fwd.add_css_class ("flat");
-            btn_help_fwd.clicked.connect (() => {
-                if (help_view.can_go_forward ()) help_view.go_forward ();
-            });
-            help_bar.append (btn_help_fwd);
-
-            var btn_help_home = new Gtk.Button.from_icon_name ("go-home-symbolic") {
-                tooltip_text = "Help Home / Reference"
-            };
-            btn_help_home.add_css_class ("flat");
-            btn_help_home.clicked.connect (load_default_help_home);
-            help_bar.append (btn_help_home);
-
-            var help_search = new Gtk.SearchEntry () {
-                placeholder_text = "Search Help (e.g. ggplot, lm, summary)...",
-                hexpand = true
-            };
-            help_search.activate.connect (() => {
-                string q = help_search.text.strip ();
-                if (q.length > 0) {
-                    show_help_for_topic.begin (q);
+            // 12. HELP PANEL (Integrated Help & Documentation Hub — 11 Domains, Offline Cache & WebKit Bridge)
+            help_hub_panel = new HelpHubPanel ();
+            help_view = help_hub_panel.web_view;
+            help_hub_panel.insert_snippet_requested.connect ((code_snippet) => {
+                doc_page.insert_ai_code_at_cursor (code_snippet);
+                doc_page.source_view.grab_focus ();
+                if (main_window != null) {
+                    main_window.show_toast ("Inserted manual code snippet into active editor");
                 }
             });
-            help_bar.append (help_search);
-            help_box.append (help_bar);
-
-            help_view = WebViewFactory.create ();
-            help_box.append (help_view);
-            bool help_initialized = false;
-            help_view.map.connect (() => {
-                if (!help_initialized) {
-                    help_initialized = true;
-                    load_default_help_home ();
+            help_hub_panel.r_topic_lookup_requested.connect ((r_topic) => {
+                show_help_for_topic.begin (r_topic);
+            });
+            help_hub_panel.toast_requested.connect ((msg) => {
+                if (main_window != null) {
+                    main_window.show_toast (msg);
                 }
             });
-            panels.set (PanelId.HELP, help_box);
+            panels.set (PanelId.HELP, help_hub_panel);
 
             // 15. SHINY VIEWER PANEL (Interactive R Shiny Application Viewer)
             var shiny_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
@@ -1421,6 +1390,10 @@ namespace Imladris.UI {
             // 17. IMLADRIS ON WEB SYNC PANEL (Offline-First Git-Style Collaboration Bridge)
             web_sync_panel = new WebSyncPanel (doc_page, main_window);
             panels.set (PanelId.WEB_SYNC, web_sync_panel);
+
+            // 18. QUALITATIVE ANALYSIS & CYTOSCAPE WORKBENCH PANEL
+            qual_panel = new UI.Qual.QualWorkbenchPanel (doc_page, main_window);
+            panels.set (PanelId.QUALITATIVE, qual_panel);
 
             // Initial AST & Environment scan
             refresh_environment_and_outline ();
@@ -2860,49 +2833,6 @@ local({
         // =================================================================
         // HELP PANEL & R DOCUMENTATION HELPERS
         // =================================================================
-        private void load_default_help_home () {
-            string bg, text, card_bg, card_border, title_col, sub_col;
-            get_plot_theme_colors (out bg, out text, out card_bg, out card_border, out title_col, out sub_col);
-            string home_html = """<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: %s; line-height: 1.5; font-size: 13px; background: %s; }
-  h2 { color: %s; margin-top: 0; font-size: 18px; border-bottom: 1px solid %s; padding-bottom: 8px; }
-  h3 { color: %s; margin-bottom: 6px; margin-top: 18px; font-size: 14px; }
-  code { background: %s; border: 1px solid %s; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 12px; }
-  ul { padding-left: 20px; }
-  li { margin-bottom: 4px; }
-  .tip-box { background: %s; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 4px; margin: 12px 0; color: %s; }
-</style>
-</head>
-<body>
-  <h2>Imladris &amp; RStudio Workbench Documentation</h2>
-  <div class="tip-box">
-    <strong>Instant Help Query:</strong> Type <code>?topic</code> or <code>help(name)</code> in the Console or search entry above to render full R man pages.
-  </div>
-  <h3>Core Keybindings</h3>
-  <ul>
-    <li><code>Ctrl+Enter</code> — Run Current Line or Selection (advances cursor to next line).</li>
-    <li><code>Ctrl+Shift+Enter</code> — Run Current Active Chunk.</li>
-    <li><code>Ctrl+Alt+P</code> — Run All Chunks Above.</li>
-    <li><code>Ctrl+Alt+R</code> — Run All Chunks in Document.</li>
-    <li><code>Ctrl+Shift+F10</code> — Restart R / Python Session.</li>
-    <li><code>Ctrl+L</code> — Clear Interactive Console.</li>
-  </ul>
-  <h3>Quadrant Layout System</h3>
-  <ul>
-    <li><strong>Quadrant 1 (Top-Left):</strong> Source Editor &amp; Data Viewer (<code>View(df)</code>).</li>
-    <li><strong>Quadrant 2 (Bottom-Left):</strong> Interactive Console, Shell Terminal, Elrond AI.</li>
-    <li><strong>Quadrant 3 (Top-Right):</strong> Environment Inspector, History, Document Outline, Citations.</li>
-    <li><strong>Quadrant 4 (Bottom-Right):</strong> Files Browser, Plots Gallery, Packages Manager, Help &amp; Reference, Web Preview.</li>
-  </ul>
-</body>
-</html>""".printf (text, bg, title_col, card_border, title_col, card_bg, card_border, card_bg, sub_col);
-            help_view.load_html (home_html, "file:///");
-        }
-
         public async void show_help_for_topic (string topic) {
             string sanitized = topic.replace ("\\", "\\\\").replace ("\"", "").replace ("'", "").strip ();
             if (sanitized.length == 0) return;

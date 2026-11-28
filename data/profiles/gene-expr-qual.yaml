@@ -1,0 +1,32 @@
+profile_id: "gene-expr-qual-v1"
+domain: "gene-expr"
+name: "Gene Expression & Transcriptomics"
+version: "1.0.0"
+entity_resolver: "yavanna:ensembl"
+scales:
+  confidence: ["low", "moderate", "high"]
+  valence: ["upregulated", "neutral", "downregulated", "biphasic"]
+codes:
+  - id: "diff-expression"
+    label: "Differential Expression"
+    color: "#88C0D0"
+    children:
+      - id: "deg-up"
+        label: "Transcriptional Upregulation"
+        color: "#A3BE8C"
+      - id: "deg-down"
+        label: "Transcriptional Repression"
+        color: "#BF616A"
+  - id: "pathway-enrichment"
+    label: "Pathway & GO Enrichment"
+    color: "#B48EAD"
+    children:
+      - id: "go-immune"
+        label: "Innate Immune Signaling"
+        color: "#B48EAD"
+      - id: "go-apoptosis"
+        label: "Apoptotic Cascade"
+        color: "#EBCB8B"
+  - id: "splicing-isoform"
+    label: "Alternative Splicing Isoform"
+    color: "#81A1C1"

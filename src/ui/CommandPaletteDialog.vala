@@ -72,6 +72,9 @@ namespace Imladris.UI {
             all_items.add (new CommandPaletteItem ("Re-dock All Floating Panel Windows", "Return all independent multi-screen panels back into the main window", "view-restore-symbolic", "win.redock_all_panels", "Workspace"));
 
             // Scientific Studios & Bridges
+            all_items.add (new CommandPaletteItem ("Qualitative Analysis & Cytoscape Studio", "Domain codebooks, ALCOA+ audit log, SDV, Evidence Matrix, and live CyREST graph bridge", "view-list-bullet-symbolic", "win.open_qual_studio", "Scientific"));
+            all_items.add (new CommandPaletteItem ("Qualitative Biostatistics & IRR Dashboard", "Cohen's Kappa, Fleiss' Kappa, Krippendorff's Alpha, Fisher's Exact enrichment, and saturation curves", "view-statistics-symbolic", "win.open_qual_biostats", "Scientific"));
+            all_items.add (new CommandPaletteItem ("Help & Documentation Hub (11 Manuals)", "Offline-cacheable R, CRAN, Python, Galaxy, Cytoscape, Markdown, Web, and Bash manuals (F1)", "help-browser-symbolic", "win.open_help_hub", "General"));
             all_items.add (new CommandPaletteItem ("Elbereth Clinical Biostatistics", "ICH E9 sample size, power curves, ADSL Table 1, and survival analysis", "view-statistics-symbolic", "bridge.elbereth", "Scientific"));
             all_items.add (new CommandPaletteItem ("Taniquetil AlphaFold Structural Bridge", "Macromolecular structures, pLDDT metrics, and Bio3D coordinates", "network-cellular-symbolic", "bridge.taniquetil", "Scientific"));
             all_items.add (new CommandPaletteItem ("Yavanna Bio-Entity Inspector", "UniProtKB, Ensembl genes, and RT-qPCR oligo melting curves", "applications-science-symbolic", "bridge.yavanna", "Scientific"));
